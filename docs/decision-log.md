@@ -1,9 +1,28 @@
 # Plainsong Decision Log
 
 Architectural and product decisions for Plainsong, moved out of `agent.md` §18 so the
-full history is not loaded into every agent session. Append new rows at the bottom in the
-same commit as the change (date, decision, why, alternatives considered). Later rows may
-supersede earlier ones; the current rules live in `agent.md` §1-§17.
+full history is not loaded into every agent session. A decision may supersede an earlier
+one; the current rules live in `agent.md` §1-§17.
+
+**New decisions go in [`docs/decisions/`](decisions/), one file per decision**, in the same
+commit as the change. A PR with several decisions adds several files. The table below is
+the archive and takes no new rows: every PR appended to its last line, so any two open PRs
+conflicted here and each resolution forced a full CI run.
+
+Name the file `YYYY-MM-DD-<short-slug>.md` after the decision date, and write:
+
+```markdown
+# <The decision, in one line>
+
+<Why: the problem or evidence that forced it, and what changed.>
+
+Alternatives: <each option considered, and why it was rejected.>
+
+Supersedes: <earlier file name, or archive row date and decision; omit if none.>
+```
+
+Read the archive first, then `ls docs/decisions` for everything after it. Order within a
+date is not meaningful, so a decision that replaces another names it in `Supersedes:`.
 
 | Date | Decision | Rationale / Alternatives |
 |---|---|---|
