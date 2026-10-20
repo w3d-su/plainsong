@@ -2,8 +2,8 @@
 
 > **Read this file fully before writing any code.** It is the single source of truth for
 > architecture, conventions, and roadmap. If you (an LLM agent or human) make a decision
-> that contradicts or extends this document, add a row to the **Decision Log**
-> (`docs/decision-log.md`, §18) in the same commit.
+> that contradicts or extends this document, add a **Decision Log** entry (a new file in
+> `docs/decisions/`, §18) in the same commit.
 
 ---
 
@@ -696,7 +696,7 @@ make format           # swiftformat . && swiftlint --fix
     `Phase 3: add scroll owner arbitration`).
 12. **When uncertain about UX,** match Typora's behavior first, macOS HIG second, then ask.
 13. **Update documentation:** behavior changes → update relevant § here; architectural
-    choices → a row in `docs/decision-log.md` (date, decision, why, alternatives).
+    choices → a new file in `docs/decisions/` (date, decision, why, alternatives; §18).
 14. **Branch + PR workflow:** `main` is protected. Do all work on a branch named
     `phase<N>-<slug>` (e.g. `phase3-editor-find-bar-ui`) and open a PR against `main`.
     State the branch name when you start. Never push to `main` directly, never force-push,
@@ -708,10 +708,12 @@ make format           # swiftformat . && swiftlint --fix
 
 ## 18. Decision Log
 
-The full log lives in [`docs/decision-log.md`](docs/decision-log.md). Append new rows
-there (date, decision, why, alternatives considered) in the same commit as the change.
-Current rules in §1-§17 are authoritative. Read the log when you need the rationale
-behind a rule or are about to revisit a past decision.
+Add each decision as its own file, `docs/decisions/YYYY-MM-DD-<slug>.md` (decision, why,
+alternatives considered), in the same commit as the change. The format and the archive
+table of earlier decisions are in [`docs/decision-log.md`](docs/decision-log.md); never
+append rows to that table, because a shared last line made every pair of open PRs
+conflict. Current rules in §1-§17 are authoritative. Read the log when you need the
+rationale behind a rule or are about to revisit a past decision.
 
 ---
 
