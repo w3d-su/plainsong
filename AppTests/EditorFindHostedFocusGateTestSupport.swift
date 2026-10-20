@@ -179,8 +179,8 @@ extension EditorFindHostedGateTests {
             var previewControllers: [PreviewController] = []
             for member in group.members {
                 member.window.isDesignatedKey = false
+                // Already nil when the test closed this member's document.
                 let controller = member.host.previewLifecycle.controllerForShutdown
-                XCTAssertNotNil(controller, "Hosted workspace did not expose its preview controller")
                 controller?.shutdownForTesting()
                 controller.map { previewControllers.append($0) }
                 member.host.window.makeFirstResponder(nil)
