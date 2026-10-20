@@ -28,7 +28,8 @@ final class WorkspaceInjectedCallRecorder: @unchecked Sendable {
     }
 
     func hooks(
-        eventHandler: (@Sendable (WorkspaceAnchoredFileSystem.Event) -> Void)? = nil
+        eventHandler: (@Sendable (WorkspaceAnchoredFileSystem.Event) -> Void)? = nil,
+        itemReplacementDirectory: (@Sendable (URL) throws -> URL)? = nil
     ) -> WorkspaceAnchoredFileSystem.Hooks {
         WorkspaceAnchoredFileSystem.Hooks(
             eventHandler: eventHandler,
@@ -37,7 +38,8 @@ final class WorkspaceInjectedCallRecorder: @unchecked Sendable {
                     storage.append(call)
                     return failures[call]
                 }
-            }
+            },
+            itemReplacementDirectory: itemReplacementDirectory
         )
     }
 }
