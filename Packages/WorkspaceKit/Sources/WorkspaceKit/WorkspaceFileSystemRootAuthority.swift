@@ -361,10 +361,14 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
     }
 
     private static func openDirectory(at url: URL, noFollow: Bool) throws -> Int32 {
-        let flags = O_RDONLY | O_DIRECTORY | O_CLOEXEC | (noFollow ? O_NOFOLLOW : 0)
+        let flags = O_DIRECTORY | O_CLOEXEC | (noFollow ? O_NOFOLLOW : 0)
         let path = try WorkspaceLiteralFileURL.absolutePath(of: url)
-        let descriptor = path.withCString { path -> Int32 in
-            Darwin.open(path, flags)
+        var descriptor = path.withCString { Darwin.open($0, O_RDONLY | flags) }
+        if descriptor < 0, errno == EACCES || errno == EPERM {
+            // A single-file Powerbox grant permits parent lookup, not directory listing.
+            // Keep ordinary read descriptors when available: search-only descriptors retain
+            // lookup permission after chmod, which changes cleanup's permission-loss handling.
+            descriptor = path.withCString { Darwin.open($0, O_SEARCH | flags) }
         }
         guard descriptor >= 0 else {
             throw switch errno {

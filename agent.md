@@ -168,6 +168,13 @@ Node installed; regenerate with `make preview-bundle` whenever `preview-src/` ch
   (import-declare `net.daringfireball.markdown`, and export a UTI for `.mdx`:
   `app.plainsong.mdx` conforming to `public.plain-text` — the `public.*` namespace
   is reserved for Apple).
+- Descriptor-backed parent capture and document/image authority fall back to `O_SEARCH`
+  when directory read access is denied. A single-file Powerbox grant permits parent lookup
+  without directory enumeration; ordinary read descriptors retain permission-loss behavior.
+  Known limitation: saving a file opened through a single-file grant still fails
+  (`Could Not Save File`), because the save transaction stages its temporary file beside
+  the document and the grant does not permit creating siblings. Open the containing folder
+  to edit and save until the transaction stages elsewhere.
 - Window chrome: a native `NavigationSplitView` with a resizable, collapsible sidebar
   (Files / Search navigators) on macOS 27+, a fixed-width sidebar in an `HStack` before
   (R17), then the document column and a right inspector for frontmatter and file details.
