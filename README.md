@@ -99,3 +99,5 @@ Plainsong is open source under the [MIT License](LICENSE).
 Feedback and bug reports: [GitHub Issues](https://github.com/w3d-su/plainsong/issues).
 The app collects no telemetry; alpha builds are distributed as direct downloads
 (see [`docs/release-engineering-plan.md`](docs/release-engineering-plan.md)).
+
+<!-- CI docs-only probe for #183; never merged. -->
