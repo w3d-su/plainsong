@@ -86,22 +86,34 @@ struct ObservedRetainedFileVersion: Equatable {
 
 @MainActor
 extension AppState {
-    /// An abandoned untitled session has no URL-keyed retirement cleanup. Remove its
-    /// unavailable proof before its ObjectIdentifier can be reused by a newly loaded file.
-    /// A live editor binding must keep the original fail-closed state until it releases it.
-    func releaseUnreferencedUntitledSessionOwnership(for session: DocumentSession) {
+    /// A session that leaves every App ownership structure without passing a URL-keyed
+    /// retirement cleanup (an abandoned untitled document, or a restored text-recovery copy
+    /// after Stop Tracking) would otherwise leave its unavailable proof for the next session
+    /// allocated at the same ObjectIdentifier. A live editor binding, recovery record,
+    /// external read, or quarantine must keep the original fail-closed state until it
+    /// releases the session.
+    func releaseUnreferencedSessionOwnership(for session: DocumentSession) {
         let sessionIdentity = ObjectIdentifier(session)
-        guard currentDocument !== session, session.fileURL == nil,
-              case .unavailable(fileURL: nil)? = unanchoredManagedSessionOwnershipProofs[sessionIdentity],
+        guard currentDocument !== session,
+              case .unavailable? = unanchoredManagedSessionOwnershipProofs[sessionIdentity],
               !sessionCache.values.contains(where: { $0 === session }),
               !isRetiredEditorSession(session),
               !editorDocumentBindingSessions.values.contains(where: { $0 === session }),
               !editorBindingInstallations.values.contains(where: { $0 === session }),
+              !pendingEditorSourceInstallations.values.contains(where: { $0 === session }),
+              !workspaceMutationRetainedRecoverySessions().contains(where: { $0 === session }),
+              workspaceMutationRecoveryIDBySession[sessionIdentity] == nil,
+              workspaceMutationTextRecoveryContexts[sessionIdentity] == nil,
+              externalDiskInspectionTasks[sessionIdentity] == nil,
+              externalReloadTasks[sessionIdentity] == nil,
+              pendingExternalReloadApplications[sessionIdentity] == nil,
+              indeterminateSessionWrites[sessionIdentity] == nil,
               indeterminateSessionWriteContexts[sessionIdentity] == nil,
               !indeterminateWorkspaceMutationSessions.contains(sessionIdentity),
               !workspaceMutationWriteFences.contains(sessionIdentity)
         else { return }
         unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
+        discardEditorImageAssetDocumentAuthority(for: session)
     }
 
     /// Captures physical ownership once, when an unanchored session first becomes App-managed.

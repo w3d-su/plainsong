@@ -84,9 +84,12 @@ supported. Live fixture coverage: `Fixtures/math.md`.
 - **Preview images** are limited to PNG/JPEG/GIF/WebP up to 10 MiB; SVG is not rendered.
   Remote images are off by default, and enabling them allows `https:` images only.
 - **WYSIWYG is Experimental and inline-only** (headings, emphasis/strike, inline code,
-  list/quote styling). Links, images, tables, and code fences stay as raw Markdown in the
+  list/quote styling, inline `[text](url)` links, and thumbnails for local PNG/JPEG/GIF/WebP
+  images up to 10 MiB in a folder workspace). Reference links, autolinks, remote/SVG/
+  single-file images, tables, code fences, and Mermaid/math stay as raw Markdown in the
   editor; the preview pane renders everything.
-- **The sidebar is fixed-width** for now.
+- **Sidebar:** The sidebar is fixed-width on macOS 14–26. On macOS 27+ it is resizable
+  (220–320 pt) and collapsible with ⌃⌘S.
 - **No auto-update:** alpha builds are manual downloads.
 
 ## License

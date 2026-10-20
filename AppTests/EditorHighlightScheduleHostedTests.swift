@@ -110,6 +110,8 @@ extension EditorFindHostedGateTests {
                 appState.replaceDocumentText(localEdit)
             }
             openFindBar(appState, query: query)
+            // Replace PR H: Replace executes only from a visible bar with an expanded row.
+            appState.setEditorReplaceExpanded(true)
             try await focusEditorOnCurrentMatch(hosted, window: window)
             try await waitForHostedReplaceObservationQuiescence(hosted)
         }

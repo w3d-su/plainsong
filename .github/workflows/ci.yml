@@ -14,22 +14,104 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Jobs only read the checkout; cache and artifact actions use the runtime
+# token, not GITHUB_TOKEN.
+permissions:
+  contents: read
+
+# The suite runs as parallel jobs instead of one serial macOS job; the
+# `build-and-test` job at the bottom keeps the check name the main ruleset
+# requires and passes only when every job passed, or when `changes` found a
+# docs-only pull request and the test jobs were skipped. Three macOS jobs per
+# run fit GitHub's 5-concurrent macOS job cap (non-Enterprise plans); when two
+# PRs run at once, one of the second run's jobs waits for a free runner.
 jobs:
-  build-and-test:
-    runs-on: macos-15
-    timeout-minutes: 40
+  # Docs-only fast path. A pull request counts as docs-only when every path it
+  # changes is under docs/ or is a top-level *.md or LICENSE file. Two docs paths
+  # are test inputs and still run everything: `make test-packages` reads
+  # docs/perf-log.md and docs/evidence/** (Scripts/editor_find_f2_evidence_tests).
+  # Deleting a top-level file also runs everything, because project.yml lists
+  # agent.md. workflow_dispatch always runs the full suite.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+    steps:
+      # A pull_request checkout is GitHub's test merge commit, the tree every job
+      # below tests; depth 2 adds its first parent, the base branch tip. The diff
+      # below reads trees, never file contents, so a sparse checkout (which
+      # actions/checkout fetches blobless) skips downloading the repository.
+      - uses: actions/checkout@v4
+        if: ${{ github.event_name == 'pull_request' }}
+        with:
+          fetch-depth: 2
+          sparse-checkout: .github
+
+      - name: Classify changed paths
+        id: classify
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            echo "$GITHUB_EVENT_NAME runs the full suite."
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # --no-renames lists a move as a delete plus an add, so every record is
+          # one status and one path and a move's source path is classified too;
+          # -z keeps unusual file names literal.
+          git diff --name-status --no-renames -z HEAD^1 HEAD > "$RUNNER_TEMP/changed-paths"
+          docs_only=true
+          changed=0
+          while IFS= read -r -d '' status && IFS= read -r -d '' path; do
+            changed=$((changed + 1))
+            case "$path" in
+              docs/perf-log.md | docs/evidence/*) verdict="test input" ;;
+              docs/*) verdict=docs ;;
+              */*) verdict=code ;;
+              *.md | LICENSE) if [ "$status" = D ]; then verdict="deleted top-level file"; else verdict=docs; fi ;;
+              *) verdict=code ;;
+            esac
+            printf '%s\t%s\t%s\n' "$status" "$verdict" "$path"
+            [ "$verdict" = docs ] || docs_only=false
+          done < "$RUNNER_TEMP/changed-paths"
+          # An empty diff is not evidence of a docs-only change.
+          [ "$changed" -gt 0 ] || docs_only=false
+          echo "$changed changed paths; docs_only=$docs_only"
+          echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
+
+  preview:
+    needs: changes
+    if: ${{ needs.changes.outputs.docs_only != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
-      - name: Prepare CI evidence paths
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: preview-src/package-lock.json
+
+      - name: Install preview dependencies
         run: |
-          artifact_dir="$RUNNER_TEMP/plainsong-ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-          mkdir -p "$artifact_dir"
-          {
-            printf 'XCODE_ARTIFACT_DIR=%s\n' "$artifact_dir"
-            printf 'XCODE_RESULT_BUNDLE=%s/Results.xcresult\n' "$artifact_dir"
-            printf 'XCODE_DERIVED_DATA=%s/plainsong-dd-%s-%s\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"
-          } >> "$GITHUB_ENV"
+          cd preview-src
+          npm ci
+
+      - name: Typecheck preview
+        run: cd preview-src && npm run typecheck
+
+      - name: Test preview
+        run: make test-preview
+
+  packages:
+    needs: changes
+    if: ${{ needs.changes.outputs.docs_only != 'true' }}
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Install tools
         run: |
@@ -70,12 +152,6 @@ jobs:
           echo "resolved: $(command -v swiftformat)"
           echo "swiftformat: $(swiftformat --version)"
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: preview-src/package-lock.json
-
       - name: Cache Swift package builds
         uses: actions/cache@v4
         with:
@@ -88,27 +164,62 @@ jobs:
           key: spm-${{ runner.os }}-${{ hashFiles('Packages/**/Package.swift', 'Packages/**/Package.resolved') }}
           restore-keys: spm-${{ runner.os }}-
 
-      - name: Install preview dependencies
-        run: |
-          cd preview-src
-          npm ci
-
-      - name: Typecheck preview
-        run: cd preview-src && npm run typecheck
-
       - name: Lint
         run: make lint
 
-      - name: Test
-        run: make test
+      - name: Test packages
+        run: make test-packages
+
+  # Hosted XCTest bundles, split across two runners by measured wall time on
+  # macos-15 (run 38697469851): PlainsongTests ~7.5 min alone; PlainsongUITests
+  # ~4.5 min plus PerformanceTests ~1 min. Each shard still builds every bundle
+  # (~3 min; -only-testing narrows execution, not the build).
+  hosted:
+    name: hosted (${{ matrix.shard }})
+    needs: changes
+    if: ${{ needs.changes.outputs.docs_only != 'true' }}
+    runs-on: macos-15
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: app
+            targets: PlainsongTests
+          - shard: ui-performance
+            targets: PlainsongUITests PerformanceTests
+            build_app: true
+    env:
+      SHARD: ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare CI evidence paths
+        run: |
+          artifact_dir="$RUNNER_TEMP/plainsong-ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$SHARD"
+          mkdir -p "$artifact_dir"
+          {
+            printf 'XCODE_ARTIFACT_DIR=%s\n' "$artifact_dir"
+            printf 'XCODE_RESULT_BUNDLE=%s/Results.xcresult\n' "$artifact_dir"
+            printf 'XCODE_DERIVED_DATA=%s/plainsong-dd-%s-%s-%s\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$SHARD"
+          } >> "$GITHUB_ENV"
+
+      - name: Install tools
+        run: |
+          brew install xcodegen
+          echo "xcodegen: $(xcodegen --version)"
+
+      - name: Test ${{ matrix.targets }}
+        run: make test-hosted XCODE_TEST_TARGETS="${{ matrix.targets }}"
 
       - name: Build app
+        if: ${{ matrix.build_app }}
         run: make build
 
       - name: Capture failure environment
         if: ${{ failure() || cancelled() }}
         run: |
-          artifact_dir="${XCODE_ARTIFACT_DIR:-$RUNNER_TEMP/plainsong-ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT}"
+          artifact_dir="${XCODE_ARTIFACT_DIR:-$RUNNER_TEMP/plainsong-ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$SHARD}"
           mkdir -p "$artifact_dir"
           printf 'XCODE_ARTIFACT_DIR=%s\n' "$artifact_dir" >> "$GITHUB_ENV"
           {
@@ -125,7 +236,27 @@ jobs:
         if: ${{ failure() || cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: plainsong-ci-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          name: plainsong-ci-failure-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ env.XCODE_ARTIFACT_DIR }}/
           retention-days: 14
           if-no-files-found: warn
+
+  # Required status check (main ruleset): keep this job id. Any failed or
+  # cancelled job above fails it. A skipped job fails it too, unless `changes`
+  # succeeded and reported a docs-only pull request.
+  build-and-test:
+    if: ${{ always() }}
+    needs: [changes, preview, packages, hosted]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Require every CI job to pass
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$NEEDS" | jq -r '"docs_only: \(.changes.outputs.docs_only // "unset")"'
+          echo "$NEEDS" | jq -e '
+            (.changes.result == "success" and .changes.outputs.docs_only == "true") as $docs_only
+            | all(.[]; .result == "success" or ($docs_only and .result == "skipped"))' > /dev/null

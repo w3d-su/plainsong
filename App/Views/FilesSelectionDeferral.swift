@@ -1,0 +1,185 @@
+import AppKit
+import Foundation
+import WorkspaceKit
+
+/// One Files list's deferred selection open (R22).
+///
+/// `List(selection:)` applies arrow-key and click selection through NavigationAuthority
+/// inside its own view update, so the binding setter must not synchronously publish
+/// through `AppState` ("Publishing changes from within view updates"). The setter records
+/// the pick here and opens it on the next main-actor turn.
+///
+/// Held in `@State` as a reference type: mutating these properties must not trigger a
+/// SwiftUI update, so they are plain `var`s, not published.
+@MainActor
+final class FilesSelectionDeferral {
+    /// The newest pick not yet applied to `AppState`; the List binding reads it so the
+    /// next arrow press advances from the just-chosen row before the deferred open runs.
+    var pendingID: WorkspaceFileNode.ID?
+    /// Total picks handed to the deferral. `applied` tracks the newest pick that ran.
+    var issued = 0
+    var applied = 0
+    /// The deferred open driving `pendingID`. The tracker outlives the view (per-view
+    /// `@State`), so `cancelPendingOpen` must stop it when the navigator unmounts.
+    private var openTask: Task<Void, Never>?
+    private weak var pickWindow: NSWindow?
+    private weak var pickResponder: NSResponder?
+    private weak var pickEvent: NSEvent?
+    private var requestsEditorFocus = false
+    private static let retryAttemptLimit = 200
+
+    #if DEBUG
+        /// Latest deferral used for a pick. Xcode 16.4 eagerly creates @State initial values
+        /// on every parent body run, so registering in init can point to a throwaway.
+        weak static var latestDebugInstance: FilesSelectionDeferral?
+        /// Hosted-test override for the number of lagged-capture retries.
+        static var debugRetryAttemptLimit: Int?
+        /// Holds or observes the real background read in regression tests.
+        var beforeFileRead: (@Sendable () -> Void)?
+        /// Every preparation/commit attempt: (picked node, whether it landed).
+        private(set) var openAttempts: [(id: WorkspaceFileNode.ID, landed: Bool)] = []
+    #endif
+
+    /// Open `nodeID` on the next main-actor turn.
+    ///
+    /// The one-turn delay lands inside a workspace-reload window often enough to matter
+    /// (measured 4/5 runs, 29b): `selectWorkspaceNode` refuses while the installed capture
+    /// generation lags the workspace generation, and the pick would be dropped. Retry only
+    /// while the refusal is that lag — a missing or non-Markdown node, or any refusal
+    /// outside the lag, ends the loop immediately, as does a newer issued pick, the
+    /// picked document or workspace root changing under the pick, or cancellation.
+    ///
+    /// `pickWindow` is the window the pick was made in; its first responder is remembered
+    /// at pick time and editor focus is requested only if it is still the same when an
+    /// attempt lands — a user who moved on while the pick retried keeps their focus.
+    /// A nil window keeps the previous always-request behaviour.
+    ///
+    /// `onDroppedPick` runs only when this pick is still the newest and never landed: the
+    /// view forces the List's selection back to the tree's selection so the dropped row is
+    /// not left highlighted.
+    func open(
+        id nodeID: WorkspaceFileNode.ID,
+        requestingEditorFocus: Bool,
+        pickWindow: NSWindow?,
+        pickEvent: NSEvent? = nil,
+        appState: AppState,
+        onDroppedPick: @escaping @MainActor () -> Void
+    ) {
+        #if DEBUG
+            Self.latestDebugInstance = self
+        #endif
+        openTask?.cancel()
+        issued += 1
+        let sequence = issued
+        pendingID = nodeID
+        self.pickWindow = pickWindow
+        pickResponder = pickWindow?.firstResponder
+        self.pickEvent = pickEvent
+        requestsEditorFocus = requestingEditorFocus
+        let pickedDocument = appState.currentDocument
+        let pickedRoot = appState.workspaceRootURL
+        openTask = Task { @MainActor [weak self] in
+            guard let self, !Task.isCancelled, sequence == issued else { return }
+            applied = sequence
+            var landed = false
+            #if DEBUG
+                let attemptLimit = Self.debugRetryAttemptLimit ?? Self.retryAttemptLimit
+            #else
+                let attemptLimit = Self.retryAttemptLimit
+            #endif
+            for _ in 0 ..< attemptLimit {
+                guard !Task.isCancelled, sequence == issued,
+                      appState.currentDocument === pickedDocument,
+                      appState.workspaceRootURL == pickedRoot
+                else { break }
+                let generation = appState.workspaceGeneration
+                var needsFreshRead = false
+                do {
+                    #if DEBUG
+                        let beforeRead = beforeFileRead
+                    #else
+                        let beforeRead: (@Sendable () -> Void)? = nil
+                    #endif
+                    let prepared = try await appState.prepareWorkspaceNodeSelection(
+                        id: nodeID, beforeRead: beforeRead
+                    )
+                    // A read can outlive a newer click, workspace change, document
+                    // activation, or unmount. None may let the stale result open a file.
+                    guard !Task.isCancelled, sequence == issued,
+                          appState.currentDocument === pickedDocument,
+                          appState.workspaceRootURL == pickedRoot
+                    else { break }
+                    if let prepared {
+                        let responderUnchanged = self.pickWindow
+                            .map { $0.firstResponder === pickResponder } ?? true
+                        landed = try appState.commitWorkspaceNodeSelection(
+                            prepared,
+                            requestingEditorFocus: requestsEditorFocus && responderUnchanged
+                        )
+                        needsFreshRead = !landed
+                    }
+                } catch is CancellationError {
+                    break
+                } catch {
+                    guard !Task.isCancelled, sequence == issued,
+                          appState.currentDocument === pickedDocument,
+                          appState.workspaceRootURL == pickedRoot
+                    else { break }
+                    if generation == appState.workspaceGeneration {
+                        appState.present(error, title: "Could Not Open File")
+                        #if DEBUG
+                            openAttempts.append((id: nodeID, landed: false))
+                        #endif
+                        break
+                    }
+                }
+                #if DEBUG
+                    openAttempts.append((id: nodeID, landed: landed))
+                #endif
+                if landed { break }
+                let nodeStillPickable =
+                    appState.workspaceTree?.node(id: nodeID)?.isEditableMarkdown == true
+                let captureChanged = generation != appState.workspaceGeneration
+                    || appState.workspaceInstalledCaptureGeneration != appState.workspaceGeneration
+                guard nodeStillPickable, captureChanged || needsFreshRead else { break }
+                do {
+                    try await Task.sleep(nanoseconds: 25_000_000)
+                } catch {
+                    break
+                }
+            }
+            guard sequence == issued, !Task.isCancelled else { return }
+            openTask = nil
+            pendingID = nil
+            clearPickFocus()
+            if !landed { onDroppedPick() }
+        }
+    }
+
+    /// The filename tap can run before native List selection finishes acquiring its
+    /// responder. Let a duplicate report from that exact mouse event settle the
+    /// snapshot, without starting a second read or accepting a later focus change.
+    func reaffirmPendingMousePick(id: WorkspaceFileNode.ID, window: NSWindow?, event: NSEvent?) {
+        guard pendingID == id, requestsEditorFocus, pickWindow === window,
+              let event, event === pickEvent,
+              [.leftMouseDown, .leftMouseUp].contains(event.type)
+        else { return }
+        pickResponder = window?.firstResponder
+    }
+
+    private func clearPickFocus() {
+        pickWindow = nil
+        pickResponder = nil
+        pickEvent = nil
+        requestsEditorFocus = false
+    }
+
+    /// Stop the pending open and forget its row (the view is gone; nothing reverts).
+    func cancelPendingOpen() {
+        openTask?.cancel()
+        issued += 1
+        openTask = nil
+        pendingID = nil
+        clearPickFocus()
+    }
+}

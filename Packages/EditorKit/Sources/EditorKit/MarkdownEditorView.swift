@@ -13,12 +13,12 @@ public struct MarkdownEditorView: View {
     @State private var styledText: HighlightedText?
     @State private var highlightRevision = 0
     @State private var selection: NSRange?
-    @State private var visibleTextRange: NSRange?
     #if DEBUG
         @StateObject private var debugNavigationProbe = EditorNavigationDebugProbe.shared
     #endif
     @StateObject private var defaultCommandProxy = EditorCommandProxy()
     @StateObject private var highlightScheduler = EditorHighlightScheduler()
+    @StateObject private var highlightViewport = EditorHighlightViewport()
 
     private static let highlightService = MarkdownHighlightService()
     nonisolated static let highlightDebounceNanoseconds: UInt64 = 20_000_000
@@ -151,6 +151,9 @@ public struct MarkdownEditorView: View {
             activeCommandProxy.update(fileKind: fileKind)
             scheduleHighlight()
         }
+        .onChange(of: documentIdentity) { _, _ in
+            scheduleHighlight()
+        }
         .onChange(of: appearanceID) { _, _ in
             scheduleHighlight()
         }
@@ -190,13 +193,14 @@ public struct MarkdownEditorView: View {
         }
     #endif
 
-    /// Every text, file-kind, or viewport change bumps the revision and restarts the
+    /// Every text/settings change or viewport leaving its padded window bumps the revision and restarts the
     /// debounced request directly, so rapid typing cancels stale visible-range work
     /// before it reaches the parser and the final request always starts. The `@State`
     /// bump still drives the same SwiftUI update as before. Scheduling during IME
     /// composition is safe because `MarkdownTextView` blocks the apply while marked
     /// text exists.
     private func scheduleHighlight() {
+        highlightViewport.beginRequest(selection: selection)
         highlightRevision += 1
         // The closure captures this view value, including its fixed settings. Every update
         // reinstalls the scheduling callback, and onChange(of: text) supersedes old work.
@@ -208,11 +212,7 @@ public struct MarkdownEditorView: View {
     }
 
     private func updateVisibleRange(_ range: NSRange) {
-        guard visibleTextRange != range else {
-            return
-        }
-
-        visibleTextRange = range
+        guard highlightViewport.update(range) else { return }
         scheduleHighlight()
     }
 
@@ -239,8 +239,8 @@ public struct MarkdownEditorView: View {
 
         let source = text
         let kind = fileKind
-        let requestedRange = Self.highlightRequestRange(
-            visibleRange: visibleTextRange,
+        let requestedRange = highlightViewport.requestedRange ?? Self.highlightRequestRange(
+            visibleRange: highlightViewport.visibleRange,
             selection: selection
         )
         let highlighted = await Self.highlightService.highlight(
@@ -262,6 +262,7 @@ public struct MarkdownEditorView: View {
             return
         }
 
+        highlightViewport.didComplete(range: highlighted.range)
         styledText = HighlightedText(
             revision: revision,
             range: highlighted.range,
@@ -289,7 +290,7 @@ public struct MarkdownEditorView: View {
            visibleRange.location != NSNotFound,
            visibleRange.length > 0
         {
-            return visibleRange
+            return EditorHighlightViewport.padded(visibleRange)
         }
 
         let fallbackLength = MarkdownSyntaxParser.visibleHighlightMinimumLength

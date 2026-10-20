@@ -2448,6 +2448,147 @@ latency budget; R6 real IME and R8/R10 also remain open. Earlier failed test-dev
 runs are retained separately in that evidence, with their corrected assertions and
 injection conditions.
 
+## Export PR G — PDF capture acceptance timings (recorded load) — 2026-10-07
+
+Informational correctness timings from the hosted `ExportPDFAcceptanceAppTests`
+runs under the shared Xcode lock (`/private/tmp/plainsong-xcodebuild-test.lock`),
+Debug configuration. These are recorded-load observations, not idle-machine samples;
+E9 remains open.
+
+Recorded load: `{ 8.08 7.41 7.47 }` at the start of the opt-in run; the full
+acceptance suite ran at comparable host load.
+
+| Fixture | Pages | Max page height (pt) | Scale | Capture time |
+|---|---:|---:|---:|---:|
+| 700-item list (generated) | 2 | 14,389.0 | 1.000 | 0.10 s |
+| 800-line code (generated) | 2 | 14,391.0 | 1.000 | 0.12 s |
+| 2,000-row table (generated) | 6 | 14,391.2 | 1.000 | 0.30 s |
+| `perf-100kb.md` | 2 | 14,400.0 | 1.000 | 0.21 s |
+| `perf-500kb.md` | 11 | 14,400.0 | 1.000 | 1.06 s |
+| `math-dense-100kb.md` | 8 | 14,400.0 | 1.000 | 1.60 s |
+| `kitchen-sink.md` | 1 | 5,311.0 | 1.000 | 0.08 s |
+| `kitchen-sink.mdx` | 1 | 2,071.0 | 1.000 | 0.06 s |
+| `math.md` | 1 | 1,067.0 | 1.000 | 0.06 s |
+| `large-1mb.md` (opt-in, `TEST_RUNNER_PLAINSONG_PDF_ACCEPTANCE_1MB=1`) | 56 | 14,400.0 | 1.000 | 18.37 s |
+
+The 1 MB capture is dominated by 56 per-page `WKPDFConfiguration` snapshots plus the
+full-size measure/resize iterations;
+`ExportPDFMechanismSpikeTests.testTallCaptureEnumeratesBoundOutcomeAndPaginatesWithoutDuplicateOrDroppedSentinels`
+bounds the page count so per-page capture stays linear. Result bundles:
+`/private/tmp/plainsong-export-g-20a-run4.xcresult` (full matrix),
+`/private/tmp/plainsong-export-g-20a-1mb.xcresult` (opt-in run).
+
+## Export PR G per-page width — acceptance timings (recorded load) — 2026-10-08
+
+Same hosted acceptance suite as the 2026-10-07 section, now reporting per-page width
+metrics: `ExportPDFAcceptanceAppTests` logs pages, widest page (pt), smallest page
+scale, and capture seconds per fixture (`A1 ACCEPTANCE` lines in
+`/private/tmp/plainsong-export-g-20b-run1.log`).
+
+| Fixture | Pages | Widest page (pt) | Smallest scale | Capture time |
+|---|---:|---:|---:|---:|
+| 700-item list (generated) | 2 | 800.0 | 1.000 | 0.15 s |
+| 800-line code (generated) | 2 | 800.0 | 1.000 | 0.19 s |
+| 2,000-row table (generated) | 6 | 800.0 | 1.000 | 0.60 s |
+| `perf-100kb.md` | 2 | 800.0 | 1.000 | 0.36 s |
+| `perf-500kb.md` | 11 | 800.0 | 1.000 | 1.75 s |
+| `math-dense-100kb.md` | 8 | 800.0 | 1.000 | 2.88 s |
+| `kitchen-sink.md` | 1 | 800.0 | 1.000 | 0.10 s |
+| `kitchen-sink.mdx` | 1 | 808.0 | 1.000 | 0.07 s |
+| `math.md` | 1 | 800.0 | 1.000 | 0.08 s |
+
+None of the named/generated fixtures overflow the baseline, so every page sits at
+width 800 (808 for the MDX fixture's wider root padding path) and scale 1; the
+wide-extent path is exercised by `ExportPrintPaginationAppTests.testWideTableWidensOnlyItsPrintPages`
+and `ExportPDFShrunkPagesAppTests`. The opt-in `large-1mb.md` capture was not re-run
+for this section (its 2026-10-07 numbers stand as the loaded-scale observation).
+Result bundles: `/private/tmp/plainsong-export-g-20b-run1.xcresult` (full matrix),
+`/private/tmp/plainsong-export-g-20b-run2.xcresult` (ExportPDF* rerun).
+
+## Export PR G wide runs — capture-area bound + hosted metrics (recorded load) — 2026-10-09
+
+A temporary test-only probe (deleted before commit) isolated why a ~114,000 pt wide
+table terminated WebContent: geometry settling and unsplittable-span measurement
+succeed at every probed width; `WKWebView.pdf(configuration:)` dies only when a single
+planned rect's raster area crosses a fixed bound. Total document area does not matter —
+per-page area does. The probe held page height at 7,290 pt and grew the wide-table
+width; results bracket the limit at exactly 2³⁰ px:
+
+| Wide-table shape (chars per cell) | Settled width (pt) | Wide-page area (px) | Result |
+|---:|---:|---:|---|
+| 240 | 85,009 | 619,481,835 | passed |
+| 320 | 112,126 | 817,090,194 | passed |
+| 400 | 139,243 | 1,014,698,552 | passed |
+| 420 | 146,022 | 1,064,098,820 | passed |
+| 430 | 149,412 | 1,088,802,597 | WebContent crash |
+| 440 | 152,802 | 1,113,506,375 | WebContent crash |
+| 480 | 166,360 | 1,212,306,910 | WebContent crash |
+| 520 | 179,919 | 1,311,114,733 | WebContent crash |
+
+`ExportPDFPagePlanner.captureAreaBudget` therefore targets 2²⁹ px (536,870,912),
+roughly a 2× margin under the observed 2³⁰ bound, and `hardBudget(width)` lowers a
+page's height cap only when `width × 14,400` would exceed the budget — pages narrower
+than ~37,300 pt keep the flat 14,400 pt cap. An unbreakable interval taller than the
+width-adjusted budget fails typed: `oversizeAtomicBox` past 14,400 CSS pt,
+`oversizeCaptureArea` when only the raster area overflows (G3, 2026-10-10).
+
+Hosted wide-run captures (Debug, `PLAINSONG_XCODEBUILD_LOCK`, recorded load
+`14.88 17.73 20.29` at measurement; `planned` = emitted plan pages):
+
+| Fixture | Pages (out/planned) | Widest output page | Smallest scale | Capture time | Content (pt) |
+|---|---:|---:|---:|---:|---|
+| Very wide table mid-post (`testVeryWideTableRunIsolatesAndCapsEveryPage`) | 5/5 | 14,400.0 pt | 0.078 | 0.24 s | 184,770 × 18,713 |
+| Minified `text` fence mid-post (`testMinifiedLineRunInALongPostWritesWithAShrunkWarning`) | 3/3 | 14,400.0 pt (wide page shrunk) | 0.007 | 0.11 s | 1,950,298 × 22,924; sentinel once, in order |
+| Mid-width table (`testMidWidthTableRunScalesNeighboursStayWhole`) | 3/3 | 14,400.0 pt | 0.572 | 0.10 s | 25,178 × 13,764 |
+| Wide code near end (`testWideCodeLineNearTheEndLeavesNoBlankTail`) | 3/3 | 14,400.0 pt | 0.294 | 0.05–0.06 s | 48,990 × 7,841 |
+| Quote/list/table shape (`testQuoteListTableShapeLeavesNoBlankTail`) | 2/2 | 4,954.0 pt | 1.000 | 0.07 s | 4,954 × 23,138 |
+| Kitchen-sink MDX (`testKitchenSinkMdxStillOnePage`) | 1/1 | 808.0 pt | 1.000 | 0.08 s | 808 × 1,686 |
+
+The minified-line fixture renders through a `text`-tagged fence: the same 240,000-char
+block as a bare fence took ~113 s to render (highlight.js auto-detection); tagged
+`text` renders in ~0.68 s while keeping the same overflow layout. Print wide-run
+sheets (`ExportPrintWideRunsAppTests`) isolate on A4 portrait and landscape with no
+blank sheets. Result bundles: DerivedData
+`Test-Plainsong-2026.10.09_15-19-00-+0800.xcresult` (wide-run suite),
+`…_15-20-16-+0800.xcresult` (ExportDestination/ExportHTML suites),
+`…_15-22-01-+0800.xcresult` (ExportPDF*/ExportPrint* matrix). The probe
+run was transient by design and kept no artifact.
+
+## Export PR G wide-page capture slack calibration (Y2) — 2026-10-10
+
+`WKWebView.pdf(configuration:)` paints a line's tail a few points past the right
+edge the geometry measurement reports; a capture rect cut exactly at the measured
+edge drops the last glyphs of a very long line. A paginated-capture probe (a
+`MINIFIEDSENTINEL` + `W`-run + `ENDLINESENTINEL` line inside a `text` fence,
+240k–410k chars, PDFKit-extracted text checked for the end sentinel) swept the
+total capture overscan on five line widths. `min overscan` is the smallest
+capture width past the measured edge that restores the full `ENDLINESENTINEL`:
+
+| Content width (pt) | Tail lost at 0 overscan | Min overscan to restore (pt) |
+|---:|---|---:|
+| ~101,000 | none | 0 |
+| ~130,000 | ~5 pt (last glyph) | ~10 |
+| ~812,000 | ~9 chars (~44 pt) | ~68 |
+| ~1,950,000 | ~12 chars (~59 pt) | ~98 |
+| ~3,350,000 | ~1 glyph (~5 pt) | ~5–66 |
+
+The deficit is bounded and non-monotonic — it tracks glyph boundaries, not width
+— so the slack is a constant, not a fraction: `widePageSlack = 200`, twice the
+worst observed need (~100 pt). It applies only to pages wider than
+`maximumSide` (14,400 pt): a 1-glyph loss was measured at 130k pt with slack 0;
+pages wider than this already shrink, while adding slack to a page that fits would lower its
+print scale for no benefit (E1). Applied after run classification — it never
+promotes a page into a run — and included in the capture-area budget check.
+
+An earlier slack-200 reference capture recorded 9 planned / 9 output pages, one
+run `[50291–50376]` at 1,950,628 × 85 pt, smallest scale 0.0074, and every
+marker once in order. The current hosted run of
+`testMinifiedLineRunInALongPostWritesWithAShrunkWarning` verifies its exact
+240,000-`W` plus sentinel line with 300 paragraphs on each side: 3 planned / 3
+output pages, content size 1,950,298 × 22,924 pt, smallest scale 0.007, and
+0.11 s capture time. Its PDFKit text assertions find every marker once in order
+and no blank pages by the trimmed-text proxy.
+
 ## Keep Mine presentation — 2026-10-06
 
 Handoff 26 Part A, from `ccaf1f7`. Keep Mine delivers the unchanged session snapshot to
@@ -2494,7 +2635,88 @@ same-length. Four consecutive runs pass; removing the post-assignment bookkeepin
 fails the post-Reload wait ("Timed out waiting for the disk source is folded and its image
 thumbnail is ready again") in two of two runs.
 
-Known follow-up, fixed in `phase3-incoming-text-presentation`:
+Known follow-up, not fixed here: `MarkdownTextView.applyIncomingTextIfNeeded` assigns
+`textView.text` for an App-initiated text change without the presentation reset. A clean
+(conflict-free) external reload, or any App text replacement, with the same UTF-16 length
+and the same first and last 64 units therefore restores folds but leaves no image markers.
+A throwaway hosted test reproduced it two of two times (folds 36, markers 0 after 3 s).
+
+## Bare-fence highlight auto-detection cap — 2026-10-15
+
+`highlightCodeBlocks()` (`preview-src/src/code-highlight.ts`) now skips highlight.js language
+auto-detection for a fence with no `language-*`/`lang-*` class whose code text exceeds
+`AUTO_DETECT_MAX_LENGTH` = 4,000 UTF-16 units; it renders as plain text with the `hljs`
+block class. Explicit-language fences are unchanged. Machine: Apple M1 Pro, recorded load
+average 135-700 (heavily loaded; numbers are relative, not gates).
+
+Auto-detection cost (`hljs.highlightAuto`, the 21 registered grammars, esbuild bundle run in
+the system `jsc` JavaScriptCore shell, single call after a warm-up):
+
+| Content | 1,000 | 2,000 | 4,000 | 8,000 | 16,000 | 40,000 chars |
+|---|---|---|---|---|---|---|
+| One line of `W` | 6.8 ms | 18.5 ms | 54.5 ms (median of 5) | 278 ms | 982 ms | 6,657 ms |
+| Minified JS (one line) | 20 ms | 34 ms | 27 ms (median of 5) | 76 ms | 300 ms | 750 ms |
+| Ordinary JS, 40-char lines | 17 ms | 12 ms | 13 ms (median of 5) | 54 ms | 132 ms | 511 ms |
+
+The superlinear term follows line length, not total size: 8,000 chars of `W` as one line took
+309 ms, as eight 1,000-char lines 54 ms; 16,000 chars took 666 ms vs 50 ms. At the 4,000 cap
+the pathological single line stays near 55 ms locally (about 200 ms at the ~3.6x hosted-CI
+factor from PR #169), while a typical ~100-line snippet still auto-detects in ~13 ms.
+
+40,000-char single-line bare fence, full preview render (`render` bridge message through
+`renderComplete`, Vitest/jsdom, five samples each, interleaved before/after/after):
+
+| Build | Samples (ms) | Median |
+|---|---|---|
+| Before (cap disabled) | 10,399 / 10,261 / 10,189 / 9,716 / 9,667 | 10,189 ms |
+| After | 74.9 / 69.7 / 67.4 / 62.2 / 75.6 | 69.7 ms |
+| After (repeat) | 66.0 / 59.7 / 57.4 / 57.3 / 59.7 | 59.7 ms |
+
+For reference, PR #169 measured the same fixture at ~3.5 s locally and ~12.6 s on hosted CI
+in the WKWebView export path, and 240,000 chars at ~113 s (past the 15 s export render
+timeout). `preview-src/test/code-highlight.test.ts` renders the 240,000-char bare fence and
+requires completion under 5 s without calling `highlightElement`.
+
+## Scroll and typing pass, paired A/B (recorded load) — 2026-10-18
+
+Three trees, each built `-configuration Debug SWIFT_OPTIMIZATION_LEVEL=-O
+GCC_OPTIMIZATION_LEVEL=s` (release optimization, Debug-only test hooks intact): main
+`f47ad3b` plus this branch's opt-in probe files; this branch pinned back to STTextView
+2.3.10; this branch (2.4.1). Three interleaved rounds (main, 2.3.10, branch), one
+`xcodebuild test-without-building` per tree per round running the source-only and
+WYSIWYG typing gates, both source+preview busy-slice probes, and the editor and preview
+scroll workloads (`TEST_RUNNER_PLAINSONG_RUN_SCROLL_PROBE=1`,
+`TEST_RUNNER_PLAINSONG_RUN_HOSTED_TYPING_GATE=1`). Medians with [min-max] over rounds.
+1-minute load at start: main 19/171/33, 2.3.10 13/70/43, branch 12/40/42; round 2 ran
+under heavy external load. Observed under recorded load, not idle-machine acceptance.
+
+| Metric | main | branch + 2.3.10 | branch (2.4.1) |
+|---|---|---|---|
+| Typing gate median / max, source-only (ms) | 15.5 / 16.6 | 4.1 / 4.4 | 4.1 / 4.3 |
+| Typing gate median / max, WYSIWYG (ms) | 15.5 / 15.9 | 4.1 / 4.3 | 4.1 / 4.4 |
+| Editor scroll p95 / max (ms) | 56.5 / 102.7 | 56.2 / 58.1 | 11.2 / 27.1 |
+| Preview scroll full anchor queries / geometry reads | 119 / 459,903 | 1 / 50,057 | 1 / 50,057 |
+| Source+preview typing, main-thread busy (ms) | 14,883 [13,856-15,171] | 7,824 [7,218-18,591] | 6,697 [6,047-7,374] |
+| … same after viewing the document end (ms) | 16,744 [15,615-17,788] | 13,282 [13,279-13,876] | 6,014 [5,884-6,637] |
+| … longest single busy slice (ms) | 14,670 | 1,836 | 1,460 |
+
+The busy-slice probe types 30 keys 90 ms apart, then 20 keys 250 ms apart, into the
+middle of `large-1mb.md` with the preview visible, and sums every main run-loop stretch
+between waking and sleeping; per-slice thread CPU time matched wall time, so the
+remaining slices compute rather than wait.
+
+Release-config EditorKit harness (1 MiB synthetic text, insert at the middle):
+0.3 ms fresh; 54 ms after the end had been in view; 2.2 ms after releasing cached
+elements below the viewport. Releasing an uncached 500 K tail costs 0.07 ms; a cached
+one 66 ms in total, at most 9.6 ms per 64 K chunk. With STTextView's line numbers on,
+each layout pass after an edit costs 9-16 ms more (one `NSView` per visible line,
+plus `textElements(for:)` over every paragraph above the viewport); this is the
+largest remaining editor cost and is not addressed here.
+
+## Whole-source assignment presentation reset — 2026-10-08
+
+Resolves the "Known follow-up, not fixed here" note at the end of the Keep Mine
+presentation entry above (fixed in `phase3-incoming-text-presentation`):
 `MarkdownTextView.applyIncomingTextIfNeeded` used to assign `textView.text` for an
 App-initiated text change without the presentation reset, so a clean (conflict-free)
 external reload, or any App text replacement, with the same UTF-16 length and the same
@@ -2504,4 +2726,5 @@ every whole-source assignment — this path, the deferred document-transition re
 reconciled-source restore and the Reload/Keep Mine synchronizer — through one
 `assignWholeSource` helper that discards the bookkeeping (including image ownership)
 after the write; hosted tests now pin the silent same-length reload and the same-length
-local edit directly.
+local edit directly. No per-keystroke work was added: the helper runs only for whole-source
+writes, never on the native typing path, so the typing measurements above are unaffected.

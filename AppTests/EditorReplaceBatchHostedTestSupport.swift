@@ -48,6 +48,16 @@ final class HostedReplaceBatchHold: @unchecked Sendable {
     }
 }
 
+/// Carries a weak `NSTextStorage` reference across a `@Sendable` boundary: the
+/// notification callback owns the read timing, so sending the box is safe.
+private final class WeakTextStorageBox: @unchecked Sendable {
+    weak var value: NSTextStorage?
+
+    init(_ value: NSTextStorage?) {
+        self.value = value
+    }
+}
+
 /// Observe existing TextKit attribute transactions only while the batch gate runs;
 /// no production instrumentation is added to typing, selection or highlight apply.
 @MainActor
@@ -61,11 +71,15 @@ final class HostedBatchPresentationObservation {
     init(editor: MarkdownSTTextView, original: String, expected: String, attempted: String? = nil) throws {
         let storage = try XCTUnwrap(MarkdownTextView.textStorage(of: editor))
         foldedRanges = Self.foldRanges(in: storage)
+        // didProcessEditing posts on the editing thread once the transaction settles;
+        // assumeIsolated asserts that thread is main before the reads. The box carries
+        // the weak reference across the @Sendable boundary without retaining the storage.
+        let storageBox = WeakTextStorageBox(storage)
         observer = NotificationCenter.default.addObserver(
             forName: NSTextStorage.didProcessEditingNotification, object: storage, queue: nil
-        ) { [weak self, weak storage] _ in
+        ) { [weak self, storageBox] _ in
             MainActor.assumeIsolated {
-                guard let observation = self, let storage else { return }
+                guard let observation = self, let storage = storageBox.value else { return }
                 XCTAssertTrue(ExactSourceText.matches(storage.string, original)
                     || ExactSourceText.matches(storage.string, expected)
                     || (attempted.map { ExactSourceText.matches(storage.string, $0) } ?? false),
@@ -121,9 +135,19 @@ extension EditorFindHostedGateTests {
                 && editor?.text == app.currentDocument.text
                 && app.editorFindHost.controller.documentBinding.revision == UInt64(app.currentDocument.version)
         }
-        // Fixture observation is already drained by the common Replace setup. Stop
-        // subsequent filesystem notifications so only the tested event can supersede.
+        // Fixture observation is already drained by the common Replace setup. `stop()`
+        // is a hard boundary: no watcher handler begins after it returns, and App drops
+        // a delivery whose main-actor hop lands behind a stop or watcher replacement, so
+        // only the tested event can supersede.
+        let fixtureWatcher = hosted.appState.workspaceWatcher
         hosted.appState.workspaceWatcher?.stop()
+        let fixtureID = fixtureWatcher.map { String(describing: ObjectIdentifier($0)) } ?? "nil"
+        let installedID = hosted.appState.workspaceWatcher.map { String(describing: ObjectIdentifier($0)) } ?? "nil"
+        hosted.appState.editorFindHost.traceReplaceBarAction(
+            "fixtureStopped watcher=\(fixtureID) "
+                + "isStopped=\(fixtureWatcher.map { String($0.isStopped) } ?? "nil") "
+                + "installed=\(installedID)"
+        )
         return hosted
     }
 

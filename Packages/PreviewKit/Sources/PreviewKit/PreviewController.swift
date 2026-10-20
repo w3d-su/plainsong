@@ -29,6 +29,17 @@ public final class PreviewController: NSObject, ObservableObject {
     var exportSourceText = ""
     var exportTimeoutNanoseconds: UInt64 = 15_000_000_000
     private(set) var isInvalidated = false
+    /// Set when `webViewWebContentProcessDidTerminate` fires; capture steps check it
+    /// between awaits so a mid-capture teardown fails typed rather than hanging.
+    private(set) var webContentProcessTerminated = false
+    /// Test seam for `captureExportPDF`: invoked with the page index before each page
+    /// capture so hosted tests can inject errors, cancellation, or record weak refs.
+    var exportPDFCaptureWillCaptureHook: (@MainActor (Int) async throws -> Void)?
+    /// Test seam for `captureExportPDF`: replaces the piece joiner so hosted tests
+    /// can drive the joined-count check (`pageCountMismatch`).
+    var exportPDFPageJoiner: (
+        @Sendable ([Data], [CGFloat]) throws -> (data: Data, pageScales: [CGFloat])
+    )?
     var pendingHTMLExport: PendingHTMLExport?
     var pendingExportRender: PendingExportRender?
     private var theme = "system"
@@ -273,6 +284,7 @@ public final class PreviewController: NSObject, ObservableObject {
 extension PreviewController: WKNavigationDelegate {
     public func webViewWebContentProcessDidTerminate(_: WKWebView) {
         isReady = false
+        webContentProcessTerminated = true
         failPendingExportWork(reason: "web-content-process-terminated")
         scrollDeliveryState.failPendingDelivery()
         scrollDeliveryState = PreviewScrollDeliveryState()
@@ -321,31 +333,6 @@ extension PreviewController {
 
         return .allow
     }
-
-    nonisolated static func assetContext(fileURL: URL?, workspaceRootURL: URL?) -> PreviewAssetContext {
-        guard let fileURL = fileURL?.standardizedFileURL else {
-            return PreviewAssetContext(allowedRoot: workspaceRootURL?.standardizedFileURL, baseDir: nil)
-        }
-
-        guard let workspaceRootURL = workspaceRootURL?.standardizedFileURL,
-              fileURL.isDescendant(of: workspaceRootURL)
-        else {
-            return PreviewAssetContext(
-                allowedRoot: fileURL.deletingLastPathComponent().standardizedFileURL,
-                baseDir: nil
-            )
-        }
-
-        return PreviewAssetContext(
-            allowedRoot: workspaceRootURL,
-            baseDir: fileURL.deletingLastPathComponent().pathRelative(to: workspaceRootURL)
-        )
-    }
-}
-
-struct PreviewAssetContext: Equatable {
-    let allowedRoot: URL?
-    let baseDir: String?
 }
 
 private extension PreviewController {
@@ -355,40 +342,6 @@ private extension PreviewController {
         }
 
         return value as? Int
-    }
-}
-
-private extension URL {
-    func isDescendant(of rootURL: URL) -> Bool {
-        let candidatePath = standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
-        let rootPath = Self.normalizedDirectoryPath(
-            rootURL.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
-        )
-        return candidatePath == rootPath || candidatePath.hasPrefix("\(rootPath)/")
-    }
-
-    func pathRelative(to rootURL: URL) -> String? {
-        let rootPath = Self.normalizedDirectoryPath(rootURL.standardizedFileURL.path(percentEncoded: false))
-        let candidatePath = standardizedFileURL.path(percentEncoded: false)
-        guard candidatePath == rootPath || candidatePath.hasPrefix("\(rootPath)/") else { return nil }
-
-        var relativePath = String(candidatePath.dropFirst(rootPath.count))
-        if relativePath.hasPrefix("/") {
-            relativePath.removeFirst()
-        }
-        while relativePath.hasSuffix("/") {
-            relativePath.removeLast()
-        }
-        return relativePath.isEmpty ? nil : relativePath
-    }
-
-    static func normalizedDirectoryPath(_ path: String) -> String {
-        guard path != "/" else { return path }
-        var normalized = path
-        while normalized.hasSuffix("/") {
-            normalized.removeLast()
-        }
-        return normalized
     }
 }
 

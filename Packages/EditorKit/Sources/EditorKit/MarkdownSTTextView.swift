@@ -14,6 +14,17 @@ final class MarkdownSTTextView: STTextView {
     var replacePresentationSnapshot: EditorReplacePresentationSnapshot?
     private var previousTextContentStorageDelegate: NSTextContentStorageDelegate?
 
+    /// `nil === nil` would match in source mode, where document installation disables
+    /// folding on SwiftUI updates while typing: the whole-document invalidation then
+    /// walked every layout fragment and relaid out the viewport on each keystroke.
+    static func isInstalled(
+        _ zeroWidthDelegate: WYSIWYGZeroWidthTextContentStorageDelegate?,
+        in textContentStorage: NSTextContentStorage
+    ) -> Bool {
+        guard let zeroWidthDelegate else { return false }
+        return textContentStorage.delegate === zeroWidthDelegate
+    }
+
     @discardableResult
     func setWYSIWYGZeroWidthFoldingEnabled(_ isEnabled: Bool) -> Bool {
         guard let textContentStorage = textContentManager as? NSTextContentStorage else {
@@ -21,9 +32,7 @@ final class MarkdownSTTextView: STTextView {
         }
 
         if isEnabled {
-            if let zeroWidthDelegate = wysiwygZeroWidthContentStorageDelegate,
-               textContentStorage.delegate === zeroWidthDelegate
-            {
+            if Self.isInstalled(wysiwygZeroWidthContentStorageDelegate, in: textContentStorage) {
                 return true
             }
 
@@ -37,7 +46,7 @@ final class MarkdownSTTextView: STTextView {
             textLayoutManager.invalidateLayout(for: textLayoutManager.documentRange)
             return true
         } else {
-            if textContentStorage.delegate === wysiwygZeroWidthContentStorageDelegate {
+            if Self.isInstalled(wysiwygZeroWidthContentStorageDelegate, in: textContentStorage) {
                 textContentStorage.delegate = previousTextContentStorageDelegate
                 textLayoutManager.invalidateLayout(for: textLayoutManager.documentRange)
             }

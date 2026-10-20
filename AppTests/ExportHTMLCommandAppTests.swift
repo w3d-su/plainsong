@@ -19,7 +19,7 @@ final class ExportHTMLCommandAppTests: XCTestCase {
 
         try await XCTUnwrap(fixture.appState.exportCurrentDocumentAsHTML()).value
 
-        guard case let .exported(commit, _) = try XCTUnwrap(recorder.results.first?.result) else {
+        guard case let .exported(commit, _, _) = try XCTUnwrap(recorder.results.first?.result) else {
             return XCTFail("Expected a committed export, got \(recorder.results)")
         }
         XCTAssertEqual(recorder.results.count, 1)
@@ -93,7 +93,7 @@ final class ExportHTMLCommandAppTests: XCTestCase {
         XCTAssertEqual(recorder.results.count, 2)
         let results = Dictionary(uniqueKeysWithValues: recorder.results.map { ($0.operationID, $0.result) })
         XCTAssertEqual(results[1], .stopped(.superseded))
-        guard case let .exported(commit, _) = results[2] else {
+        guard case let .exported(commit, _, _) = results[2] else {
             return XCTFail("Expected the newer export to commit, got \(recorder.results)")
         }
         XCTAssertEqual(commit.selectedURL, newerDestination)
@@ -282,7 +282,7 @@ extension ExportHTMLCommandAppTests {
             bytesPerRow: 0,
             bitsPerPixel: 0
         ))
-        bitmap.setColor(.systemTeal, atX: 0, y: 0)
+        bitmap.setColor(ExportPDFWideRunsAppSupport.fixtureTeal, atX: 0, y: 0)
         return try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
     }
 

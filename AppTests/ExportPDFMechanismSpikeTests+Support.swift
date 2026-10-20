@@ -52,18 +52,40 @@ extension ExportPDFMechanismSpikeTests {
         XCTAssertLessThan(firstRange.lowerBound, lastRange.lowerBound)
     }
 
+    /// One literal scan of a single bridged `NSString` per sentinel. The previous
+    /// `components(separatedBy:)` + canonical-equivalence `range(of:)` pair rescanned
+    /// and copied the whole PDF text about three times per sentinel, which was most of
+    /// the 9–19 s the 600–3,500-sentinel tests took in Debug. Sentinels are ASCII,
+    /// where a literal match is the same match; UTF-16 offsets keep their order.
     static func assertEverySentinelAppearsOnceInOrder(_ sentinels: [String], in text: String) throws {
+        let text = text as NSString
         var previousOffset = -1
         for sentinel in sentinels {
+            let (count, first) = occurrences(of: sentinel, in: text)
             XCTAssertEqual(
-                text.components(separatedBy: sentinel).count - 1,
+                count,
                 1,
                 "\(sentinel) must appear exactly once across the fixed-height page sequence."
             )
-            let range = try XCTUnwrap(text.range(of: sentinel), "Missing paginated sentinel \(sentinel)")
-            let offset = text.distance(from: text.startIndex, to: range.lowerBound)
+            let offset = try XCTUnwrap(first, "Missing paginated sentinel \(sentinel)")
             XCTAssertGreaterThan(offset, previousOffset, "\(sentinel) is out of order.")
             previousOffset = offset
+        }
+    }
+
+    /// Non-overlapping literal occurrences of `needle` (what
+    /// `components(separatedBy:).count - 1` counts) and the UTF-16 offset of the first.
+    static func occurrences(of needle: String, in text: NSString) -> (count: Int, first: Int?) {
+        var count = 0
+        var first: Int?
+        var searchRange = NSRange(location: 0, length: text.length)
+        while true {
+            let found = text.range(of: needle, options: .literal, range: searchRange)
+            guard found.location != NSNotFound else { return (count, first) }
+            count += 1
+            first = first ?? found.location
+            let next = NSMaxRange(found)
+            searchRange = NSRange(location: next, length: text.length - next)
         }
     }
 

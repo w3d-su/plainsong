@@ -4,6 +4,7 @@
 XCODE_RESULT_BUNDLE ?=
 XCODE_DERIVED_DATA ?=
 XCODE_ARTIFACT_DIR ?=
+XCODE_TEST_TARGETS ?=
 
 PACKAGES := MarkdownCore EditorKit PreviewKit WorkspaceKit
 SWIFT_FORMAT_PATHS := App AppTests Packages PerformanceTests PlainsongUITests Scripts
@@ -16,7 +17,7 @@ SWIFTFORMAT_COMPAT_FLAGS := $(shell swiftformat --rules 2>/dev/null | grep -q wr
 # treat CI as authoritative when local and CI lint results disagree.
 SWIFTFORMAT_VERSION := 0.62.1
 
-.PHONY: bootstrap generate build run test test-f2-tooling format lint preview-bundle release clean swiftformat-version-check
+.PHONY: bootstrap generate build run test test-packages test-hosted test-preview test-f2-tooling format lint preview-bundle release clean swiftformat-version-check
 
 swiftformat-version-check:
 	@actual="$$(swiftformat --version 2>/dev/null || echo missing)"; \
@@ -34,20 +35,33 @@ generate:
 build: generate
 	xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug $(if $(XCODE_DERIVED_DATA),-derivedDataPath "$(XCODE_DERIVED_DATA)") build
 
-test: generate
+# CI runs these three groups as parallel jobs (.github/workflows/ci.yml); locally
+# `make test` still runs all of them in sequence.
+test: test-packages test-hosted test-preview
+
+# generate: the sandbox checks sign their probes with the XcodeGen-generated
+# App/Plainsong.entitlements.
+test-packages: generate
 	$(MAKE) test-f2-tooling
 	@set -e; for pkg in $(PACKAGES); do \
 		echo "==> swift test: $$pkg"; \
 		(cd Packages/$$pkg && swift test); \
 	done
 	Scripts/check-export-sandbox-root.sh
+	Scripts/check-single-file-save-sandbox.sh
+
+# XCODE_TEST_TARGETS="PlainsongTests" (space-separated bundle names) runs a subset.
+test-hosted: generate
 # TEST_RUNNER_ vars are forwarded by xcodebuild into the xctest process env,
 # which does not inherit the shell env; without this, PerformanceTests'
 # isContinuousIntegration check never sees CI and hosted-runner WebKit timing
 # variance fails budgets that are informational-only on CI (risk R15).
 	TEST_RUNNER_CI="$${CI:-}" XCODE_RESULT_BUNDLE="$(XCODE_RESULT_BUNDLE)" \
 	    XCODE_DERIVED_DATA="$(XCODE_DERIVED_DATA)" XCODE_ARTIFACT_DIR="$(XCODE_ARTIFACT_DIR)" \
+	    XCODE_TEST_TARGETS="$(XCODE_TEST_TARGETS)" \
 	    Scripts/run-hosted-tests.sh
+
+test-preview:
 	cd preview-src && npm test
 
 test-f2-tooling:

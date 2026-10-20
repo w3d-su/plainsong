@@ -1,4 +1,5 @@
 import AppKit
+import MarkdownCore
 import STTextView
 
 @MainActor
@@ -33,8 +34,10 @@ extension MarkdownTextView {
         }
 
         if incoming.length > 0 {
+            // Exact code units: `==` on these bridged strings would normalize both, slowly,
+            // and accept canonically equivalent text that is not the highlighted source.
             let currentText = (textStorage.string as NSString).substring(with: targetRange)
-            guard currentText == incoming.string else {
+            guard ExactSourceText.matches(currentText, incoming.string) else {
                 return false
             }
         }
@@ -77,6 +80,12 @@ extension MarkdownTextView {
                 location: targetRange.location + range.location,
                 length: range.length
             )
+            // Re-setting equal attributes still marks the run edited, and TextKit then
+            // re-typesets every visible paragraph on each keystroke. Typing usually changes
+            // the runs of one paragraph; the stored result is identical either way.
+            guard !hasExactAttributes(attributes, in: destinationRange, of: textStorage) else {
+                return
+            }
             textStorage.setAttributes(attributes, range: destinationRange)
         }
         restoreImagePresentationMarkers(preservedImageMarkers, in: textStorage)
@@ -97,6 +106,20 @@ extension MarkdownTextView {
         }
         textView.needsDisplay = true
         return true
+    }
+
+    private static func hasExactAttributes(
+        _ attributes: [NSAttributedString.Key: Any],
+        in range: NSRange,
+        of textStorage: NSTextStorage
+    ) -> Bool {
+        var effectiveRange = NSRange(location: NSNotFound, length: 0)
+        let existing = textStorage.attributes(
+            at: range.location,
+            longestEffectiveRange: &effectiveRange,
+            in: range
+        )
+        return effectiveRange == range && (existing as NSDictionary).isEqual(to: attributes)
     }
 
     private static func collectImagePresentationMarkers(

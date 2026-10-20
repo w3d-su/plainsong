@@ -102,6 +102,7 @@ targets:
         com.apple.security.files.user-selected.read-write: true
         com.apple.security.files.bookmarks.app-scope: true
         com.apple.security.network.client: true
+        com.apple.security.print: true
     scheme:
       testTargets:
         - PlainsongUITests
@@ -124,6 +125,16 @@ targets:
       - path: Fixtures/export-f-mdx.mdx
         buildPhase: resources
       - path: Fixtures/math.md
+        buildPhase: resources
+      - path: Fixtures/perf-500kb.md
+        buildPhase: resources
+      - path: Fixtures/math-dense-100kb.md
+        buildPhase: resources
+      - path: Fixtures/perf-100kb.md
+        buildPhase: resources
+      - path: Fixtures/kitchen-sink.md
+        buildPhase: resources
+      - path: Fixtures/kitchen-sink.mdx
         buildPhase: resources
     dependencies:
       - target: Plainsong

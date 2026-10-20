@@ -189,7 +189,8 @@ extension WorkspaceCoherentFileReader {
                         eventHandler?(.parentAnchored(attempt))
                     case .fileOpened:
                         eventHandler?(.opened(attempt))
-                    case .temporaryFileCreated,
+                    case .separateStagingAnchored,
+                         .temporaryFileCreated,
                          .temporaryFilePrepared,
                          .willCommit,
                          .didCommit,

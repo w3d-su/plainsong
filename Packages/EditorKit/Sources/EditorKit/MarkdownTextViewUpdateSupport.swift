@@ -3,6 +3,9 @@ import MarkdownCore
 
 enum ExactUTF16Text {
     static func matches(_ lhs: String, _ rhs: String) -> Bool {
+        if let matches = ExactSourceText.nativeUTF8Matches(lhs, rhs) {
+            return matches
+        }
         let lhsUTF16 = lhs.utf16
         let rhsUTF16 = rhs.utf16
         guard lhsUTF16.count == rhsUTF16.count else {

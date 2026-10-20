@@ -14,8 +14,9 @@ extension WorkspaceSearchHostedActivationTests {
             let appState = fixture.appState
             let tasks = self.activeTasks(in: appState)
             tasks.forEach { $0.cancel() }
+            // Already nil when the test closed its document: the workspace root, the
+            // controller's only owner, is gone (`makeWorkspaceHost` asserts the mount).
             var previewController = host.previewLifecycle.controllerForShutdown
-            XCTAssertNotNil(previewController, "Hosted workspace did not expose its preview controller")
             previewController?.shutdownForTesting()
             host.window.makeFirstResponder(nil)
             host.hostingView.rootView = AnyView(EmptyView())

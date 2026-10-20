@@ -2,8 +2,8 @@
 
 > **Read this file fully before writing any code.** It is the single source of truth for
 > architecture, conventions, and roadmap. If you (an LLM agent or human) make a decision
-> that contradicts or extends this document, add a row to the **Decision Log**
-> (`docs/decision-log.md`, §18) in the same commit.
+> that contradicts or extends this document, add a **Decision Log** entry (a new file in
+> `docs/decisions/`, §18) in the same commit.
 
 ---
 
@@ -76,7 +76,7 @@ blogeditor/
 ├── App/                      # Thin app target (SwiftUI)
 │   ├── PlainsongApp.swift   # @main, WindowGroup, Settings scene
 │   ├── AppState.swift        # open workspaces, recent items
-│   ├── Views/                # SwiftUI views: WorkspaceWindow, Sidebar, EditorSplit, StatusBar, FrontmatterPanel
+│   ├── Views/                # SwiftUI views: WorkspaceWindow (split view), WorkspaceSidebar, WorkspaceDetail, DocumentJumpBar, WorkspaceInspector, WorkspaceToolbar, WorkspaceStatusBar
 │   └── Resources/            # Assets, preview dist bundle (generated), themes
 ├── Packages/
 │   ├── MarkdownCore/         # Pure logic: document model, markdown utilities, completion engine, scroll-sync mapping. No AppKit/SwiftUI imports. Testable via `swift test`.
@@ -87,9 +87,9 @@ blogeditor/
 │   ├── package.json
 │   ├── src/index.ts          # bridge protocol impl, render(), morphdom patching, scroll sync
 │   ├── src/pipeline.ts       # unified pipeline (md and mdx variants)
-│   ├── src/styles/           # preview CSS themes (github-light/dark, etc.)
+│   ├── src/styles/           # preview CSS (Apple system palette, Xcode-style syntax colors)
 │   └── test/                 # vitest specs
-└── .github/workflows/ci.yml  # macOS runner: swiftformat --lint, swiftlint, swift test, xcodebuild test, npm test
+└── .github/workflows/ci.yml  # parallel jobs: preview (Linux npm), packages (lint + swift test), hosted XCTest shards; `build-and-test` gate; docs-only PRs skip the test jobs (`changes`)
 ```
 
 Build artifacts: `preview-src` builds to `App/Resources/preview/` (`index.html`, `bundle.js`,
@@ -168,6 +168,25 @@ Node installed; regenerate with `make preview-bundle` whenever `preview-src/` ch
   (import-declare `net.daringfireball.markdown`, and export a UTI for `.mdx`:
   `app.plainsong.mdx` conforming to `public.plain-text` — the `public.*` namespace
   is reserved for Apple).
+- Descriptor-backed parent capture and document/image authority fall back to `O_SEARCH`
+  when directory read access is denied. A single-file Powerbox grant permits parent lookup
+  without directory enumeration; ordinary read descriptors retain permission-loss behavior.
+- Saves stage their temporary file beside the document and publish it with
+  `renameatx_np`. A file-only grant (Open panel or Finder "Open With") refuses that sibling
+  with `EPERM`; only then does the transaction stage in Foundation's item-replacement
+  directory for the document (same device, never the parent itself), anchored by its own
+  root authority and descriptor chain, and swap across directories with the same identity,
+  expected-content, no-follow, durability and rollback checks. Folder-grant saves keep
+  sibling staging. Any recovery artifact is reported at its staging-directory path;
+  the emptied directory is removed. `Scripts/check-single-file-save-sandbox.sh` exercises
+  this in a signed sandboxed probe under a LaunchServices file-only grant.
+- Window chrome: a native `NavigationSplitView` with a resizable, collapsible sidebar
+  (Files / Search navigators) on macOS 27+, a fixed-width sidebar in an `HStack` before
+  (R17), then the document column and a right inspector for frontmatter and file details.
+  Inspector intent and width are per-window scene state; visibility is derived
+  (`docs/window-state-gates.md` §10.1). The `HStack` shell's window minimum is 780 pt
+  and the macOS 27 split shell's is 841 pt (320 pt sidebar, 0 pt measured chrome, and
+  the 521 pt Split floor). The inspector auto-collapses when the document column cannot fit it.
 - Open folder: sidebar shows the tree; filter to show only markdown-related files by
   default (`.md`, `.markdown`, `.mdx`), toggle "Show all files". Images shown so they can
   be drag-inserted.
@@ -182,13 +201,20 @@ Node installed; regenerate with `make preview-bundle` whenever `preview-src/` ch
   Phase 1 currently shares one App-scoped `AppState` across the `WindowGroup`. Separate
   windows mirror the same workspace/current document until window-scoped state is built.
 - Tabs: native window tabs (`NSWindow.tabbingMode`) deferred; Phase 1 uses sidebar
-  selection to switch the single editor pane (like Typora). Multiple open
+  selection to switch the single editor pane (like Typora). Files selections defer out of
+  the native List update, read and verify the file off the main actor, and commit only the
+  latest still-current request against its installed workspace capture. Draggable filename
+  labels also forward completed taps to that same deduplicated selection path, because
+  native List selection alone misses those clicks on macOS 15. Publish the tree
+  selection only after activation succeeds; a failed read keeps the current file selected
+  and allows retrying the same row. Multiple open
   `DocumentSession`s kept warm in an LRU (target 8) so switching files is instant.
   A failed or fenced eviction candidate is retained and protected for the whole trim
   pass; each candidate is tried at most once per pass. The cache may exceed 8 while
   saves cannot complete, preserving unsaved content until a later trim can succeed.
-  Unreferenced untitled sessions release their unavailable ownership record on document
-  switch or editor-binding removal, before their object identity can be reused.
+  A session no App structure still owns (an untitled document, or a restored recovery copy
+  after Stop Tracking) releases its unavailable ownership record on document switch or
+  editor-binding removal, before its object identity can be reused.
 
 ---
 
@@ -208,6 +234,14 @@ replacement local to EditorKit.
 
 - `MarkdownHighlightService` runs tree-sitter parsing off the main actor and applies
   highlight attributes to the visible range; the façade keeps a later Neon swap local.
+- Highlight requests include 1–4 Ki UTF-16 units of padding on either side. Viewport
+  observations inside the pending/completed window reuse it without publishing a
+  SwiftUI update. Edits, document/appearance changes and WYSIWYG selection changes
+  still restart the revision-fenced scheduler; fence/frontmatter context is expanded
+  once per source highlight, off the main actor.
+- Applying a highlight skips runs whose stored attributes already equal the new ones:
+  re-setting equal attributes still marks the run edited, and TextKit then re-typesets
+  every visible paragraph. The stored result is identical either way.
 - Two-layer markdown grammar: `markdown` (block structure) with `markdown-inline`
   injected, then language injections inside fenced code blocks keyed by the info string.
 - Frontmatter: the markdown grammar exposes the YAML frontmatter block → inject
@@ -254,6 +288,9 @@ replacement local to EditorKit.
 | Strikethrough | ⌃⌘X | `~~…~~` |
 | Inline code | (Format menu; ⌘E is Use Selection for Find) | `` `…` `` |
 | Use Selection for Find | ⌘E | set find pattern from selection; does not show bar |
+| Find and Replace… | (Edit menu, no shortcut; ⌥⌘F is Format Table) | show the find bar, expand its replacement row, focus/select the query |
+| Replace | (Edit menu, no shortcut) | replace the current match and advance; only while the bar is visible and the row expanded |
+| Replace All | (Edit menu, no shortcut) | replace every match as one undo step; same eligibility as Replace |
 | Link | ⌘K | `[sel](cursor)` |
 | Insert Inline Math | (Format menu) | `$x$` with `x` selected, or wrap a single-line selection as `$sel$`; inside an existing formula selects its content instead; refused (beep, no edit) in frontmatter, code, or next to an unescaped `$` |
 | Insert Display Math | (Format menu) | `$$` block padded to paragraph breaks; inside an existing formula selects its content; refused (beep, no edit) in frontmatter, code, or on list/quote/heading/table lines |
@@ -262,10 +299,12 @@ replacement local to EditorKit.
 | Quote | ⌘⇧Q | toggle `> ` |
 | Code fence | ⌘⇧K | wrap selection in fences |
 | Toggle preview pane | ⌘⇧P | show/hide right pane |
-| Toggle sidebar | ⌘⇧S (or native ⌃⌘S) | |
+| Toggle sidebar | ⌃⌘S | native View › Show/Hide Sidebar (`SidebarCommands`; macOS 27+ split view only) |
+| Toggle inspector | ⌃⌘I | View › Show/Hide Inspector (`InspectorToggleCommands`, key window) |
 | Format table | ⌥⌘F | |
 | Toggle checkbox | ⌘L | |
 | New file | ⌘N | workspace: dedup `Untitled.md` at root; single-file: save panel |
+| Print… | ⌘P | File menu: print the captured light-theme PDF through the standard panel |
 
 All commands appear in the menu bar (Format menu) — menu first, shortcut second, so they
 are discoverable and scriptable. Format menu actions route through the AppKit responder
@@ -299,7 +338,10 @@ compute async, cancel stale requests.
 ### 7.1 Web view setup
 
 - One `WKWebView` per editor pane, non-opaque, loads the bundled `index.html` once and
-  stays alive (re-render via JS, never reload the page per keystroke).
+  stays alive (re-render via JS, never reload the page per keystroke). Only the editor
+  view's `@StateObject` state owns its `PreviewController`: closures stored on the
+  controller or handed to AppKit views capture the objects they use, never the view
+  struct, so closing the workspace root releases the controller and its web view.
 - **Security:** strict CSP (`default-src 'none'; script-src 'self'; style-src 'self'
   'unsafe-inline'; img-src asset: data: https:`), `isElementFullscreenEnabled` off, and
   no remote loads by default. The preview JS removes remote image `src` values unless
@@ -328,7 +370,10 @@ Two unified pipelines selected by `fileKind`:
 - `mdx`: same + `remark-mdx`; a custom remark plugin transforms `mdxJsxFlowElement` /
   `mdxJsxTextElement` / `mdxjsEsm` nodes into placeholder HTML (§9) instead of compiling.
 
-Post-render in browser: `highlight.js` handles non-Mermaid code fences. Before the live
+Post-render in browser: `highlight.js` handles non-Mermaid code fences. A fence with no
+info string auto-detects its language only up to 4,000 UTF-16 units
+(`AUTO_DETECT_MAX_LENGTH`); a longer bare fence renders as plain text, because
+auto-detection cost grows superlinearly with line length. Before the live
 DOM patch, Mermaid fences become `div.mermaid-rendered` placeholders carrying the exact
 fence source, its Mermaid-fence ordinal, and the current Mermaid-theme generation.
 `morphdom` keeps a matching successful live wrapper. A changed wrapper receives the new
@@ -378,7 +423,10 @@ the Frontmatter panel, §10). Optional toggle to show it as a styled block.
 ### 7.4 Build
 
 `make preview-bundle`: `npm ci && esbuild src/index.ts --bundle --minify` →
-`App/Resources/preview/`. KaTeX fonts/CSS, highlight.js theme CSS, mermaid bundled
+`App/Resources/preview/`. KaTeX fonts/CSS and Mermaid are bundled; syntax highlighting uses the preview
+stylesheet’s Apple system palette and Xcode-inspired light/dark token colors, with dark
+function/link/comment colors raised to meet 4.5:1 on code background `#2a2a2c`.
+The highlight.js `github.css` theme is no longer bundled. All assets are bundled
 locally. No CDN, app must work fully offline. Commit the dist output.
 
 ---
@@ -389,10 +437,26 @@ Mapping basis: `data-line` attributes emitted by `rehype-source-lines` on every
 block-level element.
 
 - **Editor → preview (primary direction):** on editor scroll, compute first visible
-  source line (TextKit 2 `textLayoutManager` viewport) → `scrollToLine`. JS finds the
+  source line (the layout fragment at the visible top edge, not the TextKit viewport
+  start, which STTextView extends above the visible area) → `scrollToLine`. JS finds the
   nearest `[data-line]` ≤ line and the next one > line, interpolates between their
-  `offsetTop`s proportionally to line distance → smooth, accurate positioning.
-- **Preview → editor:** symmetric, using `previewScrolled`.
+  document-relative tops proportionally to line distance → smooth, accurate positioning.
+- The preview keeps a line-sorted `[data-line]` anchor list, rebuilt only after DOM
+  mutations (`MutationObserver`, with `takeRecords()` for same-turn changes), and
+  binary-searches it. `scrollToLine` reads live layout tops for the two bracketing
+  anchors only, so resize, image, font or Mermaid reflow can never leave it stale and
+  no resize frame re-measures the document. Tops are layout coordinates: `offsetTop`
+  summed over offset parents (tables, positioned MDX blocks); unrendered anchors
+  (`display: none`, closed `<details>`) are skipped.
+- **Preview → editor:** symmetric, using `previewScrolled`. The top-ordered anchor
+  list is measured lazily and reused while the two anchors bounding a lookup are still
+  where it recorded them; otherwise it is re-measured.
+- **Reflow:** the preview remembers the (fractional) source position at its top and
+  re-places it when its width changes (`ResizeObserver`, before paint), because the
+  editor reports nothing new when its own top line survives a window resize.
+- The editor's source-line index is edited in place from `willChangeTextIn`
+  (O(log n) per keystroke; a full rebuild walked the 1 MiB storage on every selection
+  change), with a length check and a change-notification fallback that rebuild in bulk.
 - **Loop prevention:** a `scrollOwner` token (`editor` | `preview` | `none`) with 100 ms
   decay; messages from the non-owner are dropped.
 - Cursor-follow option: "typewriter sync" — on text edit, preview scrolls to the edited
@@ -433,8 +497,9 @@ attempt without a Decision Log entry.
 ## 10. Frontmatter Panel
 
 - Detect YAML frontmatter (`---` fences at byte 0). Parse with `Yams` (SPM).
-- Sidebar-attached collapsible form panel: key/value editing with type-aware controls
-  (string, date picker for `date`, tag token field for `tags`, toggle for `draft`).
+- Inspector form (right column, ⌃⌘I, Frontmatter section): key/value editing with
+  type-aware controls (string, date picker for `date`, tag token field for `tags`, toggle
+  for `draft`).
 - Edits write back into the source text (panel ↔ text always derived from the document;
   the text is the single source of truth).
 - Malformed YAML → panel shows raw text + error, never crashes, never rewrites what it
@@ -478,6 +543,17 @@ SVG children only as non-authoritative pending content, avoiding a temporary col
 **Any PR that regresses typing latency is rejected regardless of features.** Add a
 `PerformanceTests` target with a large fixture (`Fixtures/large-1mb.md`).
 
+Editor main-thread rules (profiled 2026-10-18; evidence in `docs/perf-log.md`): no
+O(document) work per keystroke on the main thread. Publish native UTF-8 source strings,
+never the bridged `NSTextStorage` string: SwiftUI compares published text with `==`,
+which normalizes a bridged string from its first character. Edit derived indexes in
+place. Release TextKit 2's cached text elements below the viewport once scrolling
+settles (`EditorTextElementCacheTrimmer`): each edit rewrites the range of every cached
+element after it, so typing above a once-viewed document end cost ~50 ms per keystroke.
+The synchronous typing gates do not see SwiftUI, layout or display work a keystroke
+schedules; typing with the preview visible is measured by the opt-in hosted
+busy-slice probe (`MainThreadStallHostedTests`, `TEST_RUNNER_PLAINSONG_RUN_SCROLL_PROBE=1`).
+
 M5 planning note: the highlight budget is accepted only from visible-range-first
 highlighting instrumentation, not from the historical 250 KB full-document inline
 parsing cutoff. The memory budget is scoped to deterministic app host-process RSS.
@@ -518,7 +594,7 @@ editor *folds* markdown tokens via rendering, not text mutation:
   reset presentation caches and request one fresh derivation; real-IME and full
   performance acceptance remain open.
 - The two-pane mode remains available behind a toggle forever (⌘⇧P cycles: source+preview
-  / source only / WYSIWYG once it ships).
+  / source only / WYSIWYG once it ships; the toolbar layout picker selects a mode directly).
 
 ---
 
@@ -602,7 +678,8 @@ make bootstrap        # brew install xcodegen swiftformat swiftlint node; npm ci
 make generate         # xcodegen generate  (run after editing project.yml)
 make preview-bundle   # build preview-src → App/Resources/preview/ (commit the output)
 make build            # xcodebuild -scheme Plainsong build
-make test             # swift test (packages) + xcodebuild test + (cd preview-src && npm test)
+make test             # test-packages (swift test) + test-hosted (xcodebuild test) + test-preview (npm test)
+make test-hosted XCODE_TEST_TARGETS=PlainsongTests  # one hosted bundle subset, as a CI shard runs it
 make release          # DMG pipeline (Scripts/release.sh); PLAINSONG_UNSIGNED=1 for the alpha path
 cd preview-src && npm run typecheck  # preview TypeScript check; CI runs this separately
 make format           # swiftformat . && swiftlint --fix
@@ -666,7 +743,7 @@ make format           # swiftformat . && swiftlint --fix
     `Phase 3: add scroll owner arbitration`).
 12. **When uncertain about UX,** match Typora's behavior first, macOS HIG second, then ask.
 13. **Update documentation:** behavior changes → update relevant § here; architectural
-    choices → a row in `docs/decision-log.md` (date, decision, why, alternatives).
+    choices → a new file in `docs/decisions/` (date, decision, why, alternatives; §18).
 14. **Branch + PR workflow:** `main` is protected. Do all work on a branch named
     `phase<N>-<slug>` (e.g. `phase3-editor-find-bar-ui`) and open a PR against `main`.
     State the branch name when you start. Never push to `main` directly, never force-push,
@@ -678,10 +755,12 @@ make format           # swiftformat . && swiftlint --fix
 
 ## 18. Decision Log
 
-The full log lives in [`docs/decision-log.md`](docs/decision-log.md). Append new rows
-there (date, decision, why, alternatives considered) in the same commit as the change.
-Current rules in §1-§17 are authoritative. Read the log when you need the rationale
-behind a rule or are about to revisit a past decision.
+Add each decision as its own file, `docs/decisions/YYYY-MM-DD-<slug>.md` (decision, why,
+alternatives considered), in the same commit as the change. The format and the archive
+table of earlier decisions are in [`docs/decision-log.md`](docs/decision-log.md); never
+append rows to that table, because a shared last line made every pair of open PRs
+conflict. Current rules in §1-§17 are authoritative. Read the log when you need the
+rationale behind a rule or are about to revisit a past decision.
 
 ---
 

@@ -45,6 +45,7 @@ extension MarkdownTextViewCoordinator {
     }
 
     func detachVisibleRangeReporter() {
+        textElementCacheTrimmer.cancel()
         visibleRangeObserver = nil
         visibleRangeTextView = nil
         visibleRangeChangeHandler = nil
@@ -105,8 +106,17 @@ extension MarkdownTextViewCoordinator {
         }
 
         lastVisibleTextRange = visibleRange
-        scrollProxy?.emitVisibleLine(containingUTF16Offset: visibleRange.location, in: textView)
+        // The range includes TextKit's prefetch band above the visible area; scroll sync
+        // needs the line the user sees at the top.
+        scrollProxy?.emitVisibleLine(
+            containingUTF16Offset: EditorVisibleTop.utf16Offset(in: textView) ?? visibleRange.location,
+            in: textView
+        )
         visibleRangeChangeHandler?(visibleRange)
+        textElementCacheTrimmer.visibleRangeDidChange(visibleRange, in: textView) { [weak self] in
+            guard let self else { return false }
+            return !isUpdating && !hasPendingWriterLease
+        }
     }
 }
 

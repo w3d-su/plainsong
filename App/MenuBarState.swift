@@ -9,6 +9,9 @@ import Foundation
 /// is enabled.
 struct MenuBarSnapshot: Equatable {
     var hasOpenDocument: Bool
+    /// Edit ▸ Replace / Replace All: bar visible, row expanded, valid value. Display only;
+    /// the action re-checks this and the key-window responder context itself.
+    var canReplace: Bool
     var canSave: Bool
     var canExportHTML: Bool
     var canUseWorkspaceSearch: Bool
@@ -18,6 +21,9 @@ struct MenuBarSnapshot: Equatable {
     @MainActor
     init(appState: AppState) {
         hasOpenDocument = appState.hasOpenDocument
+        canReplace = appState.hasOpenDocument
+            && appState.editorFindHost.ui.isReplaceRowActive
+            && appState.editorFindHost.ui.replacementValidity == .valid
         canSave = appState.canSave
         canExportHTML = appState.canExportCurrentDocumentAsHTML
         canUseWorkspaceSearch = appState.canUseWorkspaceSearch

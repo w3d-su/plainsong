@@ -61,6 +61,25 @@ struct PlainsongCommands: Commands {
             .disabled(!snapshot.canExportHTML)
             .accessibilityIdentifier(ExportHTMLAccessibility.command)
             .accessibilityLabel("Export as HTML")
+
+            Button("Export as PDF…") {
+                appState.exportCurrentDocumentAsPDF()
+            }
+            .disabled(!snapshot.canExportHTML)
+            .accessibilityIdentifier(ExportPDFAccessibility.command)
+            .accessibilityLabel("Export as PDF")
+        }
+
+        // Replaces the system group, which also carried "Page Setup…" — accepted per D4;
+        // the standard print panel covers paper changes.
+        CommandGroup(replacing: .printItem) {
+            Button("Print…") {
+                appState.printCurrentDocument()
+            }
+            .keyboardShortcut("p", modifiers: .command)
+            .disabled(!snapshot.canExportHTML)
+            .accessibilityIdentifier(ExportPDFAccessibility.printCommand)
+            .accessibilityLabel("Print")
         }
 
         // In-document find (PR C). Claimed in the system Edit menu — not a separate
@@ -74,6 +93,12 @@ struct PlainsongCommands: Commands {
                 EditorFindCommandDelivery.performShowFind()
             }
             .keyboardShortcut("f", modifiers: .command)
+            .disabled(!snapshot.hasOpenDocument)
+
+            // Replace PR H: no global shortcut — ⌥⌘F stays Format Table (agent.md §6.4).
+            Button("Find and Replace…") {
+                EditorFindCommandDelivery.performShowFindAndReplace()
+            }
             .disabled(!snapshot.hasOpenDocument)
 
             Button("Find Next") {
@@ -93,6 +118,16 @@ struct PlainsongCommands: Commands {
             }
             .keyboardShortcut("e", modifiers: .command)
             .disabled(!snapshot.hasOpenDocument)
+
+            Button("Replace") {
+                EditorFindCommandDelivery.performReplace()
+            }
+            .disabled(!snapshot.canReplace)
+
+            Button("Replace All") {
+                EditorFindCommandDelivery.performReplaceAll()
+            }
+            .disabled(!snapshot.canReplace)
         }
 
         // Placed inside the system-provided View menu (sidebar/toolbar commands live there).

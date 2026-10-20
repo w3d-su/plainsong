@@ -317,6 +317,7 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     var visibleRangeObserver: CoordinatorNotificationObserver?
     var visibleRangeChangeHandler: ((NSRange) -> Void)?
     var lastVisibleTextRange: NSRange?
+    let textElementCacheTrimmer = EditorTextElementCacheTrimmer()
     var representableUpdateDepth = 0
     var selectionPublicationGeneration: UInt64 = 0
     var isSourceSynchronizationPending = false
@@ -733,8 +734,15 @@ extension MarkdownTextViewCoordinator {
     func textView(
         _ textView: STTextView,
         willChangeTextIn affectedCharRange: NSTextRange,
-        replacementString _: String
+        replacementString: String
     ) {
+        // Every replacement, including programmatic updates, keeps the scroll line
+        // index in step without rescanning the document.
+        scrollProxy?.textWillChange(
+            in: NSRange(affectedCharRange, in: textView.textContentManager),
+            replacementString: replacementString,
+            in: textView
+        )
         guard !isUpdating,
               let textView = textView as? MarkdownSTTextView
         else {
@@ -884,10 +892,15 @@ extension MarkdownTextViewCoordinator {
             return false
         }
 
-        // Keep the lazily bridged CFStorage string here. Eagerly transcoding a 1 MiB
-        // buffer on every keystroke costs more than one frame; consumers that need a
-        // contiguous UTF-8 view already run outside this synchronous native-input path.
-        let newText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
+        // Publish a native copy (~3 ms per MiB in CoreFoundation). The lazily bridged
+        // storage string is foreign to Swift, and SwiftUI compares the published text
+        // with `==` in bindings, `onChange` and view inputs: each foreign comparison
+        // normalized the whole document, stalling the main thread for seconds per
+        // keystroke in a 1 MiB document. An unpaired surrogate keeps the bridged string,
+        // since a native string would replace it.
+        let storage = MarkdownTextView.textStorage(of: textView)
+        let newText = storage.flatMap { ExactSourceText.nativeCopy(of: $0.mutableString) }
+            ?? storage?.string ?? textView.text ?? ""
         if !installedDocument.hasSourceContract,
            nativeSourceStringMatches(newText, text)
         {

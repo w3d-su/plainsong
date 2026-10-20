@@ -10,7 +10,10 @@ extension AppState {
         refreshWorkspaceAfterFileSystemChange()
     }
 
-    func refreshWorkspaceAfterFileSystemChange() {
+    func refreshWorkspaceAfterFileSystemChange(
+        fileID: StaticString = #fileID,
+        line: UInt = #line
+    ) {
         guard workspaceMutationNamespaceDepth == 0 else {
             workspaceMutationRefreshPending = true
             workspaceMutationExternalRefreshPending = true
@@ -24,7 +27,7 @@ extension AppState {
             return
         }
         guard let workspaceRootURL else {
-            handleCurrentDocumentExternalChange()
+            handleCurrentDocumentExternalChange(fileID: fileID, line: line)
             return
         }
 
@@ -32,7 +35,7 @@ extension AppState {
         // document reads. Advance the per-session disk generation immediately so a
         // slow directory snapshot cannot allow an older Reload / Keep Mine read to
         // commit before the newer event is observed.
-        handleManagedWorkspaceSessionsExternalChange()
+        handleManagedWorkspaceSessionsExternalChange(fileID: fileID, line: line)
 
         scheduleWorkspaceReload(
             root: workspaceRootURL,
@@ -43,7 +46,9 @@ extension AppState {
 
     func refreshWorkspaceAfterNamespaceMutation(
         using retainedRootAuthority: WorkspaceFileSystemRootAuthority,
-        inspectManagedSessions: Bool
+        inspectManagedSessions: Bool,
+        fileID: StaticString = #fileID,
+        line: UInt = #line
     ) {
         guard workspaceMutationNamespaceDepth == 0 else {
             workspaceMutationRefreshPending = true
@@ -53,7 +58,7 @@ extension AppState {
         }
         guard let workspaceRootURL else {
             if inspectManagedSessions {
-                handleCurrentDocumentExternalChange()
+                handleCurrentDocumentExternalChange(fileID: fileID, line: line)
             }
             return
         }
@@ -61,10 +66,12 @@ extension AppState {
         if inspectManagedSessions {
             if workspaceSearchRootAuthority == retainedRootAuthority {
                 handleManagedWorkspaceSessionsExternalChange(
-                    rootAuthority: retainedRootAuthority
+                    rootAuthority: retainedRootAuthority,
+                    fileID: fileID,
+                    line: line
                 )
             } else {
-                handleCurrentDocumentExternalChange()
+                handleCurrentDocumentExternalChange(fileID: fileID, line: line)
             }
         }
         scheduleWorkspaceReload(
@@ -74,22 +81,31 @@ extension AppState {
         )
     }
 
-    private func handleManagedWorkspaceSessionsExternalChange() {
+    private func handleManagedWorkspaceSessionsExternalChange(
+        fileID: StaticString = #fileID,
+        line: UInt = #line
+    ) {
         guard let rootAuthority = workspaceSearchRootAuthority,
               workspaceInstalledCaptureGeneration == workspaceGeneration
         else {
-            handleCurrentDocumentExternalChange()
+            handleCurrentDocumentExternalChange(fileID: fileID, line: line)
             return
         }
 
-        handleManagedWorkspaceSessionsExternalChange(rootAuthority: rootAuthority)
+        handleManagedWorkspaceSessionsExternalChange(
+            rootAuthority: rootAuthority,
+            fileID: fileID,
+            line: line
+        )
     }
 
     private func handleManagedWorkspaceSessionsExternalChange(
-        rootAuthority: WorkspaceFileSystemRootAuthority
+        rootAuthority: WorkspaceFileSystemRootAuthority,
+        fileID: StaticString = #fileID,
+        line: UInt = #line
     ) {
         for session in managedWorkspaceSessions(rootAuthority: rootAuthority) {
-            handleExternalChange(for: session)
+            handleExternalChange(for: session, fileID: fileID, line: line)
         }
     }
 
@@ -128,22 +144,6 @@ extension AppState {
             )
         }
         return sessions
-    }
-
-    func selectWorkspaceNode(id nodeID: WorkspaceFileNode.ID) {
-        guard var tree = workspaceTree,
-              let node = tree.node(id: nodeID),
-              node.isEditableMarkdown,
-              let rootAuthority = workspaceSearchRootAuthority,
-              workspaceInstalledCaptureGeneration == workspaceGeneration,
-              let fileURL = try? rootAuthority.location(relativePath: node.relativePath).fileURL
-        else {
-            return
-        }
-
-        tree.selectNode(id: nodeID)
-        workspaceTree = tree
-        openWorkspaceFile(fileURL)
     }
 
     func setWorkspaceNodeExpanded(_ isExpanded: Bool, id nodeID: WorkspaceFileNode.ID) {
@@ -315,6 +315,14 @@ extension AppState {
     }
 }
 
+/// Lets a `WorkspaceEventWatcher` handler refer to the watcher it was installed on,
+/// which cannot be captured while the watcher is being initialized. `watcher` is written
+/// once on the main actor before `start()` and read on the watcher's serial queue and on
+/// the main actor; the only mutation is that single assignment, so the box is sent safely.
+private final class WorkspaceEventWatcherBox: @unchecked Sendable {
+    weak var watcher: WorkspaceEventWatcher?
+}
+
 private struct ManagedSessionWriteContext {
     let sessionIdentity: ObjectIdentifier
     let stateURL: URL
@@ -347,17 +355,35 @@ extension AppState {
             rememberRecentItem(root)
         }
 
-        workspaceWatcher = WorkspaceEventWatcher(rootURL: root) { [weak self, root] in
+        let watcherBox = WorkspaceEventWatcherBox()
+        let watcher = WorkspaceEventWatcher(rootURL: root) { [weak self, watcherBox, root] in
             Task { @MainActor [weak self] in
-                guard let self,
-                      let currentRoot = workspaceRootURL,
-                      exactFileURLSpellingMatches(currentRoot, root)
-                else {
-                    return
+                // The watcher's stop() boundary only guarantees no handler *begins*
+                // afterwards; a handler that began just before it still hops here.
+                // Drop a delivery whose watcher was replaced or stopped meanwhile.
+                guard let self else { return }
+                let watcher = watcherBox.watcher
+                let dropReason: String? = if watcher !== workspaceWatcher {
+                    "replaced"
+                } else if watcher == nil || watcher?.isStopped == true {
+                    "stopped"
+                } else if !(workspaceRootURL.map { self.exactFileURLSpellingMatches($0, root) } ?? false) {
+                    "rootChanged"
+                } else {
+                    nil
                 }
-                refreshWorkspaceAfterFileSystemChange()
+                // One call site for the decision trace and the refresh, so the resulting
+                // handleExternalChange entry proves the fileID/line forwarding end to end.
+                let site: (fileID: StaticString, line: UInt) = (#fileID, #line)
+                traceWorkspaceWatcherDelivery(
+                    dropReason: dropReason, watcher: watcher, fileID: site.fileID, line: site.line
+                )
+                guard dropReason == nil else { return }
+                refreshWorkspaceAfterFileSystemChange(fileID: site.fileID, line: site.line)
             }
         }
+        watcherBox.watcher = watcher
+        workspaceWatcher = watcher
         workspaceWatcher?.start()
 
         scheduleWorkspaceReload(
@@ -456,18 +482,19 @@ extension AppState {
 
     func setCurrentDocument(
         _ session: DocumentSession,
-        synchronizingWorkspaceTree: Bool = true
+        synchronizingWorkspaceTree: Bool = true,
+        requestingEditorFocus: Bool = WorkspaceSelectionFocus.requestsEditorFocus
     ) {
         guard currentDocument !== session else { return }
         let previousSession = currentDocument
         moveCurrentDocumentWorkToBackgroundBeforeSwitch()
-        requestEditorFocus()
+        if requestingEditorFocus { requestEditorFocus() }
         if synchronizingWorkspaceTree {
             synchronizeWorkspaceTreeSelection(for: session)
         }
         cancelPendingEditorNavigationIfNeeded()
         currentDocument = session
-        releaseUnreferencedUntitledSessionOwnership(for: previousSession)
+        releaseUnreferencedSessionOwnership(for: previousSession)
         clearPromptsNotMatchingCurrentDocument()
         restoreRecoveryPrompt(for: session)
         if indeterminateSessionWrites[ObjectIdentifier(session)] != nil {

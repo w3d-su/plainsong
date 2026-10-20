@@ -333,6 +333,7 @@ enum WorkspaceAnchoredFileSystem {
         case parentAnchored
         case namespaceValidated
         case fileOpened
+        case separateStagingAnchored
         case temporaryFileCreated
         case temporaryFilePrepared
         case willCommit(CommitKind)
@@ -351,6 +352,8 @@ enum WorkspaceAnchoredFileSystem {
     }
 
     enum InjectedCall: Hashable {
+        /// Refuses the sibling temporary create as a file-only sandbox grant does (`EPERM`).
+        case createSiblingTemporary
         case renameSwap
         case renameExclusive
         case afterRenameSwap
@@ -375,13 +378,16 @@ enum WorkspaceAnchoredFileSystem {
 
         let eventHandler: (@Sendable (Event) -> Void)?
         let injectedFailure: (@Sendable (InjectedCall) -> WorkspaceAnchoredFileSystemError?)?
+        let itemReplacementDirectoryProvider: (@Sendable (URL) throws -> URL)?
 
         init(
             eventHandler: (@Sendable (Event) -> Void)? = nil,
-            injectedFailure: (@Sendable (InjectedCall) -> WorkspaceAnchoredFileSystemError?)? = nil
+            injectedFailure: (@Sendable (InjectedCall) -> WorkspaceAnchoredFileSystemError?)? = nil,
+            itemReplacementDirectory: (@Sendable (URL) throws -> URL)? = nil
         ) {
             self.eventHandler = eventHandler
             self.injectedFailure = injectedFailure
+            itemReplacementDirectoryProvider = itemReplacementDirectory
         }
 
         func emit(_ event: Event) {

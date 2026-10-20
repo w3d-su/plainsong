@@ -548,7 +548,11 @@ Plan: `docs/release-engineering-plan.md`. P0 owner decisions, the MIT `LICENSE`,
 and the P5 alpha-readiness checklist are complete; R14 closed on 2026-07-05. The unsigned P4
 release workflow has landed for `v*` tags and manual dispatch. The `v0.1.0-alpha.2` tag verified
 the CI path end to end on 2026-07-10, producing a draft prerelease with the build-67 unsigned DMG
-and checksum. Per-DMG clean-machine spot-checking remains good practice and is not a release
+and checksum; that draft was never published. `v0.1.0-alpha.3` was published as a GitHub
+prerelease on 2026-10-15 (Release run 38696363613, `main` at `05bcc30`, build 146,
+`Plainsong-0.1.0-146-unsigned.dmg`, verified universal with a valid ad-hoc signature and the
+sandbox + network-client entitlements); its auto-generated changelog compares against alpha.1.
+Per-DMG clean-machine spot-checking remains good practice and is not a release
 blocker (artifact family already passed P5 with alpha.1). P1/P2 signing and notarization remain
 deferred until Apple Developer Program membership.
 

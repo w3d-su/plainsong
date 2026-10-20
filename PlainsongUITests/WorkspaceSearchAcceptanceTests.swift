@@ -95,6 +95,77 @@ final class WorkspaceSearchAcceptanceTests: XCTestCase, @unchecked Sendable {
         workspaceWindow = nil
     }
 
+    func testFilesSingleClicksKeepSelectionAndEditorInSync() {
+        launchApplication()
+        makeFixtureWindowKey()
+        let editor = workspaceWindow.textViews["plainsong.editor.textView"]
+        let fileName = workspaceWindow.staticTexts["plainsong.editor.fileName"]
+        let picks = [
+            ("z-last.md", "最後一篇：搜尋\n"),
+            ("a-overview.md", "前言\n搜尋 alpha\n"),
+        ]
+        for _ in 0 ..< 3 {
+            for (name, source) in picks {
+                let sidebar = workspaceWindow.outlines["Sidebar"]
+                let fileLabel = sidebar.descendants(matching: .staticText)
+                    .matching(NSPredicate(format: "value == %@", name)).firstMatch
+                XCTAssertTrue(fileLabel.waitForExistence(timeout: 5), "Missing Files row \(name)")
+                XCTAssertTrue(fileLabel.isHittable)
+                // The filename is the draggable area, not trailing row whitespace.
+                fileLabel.click()
+                waitForValue(name, of: fileName, description: "clicked file name")
+                waitForValue(source, of: editor, description: "clicked file source")
+                waitForKeyboardFocus(editor)
+                let selected = sidebar.descendants(matching: .any)
+                    .matching(NSPredicate(format: "isSelected == true")).firstMatch
+                XCTAssertTrue(selected.descendants(matching: .staticText)
+                    .matching(NSPredicate(format: "value == %@", name)).firstMatch.exists,
+                    "Files selection must match the editor")
+            }
+        }
+        let sidebar = workspaceWindow.outlines["Sidebar"]
+        let folderRow = sidebar.outlineRows
+            .containing(.any, identifier: "plainsong.workspaceFiles.row.posts").firstMatch
+        let disclosure = folderRow.disclosureTriangles.firstMatch
+        XCTAssertTrue(disclosure.waitForExistence(timeout: 5))
+        disclosure.click()
+        let nested = sidebar.descendants(matching: .staticText)
+            .matching(NSPredicate(format: "value == %@", "b-target.mdx")).firstMatch
+        XCTAssertTrue(nested.waitForExistence(timeout: 5))
+        nested.click()
+        waitForValue("b-target.mdx", of: fileName, description: "nested clicked file name")
+        waitForValue("# 😀前言\n測試 搜尋 目標\n", of: editor, description: "nested clicked file source")
+        waitForKeyboardFocus(editor)
+    }
+
+    func testFilesFilenameDragStillMovesIntoAFolder() {
+        launchApplication()
+        makeFixtureWindowKey()
+        let sidebar = workspaceWindow.outlines["Sidebar"]
+        let source = sidebar.descendants(matching: .staticText)
+            .matching(NSPredicate(format: "value == %@", "a-overview.md")).firstMatch
+        let folderIdentifier = "plainsong.workspaceFiles.row.posts"
+        let folder = sidebar.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier == %@", folderIdentifier)).firstMatch
+        XCTAssertTrue(source.waitForExistence(timeout: 5))
+        XCTAssertTrue(folder.waitForExistence(timeout: 5))
+        source.click(forDuration: 0.5, thenDragTo: folder, withVelocity: .slow, thenHoldForDuration: 0.5)
+        // Native spring loading may collapse posts again after the drop. Observe
+        // the real parent and old row removal instead of relying on expanded children.
+        let movedParent = workspaceWindow.popUpButtons
+            .matching(NSPredicate(format: "label == %@", "Files in posts")).firstMatch
+        XCTAssertTrue(movedParent.waitForExistence(timeout: 10))
+        let oldRow = sidebar.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier == %@", "plainsong.workspaceFiles.row.a-overview.md"))
+            .firstMatch
+        let removed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: oldRow)
+        XCTAssertEqual(XCTWaiter.wait(for: [removed], timeout: 10), .completed)
+        waitForValue("a-overview.md", of: workspaceWindow.staticTexts["plainsong.editor.fileName"],
+                     description: "dragged current file name")
+        waitForValue("前言\n搜尋 alpha\n", of: workspaceWindow.textViews["plainsong.editor.textView"],
+                     description: "dragged current file source")
+    }
+
     func testShortcutKeyboardActivationAndEscapeTransitions() throws {
         launchApplication()
         let queryField = try openSearchWithShortcut()

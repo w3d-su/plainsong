@@ -4,34 +4,27 @@ struct WorkspaceMutationRecoveryBanner: View {
     @EnvironmentObject private var appState: AppState
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "exclamationmark.triangle")
-                .foregroundStyle(.orange)
-
-            Text(message)
-                .font(.callout.weight(.medium))
-
+        NoticeBar(
+            tone: .caution,
+            systemImage: "exclamationmark.triangle.fill",
+            message: message
+        ) {
             if appState.hasWorkspaceMutationRecoveryLoadFailure {
                 Button("Stop Tracking") {
                     appState.stopTrackingWorkspaceMutationRecoveryLoadFailure()
                 }
             } else {
+                Button(secondaryActionTitle) {
+                    appState.performWorkspaceMutationRecoverySecondaryAction()
+                }
+
                 if appState.workspaceMutationReconciliationPrompt?.operation != .textRecovery {
                     Button("Check Again") {
                         appState.reconcileCurrentWorkspaceMutationRecovery()
                     }
                 }
-
-                Button(secondaryActionTitle) {
-                    appState.performWorkspaceMutationRecoverySecondaryAction()
-                }
             }
-
-            Spacer()
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(.orange.opacity(0.14))
     }
 
     private var message: String {

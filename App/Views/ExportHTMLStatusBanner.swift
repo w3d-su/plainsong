@@ -14,16 +14,20 @@ struct ExportHTMLStatusBanner: View {
     ) {
         let message: String
         switch status {
-        case let .exporting(operationID, fileName):
-            if case let .exporting(previousID, _) = previous, previousID == operationID { return }
-            message = ExportHTMLAccessibility.progressLabel(fileName: fileName)
+        case let .exporting(operationID, fileName, product):
+            if case let .exporting(previousID, _, _) = previous, previousID == operationID {
+                return
+            }
+            message = ExportHTMLAccessibility.progressLabel(fileName: fileName, product: product)
         case let .notice(notice):
             guard status != previous else { return }
             message = notice.accessibilityLabel
         case nil:
             return
         }
-        if let post { post(message) } else {
+        if let post {
+            post(message)
+        } else {
             NSAccessibility.post(element: NSApplication.shared, notification: .announcementRequested,
                                  userInfo: [.announcement: message,
                                             .priority: NSAccessibilityPriorityLevel.high.rawValue])
@@ -34,10 +38,12 @@ struct ExportHTMLStatusBanner: View {
         if let status = appState.exportHTMLStatus {
             HStack(alignment: .top, spacing: 10) {
                 switch status {
-                case let .exporting(_, fileName):
+                case let .exporting(_, fileName, product):
                     ProgressView().controlSize(.small)
-                    Text("Exporting \(fileName)…")
-                        .accessibilityLabel(ExportHTMLAccessibility.progressLabel(fileName: fileName))
+                    Text(product == .print ? "Printing \(fileName)…" : "Exporting \(fileName)…")
+                        .accessibilityLabel(
+                            ExportHTMLAccessibility.progressLabel(fileName: fileName, product: product)
+                        )
                         .accessibilityIdentifier(ExportHTMLAccessibility.progress)
                     Spacer()
                     Button("Cancel") { appState.cancelExportHTML() }
