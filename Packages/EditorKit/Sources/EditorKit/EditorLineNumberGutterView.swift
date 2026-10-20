@@ -48,6 +48,8 @@ final class EditorLineNumberGutterView: NSView {
     private(set) var lastDrawFragmentVisits = 0
     private(set) var drawCount = 0
     private(set) var lastDrawMilliseconds: Double = 0
+    private(set) var totalDrawMilliseconds: Double = 0
+    private(set) var thicknessChangeCount = 0
     private(set) var lastDrawnLabels: [EditorLineNumberGutterLayout.Label] = []
 
     init(textView: MarkdownSTTextView, scrollView: NSScrollView, style: Style) {
@@ -141,6 +143,7 @@ final class EditorLineNumberGutterView: NSView {
         digits = nextDigits
         guard newThickness != thickness else { return }
         thickness = newThickness
+        thicknessChangeCount += 1
         if tile {
             (superview as? NSScrollView)?.tile()
         }
@@ -161,7 +164,10 @@ final class EditorLineNumberGutterView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         drawCount += 1
         let start = DispatchTime.now().uptimeNanoseconds
-        defer { lastDrawMilliseconds = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000 }
+        defer {
+            lastDrawMilliseconds = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+            totalDrawMilliseconds += lastDrawMilliseconds
+        }
         guard let textView else { return }
 
         if let backgroundColor = textView.backgroundColor {

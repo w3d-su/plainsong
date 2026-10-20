@@ -48,7 +48,7 @@ extension EditorFindHostedGateTests {
         editor.scrollRangeToVisible(editor.selectedRange())
         try await Task.sleep(nanoseconds: 1_000_000_000)
 
-        let gutterDrawsBefore = editor.lineNumberGutter?.drawCount ?? 0
+        let countersBefore = EditorProbeCounters(editor)
         let monitor = MainRunLoopBusyMonitor()
         // Lets an external `sample` attach to the measured phase only (stdout is buffered).
         let marker = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("main-thread-probe-begin")
@@ -64,16 +64,20 @@ extension EditorFindHostedGateTests {
         }
         try await Task.sleep(nanoseconds: 1_000_000_000)
         let slices = monitor.stop()
-        let gutterDraws = (editor.lineNumberGutter?.drawCount ?? 0) - gutterDrawsBefore
 
         XCTAssertEqual(MarkdownTextView.textStorage(of: editor)?.string, hosted.appState.currentDocument.text)
-        let sorted = slices.map(\.wallMilliseconds).sorted()
-        let longest = slices.sorted { $0.wallMilliseconds < $1.wallMilliseconds }.suffix(12)
         let name = visitingDocumentEnd ? "after viewing the end" : "from the middle"
         let mode = layoutMode == .sourcePreview ? "Source+preview" : "Source-only"
-        recordScrollReport("\(mode) typing \(name) main-thread busy slices", [
-            "lineNumbers": lineNumbers,
-            "gutterDraws": gutterDraws,
+        let report = busySliceReport(slices)
+            .merging(EditorProbeCounters(editor).report(since: countersBefore)) { $1 }
+            .merging(["lineNumbers": lineNumbers]) { $1 }
+        recordScrollReport("\(mode) typing \(name) main-thread busy slices", report)
+    }
+
+    private func busySliceReport(_ slices: [MainRunLoopBusyMonitor.Slice]) -> [String: Any] {
+        let sorted = slices.map(\.wallMilliseconds).sorted()
+        let longest = slices.sorted { $0.wallMilliseconds < $1.wallMilliseconds }.suffix(12)
+        return [
             "slices": slices.count,
             "maxMilliseconds": sorted.last ?? 0,
             "p95Milliseconds": sorted.isEmpty ? 0 : sorted[Int(Double(sorted.count - 1) * 0.95)],
@@ -84,7 +88,7 @@ extension EditorFindHostedGateTests {
             "longest": longest.map(\.wallMilliseconds),
             "longestCPU": longest.map(\.cpuMilliseconds),
             "longestStart": longest.map(\.startMilliseconds),
-        ])
+        ]
     }
 
     private func waitForLargePreview(_ hosted: HostedReplaceWorkspace) async throws {
@@ -174,5 +178,39 @@ final class MainRunLoopBusyMonitor {
         let user = Double(info.user_time.seconds) * 1000 + Double(info.user_time.microseconds) / 1000
         let system = Double(info.system_time.seconds) * 1000 + Double(info.system_time.microseconds) / 1000
         return user + system
+    }
+}
+
+/// Editor work around a measured phase: separates the gutter's own cost from the rest, and
+/// records the TextKit element-cache state typing started from.
+@MainActor
+private struct EditorProbeCounters {
+    let gutterDraws: Int
+    let gutterDrawMilliseconds: Double
+    let gutterWidthChanges: Int
+    let lineIndexRebuilds: Int
+    /// Characters `EditorTextElementCacheTrimmer` has released so far.
+    let trimmedLength: Int
+    let editorHeight: CGFloat
+
+    init(_ editor: MarkdownSTTextView) {
+        gutterDraws = editor.lineNumberGutter?.drawCount ?? 0
+        gutterDrawMilliseconds = editor.lineNumberGutter?.totalDrawMilliseconds ?? 0
+        gutterWidthChanges = editor.lineNumberGutter?.thicknessChangeCount ?? 0
+        lineIndexRebuilds = editor.lineIndexCache.rebuildCount
+        trimmedLength = (editor.textDelegate as? MarkdownTextViewCoordinator)?.textElementCacheTrimmer
+            .trimmedLength ?? 0
+        editorHeight = editor.frame.height
+    }
+
+    func report(since start: Self) -> [String: Any] {
+        [
+            "gutterDraws": gutterDraws - start.gutterDraws,
+            "gutterDrawMilliseconds": gutterDrawMilliseconds - start.gutterDrawMilliseconds,
+            "gutterWidthChanges": gutterWidthChanges - start.gutterWidthChanges,
+            "lineIndexRebuilds": lineIndexRebuilds - start.lineIndexRebuilds,
+            "trimmedBeforeTyping": start.trimmedLength,
+            "editorHeightBeforeTyping": start.editorHeight,
+        ]
     }
 }
