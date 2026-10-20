@@ -10,29 +10,33 @@ import XCTest
 @MainActor
 extension EditorFindHostedGateTests {
     func testHostedSourcePreviewTypingMainThreadBusySlices() async throws {
-        try await recordSourcePreviewTypingBusySlices(visitingDocumentEnd: false)
+        try await recordTypingBusySlices(layoutMode: .sourcePreview, visitingDocumentEnd: false)
     }
 
     /// Viewing the end once leaves TextKit's element cache filled to there (see
     /// `EditorTextElementCacheTrimmer`); typing above it is the common case afterwards.
     func testHostedSourcePreviewTypingAfterViewingDocumentEndMainThreadBusySlices() async throws {
-        try await recordSourcePreviewTypingBusySlices(visitingDocumentEnd: true)
+        try await recordTypingBusySlices(layoutMode: .sourcePreview, visitingDocumentEnd: true)
     }
 
-    private func recordSourcePreviewTypingBusySlices(visitingDocumentEnd: Bool) async throws {
+    /// The same workload without the preview, whose layer-tree commits dominate the
+    /// slices above and vary between runs: what remains is the editor's own work.
+    func testHostedSourceOnlyTypingMainThreadBusySlices() async throws {
+        try await recordTypingBusySlices(layoutMode: .sourceOnly, visitingDocumentEnd: false)
+    }
+
+    private func recordTypingBusySlices(layoutMode: EditorLayoutMode, visitingDocumentEnd: Bool) async throws {
         try requireScrollProbe()
         let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "large-1mb", withExtension: "md"))
         let source = try String(contentsOf: fixture, encoding: .utf8)
-        let hosted = try await makeHostedEditorWorkspace(source: source, layoutMode: .sourcePreview)
-        try await waitUntil("preview mounts", timeout: 20) {
-            hosted.group.members.first?.host.previewLifecycle.controllerForShutdown?.isReady == true
-        }
-        let preview = try XCTUnwrap(hosted.group.members.first?.host.previewLifecycle.controllerForShutdown)
-        try await waitUntil("initial large preview render", timeout: 60) {
-            let count = try? await preview.webView.evaluateJavaScript(
-                "document.querySelectorAll('[data-line]').length"
-            ) as? Int
-            return (count ?? 0) > 10000
+        let lineNumbers = scrollProbeShowsLineNumbers
+        let hosted = try await makeHostedEditorWorkspace(
+            source: source,
+            layoutMode: layoutMode,
+            showsLineNumbers: lineNumbers
+        )
+        if layoutMode == .sourcePreview {
+            try await waitForLargePreview(hosted)
         }
         let editor = try hostedEditor(hosted)
         let middle = (source as NSString).lineRange(for: NSRange(location: source.utf16.count / 2, length: 0))
@@ -44,6 +48,7 @@ extension EditorFindHostedGateTests {
         editor.scrollRangeToVisible(editor.selectedRange())
         try await Task.sleep(nanoseconds: 1_000_000_000)
 
+        let gutterDrawsBefore = editor.lineNumberGutter?.drawCount ?? 0
         let monitor = MainRunLoopBusyMonitor()
         // Lets an external `sample` attach to the measured phase only (stdout is buffered).
         let marker = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("main-thread-probe-begin")
@@ -59,12 +64,16 @@ extension EditorFindHostedGateTests {
         }
         try await Task.sleep(nanoseconds: 1_000_000_000)
         let slices = monitor.stop()
+        let gutterDraws = (editor.lineNumberGutter?.drawCount ?? 0) - gutterDrawsBefore
 
         XCTAssertEqual(MarkdownTextView.textStorage(of: editor)?.string, hosted.appState.currentDocument.text)
         let sorted = slices.map(\.wallMilliseconds).sorted()
         let longest = slices.sorted { $0.wallMilliseconds < $1.wallMilliseconds }.suffix(12)
         let name = visitingDocumentEnd ? "after viewing the end" : "from the middle"
-        recordScrollReport("Source+preview typing \(name) main-thread busy slices", [
+        let mode = layoutMode == .sourcePreview ? "Source+preview" : "Source-only"
+        recordScrollReport("\(mode) typing \(name) main-thread busy slices", [
+            "lineNumbers": lineNumbers,
+            "gutterDraws": gutterDraws,
             "slices": slices.count,
             "maxMilliseconds": sorted.last ?? 0,
             "p95Milliseconds": sorted.isEmpty ? 0 : sorted[Int(Double(sorted.count - 1) * 0.95)],
@@ -76,6 +85,25 @@ extension EditorFindHostedGateTests {
             "longestCPU": longest.map(\.cpuMilliseconds),
             "longestStart": longest.map(\.startMilliseconds),
         ])
+    }
+
+    private func waitForLargePreview(_ hosted: HostedReplaceWorkspace) async throws {
+        try await waitUntil("preview mounts", timeout: 20) {
+            hosted.group.members.first?.host.previewLifecycle.controllerForShutdown?.isReady == true
+        }
+        let preview = try XCTUnwrap(hosted.group.members.first?.host.previewLifecycle.controllerForShutdown)
+        try await waitUntil("initial large preview render", timeout: 60) {
+            let count = try? await preview.webView.evaluateJavaScript(
+                "document.querySelectorAll('[data-line]').length"
+            ) as? Int
+            return (count ?? 0) > 10000
+        }
+    }
+
+    /// `TEST_RUNNER_PLAINSONG_SCROLL_PROBE_LINE_NUMBERS=0` measures the same workload with
+    /// line numbers hidden from the start (the app shows them by default).
+    var scrollProbeShowsLineNumbers: Bool {
+        ProcessInfo.processInfo.environment["PLAINSONG_SCROLL_PROBE_LINE_NUMBERS"] != "0"
     }
 }
 

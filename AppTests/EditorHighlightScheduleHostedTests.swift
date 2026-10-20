@@ -74,7 +74,8 @@ extension EditorFindHostedGateTests {
                                    query: String? = nil,
                                    localEdit: String? = nil,
                                    assets: [String: Data] = [:],
-                                   layoutMode: EditorLayoutMode = .sourceOnly) async throws -> HostedReplaceWorkspace
+                                   layoutMode: EditorLayoutMode = .sourceOnly,
+                                   showsLineNumbers: Bool = true) async throws -> HostedReplaceWorkspace
     {
         let fixture = try makeWorkspaceFixture(files: ["post.md": source])
         for (name, data) in assets {
@@ -86,6 +87,7 @@ extension EditorFindHostedGateTests {
         }
         appState.setLayoutMode(layoutMode)
         appState.preferences.setAutosaveIntervalSeconds(30)
+        appState.preferences.setShowsLineNumbers(showsLineNumbers)
         appState.openExternalFile(fixture.root)
         try await waitUntil("workspace document opens") {
             appState.currentDocument.fileURL?.lastPathComponent == "post.md"
