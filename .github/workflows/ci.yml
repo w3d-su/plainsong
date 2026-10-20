@@ -21,11 +21,68 @@ permissions:
 
 # The suite runs as parallel jobs instead of one serial macOS job; the
 # `build-and-test` job at the bottom keeps the check name the main ruleset
-# requires and passes only when every job passed. Three macOS jobs per run fit
-# GitHub's 5-concurrent macOS job cap (non-Enterprise plans); when two PRs run
-# at once, one of the second run's jobs waits for a free runner.
+# requires and passes only when every job passed, or when `changes` found a
+# docs-only pull request and the test jobs were skipped. Three macOS jobs per
+# run fit GitHub's 5-concurrent macOS job cap (non-Enterprise plans); when two
+# PRs run at once, one of the second run's jobs waits for a free runner.
 jobs:
+  # Docs-only fast path. A pull request counts as docs-only when every path it
+  # changes is under docs/ or is a top-level *.md or LICENSE file. Two docs paths
+  # are test inputs and still run everything: `make test-packages` reads
+  # docs/perf-log.md and docs/evidence/** (Scripts/editor_find_f2_evidence_tests).
+  # Deleting a top-level file also runs everything, because project.yml lists
+  # agent.md. workflow_dispatch always runs the full suite.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+    steps:
+      # A pull_request checkout is GitHub's test merge commit, the tree every job
+      # below tests; depth 2 adds its first parent, the base branch tip. The diff
+      # below reads trees, never file contents, so a sparse checkout (which
+      # actions/checkout fetches blobless) skips downloading the repository.
+      - uses: actions/checkout@v4
+        if: ${{ github.event_name == 'pull_request' }}
+        with:
+          fetch-depth: 2
+          sparse-checkout: .github
+
+      - name: Classify changed paths
+        id: classify
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            echo "$GITHUB_EVENT_NAME runs the full suite."
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # --no-renames lists a move as a delete plus an add, so every record is
+          # one status and one path and a move's source path is classified too;
+          # -z keeps unusual file names literal.
+          git diff --name-status --no-renames -z HEAD^1 HEAD > "$RUNNER_TEMP/changed-paths"
+          docs_only=true
+          changed=0
+          while IFS= read -r -d '' status && IFS= read -r -d '' path; do
+            changed=$((changed + 1))
+            case "$path" in
+              docs/perf-log.md | docs/evidence/*) verdict="test input" ;;
+              docs/*) verdict=docs ;;
+              */*) verdict=code ;;
+              *.md | LICENSE) if [ "$status" = D ]; then verdict="deleted top-level file"; else verdict=docs; fi ;;
+              *) verdict=code ;;
+            esac
+            printf '%s\t%s\t%s\n' "$status" "$verdict" "$path"
+            [ "$verdict" = docs ] || docs_only=false
+          done < "$RUNNER_TEMP/changed-paths"
+          # An empty diff is not evidence of a docs-only change.
+          [ "$changed" -gt 0 ] || docs_only=false
+          echo "$changed changed paths; docs_only=$docs_only"
+          echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
+
   preview:
+    needs: changes
+    if: ${{ needs.changes.outputs.docs_only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -49,6 +106,8 @@ jobs:
         run: make test-preview
 
   packages:
+    needs: changes
+    if: ${{ needs.changes.outputs.docs_only != 'true' }}
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -117,6 +176,8 @@ jobs:
   # (~3 min; -only-testing narrows execution, not the build).
   hosted:
     name: hosted (${{ matrix.shard }})
+    needs: changes
+    if: ${{ needs.changes.outputs.docs_only != 'true' }}
     runs-on: macos-15
     timeout-minutes: 40
     strategy:
@@ -180,11 +241,12 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
-  # Required status check (main ruleset): keep this job id. Any failed, cancelled
-  # or skipped job above fails it.
+  # Required status check (main ruleset): keep this job id. Any failed or
+  # cancelled job above fails it. A skipped job fails it too, unless `changes`
+  # succeeded and reported a docs-only pull request.
   build-and-test:
     if: ${{ always() }}
-    needs: [preview, packages, hosted]
+    needs: [changes, preview, packages, hosted]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
@@ -194,4 +256,7 @@ jobs:
           NEEDS: ${{ toJSON(needs) }}
         run: |
           echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
-          echo "$NEEDS" | jq -e 'all(.[]; .result == "success")' > /dev/null
+          echo "$NEEDS" | jq -r '"docs_only: \(.changes.outputs.docs_only // "unset")"'
+          echo "$NEEDS" | jq -e '
+            (.changes.result == "success" and .changes.outputs.docs_only == "true") as $docs_only
+            | all(.[]; .result == "success" or ($docs_only and .result == "skipped"))' > /dev/null

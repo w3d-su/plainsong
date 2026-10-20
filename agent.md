@@ -89,7 +89,7 @@ blogeditor/
 │   ├── src/pipeline.ts       # unified pipeline (md and mdx variants)
 │   ├── src/styles/           # preview CSS (Apple system palette, Xcode-style syntax colors)
 │   └── test/                 # vitest specs
-└── .github/workflows/ci.yml  # parallel jobs: preview (Linux npm), packages (lint + swift test), hosted XCTest shards; `build-and-test` gate
+└── .github/workflows/ci.yml  # parallel jobs: preview (Linux npm), packages (lint + swift test), hosted XCTest shards; `build-and-test` gate; docs-only PRs skip the test jobs (`changes`)
 ```
 
 Build artifacts: `preview-src` builds to `App/Resources/preview/` (`index.html`, `bundle.js`,
