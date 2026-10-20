@@ -112,7 +112,7 @@ Additional consumers of `currentDocument` / `sessionCache` that I2 must migrate:
 | `firstUnretirableExternalConflict` | `App/AppState+WorkspaceSessions.swift:156-175` | Enumerate globally, then filter to the release operation's root when closing one root. |
 | `isAddressableExternalResolutionSession` | `App/AppState+ExternalChanges.swift:772-786` | Accept registry-owned sessions, including another window's current session. |
 | `canAutosave` membership | `App/AppState+Autosave.swift:145` | Registry membership; never one window's cache/current document. |
-| `releaseUnreferencedUntitledSessionOwnership` | `App/AppState+SessionOwnership.swift:92-104` | Check all windows and retained owners before releasing proof. |
+| `releaseUnreferencedSessionOwnership` | `App/AppState+SessionOwnership.swift:95-117` | Check all windows and retained owners before releasing proof. |
 | Search dirty overlays and relevant-edit membership | `App/AppState+CompletionWorkspace.swift:154-162`, `App/AppState+WorkspaceReload.swift:62` | Registry candidates filtered to the query's root; refresh each affected window's search. |
 
 ### 2.4 Packages

@@ -17,8 +17,8 @@ struct EditorWorkspace: View {
                 fileURL: appState.currentDocument.fileURL,
                 fileKind: appState.currentDocument.fileKind,
                 isSaving: appState.isSaving,
-                workspaceTree: { appState.workspaceTree },
-                openNode: { appState.selectWorkspaceNode(id: $0) }
+                workspaceTree: { [appState] in appState.workspaceTree },
+                openNode: { [appState] in appState.selectWorkspaceNode(id: $0) }
             )
 
             if appState.workspaceMutationRecoveryBannerPlacement == .editor {
@@ -75,7 +75,13 @@ struct EditorWorkspace: View {
         .onAppear(perform: configurePreviewCallbacks)
     }
 
+    /// Closures that outlive this body (the controller's callbacks, the jump bar's AppKit
+    /// menu targets) capture `appState` and the coordinator, never `self`: a copy of this
+    /// view holds the `@StateObject` storage, so capturing it retains the controller and its
+    /// web view from the controller itself, and from any removed view still autoreleased.
     private func configurePreviewCallbacks() {
+        let appState = appState
+        let scrollCoordinator = scrollCoordinator
         scrollCoordinator.connect(previewController: previewController)
 
         previewController.onPreviewScrolled = { line in
