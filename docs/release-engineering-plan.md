@@ -5,7 +5,7 @@
 > notarization scripted later; direct distribution first, App Store optional. This document
 > turns that into ordered work packages with gates. Owner decisions are marked **[owner]**.
 
-Created 2026-07-02. Current state (2026-10-15): MIT `LICENSE` committed; packaging
+Created 2026-07-02. Current state (@@DATE@@): MIT `LICENSE` committed; packaging
 (`make release`, P3) and unsigned release CI (`release.yml`, P4) landed; v0.1.0-alpha.1 is
 published. The `v0.1.0-alpha.2` tag completed the first end-to-end P4 CI run and created a
 draft prerelease with the build-67 unsigned DMG and filename-only `.sha256`; that GitHub
@@ -15,7 +15,18 @@ as a GitHub prerelease, built by Release workflow run 38696363613 from `main` at
 `5707c4623a4fd4dce2255864d8972af46c0c0477d4fd55e01208647f5e5e47fc`) was verified as
 universal (arm64 + x86_64) with a valid ad-hoc signature and the sandbox +
 `com.apple.security.network.client` entitlements present. Because alpha.2 was never
-published, alpha.3's auto-generated changelog compares against alpha.1. Per-DMG
+published, alpha.3's auto-generated changelog compares against alpha.1.
+**v0.1.0-alpha.4 was published @@DATE@@** as a GitHub prerelease, built by Release
+workflow run @@RUN_ID@@ from `main` at `@@TAG_SHA@@` (build @@BUILD@@). It is a fix and
+performance release (single-file open/save under the sandbox, large-document typing and
+scroll, Files sidebar, preview leak on close) with no new features. Its asset
+`Plainsong-0.1.0-@@BUILD@@-unsigned.dmg` (SHA-256
+`@@DMG_SHA256@@`) passed the alpha.3
+checks (universal arm64 + x86_64, valid ad-hoc signature, sandbox entitlements present).
+`PLAINSONG_UNSIGNED=1 make release` was also run locally from the same `main` commit before
+the tag. `MARKETING_VERSION` stays `0.1.0` and the build number stays the commit count
+(P0.5): the prerelease label lives only in the tag name. Alpha.3 was already published, so
+alpha.4's auto-generated changelog compares against alpha.3. Per-DMG
 clean-machine spot-checking remains good practice and is not a release blocker after R14/P5
 closed with alpha.1. Developer ID signing and notarization remain deferred with P1/P2. The
 app builds and runs locally with the sandbox and `com.apple.security.network.client`
