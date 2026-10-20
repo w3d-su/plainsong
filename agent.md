@@ -325,7 +325,10 @@ compute async, cancel stale requests.
 ### 7.1 Web view setup
 
 - One `WKWebView` per editor pane, non-opaque, loads the bundled `index.html` once and
-  stays alive (re-render via JS, never reload the page per keystroke).
+  stays alive (re-render via JS, never reload the page per keystroke). Only the editor
+  view's `@StateObject` state owns its `PreviewController`: closures stored on the
+  controller or handed to AppKit views capture the objects they use, never the view
+  struct, so closing the workspace root releases the controller and its web view.
 - **Security:** strict CSP (`default-src 'none'; script-src 'self'; style-src 'self'
   'unsafe-inline'; img-src asset: data: https:`), `isElementFullscreenEnabled` off, and
   no remote loads by default. The preview JS removes remote image `src` values unless
