@@ -67,6 +67,12 @@ final class MarkdownSyntaxParser {
 
     func tokens(in source: String, fileKind: FileKind, visibleRange requestedRange: NSRange) -> [MarkdownSyntaxToken] {
         let range = Self.visibleHighlightRange(in: source, requestedRange: requestedRange)
+        return tokens(in: source, fileKind: fileKind, expandedVisibleRange: range)
+    }
+
+    /// The highlighter already expanded fence/frontmatter context. Do not repeat the
+    /// scan from the beginning of a large document just to parse the same fragment.
+    func tokens(in source: String, fileKind: FileKind, expandedVisibleRange range: NSRange) -> [MarkdownSyntaxToken] {
         guard let fragment = source.fragment(in: range) else {
             return []
         }

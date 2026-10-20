@@ -234,6 +234,14 @@ replacement local to EditorKit.
 
 - `MarkdownHighlightService` runs tree-sitter parsing off the main actor and applies
   highlight attributes to the visible range; the façade keeps a later Neon swap local.
+- Highlight requests include 1–4 Ki UTF-16 units of padding on either side. Viewport
+  observations inside the pending/completed window reuse it without publishing a
+  SwiftUI update. Edits, document/appearance changes and WYSIWYG selection changes
+  still restart the revision-fenced scheduler; fence/frontmatter context is expanded
+  once per source highlight, off the main actor.
+- Applying a highlight skips runs whose stored attributes already equal the new ones:
+  re-setting equal attributes still marks the run edited, and TextKit then re-typesets
+  every visible paragraph. The stored result is identical either way.
 - Two-layer markdown grammar: `markdown` (block structure) with `markdown-inline`
   injected, then language injections inside fenced code blocks keyed by the info string.
 - Frontmatter: the markdown grammar exposes the YAML frontmatter block → inject
@@ -429,10 +437,26 @@ Mapping basis: `data-line` attributes emitted by `rehype-source-lines` on every
 block-level element.
 
 - **Editor → preview (primary direction):** on editor scroll, compute first visible
-  source line (TextKit 2 `textLayoutManager` viewport) → `scrollToLine`. JS finds the
+  source line (the layout fragment at the visible top edge, not the TextKit viewport
+  start, which STTextView extends above the visible area) → `scrollToLine`. JS finds the
   nearest `[data-line]` ≤ line and the next one > line, interpolates between their
-  `offsetTop`s proportionally to line distance → smooth, accurate positioning.
-- **Preview → editor:** symmetric, using `previewScrolled`.
+  document-relative tops proportionally to line distance → smooth, accurate positioning.
+- The preview keeps a line-sorted `[data-line]` anchor list, rebuilt only after DOM
+  mutations (`MutationObserver`, with `takeRecords()` for same-turn changes), and
+  binary-searches it. `scrollToLine` reads live layout tops for the two bracketing
+  anchors only, so resize, image, font or Mermaid reflow can never leave it stale and
+  no resize frame re-measures the document. Tops are layout coordinates: `offsetTop`
+  summed over offset parents (tables, positioned MDX blocks); unrendered anchors
+  (`display: none`, closed `<details>`) are skipped.
+- **Preview → editor:** symmetric, using `previewScrolled`. The top-ordered anchor
+  list is measured lazily and reused while the two anchors bounding a lookup are still
+  where it recorded them; otherwise it is re-measured.
+- **Reflow:** the preview remembers the (fractional) source position at its top and
+  re-places it when its width changes (`ResizeObserver`, before paint), because the
+  editor reports nothing new when its own top line survives a window resize.
+- The editor's source-line index is edited in place from `willChangeTextIn`
+  (O(log n) per keystroke; a full rebuild walked the 1 MiB storage on every selection
+  change), with a length check and a change-notification fallback that rebuild in bulk.
 - **Loop prevention:** a `scrollOwner` token (`editor` | `preview` | `none`) with 100 ms
   decay; messages from the non-owner are dropped.
 - Cursor-follow option: "typewriter sync" — on text edit, preview scrolls to the edited
@@ -518,6 +542,17 @@ shifted following ordinals. While a changed diagram renders, morphdom keeps its 
 SVG children only as non-authoritative pending content, avoiding a temporary collapse.
 **Any PR that regresses typing latency is rejected regardless of features.** Add a
 `PerformanceTests` target with a large fixture (`Fixtures/large-1mb.md`).
+
+Editor main-thread rules (profiled 2026-10-18; evidence in `docs/perf-log.md`): no
+O(document) work per keystroke on the main thread. Publish native UTF-8 source strings,
+never the bridged `NSTextStorage` string: SwiftUI compares published text with `==`,
+which normalizes a bridged string from its first character. Edit derived indexes in
+place. Release TextKit 2's cached text elements below the viewport once scrolling
+settles (`EditorTextElementCacheTrimmer`): each edit rewrites the range of every cached
+element after it, so typing above a once-viewed document end cost ~50 ms per keystroke.
+The synchronous typing gates do not see SwiftUI, layout or display work a keystroke
+schedules; typing with the preview visible is measured by the opt-in hosted
+busy-slice probe (`MainThreadStallHostedTests`, `TEST_RUNNER_PLAINSONG_RUN_SCROLL_PROBE=1`).
 
 M5 planning note: the highlight budget is accepted only from visible-range-first
 highlighting instrumentation, not from the historical 250 KB full-document inline

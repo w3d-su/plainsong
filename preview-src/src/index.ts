@@ -23,6 +23,7 @@ import {
 import { MermaidRenderCoordinator } from "./mermaid-renderer";
 import { mdxErrorDetails } from "./mdx-error";
 import { renderMarkdown, renderMdx } from "./pipeline";
+import { PreviewScrollIndex } from "./scroll-index";
 
 export { PROTOCOL_VERSION } from "./bridge";
 
@@ -32,6 +33,7 @@ declare const __PLAINSONG_BUNDLED_CSS__: string;
 type ScrollOwner = "editor" | "preview" | "none";
 
 const previewRoot = requirePreviewRoot();
+const scrollIndex = new PreviewScrollIndex(previewRoot);
 
 // Drop-ordering key. Monotonic across document switches, unlike `version` which
 // resets per document — using `version` here stranded the preview on the previous
@@ -46,6 +48,12 @@ let currentAllowRemoteImages = false;
 let scrollOwner: ScrollOwner = "none";
 let scrollOwnerTimer: number | undefined;
 let scrollFrame: number | undefined;
+// Fractional source line kept at the top of the viewport. A width change reflows the
+// content under an unchanged scrollY, and the editor reports nothing new when its own
+// top line survives the resize, so the preview re-places this position itself.
+let anchoredPosition: number | undefined;
+let layoutWidth: number | undefined;
+const scrollAnchorOffset = 12;
 
 const mermaidRenderer = new MermaidRenderCoordinator(
   (id, source) => mermaid.render(id, source),
@@ -77,6 +85,18 @@ window.addEventListener(
   },
   { passive: true },
 );
+
+// Resize callbacks run after layout and before paint, so the re-anchored scroll
+// position is what the next frame shows. (jsdom has no ResizeObserver.)
+if (typeof ResizeObserver !== "undefined") {
+  new ResizeObserver(([entry]) => {
+    const width = entry.contentRect.width;
+    if (width === layoutWidth) return;
+    const isReflow = layoutWidth !== undefined;
+    layoutWidth = width;
+    if (isReflow && anchoredPosition !== undefined) placeSourcePosition(anchoredPosition, false);
+  }).observe(previewRoot);
+}
 
 previewRoot.addEventListener("click", (event) => {
   const target = event.target;
@@ -248,12 +268,18 @@ function clearMdxErrorBanner(): void {
 }
 
 function scrollToLine(line: number, animated: boolean): void {
-  const targetTop = interpolatedTopForLine(line);
+  anchoredPosition = line;
+  placeSourcePosition(line, animated);
+}
+
+function placeSourcePosition(position: number, animated: boolean): void {
+  const targetTop = scrollIndex.topForLine(position);
   if (targetTop === undefined) return;
 
+  // Programmatic scrolling is never reported back to the editor.
   setScrollOwner("editor");
   window.scrollTo({
-    top: Math.max(0, targetTop - 12),
+    top: Math.max(0, targetTop - scrollAnchorOffset),
     behavior: animated ? "smooth" : "auto",
   });
 }
@@ -261,7 +287,8 @@ function scrollToLine(line: number, animated: boolean): void {
 function handlePreviewScroll(): void {
   if (scrollOwner === "editor") return;
 
-  const topVisibleLine = topVisibleLineFromScroll();
+  anchoredPosition = scrollIndex.positionAtTop(window.scrollY + scrollAnchorOffset) ?? anchoredPosition;
+  const topVisibleLine = scrollIndex.lineAtTop(window.scrollY + 16);
   if (topVisibleLine === undefined) return;
 
   setScrollOwner("preview");
@@ -280,54 +307,6 @@ function setScrollOwner(owner: ScrollOwner): void {
     scrollOwner = "none";
     scrollOwnerTimer = undefined;
   }, 100);
-}
-
-function lineAnchors(): Array<{ line: number; element: HTMLElement }> {
-  return Array.from(previewRoot.querySelectorAll<HTMLElement>("[data-line]"))
-    .map((element) => ({
-      element,
-      line: Number.parseInt(element.dataset.line ?? "", 10),
-    }))
-    .filter(({ line }) => Number.isFinite(line))
-    .sort((a, b) => a.line - b.line);
-}
-
-function interpolatedTopForLine(line: number): number | undefined {
-  const anchors = lineAnchors();
-  if (anchors.length === 0) return undefined;
-
-  let previous = anchors[0];
-  let next = anchors[anchors.length - 1];
-
-  for (const anchor of anchors) {
-    if (anchor.line <= line) previous = anchor;
-    if (anchor.line > line) {
-      next = anchor;
-      break;
-    }
-  }
-
-  if (previous === next || next.line <= previous.line) {
-    return previous.element.offsetTop;
-  }
-
-  const progress = (line - previous.line) / (next.line - previous.line);
-  return (
-    previous.element.offsetTop +
-    (next.element.offsetTop - previous.element.offsetTop) * progress
-  );
-}
-
-function topVisibleLineFromScroll(): number | undefined {
-  const y = window.scrollY + 16;
-  let bestLine: number | undefined;
-
-  for (const anchor of lineAnchors()) {
-    if (anchor.element.offsetTop > y) break;
-    bestLine = anchor.line;
-  }
-
-  return bestLine;
 }
 
 function sourceLineForElement(element: Element): number | undefined {

@@ -27,6 +27,13 @@ public final class EditorScrollProxy: ObservableObject {
         attachment?.emitVisibleLine(containingUTF16Offset: offset)
     }
 
+    /// Native replacements arrive here before the content storage changes, so selection
+    /// and layout callbacks inside the edit already see an index for the new text.
+    func textWillChange(in range: NSRange, replacementString: String, in textView: STTextView) {
+        guard attachment?.isAttached(to: textView) == true else { return }
+        attachment?.textWillChange(in: range, replacementString: replacementString)
+    }
+
     func emitNavigationLine(
         containingUTF16Offset offset: Int,
         documentIdentity: EditorDocumentIdentity,
@@ -52,53 +59,10 @@ public final class EditorScrollProxy: ObservableObject {
         attachment?.detach()
         attachment = nil
     }
-}
 
-struct EditorScrollLineIndex {
-    private let lineStarts: [Int]
-    private let textUTF16Count: Int
-
-    init(text: String) {
-        var starts = [0]
-        var offset = 0
-
-        for unit in text.utf16 {
-            offset += 1
-            if unit == 10 {
-                starts.append(offset)
-            }
-        }
-
-        lineStarts = starts
-        textUTF16Count = offset
-    }
-
-    func oneBasedLine(containingUTF16Offset offset: Int) -> Int {
-        let clampedOffset = min(max(offset, 0), textUTF16Count)
-        var lowerBound = 0
-        var upperBound = lineStarts.count
-
-        while lowerBound < upperBound {
-            let midpoint = lowerBound + (upperBound - lowerBound) / 2
-            if lineStarts[midpoint] <= clampedOffset {
-                lowerBound = midpoint + 1
-            } else {
-                upperBound = midpoint
-            }
-        }
-
-        return max(1, lowerBound)
-    }
-
-    func utf16Offset(forOneBasedLine line: Int) -> Int {
-        guard line > 1 else { return 0 }
-
-        let index = line - 1
-        guard lineStarts.indices.contains(index) else {
-            return textUTF16Count
-        }
-
-        return lineStarts[index]
+    /// Full line-index scans since attachment; typing must not add any.
+    var lineIndexRebuildCount: Int {
+        attachment?.lineIndexRebuildCount ?? 0
     }
 }
 
@@ -109,7 +73,10 @@ private final class EditorScrollAttachment {
     private var boundsObserver: NotificationObserver?
     private var textObserver: NotificationObserver?
     private var lineIndex: EditorScrollLineIndex?
+    /// Forwarded replacements whose `textDidChangeNotification` has not arrived yet.
+    private var editsAwaitingDidChange = 0
     private var lastEmittedLine: Int?
+    private(set) var lineIndexRebuildCount = 0
 
     init(textView: STTextView, proxy: EditorScrollProxy) {
         self.textView = textView
@@ -159,12 +126,28 @@ private final class EditorScrollAttachment {
             object: textView,
             queue: .main
         ) { [weak self] _ in
-            // The observer is delivered on the main queue. Invalidate in this notification,
-            // before a same-turn source installation can issue navigation into the new text.
+            // The observer is delivered on the main queue. A change that was not forwarded
+            // through `textWillChange` invalidates here, before a same-turn source
+            // installation can issue navigation into the new text.
             MainActor.assumeIsolated {
-                self?.lineIndex = nil
+                guard let self else { return }
+                if self.editsAwaitingDidChange > 0 {
+                    self.editsAwaitingDidChange -= 1
+                } else {
+                    self.lineIndex = nil
+                }
             }
         })
+    }
+
+    func textWillChange(in range: NSRange, replacementString: String) {
+        editsAwaitingDidChange += 1
+        guard var index = lineIndex else { return }
+        // Release the stored copy first so the edit mutates a uniquely referenced buffer.
+        lineIndex = nil
+        if index.replaceCharacters(in: range, with: replacementString) {
+            lineIndex = index
+        }
     }
 
     func emitVisibleLine(containingUTF16Offset offset: Int) {
@@ -199,23 +182,24 @@ private final class EditorScrollAttachment {
     private func firstVisibleLine() -> Int? {
         guard let textView else { return nil }
 
-        let layoutManager = textView.textLayoutManager
-        let contentManager = textView.textContentManager
-        let visibleLocation = layoutManager.textViewportLayoutController.viewportRange?.location
-            ?? layoutManager.documentRange.location
-        let offset = contentManager.offset(from: contentManager.documentRange.location, to: visibleLocation)
-        guard offset != NSNotFound else { return nil }
-
+        // Not `viewportRange.location`: the viewport extends above the visible area.
+        let offset = EditorVisibleTop.utf16Offset(in: textView) ?? 0
         return currentLineIndex().oneBasedLine(containingUTF16Offset: offset)
     }
 
     private func currentLineIndex() -> EditorScrollLineIndex {
-        if let lineIndex {
+        // `mutableString` reads the storage in place, without bridging it to `String`.
+        let text = textView.map { textView -> NSString in
+            MarkdownTextView.textStorage(of: textView)?.mutableString
+                ?? (textView.text ?? "") as NSString
+        } ?? ""
+        // The length check is O(1) and catches any edit that bypassed `textWillChange`.
+        if let lineIndex, lineIndex.textUTF16Count == text.length {
             return lineIndex
         }
 
-        let text = textView.map { MarkdownTextView.textStorage(of: $0)?.string ?? $0.text ?? "" } ?? ""
-        let newIndex = EditorScrollLineIndex(text: text)
+        let newIndex = EditorScrollLineIndex(utf16: text)
+        lineIndexRebuildCount += 1
         lineIndex = newIndex
         return newIndex
     }

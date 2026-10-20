@@ -313,6 +313,21 @@ final class WYSIWYGNativeInteractionGateTests: XCTestCase {
         XCTAssertNil(textContentStorage.delegate)
     }
 
+    func testDisablingFoldingThatWasNeverEnabledDoesNotTreatNilAsInstalled() throws {
+        let textView = MarkdownSTTextView(frame: .zero)
+        textView.text = "plain paragraph"
+        let textContentStorage = try XCTUnwrap(textView.textContentManager as? NSTextContentStorage)
+        XCTAssertNil(textContentStorage.delegate)
+        // Source mode disables folding on document installation, including while typing.
+        XCTAssertFalse(MarkdownSTTextView.isInstalled(nil, in: textContentStorage))
+
+        textView.setWYSIWYGZeroWidthFoldingEnabled(true)
+        let zeroWidthDelegate = try XCTUnwrap(textView.wysiwygZeroWidthContentStorageDelegate)
+        XCTAssertTrue(MarkdownSTTextView.isInstalled(zeroWidthDelegate, in: textContentStorage))
+        textContentStorage.delegate = nil
+        XCTAssertFalse(MarkdownSTTextView.isInstalled(zeroWidthDelegate, in: textContentStorage))
+    }
+
     func testZeroWidthDelegateForwardsNonFoldedParagraphRequestsToPreviousDelegate() throws {
         let source = "plain paragraph"
         let textView = MarkdownSTTextView(frame: .zero)

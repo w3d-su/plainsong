@@ -2676,3 +2676,39 @@ For reference, PR #169 measured the same fixture at ~3.5 s locally and ~12.6 s o
 in the WKWebView export path, and 240,000 chars at ~113 s (past the 15 s export render
 timeout). `preview-src/test/code-highlight.test.ts` renders the 240,000-char bare fence and
 requires completion under 5 s without calling `highlightElement`.
+
+## Scroll and typing pass, paired A/B (recorded load) — 2026-10-18
+
+Three trees, each built `-configuration Debug SWIFT_OPTIMIZATION_LEVEL=-O
+GCC_OPTIMIZATION_LEVEL=s` (release optimization, Debug-only test hooks intact): main
+`f47ad3b` plus this branch's opt-in probe files; this branch pinned back to STTextView
+2.3.10; this branch (2.4.1). Three interleaved rounds (main, 2.3.10, branch), one
+`xcodebuild test-without-building` per tree per round running the source-only and
+WYSIWYG typing gates, both source+preview busy-slice probes, and the editor and preview
+scroll workloads (`TEST_RUNNER_PLAINSONG_RUN_SCROLL_PROBE=1`,
+`TEST_RUNNER_PLAINSONG_RUN_HOSTED_TYPING_GATE=1`). Medians with [min-max] over rounds.
+1-minute load at start: main 19/171/33, 2.3.10 13/70/43, branch 12/40/42; round 2 ran
+under heavy external load. Observed under recorded load, not idle-machine acceptance.
+
+| Metric | main | branch + 2.3.10 | branch (2.4.1) |
+|---|---|---|---|
+| Typing gate median / max, source-only (ms) | 15.5 / 16.6 | 4.1 / 4.4 | 4.1 / 4.3 |
+| Typing gate median / max, WYSIWYG (ms) | 15.5 / 15.9 | 4.1 / 4.3 | 4.1 / 4.4 |
+| Editor scroll p95 / max (ms) | 56.5 / 102.7 | 56.2 / 58.1 | 11.2 / 27.1 |
+| Preview scroll full anchor queries / geometry reads | 119 / 459,903 | 1 / 50,057 | 1 / 50,057 |
+| Source+preview typing, main-thread busy (ms) | 14,883 [13,856-15,171] | 7,824 [7,218-18,591] | 6,697 [6,047-7,374] |
+| … same after viewing the document end (ms) | 16,744 [15,615-17,788] | 13,282 [13,279-13,876] | 6,014 [5,884-6,637] |
+| … longest single busy slice (ms) | 14,670 | 1,836 | 1,460 |
+
+The busy-slice probe types 30 keys 90 ms apart, then 20 keys 250 ms apart, into the
+middle of `large-1mb.md` with the preview visible, and sums every main run-loop stretch
+between waking and sleeping; per-slice thread CPU time matched wall time, so the
+remaining slices compute rather than wait.
+
+Release-config EditorKit harness (1 MiB synthetic text, insert at the middle):
+0.3 ms fresh; 54 ms after the end had been in view; 2.2 ms after releasing cached
+elements below the viewport. Releasing an uncached 500 K tail costs 0.07 ms; a cached
+one 66 ms in total, at most 9.6 ms per 64 K chunk. With STTextView's line numbers on,
+each layout pass after an edit costs 9-16 ms more (one `NSView` per visible line,
+plus `textElements(for:)` over every paragraph above the viewport); this is the
+largest remaining editor cost and is not addressed here.

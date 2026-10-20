@@ -9,7 +9,7 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../MarkdownCore"),
-        .package(url: "https://github.com/krzyzanowskim/STTextView.git", exact: "2.3.10"),
+        .package(url: "https://github.com/krzyzanowskim/STTextView.git", exact: "2.4.1"),
         .package(url: "https://github.com/tree-sitter/swift-tree-sitter.git", exact: "0.10.0"),
         .package(url: "https://github.com/tree-sitter-grammars/tree-sitter-markdown.git", exact: "0.5.3"),
     ],
