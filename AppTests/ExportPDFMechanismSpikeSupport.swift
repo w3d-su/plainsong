@@ -198,6 +198,35 @@ final class E0OffscreenPDFProbe {
         _ = try await evaluateJavaScript("window.scrollTo(0, \(offset))", label: "preview scroll")
     }
 
+    /// Baseline visible state only after resources and queued layout/scroll work settle.
+    /// The unchanged post-capture assertions must still detect any export-time mutation.
+    func settledVisibleDOMState() async throws -> E0DOMState {
+        var previousSignature: String?
+        var stableSamples = 0
+        try await waitUntil("visible preview presentation settled", timeoutNanoseconds: 5_000_000_000) {
+            let signature = try await self.evaluateJavaScript("""
+            (() => {
+              const root = document.getElementById("preview-root");
+              if (!root || window.scrollY <= 0 || document.fonts?.status === "loading"
+                  || [...document.images].some(image => !image.complete)) return null;
+              const bounds = root.getBoundingClientRect();
+              return JSON.stringify([window.scrollX, window.scrollY, innerWidth, innerHeight,
+                bounds.width, bounds.height, document.documentElement.scrollWidth,
+                document.documentElement.scrollHeight, document.documentElement.dataset.theme]);
+            })()
+            """, label: "visible presentation signature") as? String
+            guard let signature else {
+                previousSignature = nil
+                stableSamples = 0
+                return false
+            }
+            stableSamples = signature == previousSignature ? stableSamples + 1 : 0
+            previousSignature = signature
+            return stableSamples >= 3
+        }
+        return try await domState()
+    }
+
     func capturePlannedPages(rects: [CGRect]) async throws -> [E0PDFSnapshot] {
         var pages: [E0PDFSnapshot] = []
         for rect in rects {

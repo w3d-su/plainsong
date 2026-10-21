@@ -79,6 +79,21 @@ the actual signed probe passed locally without changing save logic or assertions
 Final full CI is tracked by [PR #188](https://github.com/w3d-su/plainsong/pull/188),
 not inferred from the first run or from local tests.
 
+A later run [39540297936](https://github.com/w3d-su/plainsong/actions/runs/39540297936)
+observed one existing Mac E0 test at scroll899 versus baseline900 (0.5-point
+tolerance). The test and preview JS were unchanged from main before the repair;
+that observation does not prove a specific platform or production cause.
+The test now establishes loaded resources and three stable visible-presentation
+signatures inside its existing5-second wait before recording the baseline.
+Post-capture assertions and tolerance remain unchanged.
+
+The case passed five separate native executions. Injecting a64-point visible
+scroll change during export produced the exact expected named failure (exit65).
+After source restoration, all7 E0 cases passed. `mac-fixture-controls.json` and
+`mac-fixture-source.json.gz` retain the sanitized control results and908 source
+records; raw overlays/logs/complete results remain with local evidence. These Mac
+test-only edits do not change the755 captured iOS inputs.
+
 The iOS preview gate retains every original required case and its 8 s / 2 s
 limits. Pure geometry cases added on main may increase the executed count;
 the original required-name set and no-skip gate stay intact.
