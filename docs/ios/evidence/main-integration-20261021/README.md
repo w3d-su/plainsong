@@ -18,9 +18,35 @@ follow-up `a13c845e3536a147a6dfdbf6ce09c60bf1efda2c`.
 Native execution used clean merge candidate
 `318be8ddf9189b09e7e030e7b29d5e9d017005d8`, Xcode 27.0 (27A5194q), and an
 iOS 27.0 iPhone simulator. The subsequent fix changes the Mac sandbox linker and
-documentation only; all 755 captured iOS input records remain equal. Verify that
-boundary with `python3 Scripts/ios/ios-provenance.py verify-source
-docs/ios/evidence/main-integration-20261021/native-source.json`.
+documentation only; all 755 captured iOS input records remain equal. This is
+source-equivalent execution evidence, not a claim that the follow-up head was
+executed. The public `verify-source` also requires the same Git head and correctly
+rejects an older receipt at a follow-up head. Its archive guard is unchanged.
+
+For the narrower input comparison, run from the repository root:
+
+```sh
+python3 - <<'PY'
+from pathlib import Path
+import json, subprocess, sys, tempfile
+recorded = json.loads(Path(
+    'docs/ios/evidence/main-integration-20261021/native-source.json'
+).read_text())
+with tempfile.TemporaryDirectory(prefix='plainsong-input-review-') as directory:
+    snapshot = Path(directory) / 'current.json'
+    subprocess.run([sys.executable, 'Scripts/ios/ios-provenance.py',
+                    'capture', str(snapshot)], check=True)
+    current = json.loads(snapshot.read_text())
+assert recorded['files'] == current['files']
+assert recorded['source_fingerprint'] == current['source_fingerprint']
+print('Input records match:', len(current['files']))
+print('Native execution remains bound to:', recorded['source_sha'])
+print('Compared checkout:', current['source_sha'])
+PY
+```
+
+This comparison does not issue an archive receipt, authorize reuse of an old IPA,
+or weaken the head-bound build/packaging checks.
 
 | Check | Result | Receipt |
 |---|---|---|
