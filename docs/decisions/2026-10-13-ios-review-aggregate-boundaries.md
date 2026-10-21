@@ -1,0 +1,7 @@
+# Seal the iOS acceptance review fixes as an isolated aggregate with explicit execution boundaries
+
+The review batch fences pending external reads, preserves close/retirement recovery, resumes autosave after retained-close barriers only with current writable authority, verifies accepted and asynchronously delivered Find against exact source, bounds production scans, observes Frontmatter projections, drains cancellation-owned image cleanup, validates full ImageIO containers/first raster, and fixes workspace publication/opaque IDs and artifact/named-test/lock provenance. Full aggregate and PreviewKit iOS generic compilation pass; Mac Preview94/architecture5/WorkspaceCore29/tooling21 and portable Authoring+Images149 pass in their own scopes. Original17 iOS replay, latest46 storage native tests/six guard mutations, real iOS preview, M0/device/performance and re-signed installation remain open because current simulator discovery/install cannot execute tests. Lane06/11 and production composition are absent. A new immutable aggregate PR base preserves original feature PRs; logs use reversible byte-verified gzip rather than editing raw evidence for whitespace. Alternatives: updating the original integration base, treating historical/native-fake/zero-run evidence as final acceptance, or enabling composition before M0 were rejected.
+
+Preserved from the iOS review branch during main integration. Status and head
+references above describe the original decision date; current evidence is tracked in
+[`docs/ios/integration-ledger.md`](../ios/integration-ledger.md).

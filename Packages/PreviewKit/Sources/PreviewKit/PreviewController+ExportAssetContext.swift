@@ -1,4 +1,5 @@
 import Foundation
+import PreviewKitContracts
 
 /// The asset containment context a render carries (`docs/export-gates.md` D3): the
 /// allowed root the `asset://` handler may serve and the workspace-relative base
@@ -22,6 +23,24 @@ extension PreviewController {
         return PreviewAssetContext(
             allowedRoot: workspaceRootURL,
             baseDir: fileURL.deletingLastPathComponent().pathRelative(to: workspaceRootURL)
+        )
+    }
+
+    /// Directory authority comes only from the supplied grant. A nil grant does not
+    /// promote the file parent into an asset root.
+    nonisolated static func grantedAssetContext(
+        fileURL: URL?,
+        access: PreviewAssetAccessContext?
+    ) -> PreviewAssetContext {
+        guard let access else {
+            return PreviewAssetContext(allowedRoot: nil, baseDir: nil)
+        }
+        guard let fileURL = fileURL?.standardizedFileURL else {
+            return PreviewAssetContext(allowedRoot: access.allowedRoot, baseDir: nil)
+        }
+        return PreviewAssetContext(
+            allowedRoot: access.allowedRoot,
+            baseDir: fileURL.deletingLastPathComponent().pathRelative(to: access.allowedRoot)
         )
     }
 }

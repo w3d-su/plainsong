@@ -48,8 +48,8 @@ actor MarkdownHighlightService {
 
 /// Parser-backed source styling for Markdown and MDX source mode.
 ///
-/// This remains a facade: callers depend on String + FileKind -> AttributedString,
-/// while tree-sitter parsing and theme mapping stay local to EditorKit.
+/// This remains a facade: callers depend on String + FileKind -> AttributedString.
+/// Tree-sitter parsing lives in SyntaxKit. Theme, font, and fold attributes stay here.
 public struct MarkdownSyntaxHighlighter {
     public static let systemMonospacedFontName = "System Monospaced"
 

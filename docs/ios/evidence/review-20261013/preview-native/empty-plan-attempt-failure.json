@@ -1,0 +1,17 @@
+{
+  "build_exit_code": 0,
+  "compiled_test_cases": 0,
+  "executed": 0,
+  "input_verification": {
+    "checked_at": "2026-10-13T08:18:46.573022+00:00",
+    "input_and_frozen_differences": [],
+    "source_dirty": true,
+    "source_head": "f619cf674d77b737589fea4c2af77f3ab0a981e9"
+  },
+  "passed": false,
+  "reason": "Selected PreviewKit product scheme produced no test bundle and an empty TestConfigurations list; rejected before any test execution",
+  "runner_exit_code": 65,
+  "runner_sha256": "7ea03026d0d68109db2b56266ad2182770773cf25c5057eb6964cfb0b9d93d70",
+  "runner_snapshot": "/private/tmp/plainsong-preview-ios-native-tools-20261013/preview_runner.py.first-library-only-attempt.py",
+  "scope": "Library-only build; no compiled or executed PreviewKit test proof"
+}

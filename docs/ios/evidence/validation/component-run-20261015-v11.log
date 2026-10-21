@@ -1,0 +1,96 @@
+start 2026-10-15T14:37:54Z
+Building for debugging...
+[Computing dependencies]
+[1 / 10]
+[2 / 5] IOSAcceptanceHarnessTests-product
+[4 / 7] IOSAcceptanceHarnessTests-product
+[9 / 11] IOSAcceptanceHarnessTests-product
+Build complete! (1.99 sec)
+Test Suite 'All tests' started at 2026-10-15 22:37:57.672.
+Test Suite 'IOSAcceptanceHarnessTests.xctest' started at 2026-10-15 22:37:57.673.
+Test Suite 'AuthoringAcceptanceTests' started at 2026-10-15 22:37:57.673.
+Test Case '-[IOSAcceptanceHarnessTests.AuthoringAcceptanceTests testFrontmatterRoundTripPreservesLiteralsAndInvalidYAMLIsNotRewritten]' started.
+Test Case '-[IOSAcceptanceHarnessTests.AuthoringAcceptanceTests testFrontmatterRoundTripPreservesLiteralsAndInvalidYAMLIsNotRewritten]' passed (0.003 seconds).
+Test Case '-[IOSAcceptanceHarnessTests.AuthoringAcceptanceTests testStaleSourceAndMissingAuthorityLeaveSourceSelectionAndUndoUntouched]' started.
+Test Case '-[IOSAcceptanceHarnessTests.AuthoringAcceptanceTests testStaleSourceAndMissingAuthorityLeaveSourceSelectionAndUndoUntouched]' passed (0.000 seconds).
+Test Case '-[IOSAcceptanceHarnessTests.AuthoringAcceptanceTests testUnicodeSingleReplaceEditsOnlyTheCurrentMatch]' started.
+Test Case '-[IOSAcceptanceHarnessTests.AuthoringAcceptanceTests testUnicodeSingleReplaceEditsOnlyTheCurrentMatch]' passed (0.000 seconds).
+Test Suite 'AuthoringAcceptanceTests' passed at 2026-10-15 22:37:57.677.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.004 (0.004) seconds
+Test Suite 'AuthoringOracleTests' started at 2026-10-15 22:37:57.677.
+Test Case '-[IOSAcceptanceHarnessTests.AuthoringOracleTests testSecondHitReplacesOnlyThatMatch]' started.
+Test Case '-[IOSAcceptanceHarnessTests.AuthoringOracleTests testSecondHitReplacesOnlyThatMatch]' passed (0.000 seconds).
+Test Case '-[IOSAcceptanceHarnessTests.AuthoringOracleTests testUnacceptedAndStaleSelectionsDoNotEdit]' started.
+Test Case '-[IOSAcceptanceHarnessTests.AuthoringOracleTests testUnacceptedAndStaleSelectionsDoNotEdit]' passed (0.000 seconds).
+Test Suite 'AuthoringOracleTests' passed at 2026-10-15 22:37:57.678.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+Test Suite 'BoundedWaitFenceTests' started at 2026-10-15 22:37:57.678.
+Test Case '-[IOSAcceptanceHarnessTests.BoundedWaitFenceTests testDelayedTruePastTheDeadlineIsRejected]' started.
+Test Case '-[IOSAcceptanceHarnessTests.BoundedWaitFenceTests testDelayedTruePastTheDeadlineIsRejected]' passed (0.021 seconds).
+Test Case '-[IOSAcceptanceHarnessTests.BoundedWaitFenceTests testSilentPredicateTimesOutBeforeALateTrue]' started.
+Test Case '-[IOSAcceptanceHarnessTests.BoundedWaitFenceTests testSilentPredicateTimesOutBeforeALateTrue]' passed (0.021 seconds).
+Test Case '-[IOSAcceptanceHarnessTests.BoundedWaitFenceTests testTrueBeforeTheDeadlineIsAccepted]' started.
+Test Case '-[IOSAcceptanceHarnessTests.BoundedWaitFenceTests testTrueBeforeTheDeadlineIsAccepted]' passed (0.023 seconds).
+Test Case '-[IOSAcceptanceHarnessTests.BoundedWaitFenceTests testZeroTimeoutDoesNotAcceptAnImmediateTrue]' started.
+Test Case '-[IOSAcceptanceHarnessTests.BoundedWaitFenceTests testZeroTimeoutDoesNotAcceptAnImmediateTrue]' passed (0.000 seconds).
+Test Suite 'BoundedWaitFenceTests' passed at 2026-10-15 22:37:57.744.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.066 (0.066) seconds
+Test Suite 'BoundedWaitTests' started at 2026-10-15 22:37:57.744.
+Test Case '-[IOSAcceptanceHarnessTests.BoundedWaitTests testPredicateSuccessDoesNotWaitOutTheDeadline]' started.
+Test Case '-[IOSAcceptanceHarnessTests.BoundedWaitTests testPredicateSuccessDoesNotWaitOutTheDeadline]' passed (0.000 seconds).
+Test Case '-[IOSAcceptanceHarnessTests.BoundedWaitTests testTimeoutStaysFailed]' started.
+Test Case '-[IOSAcceptanceHarnessTests.BoundedWaitTests testTimeoutStaysFailed]' passed (0.021 seconds).
+Test Suite 'BoundedWaitTests' passed at 2026-10-15 22:37:57.765.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.021 (0.021) seconds
+Test Suite 'GateLedgerTests' started at 2026-10-15 22:37:57.765.
+Test Case '-[IOSAcceptanceHarnessTests.GateLedgerTests testExistingResultScriptRejectsEmptySkipAndMissingCases]' started.
+Test Case '-[IOSAcceptanceHarnessTests.GateLedgerTests testExistingResultScriptRejectsEmptySkipAndMissingCases]' passed (0.218 seconds).
+Test Case '-[IOSAcceptanceHarnessTests.GateLedgerTests testProductGatesStayOpenOrBlocked]' started.
+Test Case '-[IOSAcceptanceHarnessTests.GateLedgerTests testProductGatesStayOpenOrBlocked]' passed (0.000 seconds).
+Test Case '-[IOSAcceptanceHarnessTests.GateLedgerTests testTextDidChangeAndShortRunsCannotClosePerformance]' started.
+Test Case '-[IOSAcceptanceHarnessTests.GateLedgerTests testTextDidChangeAndShortRunsCannotClosePerformance]' passed (0.000 seconds).
+Test Suite 'GateLedgerTests' passed at 2026-10-15 22:37:57.985.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.219 (0.219) seconds
+Test Suite 'ResourceAndLeaseTests' started at 2026-10-15 22:37:57.985.
+Test Case '-[IOSAcceptanceHarnessTests.ResourceAndLeaseTests testAncestorSymlinkCannotBeRead]' started.
+Test Case '-[IOSAcceptanceHarnessTests.ResourceAndLeaseTests testAncestorSymlinkCannotBeRead]' passed (0.004 seconds).
+Test Case '-[IOSAcceptanceHarnessTests.ResourceAndLeaseTests testAncestorSymlinkCannotBeWritten]' started.
+Test Case '-[IOSAcceptanceHarnessTests.ResourceAndLeaseTests testAncestorSymlinkCannotBeWritten]' passed (0.002 seconds).
+Test Case '-[IOSAcceptanceHarnessTests.ResourceAndLeaseTests testHostileEmptyAndTamperedResourcesFailClosed]' started.
+Test Case '-[IOSAcceptanceHarnessTests.ResourceAndLeaseTests testHostileEmptyAndTamperedResourcesFailClosed]' passed (0.002 seconds).
+Test Case '-[IOSAcceptanceHarnessTests.ResourceAndLeaseTests testLeaseCleanupRemovesOnlyItsOwnRoot]' started.
+Test Case '-[IOSAcceptanceHarnessTests.ResourceAndLeaseTests testLeaseCleanupRemovesOnlyItsOwnRoot]' passed (0.003 seconds).
+Test Case '-[IOSAcceptanceHarnessTests.ResourceAndLeaseTests testPinnedManifestMatchesBytesAndPreviewDirectoryIsExact]' started.
+Test Case '-[IOSAcceptanceHarnessTests.ResourceAndLeaseTests testPinnedManifestMatchesBytesAndPreviewDirectoryIsExact]' passed (0.061 seconds).
+Test Case '-[IOSAcceptanceHarnessTests.ResourceAndLeaseTests testSymlinkResourceIsNotFollowed]' started.
+Test Case '-[IOSAcceptanceHarnessTests.ResourceAndLeaseTests testSymlinkResourceIsNotFollowed]' passed (0.002 seconds).
+Test Suite 'ResourceAndLeaseTests' passed at 2026-10-15 22:37:58.059.
+	 Executed 6 tests, with 0 failures (0 unexpected) in 0.074 (0.074) seconds
+Test Suite 'SaveBaselineOracleTests' started at 2026-10-15 22:37:58.059.
+Test Case '-[IOSAcceptanceHarnessTests.SaveBaselineOracleTests testDirtyDraftIsNotReplacedByExternalBytes]' started.
+Test Case '-[IOSAcceptanceHarnessTests.SaveBaselineOracleTests testDirtyDraftIsNotReplacedByExternalBytes]' passed (0.003 seconds).
+Test Case '-[IOSAcceptanceHarnessTests.SaveBaselineOracleTests testLateOlderCompletionCannotCleanANewerAcknowledgement]' started.
+Test Case '-[IOSAcceptanceHarnessTests.SaveBaselineOracleTests testLateOlderCompletionCannotCleanANewerAcknowledgement]' passed (0.000 seconds).
+Test Case '-[IOSAcceptanceHarnessTests.SaveBaselineOracleTests testMarkSavedWouldClobberButTheOracleDoesNotCallIt]' started.
+Test Case '-[IOSAcceptanceHarnessTests.SaveBaselineOracleTests testMarkSavedWouldClobberButTheOracleDoesNotCallIt]' passed (0.000 seconds).
+Test Case '-[IOSAcceptanceHarnessTests.SaveBaselineOracleTests testOlderSaveKeepsNewerDraftDirtyAndLive]' started.
+Test Case '-[IOSAcceptanceHarnessTests.SaveBaselineOracleTests testOlderSaveKeepsNewerDraftDirtyAndLive]' passed (0.002 seconds).
+Test Suite 'SaveBaselineOracleTests' passed at 2026-10-15 22:37:58.065.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.006 (0.006) seconds
+Test Suite 'WorkspaceAndPreviewTests' started at 2026-10-15 22:37:58.065.
+Test Case '-[IOSAcceptanceHarnessTests.WorkspaceAndPreviewTests testSameVersionDocumentSwitchDropsThePreviousAssetRoot]' started.
+Test Case '-[IOSAcceptanceHarnessTests.WorkspaceAndPreviewTests testSameVersionDocumentSwitchDropsThePreviousAssetRoot]' passed (0.261 seconds).
+Test Case '-[IOSAcceptanceHarnessTests.WorkspaceAndPreviewTests testSingleFileGrantDoesNotAuthorizeParentSiblingOrAnotherRoot]' started.
+Test Case '-[IOSAcceptanceHarnessTests.WorkspaceAndPreviewTests testSingleFileGrantDoesNotAuthorizeParentSiblingOrAnotherRoot]' passed (0.000 seconds).
+Test Suite 'WorkspaceAndPreviewTests' passed at 2026-10-15 22:37:58.326.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.261 (0.261) seconds
+Test Suite 'IOSAcceptanceHarnessTests.xctest' passed at 2026-10-15 22:37:58.326.
+	 Executed 26 tests, with 0 failures (0 unexpected) in 0.650 (0.653) seconds
+Test Suite 'All tests' passed at 2026-10-15 22:37:58.326.
+	 Executed 26 tests, with 0 failures (0 unexpected) in 0.650 (0.655) seconds
+◇ Test run started.
+↳ Testing Library Version: 2067.1
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.
+EXIT 0
+end 2026-10-15T14:37:58Z

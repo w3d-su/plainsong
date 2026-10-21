@@ -1,0 +1,71 @@
+{
+  "method": "gzip mtime=0; raw bytes unmodified",
+  "files": [
+    {
+      "original_path": "docs/ios/evidence/lane-05/review-generic-build.log",
+      "compressed_path": "docs/ios/evidence/lane-05/review-generic-build.log.gz",
+      "original_sha256": "0fb1a3d891c032695c5b7b8526ca8bb3c6bc8c7496257ea0cdd36de73b92f86a",
+      "compressed_sha256": "5c423922b909793f0e5eb70f681196b010945739eb962cdf5fbf4a89dbff143f",
+      "original_bytes": 731129,
+      "compressed_bytes": 36822,
+      "byte_roundtrip_verified": true
+    },
+    {
+      "original_path": "docs/ios/evidence/lane-05/autosave-review-generic-build.log",
+      "compressed_path": "docs/ios/evidence/lane-05/autosave-review-generic-build.log.gz",
+      "original_sha256": "3c694ff7aee2271a981ebbd5977d8d7513d77a505434d764d4269bf4c7cea384",
+      "compressed_sha256": "24151e148b678fb1cf4b3d54271715f7a26a27175dec3b2ba02d895ffc006191",
+      "original_bytes": 741371,
+      "compressed_bytes": 36459,
+      "byte_roundtrip_verified": true
+    },
+    {
+      "compressed_path": "docs/ios/evidence/review-20261013/aggregate-generic.log.gz",
+      "original_sha256": "9195f02889f0813a41d83e2c59f5b4cac7928e69ddb046d50b442fdf8e1c46b1",
+      "compressed_sha256": "bf1695cf754392e6ccf6f9c70a03cf0c953afb4c1ccaa480c3d397e134bf1ea9",
+      "original_bytes": 2189682,
+      "compressed_bytes": 98968,
+      "byte_roundtrip_verified": true
+    },
+    {
+      "compressed_path": "docs/ios/evidence/review-20261013/lint-final.log.gz",
+      "original_sha256": "476325208ff6c4e4226d12e6eee7ab5e78135dc5d59cbe068ff796d50f74cb9d",
+      "compressed_sha256": "41f5fa0b9f43e4a264b2c2dcb044b0845cb4098c943a4cd7e37ce872632d0cab",
+      "original_bytes": 136531,
+      "compressed_bytes": 12287,
+      "byte_roundtrip_verified": true
+    },
+    {
+      "compressed_path": "docs/ios/evidence/review-20261013/mac-architecture.log.gz",
+      "original_sha256": "87ab69199c58598d42e254c319a9e189534814f07dd353f3603526305316992a",
+      "compressed_sha256": "283a42a7817156133eea6f4580e4828f5a12274588e5275ed8bd928bd2408bca",
+      "original_bytes": 12721,
+      "compressed_bytes": 2613,
+      "byte_roundtrip_verified": true
+    },
+    {
+      "compressed_path": "docs/ios/evidence/review-20261013/preview-generic.log.gz",
+      "original_sha256": "7000137bf68c0f05ef11afa903c41c84e1e33451e0fcbb8dcdc1991396c68201",
+      "compressed_sha256": "6ed4ed1322dcdf46b55f5de56666036a03e40df6e12cdc017a7657606c2c6c1c",
+      "original_bytes": 503435,
+      "compressed_bytes": 25956,
+      "byte_roundtrip_verified": true
+    },
+    {
+      "compressed_path": "docs/ios/evidence/review-20261013/preview-mac-full.log.gz",
+      "original_sha256": "6a39dfcf7c4d71abc6e2b98472f92e3f4c43a8c18cbdd0108e83de924ddd3008",
+      "compressed_sha256": "271247339dc0d54dee95c8ccd34a97ee09a5cdf50cc269d98b5fe0f96cf0efe4",
+      "original_bytes": 32861,
+      "compressed_bytes": 5139,
+      "byte_roundtrip_verified": true
+    },
+    {
+      "compressed_path": "docs/ios/evidence/review-20261013/workspace-core-final.log.gz",
+      "original_sha256": "183094d6b762141e02310616d1c859919e027d91d2607ac387adf1b3d4560910",
+      "compressed_sha256": "60b4d6de0425ee05bba5164fa717d89d9b05baa4e243338227d71814b41dcd87",
+      "original_bytes": 11301,
+      "compressed_bytes": 1840,
+      "byte_roundtrip_verified": true
+    }
+  ]
+}

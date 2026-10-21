@@ -1,0 +1,15 @@
+{
+  "source_head": "0f97875e4cf11a2c3e4630d032b380d7cf04c6c5",
+  "command": "canonical lockf swift test --package-path Packages/EditorKit --filter EditorReplaceLayeringTests",
+  "passed": 5,
+  "failed": 0,
+  "skipped": 0,
+  "exit_code": 0,
+  "cases": [
+    "EditorReplaceLayeringTests/testAppAndMarkdownCoreDoNotImportSTTextView",
+    "EditorReplaceLayeringTests/testEditorKitImportsNeitherAppNorWorkspaceKit",
+    "EditorReplaceLayeringTests/testIOSScaffoldDoesNotLinkMacOnlyProviders",
+    "EditorReplaceLayeringTests/testNoProjectOrPackageDependencyChange",
+    "EditorReplaceLayeringTests/testSingleReplaceDoesNotUseForbiddenMutationAPIs"
+  ]
+}

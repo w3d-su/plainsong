@@ -1,0 +1,174 @@
+#if os(iOS)
+    import Foundation
+    import UIKit
+    import WebKit
+    import XCTest
+    @testable import PreviewKit
+
+    /// TEMPORARY diagnostic (not committed): compares hostless vs app-hosted WebKit load timing.
+    @MainActor
+    final class ZZReadyProbeTests: XCTestCase {
+        private final class NavigationLog: NSObject, WKNavigationDelegate {
+            let start = Date()
+            var events: [String] = []
+            func stamp(_ name: String) {
+                events.append(String(format: "%@@%.3f", name, Date().timeIntervalSince(start)))
+            }
+
+            func webView(_: WKWebView, didStartProvisionalNavigation _: WKNavigation!) { stamp("start") }
+            func webView(_: WKWebView, didCommit _: WKNavigation!) { stamp("commit") }
+            func webView(_: WKWebView, didFinish _: WKNavigation!) { stamp("finish") }
+            func webView(_: WKWebView, didFail _: WKNavigation!, withError error: Error) { stamp("fail:\(error)") }
+            func webView(_: WKWebView, didFailProvisionalNavigation _: WKNavigation!, withError error: Error) {
+                stamp("provisionalFail:\(error)")
+            }
+
+            func webViewWebContentProcessDidTerminate(_: WKWebView) { stamp("terminated") }
+        }
+
+        func testProbeRealBundleLoad() async throws {
+            let source = URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+                .deletingLastPathComponent().deletingLastPathComponent()
+                .appendingPathComponent("App/Resources/preview", isDirectory: true)
+            let destination = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+                .appendingPathComponent("ZZProbe-" + UUID().uuidString, isDirectory: true)
+            try FileManager.default.copyItem(at: source, to: destination)
+            defer { try? FileManager.default.removeItem(at: destination) }
+            try await probe(
+                label: "real",
+                load: { $0.loadFileURL(
+                    destination.appendingPathComponent("index.html"),
+                    allowingReadAccessTo: destination
+                ) }
+            )
+        }
+
+        func testProbeTinyPageLoad() async throws {
+            try await probe(label: "tiny", load: { $0.loadHTMLString(
+                "<!doctype html><script>window.PlainsongPreview={PROTOCOL_VERSION:1}</script>",
+                baseURL: nil
+            ) })
+        }
+
+        private final class NoopHandler: NSObject, WKScriptMessageHandler, WKURLSchemeHandler {
+            func userContentController(_: WKUserContentController, didReceive _: WKScriptMessage) {}
+            func webView(_: WKWebView, start task: any WKURLSchemeTask) {
+                task.didFailWithError(URLError(.fileDoesNotExist))
+            }
+
+            func webView(_: WKWebView, stop _: any WKURLSchemeTask) {}
+        }
+
+        private func copiedBundle() throws -> URL {
+            let source = URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+                .deletingLastPathComponent().deletingLastPathComponent()
+                .appendingPathComponent("App/Resources/preview", isDirectory: true)
+            let destination = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+                .appendingPathComponent("ZZProbe-" + UUID().uuidString, isDirectory: true)
+            try FileManager.default.copyItem(at: source, to: destination)
+            return destination
+        }
+
+        func testProbeVariantZeroFrame() async throws {
+            try await probe(label: "tiny-zero", frame: .zero, load: { $0.loadHTMLString(
+                "<!doctype html><script>window.PlainsongPreview={PROTOCOL_VERSION:1}</script>", baseURL: nil
+            ) })
+        }
+
+        func testProbeVariantTransparent() async throws {
+            try await probe(label: "tiny-transparent", transparent: true, load: { $0.loadHTMLString(
+                "<!doctype html><script>window.PlainsongPreview={PROTOCOL_VERSION:1}</script>", baseURL: nil
+            ) })
+        }
+
+        func testProbeVariantHandlers() async throws {
+            try await probe(label: "tiny-handlers", handlers: true, load: { $0.loadHTMLString(
+                "<!doctype html><script>window.PlainsongPreview={PROTOCOL_VERSION:1}</script>", baseURL: nil
+            ) })
+        }
+
+        func testAAProbeVariantRealAllFirst() async throws {
+            try await Task.sleep(nanoseconds: 25_000_000_000)
+            let destination = try copiedBundle()
+            defer { try? FileManager.default.removeItem(at: destination) }
+            try await probe(label: "real-all", frame: .zero, transparent: true, handlers: true, load: {
+                $0.loadFileURL(destination.appendingPathComponent("index.html"), allowingReadAccessTo: destination)
+            })
+        }
+
+        func testZZProbeControllerRealLast() async throws {
+            let destination = try copiedBundle()
+            defer { try? FileManager.default.removeItem(at: destination) }
+            let start = Date()
+            let controller = PreviewController(previewIndexURL: destination.appendingPathComponent("index.html"))
+            defer { controller.shutdownForTesting() }
+            var readyAt = "never"
+            while Date().timeIntervalSince(start) < 20 {
+                if controller.isReady { readyAt = String(format: "%.3f", Date().timeIntervalSince(start)); break }
+                try await Task.sleep(nanoseconds: 50_000_000)
+            }
+            let js = try? await PreviewHostedTestWait.javascript(
+                "JSON.stringify({ready: document.readyState, href: location.href, pv: typeof window.PlainsongPreview, ver: window.PlainsongPreview && window.PlainsongPreview.PROTOCOL_VERSION})",
+                in: controller.webView
+            )
+            print("ZZPROBE label=controller-real readyAt=\(readyAt) isLoading=\(controller.webView.isLoading) url=\(String(describing: controller.webView.url)) js=\(String(describing: js))")
+        }
+
+        private func probe(
+            label: String,
+            frame: CGRect = CGRect(x: 0, y: 0, width: 320, height: 480),
+            transparent: Bool = false,
+            handlers: Bool = false,
+            load: (WKWebView) -> Void
+        ) async throws {
+            let hasApp = (UIApplication.value(forKey: "sharedApplication") as AnyObject?) != nil
+            let configuration = WKWebViewConfiguration()
+            let handler = NoopHandler()
+            if handlers {
+                configuration.userContentController.add(handler, name: "bridge")
+                configuration.setURLSchemeHandler(handler, forURLScheme: "asset")
+                configuration.preferences.isElementFullscreenEnabled = false
+            }
+            let webView = WKWebView(frame: frame, configuration: configuration)
+            if transparent {
+                webView.isOpaque = false
+                webView.backgroundColor = .clear
+                webView.scrollView.backgroundColor = .clear
+                webView.underPageBackgroundColor = .clear
+            }
+            let log = NavigationLog()
+            webView.navigationDelegate = log
+            load(webView)
+            var ready = "never"
+            var cpu = "n/a"
+            var jsErrors = 0
+            let deadline = Date().addingTimeInterval(20)
+            while Date() < deadline {
+                do {
+                    let value = try await PreviewHostedTestWait.javascript(
+                        "typeof window.PlainsongPreview === 'object' ? 1 : 0",
+                        in: webView
+                    )
+                    if (value as? NSNumber)?.intValue == 1 {
+                        ready = String(format: "%.3f", Date().timeIntervalSince(log.start))
+                        break
+                    }
+                } catch {
+                    jsErrors += 1
+                }
+                try await Task.sleep(nanoseconds: 50_000_000)
+            }
+            if ready != "never" {
+                let ms = try? await PreviewHostedTestWait.javascript(
+                    "(function(){var t=performance.now();var x=0;for(var i=0;i<2e7;i++){x+=i%7}return performance.now()-t})()",
+                    in: webView,
+                    timeoutNanoseconds: 10_000_000_000
+                )
+                cpu = "\(ms ?? "timeout")"
+            }
+            print("ZZPROBE label=\(label) uiApplication=\(hasApp) ready=\(ready) jsErrors=\(jsErrors) cpuLoopMs=\(cpu) events=\(log.events)")
+        }
+    }
+#endif

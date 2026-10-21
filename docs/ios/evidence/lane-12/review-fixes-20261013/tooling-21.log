@@ -1,0 +1,26 @@
+testArchiveReceiptFromAnotherContractCannotBeRepackaged (test_runner_evidence.RunnerEvidenceTests) ... ok
+testChangedHeadRejectsReuseEvenWhenCompiledInputsAreEqual (test_runner_evidence.RunnerEvidenceTests) ... ok
+testDirtySourceDriftAtTheSameHeadRejectsArchiveReuse (test_runner_evidence.RunnerEvidenceTests) ... ok
+testExactDevicePlatformRejectsArm64Simulator (test_runner_evidence.RunnerEvidenceTests) ... ok
+testFailedArchiveCannotBeRepackagedEvenWithAnExistingApp (test_runner_evidence.RunnerEvidenceTests) ... ok
+testFailedFinalValidationPreservesPreviouslyPublishedIPA (test_runner_evidence.RunnerEvidenceTests) ... ok
+testForgedFingerprintWithoutMatchingInputManifestIsRejected (test_runner_evidence.RunnerEvidenceTests) ... ok
+testFreshZipDropsMembersFromAPreviousIPA (test_runner_evidence.RunnerEvidenceTests) ... ok
+testHostedTestSourceDriftIsIncludedInInputFingerprint (test_runner_evidence.RunnerEvidenceTests) ... ok
+testMalformedJSONCLIExitsNonzeroAndKeepsFailureReport (test_runner_evidence.RunnerEvidenceTests) ... ok
+testMissingSuccessReceiptCannotBeRepackaged (test_runner_evidence.RunnerEvidenceTests) ... ok
+testModifiedArchiveBytesRejectTheSuccessReceipt (test_runner_evidence.RunnerEvidenceTests) ... ok
+testOptionalSkippedCaseIsRecordedSeparatelyFromExecution (test_runner_evidence.RunnerEvidenceTests) ... ok
+testSigningMaterialCannotBePublished (test_runner_evidence.RunnerEvidenceTests) ... ok
+testSkippedFailedMissingAndMalformedCasesCannotBecomePass (test_runner_evidence.RunnerEvidenceTests) ... ok
+testSuccessfulReceiptRetainsExactSourceAndArtifactFingerprints (test_runner_evidence.RunnerEvidenceTests) ... ok
+testSymlinkEscapeCannotEnterArtifactDigest (test_runner_evidence.RunnerEvidenceTests) ... ok
+testUntrackedBuildInputDriftRejectsArchiveReuse (test_runner_evidence.RunnerEvidenceTests) ... ok
+testForgedAncestorContextIsRejected (test_runner_evidence.RunnerLockTests) ... ok
+testLegitimateNestedOperationUsesOneCanonicalLock (test_runner_evidence.RunnerLockTests) ... ok
+testPublicLockedFlagIsRejectedWithoutExecutingPayload (test_runner_evidence.RunnerLockTests) ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 2.781s
+
+OK

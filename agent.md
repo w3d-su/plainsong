@@ -26,7 +26,13 @@ projects such as Astro/Next.js content directories).
 
 ### Non-Goals (for now)
 
-- iOS/iPadOS version (keep core packages platform-portable, but do not build UI for it).
+- iOS/iPadOS UI is outside the macOS roadmap. The separately authorized iOS/iPadOS 26+
+  source-editor and preview work follows [`docs/ios/README.md`](docs/ios/README.md):
+  12 parallel implementation lanes and one integration owner, frozen C0 interfaces,
+  isolated worktrees, and M0 real-device gates before production composition.
+  C0 supplies compile-time contracts and an unavailable app scaffold. Production
+  providers, device validation, persistence, performance and IPA installation remain
+  separate gates in `docs/ios/integration-ledger.md`.
 - Cloud sync, accounts, collaboration.
 - Full MDX component *execution* with user project bundling (placeholder rendering instead; see §9).
 - Plugin system for third parties.
@@ -95,6 +101,14 @@ blogeditor/
 Build artifacts: `preview-src` builds to `App/Resources/preview/` (`index.html`, `bundle.js`,
 `bundle.css`). The dist output **is committed** so Swift-only agents can build the app without
 Node installed; regenerate with `make preview-bundle` whenever `preview-src/` changes.
+
+Manual Swift linker harnesses must include the approved portable package dependencies:
+`WorkspaceKit` requires `WorkspaceCore`, while the parser extraction belongs to
+`SyntaxKit`. Keep missing-object refusals and existing sandbox assertions. For iOS
+package test admission, verify an enabled test plan, built test bundle and actual
+named results; a library-only `build-for-testing` does not verify test compilation.
+Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-ledger.md`.
+
 
 ---
 
@@ -667,7 +681,33 @@ Phase 1 milestones were delivered in order and are all accepted; each lists the 
 
 **Phase 2 = WYSIWYG (§13). Phase 3 candidates:** export (HTML/PDF via preview print),
 window tabs, search across workspace (ripgrep-style), publish integrations, real MDX
-component rendering.
+component rendering. The independent iOS lane follows `docs/ios/contracts.md`: iOS 26+,
+source plus preview, Files/iCloud in-place access, native UIKit editor and UIDocument
+persistence. The first C0 PR owns declarations/scaffolds only; 02/03 perform shared
+core extraction, 13 retains contracts/composition, and 12 receives global build
+manifests after the recorded C0 transfer. iOS-only packages stay out of Mac `make test`.
+
+The iOS acceptance review uses a separate aggregate of the published lane heads;
+fix commits preserve the frozen declarations and unavailable C0 composition. Shared
+package dependency inventory tests pin SyntaxKit's two existing parser dependencies
+and WorkspaceKit's WorkspaceCore path after extraction. A successful test action must
+report executed named cases; skip, empty results, lock admission timeout, and simulator
+installation failure remain distinct. Real PreviewKit tests load byte-verified resources
+inside the test container with the original CSP, bounded JavaScript replies, and cleanup
+registered before the first await. M0 device and re-signed IPA installation gates stay
+open until owner evidence is recorded. The current review receipt and next-agent
+handoff live in `docs/ios/evidence/review-20261013/README.md`; an aggregate compilation
+and a portable Mac logic run do not close native or owner acceptance.
+
+Lane 12 owns the separate `IOSPreview` / `make ios-preview` entry. Its dedicated
+SwiftUI app host links system frameworks only; PreviewKit and MarkdownCore are
+linked in the unit-test bundle, avoiding duplicate package classes in the host.
+Admission must prove a built app-hosted Mach-O unit-test bundle. The full suite
+retains all original 94 cases and rejects skips; a separate first-controller run
+loads the production-default app-bundled index after byte parity checks. Keep the
+8-second ready and 2-second JavaScript limits. `PreviewKit-Package` remains the
+hostless package diagnostic, not the iOS app-host acceptance entry. This test
+scaffold does not install providers or authorize production composition before M0.
 
 ---
 

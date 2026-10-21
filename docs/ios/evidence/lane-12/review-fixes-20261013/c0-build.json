@@ -1,0 +1,15 @@
+{
+  "app": "/private/tmp/plainsong-shell-build-review-20261013/release/dd/3d4f671545eb-build-20261013-132902-64024/Build/Products/Debug-iphonesimulator/PlainsongIOS.app",
+  "command": "make ios-build",
+  "configuration": "Debug",
+  "contract_version": "IOS-C0-v1",
+  "derived_data": "/private/tmp/plainsong-shell-build-review-20261013/release/dd/3d4f671545eb-build-20261013-132902-64024",
+  "destination": "generic/platform=iOS Simulator",
+  "end": "2026-10-13T05:30:17Z",
+  "exit_code": 0,
+  "ios_base_sha": "642cb212703220409874a2741c5adbfb8c80fe8a",
+  "scheme": "PlainsongIOS",
+  "source_dirty": false,
+  "source_sha": "3d4f671545eb41190b1b8e7262bcd27349aad36e",
+  "start": "2026-10-13T05:29:24Z"
+}

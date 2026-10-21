@@ -1,0 +1,34 @@
+{
+  "user_authorized": true,
+  "service_pid_before": 4560,
+  "uid": 501,
+  "service_command": "/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/XPCServices/com.apple.CoreSimulator.CoreSimulatorService.xpc/Contents/MacOS/com.apple.CoreSimulator.CoreSimulatorService",
+  "started_epoch": 1791878091.3736792,
+  "finished_epoch": 1791878092.670482,
+  "commands": [
+    {
+      "command": [
+        "xcrun",
+        "simctl",
+        "list",
+        "devices",
+        "available",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false
+    },
+    {
+      "command": [
+        "xcrun",
+        "simctl",
+        "list",
+        "runtimes",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false
+    }
+  ],
+  "unrelated_xctest_signalled": false
+}

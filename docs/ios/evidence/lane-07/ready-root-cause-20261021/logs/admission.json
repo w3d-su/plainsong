@@ -1,0 +1,25 @@
+{
+  "compiled_test_images": 1,
+  "images": [
+    {
+      "app_hosted": true,
+      "bundle": "IOSPreviewTests.xctest",
+      "bytes": 5476976,
+      "executable": "IOSPreviewTests",
+      "host_app": "IOSPreviewTestHost.app",
+      "target": "IOSPreviewTests"
+    }
+  ],
+  "library_products_ignored": [
+    "arm64-apple-ios-simulator.swiftmodule",
+    "arm64-apple-ios-simulator.swiftmodule",
+    "arm64-apple-ios-simulator.swiftmodule",
+    "arm64-apple-ios-simulator.swiftmodule",
+    "arm64-apple-ios-simulator.swiftmodule",
+    "arm64-apple-ios-simulator.swiftmodule"
+  ],
+  "reason": null,
+  "scheme": "IOSPreview",
+  "tests_compiled": true,
+  "xctestrun": "IOSPreview_iphonesimulator27.0-arm64.xctestrun"
+}

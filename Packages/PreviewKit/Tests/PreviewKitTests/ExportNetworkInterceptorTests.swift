@@ -1,4 +1,6 @@
-import AppKit
+#if os(macOS)
+    import AppKit
+#endif
 import MarkdownCore
 import Network
 @testable import PreviewKit
@@ -74,7 +76,7 @@ final class ExportNetworkInterceptorTests: XCTestCase {
         }
 
         // Positive control: the same document with remote images allowed reaches the proxy.
-        let live = makeController(dataStore: dataStore)
+        let live = try makeController(dataStore: dataStore)
         live.setAllowsRemoteImages(true)
         live.render(DocumentTextChange(
             text: Self.markdown,
@@ -164,19 +166,12 @@ final class ExportNetworkInterceptorTests: XCTestCase {
         XCTAssertEqual(handler.requests, ["plainsong-e4://document"])
     }
 
-    private func previewIndexURL() -> URL {
-        let testFile = URL(fileURLWithPath: #filePath)
-        let repositoryRoot = testFile
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        return repositoryRoot.appendingPathComponent("App/Resources/preview/index.html")
+    private func previewIndexURL() throws -> URL {
+        try PreviewBundleFixture.indexURL()
     }
 
-    private func makeController(dataStore: WKWebsiteDataStore) -> PreviewController {
-        let controller = PreviewController(previewIndexURL: previewIndexURL(), websiteDataStore: dataStore)
+    private func makeController(dataStore: WKWebsiteDataStore) throws -> PreviewController {
+        let controller = try PreviewController(previewIndexURL: previewIndexURL(), websiteDataStore: dataStore)
         controller.exportTimeoutNanoseconds = 30_000_000_000
         addTeardownBlock { @MainActor [weak controller] in controller?.invalidate() }
         return controller

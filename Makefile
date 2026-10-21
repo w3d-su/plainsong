@@ -7,7 +7,10 @@ XCODE_ARTIFACT_DIR ?=
 XCODE_TEST_TARGETS ?=
 
 PACKAGES := MarkdownCore EditorKit PreviewKit WorkspaceKit
-SWIFT_FORMAT_PATHS := App AppTests Packages PerformanceTests PlainsongUITests Scripts
+PORTABLE_PACKAGES := SyntaxKit WorkspaceCore
+# IOSAcceptanceTests is lane 11's dir and does not exist yet; wildcard keeps the
+# list valid before it lands and picks it up automatically once it does.
+SWIFT_FORMAT_PATHS := App AppTests AppIOS AppIOSTests Packages PerformanceTests PlainsongUITests Scripts $(wildcard IOSAcceptanceTests)
 # SwiftFormat 0.62 enabled these wrapping rules by default. Keep the repository's
 # existing 0.61 layout until a deliberate repo-wide migration, without breaking
 # older SwiftFormat versions that do not recognize the rule names.
@@ -47,6 +50,7 @@ test-packages: generate
 		echo "==> swift test: $$pkg"; \
 		(cd Packages/$$pkg && swift test); \
 	done
+	$(MAKE) test-portable-core
 	Scripts/check-export-sandbox-root.sh
 	Scripts/check-single-file-save-sandbox.sh
 
@@ -88,3 +92,63 @@ lint: swiftformat-version-check
 clean:
 	rm -rf Plainsong.xcodeproj
 	@for pkg in $(PACKAGES); do rm -rf Packages/$$pkg/.build; done
+
+# C0-only bootstrap (kept so the PR #157 reproduction commands stay valid);
+# superseded by the fixed ios-* entries below.
+.PHONY: ios-c0-build ios-c0-test
+ios-c0-build:
+	Scripts/ios/c0.sh build
+
+ios-c0-test:
+	Scripts/ios/c0.sh test
+
+# ── iOS lane-12 entries (docs/ios/build-and-ipa.md) ──────────────────────────
+# Fixed, isolated entry points: every runner holds the shared lock
+# (/private/tmp/plainsong-xcodebuild-test.lock) for its whole run and writes
+# evidence under IOS_OUTPUT_ROOT. These never run from `make build`/`test`/
+# `release`, and iOS-only packages never join the Mac `swift test` loop above.
+#
+#   make ios-build   [IOS_DESTINATION='platform=iOS Simulator,id=<uuid>']
+#   make ios-test    IOS_DESTINATION='platform=iOS Simulator,id=<installed-uuid>'
+#   make ios-preview IOS_DESTINATION='platform=iOS Simulator,id=<installed-uuid>'
+#   make ios-acceptance IOS_DESTINATION='platform=iOS Simulator,id=<installed-uuid>'
+#   make ios-acceptance-components
+#   make ios-archive [IOS_OUTPUT_ROOT=/private/tmp/plainsong-ios-release]
+#   make ios-ipa     [IOS_OUTPUT_ROOT=/private/tmp/plainsong-ios-release]
+# ios-acceptance is the hosted scaffold smoke only. It is not part of
+# `make test` or `make ios-test`. ios-acceptance-components is the Mac
+# package suite and is also outside those loops.
+IOS_OUTPUT_ROOT ?= /private/tmp/plainsong-ios-release
+
+.PHONY: ios-build ios-test ios-preview ios-acceptance ios-acceptance-components ios-archive ios-ipa
+ios-build:
+	Scripts/ios/run-ios-build.sh "$(IOS_OUTPUT_ROOT)"
+
+ios-test:
+	Scripts/ios/run-ios-tests.sh "$(IOS_OUTPUT_ROOT)"
+
+ios-preview:
+	IOS_SCHEME=IOSPreview Scripts/ios/run-ios-tests.sh "$(IOS_OUTPUT_ROOT)"
+
+ios-acceptance:
+	IOS_SCHEME=IOSAcceptance Scripts/ios/run-ios-tests.sh "$(IOS_OUTPUT_ROOT)"
+
+ios-acceptance-components:
+	Scripts/ios/run-ios-acceptance-components.sh "$(IOS_OUTPUT_ROOT)"
+
+ios-archive:
+	Scripts/ios/run-ios-archive.sh "$(IOS_OUTPUT_ROOT)"
+
+ios-ipa:
+	Scripts/ios/run-ios-ipa.sh "$(IOS_OUTPUT_ROOT)"
+
+.PHONY: test-portable-core
+test-portable-core:
+	@set -e; for pkg in $(PORTABLE_PACKAGES); do \
+		echo "==> portable swift test: $$pkg"; \
+		(cd Packages/$$pkg && swift test); \
+	done
+
+.PHONY: test-ios-tooling
+test-ios-tooling:
+	PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -m unittest discover -s Scripts/ios/tests -p 'test_*.py' -v

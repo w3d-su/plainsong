@@ -1,0 +1,16 @@
+{
+  "archive": "/private/tmp/plainsong-shell-build-review-20261013/release/archive-attempt-3d4f671545eb.nrLXvx/PlainsongIOS.xcarchive",
+  "archive_sha256": "73c6d00f2280569edaed781d843a195c7ce940d4edd0a78822cd61b7f4c84d10",
+  "command": "make ios-ipa",
+  "contract_version": "IOS-C0-v1",
+  "exit_code": 0,
+  "installation": "OPEN",
+  "ipa": "/private/tmp/plainsong-shell-build-review-20261013/release/PlainsongIOS-3d4f671545eb.ipa",
+  "ipa_bytes": 2516957,
+  "ipa_sha256": "138096c65c31faa674864cf6f093119d3dbc055cb26df0e86797730c238becdd",
+  "payload_sha256": "9b97ba47c22f7fd8c73cd25f63d453f885bdd94d45e953fd149b5bb8c39e0823",
+  "schema": "IOS-IPA-v1",
+  "source_dirty": false,
+  "source_fingerprint": "b0a6a7273be3da51500e210796e89fe7dee08a3abe6471e0bb5455e81fdc5343",
+  "source_sha": "3d4f671545eb41190b1b8e7262bcd27349aad36e"
+}

@@ -1,0 +1,148 @@
+Fetching https://github.com/jpsim/Yams.git from cache
+Fetched https://github.com/jpsim/Yams.git from cache (0.03s)
+Creating working copy for https://github.com/jpsim/Yams.git
+Working copy of https://github.com/jpsim/Yams.git resolved at 6.2.2
+Building for debugging...
+[Constructing description]
+[Planning deferred tasks]
+[41 / 94]
+[48 / 95] CYaml
+[54 / 105]
+[58 / 105]
+[64 / 105] CYaml
+[65 / 105] Yams
+[74 / 149]
+[77 / 149]
+[82 / 149]
+[85 / 149]
+[89 / 149]
+[91 / 149]
+[94 / 149]
+[97 / 149]
+[99 / 149]
+[100 / 149]
+[109 / 149] Yams
+[110 / 149] Yams
+[116 / 150] MarkdownCore
+[119 / 194]
+[121 / 194]
+[125 / 194]
+[126 / 194]
+[128 / 194]
+[131 / 194]
+[135 / 194]
+[138 / 194]
+[142 / 194]
+[144 / 194]
+[147 / 194]
+[150 / 194]
+[152 / 194]
+[153 / 194]
+[162 / 194] MarkdownCore
+[163 / 194] MarkdownCore
+[169 / 195] MarkdownCore
+[169 / 195] WorkspaceCore
+[177 / 203] WorkspaceCore
+[185 / 203] WorkspaceCore
+[187 / 203] MarkdownCore
+[193 / 204] WorkspaceCoreTests-product
+[202 / 246]
+[205 / 246]
+[208 / 246]
+[213 / 246]
+[214 / 246]
+[215 / 246]
+[217 / 246]
+[219 / 246]
+[222 / 246]
+[225 / 246]
+[226 / 246]
+[235 / 246] WorkspaceCoreTests-product
+[240 / 246] WorkspaceCoreTests-product
+[242 / 246] WorkspaceCoreTests-product
+[245 / 246] WorkspaceCoreTests-product
+Build complete! (18.45 sec)
+Test Suite 'All tests' started at 2026-10-13 13:20:48.191.
+Test Suite 'WorkspaceCoreTests.xctest' started at 2026-10-13 13:20:48.193.
+Test Suite 'WorkspaceContractTests' started at 2026-10-13 13:20:48.193.
+Test Case '-[WorkspaceCoreTests.WorkspaceContractTests testDescriptorsRetainUnicodeSpellingAndOpaqueResourceBytes]' started.
+Test Case '-[WorkspaceCoreTests.WorkspaceContractTests testDescriptorsRetainUnicodeSpellingAndOpaqueResourceBytes]' passed (0.003 seconds).
+Test Suite 'WorkspaceContractTests' passed at 2026-10-13 13:20:48.196.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.003 (0.003) seconds
+Test Suite 'WorkspacePathIdentityTests' started at 2026-10-13 13:20:48.196.
+Test Case '-[WorkspaceCoreTests.WorkspacePathIdentityTests testByteKeyDoesNotTreatCanonicalEquivalentsAsEqual]' started.
+Test Case '-[WorkspaceCoreTests.WorkspacePathIdentityTests testByteKeyDoesNotTreatCanonicalEquivalentsAsEqual]' passed (0.000 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspacePathIdentityTests testRelativePathPreservesDistinctUnicodeSpellings]' started.
+Test Case '-[WorkspaceCoreTests.WorkspacePathIdentityTests testRelativePathPreservesDistinctUnicodeSpellings]' passed (0.000 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspacePathIdentityTests testRelativePathRejectsAbsoluteNULTraversalAndEmptyLeaf]' started.
+Test Case '-[WorkspaceCoreTests.WorkspacePathIdentityTests testRelativePathRejectsAbsoluteNULTraversalAndEmptyLeaf]' passed (0.000 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspacePathIdentityTests testRootMarkerIsNotAnEmptyLeafPath]' started.
+Test Case '-[WorkspaceCoreTests.WorkspacePathIdentityTests testRootMarkerIsNotAnEmptyLeafPath]' passed (0.000 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspacePathIdentityTests testTreeImageKindIncludesFormatsOutsideThePreviewRasterAllowlist]' started.
+Test Case '-[WorkspaceCoreTests.WorkspacePathIdentityTests testTreeImageKindIncludesFormatsOutsideThePreviewRasterAllowlist]' passed (0.000 seconds).
+Test Suite 'WorkspacePathIdentityTests' passed at 2026-10-13 13:20:48.198.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+Test Suite 'WorkspacePureTreeTests' started at 2026-10-13 13:20:48.198.
+Test Case '-[WorkspaceCoreTests.WorkspacePureTreeTests testAbsoluteSnapshotPathIsNotLaunderedIntoRootChild]' started.
+Test Case '-[WorkspaceCoreTests.WorkspacePureTreeTests testAbsoluteSnapshotPathIsNotLaunderedIntoRootChild]' passed (0.000 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspacePureTreeTests testCaseInsensitiveTieBreaksByUTF8Bytes]' started.
+Test Case '-[WorkspaceCoreTests.WorkspacePureTreeTests testCaseInsensitiveTieBreaksByUTF8Bytes]' passed (0.000 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspacePureTreeTests testFilteredAncestorsRemainVisibleForNestedMarkdown]' started.
+Test Case '-[WorkspaceCoreTests.WorkspacePureTreeTests testFilteredAncestorsRemainVisibleForNestedMarkdown]' passed (0.000 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspacePureTreeTests testFilteredAncestorsUseByteExactPaths]' started.
+Test Case '-[WorkspaceCoreTests.WorkspacePureTreeTests testFilteredAncestorsUseByteExactPaths]' passed (0.000 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspacePureTreeTests testMissingIdentityUsesBytePathFallbackAndDoesNotTrackRename]' started.
+Test Case '-[WorkspaceCoreTests.WorkspacePureTreeTests testMissingIdentityUsesBytePathFallbackAndDoesNotTrackRename]' passed (0.000 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspacePureTreeTests testNFCAndNFDPathsStayDistinctNodes]' started.
+Test Case '-[WorkspaceCoreTests.WorkspacePureTreeTests testNFCAndNFDPathsStayDistinctNodes]' passed (0.000 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspacePureTreeTests testNumericSortPlacesTenAfterTwo]' started.
+Test Case '-[WorkspaceCoreTests.WorkspacePureTreeTests testNumericSortPlacesTenAfterTwo]' passed (0.000 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspacePureTreeTests testSameIdentityDifferentPathsStayDistinct]' started.
+Test Case '-[WorkspaceCoreTests.WorkspacePureTreeTests testSameIdentityDifferentPathsStayDistinct]' passed (0.000 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspacePureTreeTests testSameRootKeepsSurvivingExpansionAndDropsDeletedSelection]' started.
+Test Case '-[WorkspaceCoreTests.WorkspacePureTreeTests testSameRootKeepsSurvivingExpansionAndDropsDeletedSelection]' passed (0.000 seconds).
+Test Suite 'WorkspacePureTreeTests' passed at 2026-10-13 13:20:48.200.
+	 Executed 9 tests, with 0 failures (0 unexpected) in 0.002 (0.002) seconds
+Test Suite 'WorkspaceSnapshotOpaqueIdentityTests' started at 2026-10-13 13:20:48.200.
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotOpaqueIdentityTests testArbitraryResourceBytesAndDuplicateFieldBoundariesRemainDistinct]' started.
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotOpaqueIdentityTests testArbitraryResourceBytesAndDuplicateFieldBoundariesRemainDistinct]' passed (0.001 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotOpaqueIdentityTests testDeletingDuplicateDoesNotRetargetSelectionToEncodedLookingResource]' started.
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotOpaqueIdentityTests testDeletingDuplicateDoesNotRetargetSelectionToEncodedLookingResource]' passed (0.000 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotOpaqueIdentityTests testDuplicateEncodingCannotCollideWithUniqueOpaqueIdentity]' started.
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotOpaqueIdentityTests testDuplicateEncodingCannotCollideWithUniqueOpaqueIdentity]' passed (0.000 seconds).
+Test Suite 'WorkspaceSnapshotOpaqueIdentityTests' passed at 2026-10-13 13:20:48.202.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+Test Suite 'WorkspaceSnapshotReconcileTests' started at 2026-10-13 13:20:48.202.
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotReconcileTests testDeletedNodeDropsSelection]' started.
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotReconcileTests testDeletedNodeDropsSelection]' passed (0.000 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotReconcileTests testMissingResourceIdentityDoesNotTrackRename]' started.
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotReconcileTests testMissingResourceIdentityDoesNotTrackRename]' passed (0.000 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotReconcileTests testSamePathAcrossRootsDoesNotInheritExpansionOrSelection]' started.
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotReconcileTests testSamePathAcrossRootsDoesNotInheritExpansionOrSelection]' passed (0.001 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotReconcileTests testSameRootNewerGenerationKeepsSurvivingExpansionAndSelection]' started.
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotReconcileTests testSameRootNewerGenerationKeepsSurvivingExpansionAndSelection]' passed (0.001 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotReconcileTests testStaleGenerationDoesNotReconcile]' started.
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotReconcileTests testStaleGenerationDoesNotReconcile]' passed (0.000 seconds).
+Test Suite 'WorkspaceSnapshotReconcileTests' passed at 2026-10-13 13:20:48.205.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 0.002 (0.003) seconds
+Test Suite 'WorkspaceSnapshotRejectionTests' started at 2026-10-13 13:20:48.205.
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotRejectionTests testCanonicalSpellingsAndDuplicateResourcesStayDistinct]' started.
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotRejectionTests testCanonicalSpellingsAndDuplicateResourcesStayDistinct]' passed (0.000 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotRejectionTests testEntryFromAnotherRootOrOlderGenerationIsOmitted]' started.
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotRejectionTests testEntryFromAnotherRootOrOlderGenerationIsOmitted]' passed (0.000 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotRejectionTests testInvalidSnapshotPathsAreOmittedWithoutLaundering]' started.
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotRejectionTests testInvalidSnapshotPathsAreOmittedWithoutLaundering]' passed (0.000 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotRejectionTests testNodeSpellingComesFromRelativePathRatherThanFileURL]' started.
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotRejectionTests testNodeSpellingComesFromRelativePathRatherThanFileURL]' passed (0.000 seconds).
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotRejectionTests testUnavailableEntryStaysInTheTree]' started.
+Test Case '-[WorkspaceCoreTests.WorkspaceSnapshotRejectionTests testUnavailableEntryStaysInTheTree]' passed (0.000 seconds).
+Test Suite 'WorkspaceSnapshotRejectionTests' passed at 2026-10-13 13:20:48.206.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 0.001 (0.002) seconds
+Test Suite 'WorkspaceCoreTests.xctest' passed at 2026-10-13 13:20:48.206.
+	 Executed 28 tests, with 0 failures (0 unexpected) in 0.010 (0.013) seconds
+Test Suite 'All tests' passed at 2026-10-13 13:20:48.206.
+	 Executed 28 tests, with 0 failures (0 unexpected) in 0.010 (0.016) seconds
+◇ Test run started.
+↳ Testing Library Version: 2067.1
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.002 seconds.

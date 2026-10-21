@@ -1,0 +1,80 @@
+[
+  {
+    "path": "AppIOS/State/Contracts.swift",
+    "expected": "d5146a1a803e2e890fed799d8f4020103f72fb22d1262e3861c8bb5e5bf82b56",
+    "actual": "d5146a1a803e2e890fed799d8f4020103f72fb22d1262e3861c8bb5e5bf82b56",
+    "matches": true
+  },
+  {
+    "path": "AppIOS/State/FeatureContracts.swift",
+    "expected": "c6b19edb56e69d3ef64b7230ebbb9c1440ad7c2db09c9019435afa1bbfe78361",
+    "actual": "c6b19edb56e69d3ef64b7230ebbb9c1440ad7c2db09c9019435afa1bbfe78361",
+    "matches": true
+  },
+  {
+    "path": "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift",
+    "expected": "fc07a44c9743be3444bb47ddd15e9a12d1cf2b2de6602650558ef97966f0e567",
+    "actual": "fc07a44c9743be3444bb47ddd15e9a12d1cf2b2de6602650558ef97966f0e567",
+    "matches": true
+  },
+  {
+    "path": "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift",
+    "expected": "f2bec4e93b0262d45ae4456b4b2c0cdb2a0cb0abe5176424ef0599ae4362d285",
+    "actual": "f2bec4e93b0262d45ae4456b4b2c0cdb2a0cb0abe5176424ef0599ae4362d285",
+    "matches": true
+  },
+  {
+    "path": "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift",
+    "expected": "5ec2bfc76bb6237f5ff019cc3381361f5219b2fa8e0f2d6eff8a43412113b593",
+    "actual": "5ec2bfc76bb6237f5ff019cc3381361f5219b2fa8e0f2d6eff8a43412113b593",
+    "matches": true
+  },
+  {
+    "path": "Packages/PreviewKit/Sources/PreviewKit/PreviewContractExports.swift",
+    "expected": "bea8b7f635a3705691f5c1016d08b2f016663b498409463d6b2f2453096f39fa",
+    "actual": "bea8b7f635a3705691f5c1016d08b2f016663b498409463d6b2f2453096f39fa",
+    "matches": true
+  },
+  {
+    "path": "Packages/PreviewKit/Sources/PreviewKit/PreviewContracts.swift",
+    "expected": "ffae81620f5ceb09ea28aa4bab49a4319dfd30a965bbb89ad7ead81fa2d0fdfe",
+    "actual": "ffae81620f5ceb09ea28aa4bab49a4319dfd30a965bbb89ad7ead81fa2d0fdfe",
+    "matches": true
+  },
+  {
+    "path": "Packages/SyntaxKit/Sources/SyntaxKit/Contracts.swift",
+    "expected": "77ae739d3ad480b9380eb12f85cb171c2277576dd4c633ca215731b30f767174",
+    "actual": "77ae739d3ad480b9380eb12f85cb171c2277576dd4c633ca215731b30f767174",
+    "matches": true
+  },
+  {
+    "path": "Packages/SyntaxKit/Sources/SyntaxKit/MarkdownSyntaxToken.swift",
+    "expected": "0be329653fb003ef5c1a9adac577d809a570779a8fe198a8f244032b51a7bed6",
+    "actual": "0be329653fb003ef5c1a9adac577d809a570779a8fe198a8f244032b51a7bed6",
+    "matches": true
+  },
+  {
+    "path": "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift",
+    "expected": "e56ba2961c82d2192994b96ef355813ca13aaec2598e2ff4ae7671a333ce0f8e",
+    "actual": "e56ba2961c82d2192994b96ef355813ca13aaec2598e2ff4ae7671a333ce0f8e",
+    "matches": true
+  },
+  {
+    "path": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+    "expected": "eec068b9deaf94912de7af2654b54f11650d0e2c8d76e8b7f9e2d3a43269eb14",
+    "actual": "eec068b9deaf94912de7af2654b54f11650d0e2c8d76e8b7f9e2d3a43269eb14",
+    "matches": true
+  },
+  {
+    "path": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+    "expected": "beb9d47293b3aeb029de4fa9716d7d8b8af18f2971eec9495354936185c0c06b",
+    "actual": "beb9d47293b3aeb029de4fa9716d7d8b8af18f2971eec9495354936185c0c06b",
+    "matches": true
+  },
+  {
+    "path": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift",
+    "expected": "259d40b8b25c997db2d0f44c34ef2c16517132dfbadd123178349070c53a2748",
+    "actual": "259d40b8b25c997db2d0f44c34ef2c16517132dfbadd123178349070c53a2748",
+    "matches": true
+  }
+]

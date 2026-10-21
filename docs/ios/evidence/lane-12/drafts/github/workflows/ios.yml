@@ -1,0 +1,78 @@
+# iOS CI — lane 12 (docs/ios/handoffs/12-build-and-ipa.md).
+#
+# Manual-only by design: private-repo macOS minutes carry a 10x multiplier, so
+# this workflow is `workflow_dispatch` only. No push/pull_request triggers.
+#
+# Runner image + Xcode must provide an iOS >= 26 SDK and an installed iOS
+# simulator runtime; verify the image label and Xcode version at implementation
+# time and record both in the evidence artifact (image+toolchain are part of the
+# deliverable metadata).
+
+name: iOS
+
+on:
+  workflow_dispatch:
+
+# One in-flight build per ref; private macOS minutes are expensive.
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios-build-test-archive-ipa:
+    # TODO(lane-12): pin the runner image once verified to carry iOS >= 26 SDK +
+    # runtime (e.g. macos-26 w/ Xcode 26.x); record image + toolchain in evidence.
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Record image and toolchain
+        run: |
+          {
+            printf 'ImageOS=%s\nImageVersion=%s\n' "${ImageOS:-unknown}" "${ImageVersion:-unknown}"
+            xcodebuild -version
+            xcodebuild -showsdks | grep -i ios
+            xcrun simctl list runtimes | grep -i ios || true
+          } | tee "$RUNNER_TEMP/toolchain.txt"
+
+      - name: Install xcodegen
+        run: |
+          brew install xcodegen
+          echo "xcodegen: $(xcodegen --version)"
+
+      - name: Prepare iOS evidence paths
+        run: |
+          out="$RUNNER_TEMP/plainsong-ios-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir -p "$out"
+          printf 'IOS_OUTPUT_ROOT=%s\n' "$out" >> "$GITHUB_ENV"
+
+      - name: Simulator build
+        run: make ios-build
+
+      - name: Simulator tests
+        run: make ios-test
+
+      - name: Device archive (unsigned)
+        run: make ios-archive
+
+      - name: Unsigned IPA + metadata
+        run: make ios-ipa
+
+      # Artifact scope is the runner-temp evidence dir only — never DerivedData
+      # caches, the workspace, env dumps, or signing material. Failed attempts
+      # upload too; a rerun never overwrites another attempt's artifact name.
+      - name: Upload iOS evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: plainsong-ios-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.IOS_OUTPUT_ROOT }}/evidence/
+            ${{ env.IOS_OUTPUT_ROOT }}/*.ipa
+            ${{ env.IOS_OUTPUT_ROOT }}/*.ipa.sha256
+            ${{ env.IOS_OUTPUT_ROOT }}/*-meta/
+            ${{ env.IOS_OUTPUT_ROOT }}/*.xcarchive-meta/
+            ${{ runner.temp }}/toolchain.txt
+          retention-days: 14
+          if-no-files-found: warn
