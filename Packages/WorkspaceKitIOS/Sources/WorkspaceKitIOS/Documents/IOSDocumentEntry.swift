@@ -9,6 +9,7 @@ struct IOSDocumentSaveOperation: Sendable {
     let capturedVersion: Int
     let accessGeneration: UInt64
     let identity: IOSDocumentIdentity
+    let allowsClosing: Bool
 }
 
 @MainActor
@@ -26,6 +27,12 @@ final class IOSDocumentEntry {
     var fenced = false
     var allowsProviderWrite: Bool
     var closed = false
+    var isClosing = false
+    var isRetiring = false
+    var portClosed = false
+    var closeTask: Task<IOSDocumentCloseOutcome, Error>?
+    var retirementTask: Task<Void, Error>?
+    var externalReadTasks: [UUID: Task<Void, Never>] = [:]
     var lastPersistedText: String?
     var inFlightText: String?
     var lastAcknowledgedSequence: UInt64 = 0

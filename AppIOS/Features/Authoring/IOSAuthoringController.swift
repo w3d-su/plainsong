@@ -6,6 +6,7 @@ import MarkdownCore
 final class IOSAuthoringController: ObservableObject, IOSAuthoringActionProviding {
     let actions = IOSAuthoringCatalog.actions
     let findScheduler: any IOSAuthoringFindScheduling
+    var frontmatterObservation: (any IOSObservation)?
 
     @Published var statusMessage = ""
     @Published var linkDraft: IOSLinkDraft?

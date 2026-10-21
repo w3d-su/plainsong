@@ -1,7 +1,10 @@
+import CoreGraphics
 import EditorKitIOS
 import Foundation
+import ImageIO
 import MarkdownCore
 @testable import PlainsongIOS
+import UniformTypeIdentifiers
 import WorkspaceCore
 import WorkspaceKitIOS
 import XCTest
@@ -84,23 +87,43 @@ enum ImageBytes {
     static let pngSignature: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
 
     static func png(count: Int) -> Data {
-        precondition(count >= pngSignature.count)
-        var data = Data(count: count)
-        data.replaceSubrange(0 ..< pngSignature.count, with: pngSignature)
+        precondition(count >= png.count)
+        var data = png
+        data.append(Data(count: count - data.count))
         return data
     }
 
-    static let png = png(count: 32)
-    static let jpeg = Data([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10])
-    static let gif = Data("GIF89a".utf8)
-    static let gif87 = Data("GIF87a".utf8)
-    static let webp: Data = {
-        var data = Data("RIFF".utf8)
-        data.append(contentsOf: [0x10, 0x00, 0x00, 0x00])
-        data.append(contentsOf: "WEBP".utf8)
-        data.append(contentsOf: [0, 0, 0, 0])
+    static let png = encodedRaster(type: UTType.png.identifier)
+    static let jpeg = encodedRaster(type: UTType.jpeg.identifier)
+    static let gif = encodedRaster(type: UTType.gif.identifier)
+    static let gif87: Data = {
+        var data = gif
+        data.replaceSubrange(0 ..< 6, with: Data("GIF87a".utf8))
         return data
     }()
+
+    /// A real, decodable 1x1 WebP fixture, also used by WorkspaceKit's thumbnail tests.
+    static let webp = Data(base64Encoded: "UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAwA0JaQAA3AA/vuUAAA=")!
+
+    private static func encodedRaster(type: String) -> Data {
+        let context = CGContext(
+            data: nil,
+            width: 1,
+            height: 1,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        context.setFillColor(red: 0.2, green: 0.4, blue: 0.6, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: 1, height: 1))
+        let image = context.makeImage()!
+        let encoded = NSMutableData()
+        let destination = CGImageDestinationCreateWithData(encoded, type as CFString, 1, nil)!
+        CGImageDestinationAddImage(destination, image, nil)
+        precondition(CGImageDestinationFinalize(destination))
+        return encoded as Data
+    }
 
     static func heic(brand: String = "heic") -> Data {
         var data = Data(count: 24)
@@ -136,6 +159,7 @@ final class ImageEditorFake: IOSSourceEditorControlling {
     var isFocused = true
     var returnNilSnapshot = false
     var beforeApply: (() -> Void)?
+    var beforeSnapshot: (() -> Void)?
     var nextRefusal: IOSEditRefusal?
     let probe: InsertionProbe
     private(set) var submitted: [IOSAuthorizedEdit] = []
@@ -165,6 +189,10 @@ final class ImageEditorFake: IOSSourceEditorControlling {
     }
 
     func captureSnapshot() -> IOSSourceEditorSnapshot? {
+        if let hook = beforeSnapshot {
+            beforeSnapshot = nil
+            hook()
+        }
         if returnNilSnapshot {
             return nil
         }

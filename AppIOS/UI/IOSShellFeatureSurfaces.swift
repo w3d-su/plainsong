@@ -95,8 +95,8 @@ struct IOSShellFeatureSurfaces {
     var makeAuthoringPanel: ((IOSShellAuthoringPanel, IOSShellSheetContext) -> AnyView?)?
     var makeImagePicker: ((IOSShellSheetContext) -> AnyView?)?
 
-    /// Image insertion needs an explicit grant the shell cannot derive from the
-    /// frozen scene snapshot; composition supplies the current one (W13).
+    /// New-file root and image insertion need the access provider's current
+    /// grant; a scene snapshot or derived parent is never an implicit grant.
     var currentGrant: (() -> IOSWorkspaceGrant?)?
 
     /// Conflict "Save a Copy" needs a destination picker + lease owned by

@@ -220,15 +220,27 @@ final class IOSFormattingActionTests: XCTestCase {
     @MainActor
     func testToolbarContainsPrimaryActionsAndGroups() {
         let toolbar = IOSAuthoringCatalog.actions.filter {
-            if case .toolbar = $0.placement { true } else { false }
+            if case .toolbar = $0.placement {
+                true
+            } else {
+                false
+            }
         }
         XCTAssertEqual(toolbar.map(\.id), [.bold, .italic, .link])
         let headings = IOSAuthoringCatalog.actions.filter { action in
-            if case let .toolbarGroup(name) = action.placement { name == "Heading" } else { false }
+            if case let .toolbarGroup(name) = action.placement {
+                name == "Heading"
+            } else {
+                false
+            }
         }
         XCTAssertEqual(headings.map(\.id), (1 ... 6).map { IOSAuthoringActionID.heading($0) })
         let codeGroup = IOSAuthoringCatalog.actions.filter { action in
-            if case let .toolbarGroup(name) = action.placement { name == "Code" } else { false }
+            if case let .toolbarGroup(name) = action.placement {
+                name == "Code"
+            } else {
+                false
+            }
         }
         XCTAssertEqual(codeGroup.map(\.id), [.code, .inlineCode, .codeFence])
         XCTAssertEqual(IOSAuthoringCatalog.actions.count, 24)

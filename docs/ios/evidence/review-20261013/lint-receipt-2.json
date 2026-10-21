@@ -1,0 +1,7 @@
+{
+  "source_head": "0f97875e4cf11a2c3e4630d032b380d7cf04c6c5",
+  "command": "PATH=pinned-0.62.1 make lint",
+  "exit_code": 0,
+  "warnings": 367,
+  "serious": 0
+}

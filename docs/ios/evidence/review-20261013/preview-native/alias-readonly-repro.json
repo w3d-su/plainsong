@@ -1,0 +1,13 @@
+{
+  "command": [
+    "swift",
+    "-module-cache-path",
+    "/private/tmp/plainsong-preview-ios-native-c1-20261013/readonly-repro-module-cache",
+    "/private/tmp/plainsong-preview-ios-native-c1-20261013/alias-readonly-repro.swift"
+  ],
+  "elapsed_seconds": 6.023419167031534,
+  "exit_code": 0,
+  "scope": "Read-only native macOS Foundation reproduction of original iOS test helper URL string slicing; not native test rerun, product patch, or kernel cause attribution",
+  "stderr": "",
+  "stdout": "[\n  {\n    \"canonicalRelative\" : \"index.html\",\n    \"canonicalRoot\" : \"\\/tmp\\/plainsong-preview-ios-native-c1-20261013\\/App\\/Resources\\/preview\",\n    \"enumeratedPath\" : \"\\/private\\/tmp\\/plainsong-preview-ios-native-c1-20261013\\/App\\/Resources\\/preview\\/index.html\",\n    \"lexicalRoot\" : \"\\/tmp\\/plainsong-preview-ios-native-c1-20261013\\/App\\/Resources\\/preview\",\n    \"rawRelative\" : \"preview\\/index.html\"\n  },\n  {\n    \"canonicalRelative\" : \"bundle.css\",\n    \"canonicalRoot\" : \"\\/tmp\\/plainsong-preview-ios-native-c1-20261013\\/App\\/Resources\\/preview\",\n    \"enumeratedPath\" : \"\\/private\\/tmp\\/plainsong-preview-ios-native-c1-20261013\\/App\\/Resources\\/preview\\/bundle.css\",\n    \"lexicalRoot\" : \"\\/tmp\\/plainsong-preview-ios-native-c1-20261013\\/App\\/Resources\\/preview\",\n    \"rawRelative\" : \"preview\\/bundle.css\"\n  },\n  {\n    \"canonicalRelative\" : \"bundle.js\",\n    \"canonicalRoot\" : \"\\/tmp\\/plainsong-preview-ios-native-c1-20261013\\/App\\/Resources\\/preview\",\n    \"enumeratedPath\" : \"\\/private\\/tmp\\/plainsong-preview-ios-native-c1-20261013\\/App\\/Resources\\/preview\\/bundle.js\",\n    \"lexicalRoot\" : \"\\/tmp\\/plainsong-preview-ios-native-c1-20261013\\/App\\/Resources\\/preview\",\n    \"rawRelative\" : \"preview\\/bundle.js\"\n  }\n]\n"
+}

@@ -11,6 +11,8 @@ final class PausableImageWriter: IOSWorkspaceAssetWriting, @unchecked Sendable {
     private var stagedRequestsStorage: [IOSImageAssetRequest] = []
     private var commitCounter = 0
     private var rollbackCounter = 0
+    private var rollbackCancellation = false
+    private var commitCancellation = false
     private var removed: [UUID] = []
     private var stagedOperationID: UUID?
 
@@ -57,6 +59,14 @@ final class PausableImageWriter: IOSWorkspaceAssetWriting, @unchecked Sendable {
         value { rollbackCounter }
     }
 
+    var rollbackObservedCancellation: Bool {
+        value { rollbackCancellation }
+    }
+
+    var commitObservedCancellation: Bool {
+        value { commitCancellation }
+    }
+
     var removedTokens: [UUID] {
         value { removed }
     }
@@ -94,6 +104,7 @@ final class PausableImageWriter: IOSWorkspaceAssetWriting, @unchecked Sendable {
         record("commit")
         lock.lock()
         commitCounter += 1
+        commitCancellation = Task.isCancelled
         let retain = forceRetainCommit
         lock.unlock()
         if retain {
@@ -106,6 +117,7 @@ final class PausableImageWriter: IOSWorkspaceAssetWriting, @unchecked Sendable {
         record("rollback")
         lock.lock()
         rollbackCounter += 1
+        rollbackCancellation = Task.isCancelled
         let retain = forceRetainRollback || asset.operationID != stagedOperationID
         if !retain {
             removed.append(asset.ownershipToken)

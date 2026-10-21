@@ -17,6 +17,7 @@ final class IOSShellSceneState: ObservableObject {
     var surfaces: IOSShellFeatureSurfaces
 
     @Published private(set) var chrome: IOSShellChromeSnapshot
+    @Published private(set) var workspaceSnapshot: IOSWorkspaceSnapshot?
     @Published private(set) var layout: IOSContentLayout
     @Published var preferredPane: IOSEditorPane = .source
     @Published private(set) var presentation: IOSShellPresentation?
@@ -45,6 +46,7 @@ final class IOSShellSceneState: ObservableObject {
         self.facade = facade
         self.surfaces = surfaces
         sceneSnapshot = facade.snapshot
+        workspaceSnapshot = facade.snapshot.workspace
         chrome = IOSShellChromeSnapshot(scene: facade.snapshot, editor: nil)
         layout = .single(.source)
     }
@@ -76,6 +78,9 @@ final class IOSShellSceneState: ObservableObject {
     private func apply(sceneSnapshot snapshot: IOSAppSceneSnapshot) {
         let previousIdentity = sceneSnapshot.document?.revision.documentID
         sceneSnapshot = snapshot
+        if !IOSShellWorkspaceProjection.matches(workspaceSnapshot, snapshot.workspace) {
+            workspaceSnapshot = snapshot.workspace
+        }
         let identity = snapshot.document?.revision.documentID
         if previousIdentity != identity {
             // A pending sheet proposal is bound to the old document's capture;
@@ -231,7 +236,7 @@ final class IOSShellSceneState: ObservableObject {
     // MARK: Facade-delegated operations
 
     var sceneWorkspaceEntries: [IOSWorkspaceEntry] {
-        sceneSnapshot.workspace?.entries ?? []
+        workspaceSnapshot?.entries ?? []
     }
 
     func openSelectedURL(_ url: URL, scope: IOSWorkspaceScope) {
@@ -259,12 +264,20 @@ final class IOSShellSceneState: ObservableObject {
         navigationPath.append(.document)
     }
 
-    /// Target directory for New File: the selected directory, else the parent
-    /// of the selected document, else the workspace root derived from any
-    /// top-level entry. Nil when no workspace is open (nothing to derive from).
+    /// New File only uses the current directory grant. A file URL or an
+    /// existing row cannot authorize its parent, including an empty workspace.
     var newFileTarget: IOSFileLocation? {
-        let entries = sceneWorkspaceEntries
-        if let selected = selectedEntryID.flatMap({ id in entries.depthFirstFirst { $0.id == id } }) {
+        guard let workspace = workspaceSnapshot,
+              let grant = surfaces.currentGrant?(), grant.scope == .directory,
+              grant.workspaceID == workspace.workspaceID,
+              grant.accessGeneration == workspace.accessGeneration
+        else { return nil }
+        if let selected = selectedEntryID.flatMap({ id in sceneWorkspaceEntries.depthFirstFirst { $0.id == id } }),
+           selected.location.workspaceID == grant.workspaceID,
+           selected.location.accessGeneration == grant.accessGeneration,
+           WorkspaceRelativePath(spelling: selected.location.relativePath) != nil,
+           case .available(canWrite: true) = selected.availability
+        {
             if case .directory = selected.kind {
                 return selected.location
             }
@@ -272,7 +285,10 @@ final class IOSShellSceneState: ObservableObject {
                 return parent
             }
         }
-        return entries.first?.location.parentDirectoryLocation
+        return IOSFileLocation(
+            workspaceID: grant.workspaceID, accessGeneration: grant.accessGeneration,
+            relativePath: "", fileURL: grant.rootURL, resourceID: nil
+        )
     }
 
     func createDocument() {

@@ -1,0 +1,770 @@
+{
+  "by_class": {
+    "IOSAcceptedFindProtectionTests": 7,
+    "IOSAuthoringGuardedEditTests": 9,
+    "IOSFindGenerationTests": 17,
+    "IOSFormattingActionTests": 18,
+    "IOSFrontmatterPanelTests": 16,
+    "IOSFrontmatterProjectionTests": 6,
+    "IOSImageInsertionOrderingTests": 5,
+    "IOSImageInsertionPathTests": 5,
+    "IOSImageInsertionPolicyTests": 7,
+    "IOSImageInsertionStaleTests": 17,
+    "IOSImageInsertionTerminalTests": 15,
+    "IOSImageRasterValidationTests": 4,
+    "IOSImageTaskCancellationTests": 7,
+    "IOSProductionFindSchedulerTests": 3,
+    "IOSSingleReplaceTests": 13
+  },
+  "cases": [
+    {
+      "class": "IOSAcceptedFindProtectionTests",
+      "name": "testAcceptedFindCannotReplaceAnotherDocument",
+      "status": "passed"
+    },
+    {
+      "class": "IOSAcceptedFindProtectionTests",
+      "name": "testAcceptedFindCannotReplaceDifferentLatestSource",
+      "status": "passed"
+    },
+    {
+      "class": "IOSAcceptedFindProtectionTests",
+      "name": "testNextAfterSourceChangeRecomputesBeforeReveal",
+      "status": "passed"
+    },
+    {
+      "class": "IOSAcceptedFindProtectionTests",
+      "name": "testPendingFindDeliveryCannotBlessChangedSourceAtSameRevision",
+      "status": "passed"
+    },
+    {
+      "class": "IOSAcceptedFindProtectionTests",
+      "name": "testPendingFindDeliveryUsesRawUnicodeSourceRatherThanCanonicalEquality",
+      "status": "passed"
+    },
+    {
+      "class": "IOSAcceptedFindProtectionTests",
+      "name": "testPreviousAfterSourceChangeRecomputesBeforeReveal",
+      "status": "passed"
+    },
+    {
+      "class": "IOSAcceptedFindProtectionTests",
+      "name": "testSameDocumentReboundInstallationCannotUseAcceptedFind",
+      "status": "passed"
+    },
+    {
+      "class": "IOSAuthoringGuardedEditTests",
+      "name": "testAccessGenerationABARefuses",
+      "status": "passed"
+    },
+    {
+      "class": "IOSAuthoringGuardedEditTests",
+      "name": "testBusyRefusalDoesNotRetry",
+      "status": "passed"
+    },
+    {
+      "class": "IOSAuthoringGuardedEditTests",
+      "name": "testFormatFrontmatterAndReplaceShareOneApplyRoute",
+      "status": "passed"
+    },
+    {
+      "class": "IOSAuthoringGuardedEditTests",
+      "name": "testMarkedTextRefusesRevealAndApply",
+      "status": "passed"
+    },
+    {
+      "class": "IOSAuthoringGuardedEditTests",
+      "name": "testReadOnlyRefuses",
+      "status": "passed"
+    },
+    {
+      "class": "IOSAuthoringGuardedEditTests",
+      "name": "testRejectedLinkDraftIsNotRetargeted",
+      "status": "passed"
+    },
+    {
+      "class": "IOSAuthoringGuardedEditTests",
+      "name": "testSameVersionDifferentDocumentRefuses",
+      "status": "passed"
+    },
+    {
+      "class": "IOSAuthoringGuardedEditTests",
+      "name": "testSelectionABARefuses",
+      "status": "passed"
+    },
+    {
+      "class": "IOSAuthoringGuardedEditTests",
+      "name": "testStaleRevisionRefusesWithZeroMutation",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFindGenerationTests",
+      "name": "testCanonicalEquivalenceRevealUsesActualRange",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFindGenerationTests",
+      "name": "testCaseFoldLengthUsesActualRange",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFindGenerationTests",
+      "name": "testEmptyQueryIsDistinctFromNoResults",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFindGenerationTests",
+      "name": "testFindFieldFocusKeepsEditorSelection",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFindGenerationTests",
+      "name": "testHandlerReturnsBeforeSearchStarts",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFindGenerationTests",
+      "name": "testNewlineIsInvalid",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFindGenerationTests",
+      "name": "testNoResultsUsesValidQuery",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFindGenerationTests",
+      "name": "testOnlyLatestPendingSearchIsRetained",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFindGenerationTests",
+      "name": "testPattern257IsInvalidAnd256IsSearchable",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFindGenerationTests",
+      "name": "testRapidNextUsesSteppedByThree",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFindGenerationTests",
+      "name": "testSameVersionOtherDocumentDropped",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFindGenerationTests",
+      "name": "testStaleQueryGenerationDropped",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFindGenerationTests",
+      "name": "testStaleSourceRevisionDropped",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFindGenerationTests",
+      "name": "testStepsResetWhenQueryChanges",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFindGenerationTests",
+      "name": "testTruncatedCountRendersTenThousandPlus",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFindGenerationTests",
+      "name": "testUseSelectionAdoptsBoundedEditorText",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFindGenerationTests",
+      "name": "testUseSelectionIgnoresNewlineAndOverlongSelection",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFormattingActionTests",
+      "name": "testAuthoringViewDoesNotInstallKeyCommands",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFormattingActionTests",
+      "name": "testBoldEmptyCaret",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFormattingActionTests",
+      "name": "testBoldMultilineSelection",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFormattingActionTests",
+      "name": "testBoldNestedToggleRemovesDelimiter",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFormattingActionTests",
+      "name": "testBoldTraditionalChineseAndEmoji",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFormattingActionTests",
+      "name": "testCatalogShortcutIdentifiersAreUnique",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFormattingActionTests",
+      "name": "testDisplayMathRefusalOnListHasNoUndo",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFormattingActionTests",
+      "name": "testItalicStrikethroughInlineCodeQuoteFenceCheckboxTableMatchPlanner",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFormattingActionTests",
+      "name": "testLinkCaretOffsetOutsideReplacementRefuses",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFormattingActionTests",
+      "name": "testLinkEmptyDestinationUsesPlannerResult",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFormattingActionTests",
+      "name": "testLinkEmptySelectionInsertsLabelAndURL",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFormattingActionTests",
+      "name": "testLinkSheetSubmitsCapturedGenerationsOnce",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFormattingActionTests",
+      "name": "testLinkUnwrapSkipsSheet",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFormattingActionTests",
+      "name": "testMathInsideFormulaRevealsWithoutApply",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFormattingActionTests",
+      "name": "testMathRefusalInCodeHasNoEditOrUndo",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFormattingActionTests",
+      "name": "testStrikethroughKeepsControlCommandXUnlessC0NarrowsTheList",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFormattingActionTests",
+      "name": "testToolbarContainsPrimaryActionsAndGroups",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFormattingActionTests",
+      "name": "testUndoActionNameMatchesDescriptorTitle",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterPanelTests",
+      "name": "testAbsentBlockInsertsDefault",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterPanelTests",
+      "name": "testDiffDoesNotSplitCombiningMark",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterPanelTests",
+      "name": "testDiffDoesNotSplitSurrogate",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterPanelTests",
+      "name": "testDraftRaceKeepsDraftAndNewerSource",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterPanelTests",
+      "name": "testIdenticalFormDoesNotApply",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterPanelTests",
+      "name": "testMalformedYAMLShowsRawAndDoesNotRewrite",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterPanelTests",
+      "name": "testMissingClosingFenceDoesNotRepair",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterPanelTests",
+      "name": "testOverflowingSelectionRefuses",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterPanelTests",
+      "name": "testQuotedLiteralStringRoundTrip",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterPanelTests",
+      "name": "testRawFieldHasNoCommit",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterPanelTests",
+      "name": "testSecondConfirmUsesNewSnapshot",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterPanelTests",
+      "name": "testSelectionBeforeInsideAndAfterDiff",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterPanelTests",
+      "name": "testTagsDateAndBool",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterPanelTests",
+      "name": "testUnicodeAndEmbeddedNewline",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterPanelTests",
+      "name": "testUnknownKeysAndCRLF",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterPanelTests",
+      "name": "testViewDoesNotPaintSourceBeforeApply",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterProjectionTests",
+      "name": "testAddChecksCurrentSourceInsteadOfPreviouslyAbsentProjection",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterProjectionTests",
+      "name": "testAddDoesNotRewriteMalformedExistingBlock",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterProjectionTests",
+      "name": "testBindingObservationPublishesFreshProjectionAndCanBeCancelled",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterProjectionTests",
+      "name": "testDocumentSwitchPreservesOldDraftWithoutApplyingItToNewDocument",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterProjectionTests",
+      "name": "testFreshProjectionPreservesDraftAndItsOriginalAuthorization",
+      "status": "passed"
+    },
+    {
+      "class": "IOSFrontmatterProjectionTests",
+      "name": "testNoDraftProjectionTracksNativeEditAndUndo",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionOrderingTests",
+      "name": "testAcceptedInsertionUsesTheSavedRelativePath",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionOrderingTests",
+      "name": "testCancelObservedInsideApplyStillCommits",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionOrderingTests",
+      "name": "testPersistenceAndValidateFinishBeforeTheSourceEdit",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionOrderingTests",
+      "name": "testRetainedCommitAfterAcceptIsStillInserted",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionOrderingTests",
+      "name": "testUndoAndRedoKeepTheCommittedImage",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionPathTests",
+      "name": "testIllegalWriterPathsAreNotInserted",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionPathTests",
+      "name": "testPickedFileBytesAreNotTheMarkdownPath",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionPathTests",
+      "name": "testSmartPasteRepresentsSpecialFilenames",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionPathTests",
+      "name": "testUTF16CaretStaysOnTheCapturedSelection",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionPathTests",
+      "name": "testWriterDedupedPathIsUsedVerbatim",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionPolicyTests",
+      "name": "testAllowedRasters",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionPolicyTests",
+      "name": "testHEICConversionStagesPNGBytes",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionPolicyTests",
+      "name": "testImageIOTranscodesGeneratedHEIC",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionPolicyTests",
+      "name": "testMismatchedExtensionOrTypeIsRejected",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionPolicyTests",
+      "name": "testOversizeAfterHEICTranscodeIsRejected",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionPolicyTests",
+      "name": "testSVGInvalidBytesAndExecutablesAreRejected",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionPolicyTests",
+      "name": "testTenMebibyteBoundary",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionStaleTests",
+      "name": "testAccessGenerationChangeAfterValidateRollsBack",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionStaleTests",
+      "name": "testAccessGenerationChangeDuringStageRollsBack",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionStaleTests",
+      "name": "testBindingReplacementDuringStageRollsBack",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionStaleTests",
+      "name": "testComposingDuringStageRollsBack",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionStaleTests",
+      "name": "testComposingOrUnfocusedCaptureDoesNotOpen",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionStaleTests",
+      "name": "testDestinationValidationFailureRollsBack",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionStaleTests",
+      "name": "testLostFocusDuringStageRollsBack",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionStaleTests",
+      "name": "testMissingSnapshotDuringStageRollsBack",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionStaleTests",
+      "name": "testNativeEditDuringStageRollsBack",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionStaleTests",
+      "name": "testReadOnlyDuringStageRollsBack",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionStaleTests",
+      "name": "testSameVersionDifferentDocumentRollsBack",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionStaleTests",
+      "name": "testSelectionABARollsBack",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionStaleTests",
+      "name": "testSingleFileGrantDoesNotSaveOrEdit",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionStaleTests",
+      "name": "testStagedGenerationMismatchRollsBack",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionStaleTests",
+      "name": "testStagedWorkspaceReplacementRollsBack",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionStaleTests",
+      "name": "testSwitchingDocumentDuringStageRollsBack",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionStaleTests",
+      "name": "testURLPrefixIsNotGrantAuthority",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionTerminalTests",
+      "name": "testApplyRejectionRollsBackAndKeepsSource",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionTerminalTests",
+      "name": "testCancelBeforeStageDoesNotCallWriter",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionTerminalTests",
+      "name": "testCancelDuringStageRollsBackOnce",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionTerminalTests",
+      "name": "testCancellationErrorFromStageDoesNotRollback",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionTerminalTests",
+      "name": "testConflictRefusalRollsBackWithoutSourceChange",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionTerminalTests",
+      "name": "testDuplicateFinishImportStagesOnce",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionTerminalTests",
+      "name": "testDuplicateInsertDoesNotCommitTwice",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionTerminalTests",
+      "name": "testLoadFailureDoesNotStage",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionTerminalTests",
+      "name": "testMismatchedOperationDoesNotDelete",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionTerminalTests",
+      "name": "testPickerDismissalDoesNotSaveOrEdit",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionTerminalTests",
+      "name": "testProviderStageFailuresDoNotMutateSource",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionTerminalTests",
+      "name": "testRollbackRetentionDoesNotDelete",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionTerminalTests",
+      "name": "testStageRetentionDoesNotRollback",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionTerminalTests",
+      "name": "testTeardownDuringStageRollsBackOnce",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageInsertionTerminalTests",
+      "name": "testUncapturedContextDoesNotStage",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageRasterValidationTests",
+      "name": "testHEICTranscoderMustReturnCompletePNG",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageRasterValidationTests",
+      "name": "testRealRasterFixturesDecodeAndRemainUnchanged",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageRasterValidationTests",
+      "name": "testSignatureOnlyRastersNeverReachPersistence",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageRasterValidationTests",
+      "name": "testTruncatedRealRastersNeverReachPersistence",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageTaskCancellationTests",
+      "name": "testCancellationDuringFinalSnapshotNeverApplies",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageTaskCancellationTests",
+      "name": "testCancelledCallerDoesNotBeginPersistence",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageTaskCancellationTests",
+      "name": "testCancelledRollbackRetentionKeepsReceiptAndOwnedIdentity",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageTaskCancellationTests",
+      "name": "testTaskCancelDuringNormalizationNeverStages",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageTaskCancellationTests",
+      "name": "testTaskCancelDuringStageDrainsOneOwnedRollback",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageTaskCancellationTests",
+      "name": "testTaskCancelDuringValidationDrainsWithoutApply",
+      "status": "passed"
+    },
+    {
+      "class": "IOSImageTaskCancellationTests",
+      "name": "testTaskCancellationInsideAcceptedApplyStillCommitsOnce",
+      "status": "passed"
+    },
+    {
+      "class": "IOSProductionFindSchedulerTests",
+      "name": "testCancelBeforeRunnerStartsDoesNotScanTheCancelledQuery",
+      "status": "passed"
+    },
+    {
+      "class": "IOSProductionFindSchedulerTests",
+      "name": "testCancelDropsQueuedScanAndRunningResultBeforeReuse",
+      "status": "passed"
+    },
+    {
+      "class": "IOSProductionFindSchedulerTests",
+      "name": "testRunningScanDrainsBeforeOnlyLatestPendingStarts",
+      "status": "passed"
+    },
+    {
+      "class": "IOSSingleReplaceTests",
+      "name": "testEmptyReplacementDeletesMatch",
+      "status": "passed"
+    },
+    {
+      "class": "IOSSingleReplaceTests",
+      "name": "testFirstActionRevealsWhenSelectionIsNotMatch",
+      "status": "passed"
+    },
+    {
+      "class": "IOSSingleReplaceTests",
+      "name": "testFollowingMatchBecomesCurrent",
+      "status": "passed"
+    },
+    {
+      "class": "IOSSingleReplaceTests",
+      "name": "testGuardRejectionLeavesSource",
+      "status": "passed"
+    },
+    {
+      "class": "IOSSingleReplaceTests",
+      "name": "testLiteralIdenticalDoesNotEdit",
+      "status": "passed"
+    },
+    {
+      "class": "IOSSingleReplaceTests",
+      "name": "testMarkedTextSkipsRevealOnSelectOnlyReplace",
+      "status": "passed"
+    },
+    {
+      "class": "IOSSingleReplaceTests",
+      "name": "testNextStillWrapsAfterUnresolvedCurrent",
+      "status": "passed"
+    },
+    {
+      "class": "IOSSingleReplaceTests",
+      "name": "testOneRealEditRescansWithoutWrapping",
+      "status": "passed"
+    },
+    {
+      "class": "IOSSingleReplaceTests",
+      "name": "testQueryLengthIsNotMatchLength",
+      "status": "passed"
+    },
+    {
+      "class": "IOSSingleReplaceTests",
+      "name": "testReplacement256Accepted",
+      "status": "passed"
+    },
+    {
+      "class": "IOSSingleReplaceTests",
+      "name": "testReplacementNewlineRefuses",
+      "status": "passed"
+    },
+    {
+      "class": "IOSSingleReplaceTests",
+      "name": "testSecondActionReplacesActualRange",
+      "status": "passed"
+    },
+    {
+      "class": "IOSSingleReplaceTests",
+      "name": "testTruncatedSessionReplacesRetainedCurrentMatch",
+      "status": "passed"
+    }
+  ],
+  "statuses": {
+    "passed": 149
+  },
+  "total": 149
+}

@@ -1,0 +1,866 @@
+{
+  "controlled_test_doubles": "Only unchanged private Authoring/Images test doubles; no native provider implementation is supplied.",
+  "copies": [
+    {
+      "destination": "Packages/MarkdownCore/Package.swift",
+      "origin": "Packages/MarkdownCore/Package.swift",
+      "sha256": "f48f36e7802f1300a00f79787bdb5dcd41d0a4bd1b0b3ee7f698c53adb8ab398"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/AutoPairing.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/AutoPairing.swift",
+      "sha256": "40927365b9bb3b5586ae27e6ad7b93b6f8c6da8b8323b19a32a091c1518106c3"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/CheckboxEditing.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/CheckboxEditing.swift",
+      "sha256": "7c09c5907525bed13be5962ff4f7b17558f30a005386b22e4a073d6215b01a9d"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/CodeFenceEditing.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/CodeFenceEditing.swift",
+      "sha256": "ab21e17fb2895485f3108b8b79b9d6aecc6b5725cea701bf6428e6b5715fe0c7"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/CompletionEngine+Completions.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/CompletionEngine+Completions.swift",
+      "sha256": "26d3cd16c45e7470510d54e3b747103bfc33e3a0966f146a8d30ce6f49ed62d7"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/CompletionEngine+Contexts.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/CompletionEngine+Contexts.swift",
+      "sha256": "40f701d47786777169e8db1cffe8ca3ccb07b490aff61e91fed5df540dce8f1f"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/CompletionEngine+Ranking.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/CompletionEngine+Ranking.swift",
+      "sha256": "e211221878d8b95f49db6516996689b53bed4f30f1e2153354493cce92db2adb"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/CompletionEngine.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/CompletionEngine.swift",
+      "sha256": "a31c7ef33bf7962b279b5e477866603a53e864ea17909082d2989ab8a17e1643"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/DocumentSession.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/DocumentSession.swift",
+      "sha256": "e61c400ef4af3d617d99e627ee4e4c657d72d5aa5d944c85d3e54b521f3a3fd7"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/DocumentSnapshot.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/DocumentSnapshot.swift",
+      "sha256": "809a87186be11393bb3cb299abe8e8612e8c2eee6536c1c1fa05a91e78e980ba"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/DocumentTextChange.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/DocumentTextChange.swift",
+      "sha256": "5d9d3b156b363fa66a151bcc3b8a4e615bca8caff30d958d6c26e75085f55e28"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/EditorFindSession.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/EditorFindSession.swift",
+      "sha256": "cb0bfade1e45720fb03dfd7c6d0b0767a6e22902fd18d142e711a4f0719c63c5"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/EditorReplaceBatchPreparation.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/EditorReplaceBatchPreparation.swift",
+      "sha256": "fcd5a114b503aa98f34f039fd2bcf871f575cbe5cada9fa70e21bfb9d6d88fa7"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/EditorReplaceContinuation.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/EditorReplaceContinuation.swift",
+      "sha256": "96ee6368b18e21e715ab27a4292b302a1234d7349d8788842db15a6d9a601844"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/EditorReplaceLimits.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/EditorReplaceLimits.swift",
+      "sha256": "ae176804119de87031626dcd5bd75939cd873a2dc87b34438af53f3e6d7c9f58"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/EditorReplacePlanner.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/EditorReplacePlanner.swift",
+      "sha256": "9486a7f61b870d146ede3de2a7fb3c1bb03e3efa0c36e885de0b52c7a469dbf6"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/EditorReplacePlanning.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/EditorReplacePlanning.swift",
+      "sha256": "fc34457847b705d097250710003aa31ef037c7e617fa0d411659db87c87115cc"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/EditorReplaceSourceConstruction.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/EditorReplaceSourceConstruction.swift",
+      "sha256": "556b52a6b3603e49591742c6321629ae5fc3182c803c108c6bc1b1c6deec87be"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/ExactSourceReconciliation.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/ExactSourceReconciliation.swift",
+      "sha256": "d1ac5e301a15f8fee1ce96535513f63975cd9cf16585e70f21fe5140d49bf0ca"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/ExactSourceText.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/ExactSourceText.swift",
+      "sha256": "f1f0a7c116a4a10e1139944462649c4a9569c96f1303d0dd668f60d8a57a4002"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/FormattingEditing.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/FormattingEditing.swift",
+      "sha256": "f619219670f7694107dac813d8d453fd8ad9366a8838bac81dbb0e6afc1dae70"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/Frontmatter.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/Frontmatter.swift",
+      "sha256": "d767f871e6d072aa5733ceb2c4716bcc6b2e62d807294485ce96a51912160344"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/FrontmatterTextSupport.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/FrontmatterTextSupport.swift",
+      "sha256": "ecd99a9ab444b8df163d2bc38690ed22d6c75a72e35342dd0fa01b9047e83d26"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift",
+      "sha256": "f2bec4e93b0262d45ae4456b4b2c0cdb2a0cb0abe5176424ef0599ae4362d285"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/ListEditing.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/ListEditing.swift",
+      "sha256": "b5e82a56a0518bd0bcd936d11562871331515178210d5ecf85d44537171fe3b8"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/MDXImportParser.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/MDXImportParser.swift",
+      "sha256": "4d5de87416327e08eb7e98a8e75d4bfddcd606f345ecf7c5cf445ae4f2a3572e"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/MarkdownCore.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/MarkdownCore.swift",
+      "sha256": "f543f244e2c27d2e91742137aa3463f460bfa3380c12174aa0e2b1413e30abf6"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/MarkdownEditTypes.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/MarkdownEditTypes.swift",
+      "sha256": "00d4c67f205ea396d540da8f596aee0cb8aab8ca861da24d33a009ce4c31fe62"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/MarkdownImageRegions.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/MarkdownImageRegions.swift",
+      "sha256": "dc10e9a7727720972ff158017991d185f6506335beabc43ff31f213c1da052a3"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/MarkdownTextEditingSupport.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/MarkdownTextEditingSupport.swift",
+      "sha256": "60eccebbf5c34508db8e52895a3d9564a2d2831f606b7fe8f9654eaf83363b7b"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/MathEditing.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/MathEditing.swift",
+      "sha256": "055abdd742cb0ef3bb127cc95105046692af4e578c842d459ef3f1e32554c55a"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/MathInsertionContext.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/MathInsertionContext.swift",
+      "sha256": "924c4384acfdac9b4e4cf5590c64d564d236b5b29b1ef7a51f1edd872fafdf51"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/SmartPaste.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/SmartPaste.swift",
+      "sha256": "c95225ae27f4e1496e4c47035467f7ab8849ce9ded6eb66e7dfbfa478db65361"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/TableEditing.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/TableEditing.swift",
+      "sha256": "940816fba6a7b3399388f2854aeb1569d268fd4232587f5cffa3957267632e94"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/TextSearch.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/TextSearch.swift",
+      "sha256": "b9fe57407f68960652a15565a35005a8fb23ba4d17f6ee946e426d35d8473fe7"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/TextSearchComposedSequences.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/TextSearchComposedSequences.swift",
+      "sha256": "740242370fecfd9fffed81ab746c0db5c3eb2080b550af029a0e4133b404043e"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/TextSearchInputValidation.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/TextSearchInputValidation.swift",
+      "sha256": "ed577c5400768aa7f804be2d61218a03cec6c8457c39910dfbe959725ce42755"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/TextSearchLiteralCursor.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/TextSearchLiteralCursor.swift",
+      "sha256": "6d0a6f8b4b275bb39b7c88685fba117983d6f6b6fe35edc454d1cb565ea6b01b"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/TextSearchPreview.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/TextSearchPreview.swift",
+      "sha256": "ab94ceda39dc5e115d932c7c964f92d98269914ce8be20ffa55537914d2757ce"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/TextSearchScanner.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/TextSearchScanner.swift",
+      "sha256": "645440ead35818c8a0db90431c8a6019c126ae58eeabd4510be9e228ac8410b6"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Sources/MarkdownCore/TextStatistics.swift",
+      "origin": "Packages/MarkdownCore/Sources/MarkdownCore/TextStatistics.swift",
+      "sha256": "15adfc8e043bcc06f7a4b50e2075780a2ee31ee6bf87d2661f6f512c445a8cb9"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/CompletionEngineTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/CompletionEngineTests.swift",
+      "sha256": "855c6f6ee22ec352d58e37274e9c739e4282f56a23b72b33006b315b7b2beac3"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/DocumentSessionRelocationTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/DocumentSessionRelocationTests.swift",
+      "sha256": "729e3583c684f69cb781b03a6964033d3275ec648d75d13c29c05d85ca2ef032"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/DocumentSessionTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/DocumentSessionTests.swift",
+      "sha256": "4c45272a5cfea3dff9af992ef18eff561c3adaf93ba4869130d365a3c6207a14"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorFindSessionTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorFindSessionTests.swift",
+      "sha256": "aa711184178b554bc1cd5ac74a1f9c25fc2e55c1e1fd4cf498d1c58481741931"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorFindSessionUnresolvedCurrentTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorFindSessionUnresolvedCurrentTests.swift",
+      "sha256": "70989fbfbe22dd50021d42291a77e4b7c4d9f12e4a97c7b525b6d08e94d99334"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceBatchDifferentialTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceBatchDifferentialTests.swift",
+      "sha256": "7a7f1c1d62c68c6ff88b90c9ac38342017ded16572f7a9b7870ad22f09f2adc8"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceBatchPlanTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceBatchPlanTests.swift",
+      "sha256": "1cffde7f730d76b6659668dbed2fb960e0408345f845b32e966eec17dd646999"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceBatchPreparationTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceBatchPreparationTests.swift",
+      "sha256": "8cdcde7c45cebda753d82c526cde6a56d44814391222673efad74817143e2f6a"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceContinuationRescanTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceContinuationRescanTests.swift",
+      "sha256": "a85acd4a4823413873c8602bba5ced731d1241515be45d1daadfe6cd5eb769f7"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceContinuationTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceContinuationTests.swift",
+      "sha256": "49abfb36de12e9ea4f7ecb854201e72c93c3b66cd98db42b9250715f78c0c64d"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceFindAgreementTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceFindAgreementTests.swift",
+      "sha256": "d74a20231bd6c3f7d3563ee510d27ec406ce70bf513303ed73cf209594903b3a"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceOffsetMappingTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceOffsetMappingTests.swift",
+      "sha256": "1183ada3a750ea56fe79c8ae422381a9f17510bbbe418af51a5bc06cbe38cb08"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceOneMatchPlanTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceOneMatchPlanTests.swift",
+      "sha256": "7875cf29529caf63ff6f9ccd9c00c38ef84037e5d6b220cd7c2550aea4a1ef3b"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceSourceConstructionTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceSourceConstructionTests.swift",
+      "sha256": "1ae785769d47d037a22a3b4bc155f012bb59d9965b07b8b1ba155948ada42cc5"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceValidationTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceValidationTests.swift",
+      "sha256": "039efb856efa462a416c17dbb462c15ca77c8b73f80c7a9b8457d949eeb8be59"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/ExactSourceReconciliationTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/ExactSourceReconciliationTests.swift",
+      "sha256": "b756e263cabdbed0bf584d1a3695f89077f3cc2aa05c2a1c063c1b959543476b"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/FileKindTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/FileKindTests.swift",
+      "sha256": "a4959aaa2ead625a11e39b2dad96cde340501be3778eab693e332ffa71ec9893"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/FrontmatterStringRoundTripTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/FrontmatterStringRoundTripTests.swift",
+      "sha256": "08defe08c4fca56baa15e03f15c9715469fe6835a50d0ccedaba67129bc24af6"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/FrontmatterTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/FrontmatterTests.swift",
+      "sha256": "4ab8766f1d0633bec39bab16c30f1537e0bacf632caa950d0f03db15577e80e0"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/IOSDocumentContractTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/IOSDocumentContractTests.swift",
+      "sha256": "4301e95fa5712c4470baaa7acfd17355084b9d0107156ed8203dae08bc20512e"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/MarkdownEditingTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/MarkdownEditingTests.swift",
+      "sha256": "5e823eae24580f6e21bf16c49bdbbbc90983a7c99a0e4d6a3d98f3df52cce202"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/MarkdownImageRegionsTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/MarkdownImageRegionsTests.swift",
+      "sha256": "b3bd6b31777e50decca088c582614bd09209db63c2bbbe1942159c3d06def878"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/MathEditingTestSupport.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/MathEditingTestSupport.swift",
+      "sha256": "a41a707ba401490a999c62acffd6a656384c12ced1f7169d74cb2c6cbd9568d7"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/MathEditingTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/MathEditingTests.swift",
+      "sha256": "587cf6ec652c899f9d912005cc0b691f4a23a2b6dfa98a8a8f68bfcaf6bebf43"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/MathInsertionContextTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/MathInsertionContextTests.swift",
+      "sha256": "e73d0cabd72a733639068d5034914e70b24b6f1c75ed79958fa40b415e413fe5"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/SmartPasteTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/SmartPasteTests.swift",
+      "sha256": "c535963eeaa48244d3ccfca3f2eef8a15f6aa1e9508f133a83cdaf34002bccff"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchPreviewBudgetTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchPreviewBudgetTests.swift",
+      "sha256": "acdf3270286411d211478e46a1e8faacb3e14576bb83f86aba7dd4b958547225"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchResourceBoundTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchResourceBoundTests.swift",
+      "sha256": "8a85852440ee6a355ca45fca1cccd70d7e38d6d966a447c5688ed1dceba0030a"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchScalingTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchScalingTests.swift",
+      "sha256": "ed4bb969855ecfa5f8c110f606e5b602bb6f83d05b44383bea2a15f5413fe1f3"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchTestSupport.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchTestSupport.swift",
+      "sha256": "86b1905a9773659392dd470b3876c58be534d08a7109b17b2145256fe558fd1d"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchTests.swift",
+      "sha256": "49bb9f15d818092cd60f3226cc1ced12ac868c2cd463dfebc537824f25d2f3dd"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchUnicodeAndSnippetTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchUnicodeAndSnippetTests.swift",
+      "sha256": "39b35b7c66611259f241342229d8f25099ff9401fbe7ee1882289ddf640b2098"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchWholeWordTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchWholeWordTests.swift",
+      "sha256": "23f89fffde1baaa6d8e1dc9fbb02bc2eb76f4bf74e4b14bcf83a96790f8cd14b"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchWordBoundaryScalarTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchWordBoundaryScalarTests.swift",
+      "sha256": "756e0f53c2e5c6ade54e08cd9bffa516a956fc0d8c05a14cbaa8a9fa68975a8b"
+    },
+    {
+      "destination": "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextStatisticsTests.swift",
+      "origin": "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextStatisticsTests.swift",
+      "sha256": "99ab6e9fa2c53961c1541db588d7e44658564baa1e2781d353d9fdd4b36fc568"
+    },
+    {
+      "destination": "Packages/SyntaxKit/Package.swift",
+      "origin": "Packages/SyntaxKit/Package.swift",
+      "sha256": "7baf8871fed0980682bc4dcc220d4e6d95a65c845833c2c013f229d715b3c273"
+    },
+    {
+      "destination": "Packages/SyntaxKit/Sources/SyntaxKit/Contracts.swift",
+      "origin": "Packages/SyntaxKit/Sources/SyntaxKit/Contracts.swift",
+      "sha256": "77ae739d3ad480b9380eb12f85cb171c2277576dd4c633ca215731b30f767174"
+    },
+    {
+      "destination": "Packages/SyntaxKit/Sources/SyntaxKit/MarkdownSyntaxToken.swift",
+      "origin": "Packages/SyntaxKit/Sources/SyntaxKit/MarkdownSyntaxToken.swift",
+      "sha256": "0be329653fb003ef5c1a9adac577d809a570779a8fe198a8f244032b51a7bed6"
+    },
+    {
+      "destination": "Packages/SyntaxKit/Tests/SyntaxKitTests/SyntaxContractConsumerTests.swift",
+      "origin": "Packages/SyntaxKit/Tests/SyntaxKitTests/SyntaxContractConsumerTests.swift",
+      "sha256": "5b98fc0ae5358eda52c20adc600d8a48bee6566924bed6261657bc6a3de9e443"
+    },
+    {
+      "destination": "Packages/WorkspaceCore/Package.swift",
+      "origin": "Packages/WorkspaceCore/Package.swift",
+      "sha256": "6e707eff61c122f575d84e1c388796236086746eded040bd41df246cb6a51622"
+    },
+    {
+      "destination": "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift",
+      "origin": "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift",
+      "sha256": "e56ba2961c82d2192994b96ef355813ca13aaec2598e2ff4ae7671a333ce0f8e"
+    },
+    {
+      "destination": "Packages/WorkspaceCore/Tests/WorkspaceCoreTests/WorkspaceContractTests.swift",
+      "origin": "Packages/WorkspaceCore/Tests/WorkspaceCoreTests/WorkspaceContractTests.swift",
+      "sha256": "475e01afa578b1192fafd82d4cdad2b3b8a9833ff0ff8bff2476405f39a98870"
+    },
+    {
+      "destination": "Packages/EditorKitIOS/Package.swift",
+      "harness_adaptation": "Only temporary manifest adds macOS 14 platform to iOS-only declaration package; original candidate manifest unchanged.",
+      "harness_sha256": "f186b96b50cd194e665f0ebd9e73a4b1c42d982cd0ab91fe2bb007d0b845d0f1",
+      "origin": "Packages/EditorKitIOS/Package.swift",
+      "sha256": "311dc44460b357d7a3383a71c7867ffbbb7dfc5a4f0f549812631ce77ab47e0a"
+    },
+    {
+      "destination": "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift",
+      "origin": "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift",
+      "sha256": "fc07a44c9743be3444bb47ddd15e9a12d1cf2b2de6602650558ef97966f0e567"
+    },
+    {
+      "destination": "Packages/EditorKitIOS/Sources/EditorKitIOS/Editor/.gitkeep",
+      "origin": "Packages/EditorKitIOS/Sources/EditorKitIOS/Editor/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "destination": "Packages/EditorKitIOS/Sources/EditorKitIOS/Presentation/.gitkeep",
+      "origin": "Packages/EditorKitIOS/Sources/EditorKitIOS/Presentation/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "destination": "Packages/EditorKitIOS/Tests/EditorKitIOSTests/EditorContractConsumerTests.swift",
+      "origin": "Packages/EditorKitIOS/Tests/EditorKitIOSTests/EditorContractConsumerTests.swift",
+      "sha256": "694cd2431f99f86665ac09a496e86fe229096a918c8f888dbd50146352804df1"
+    },
+    {
+      "destination": "Packages/WorkspaceKitIOS/Package.swift",
+      "harness_adaptation": "Only temporary manifest adds macOS 14 platform to iOS-only declaration package; original candidate manifest unchanged.",
+      "harness_sha256": "77f850494dade0b18727f3f6cddc40a699c9a418979cbb6999720e5f0e299447",
+      "origin": "Packages/WorkspaceKitIOS/Package.swift",
+      "sha256": "0d338cdb207cc8d36b7c7bf4f00308269af635632ba742d127110c60651a1e4c"
+    },
+    {
+      "destination": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Access/.gitkeep",
+      "origin": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Access/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "destination": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+      "origin": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+      "sha256": "eec068b9deaf94912de7af2654b54f11650d0e2c8d76e8b7f9e2d3a43269eb14"
+    },
+    {
+      "destination": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+      "origin": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+      "sha256": "beb9d47293b3aeb029de4fa9716d7d8b8af18f2971eec9495354936185c0c06b"
+    },
+    {
+      "destination": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/.gitkeep",
+      "origin": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "destination": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift",
+      "origin": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift",
+      "sha256": "259d40b8b25c997db2d0f44c34ef2c16517132dfbadd123178349070c53a2748"
+    },
+    {
+      "destination": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Recovery/.gitkeep",
+      "origin": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Recovery/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "destination": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Workspace/.gitkeep",
+      "origin": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Workspace/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "destination": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Contracts/DocumentStateContractTests.swift",
+      "origin": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Contracts/DocumentStateContractTests.swift",
+      "sha256": "64a4df69d3a95216e6c17040f43f45253232132816f4f294797951dcaa515116"
+    },
+    {
+      "destination": "Packages/PreviewKit/Package.swift",
+      "origin": "Packages/PreviewKit/Package.swift",
+      "sha256": "dab2663999869fafa412effe795e7389c900581b228764cf98c35e1781ea53ca"
+    },
+    {
+      "destination": "Packages/PreviewKit/Sources/PreviewKit/AssetURLResolver.swift",
+      "origin": "Packages/PreviewKit/Sources/PreviewKit/AssetURLResolver.swift",
+      "sha256": "0f76afdf6ac846605bdcd4c0ce900f96ac5f3797af2b39fe5d6e4063922438e8"
+    },
+    {
+      "destination": "Packages/PreviewKit/Sources/PreviewKit/AssetURLSchemeHandler.swift",
+      "origin": "Packages/PreviewKit/Sources/PreviewKit/AssetURLSchemeHandler.swift",
+      "sha256": "2bcd387a180ecc2aba9fe7580dea5419d99a71df72f8049db1cf917f4db794da"
+    },
+    {
+      "destination": "Packages/PreviewKit/Sources/PreviewKit/BridgeMessage.swift",
+      "origin": "Packages/PreviewKit/Sources/PreviewKit/BridgeMessage.swift",
+      "sha256": "223bd321d08443d1ea7b6c043dfe40884df3b87d032cb32d37b947c9042721c8"
+    },
+    {
+      "destination": "Packages/PreviewKit/Sources/PreviewKit/ExportBridgeMessages.swift",
+      "origin": "Packages/PreviewKit/Sources/PreviewKit/ExportBridgeMessages.swift",
+      "sha256": "2dba08097099c24d1a787c676ea1dd01231865b2679c4756c5805ea886d8cb05"
+    },
+    {
+      "destination": "Packages/PreviewKit/Sources/PreviewKit/ExportFontManifest.swift",
+      "origin": "Packages/PreviewKit/Sources/PreviewKit/ExportFontManifest.swift",
+      "sha256": "16c4532fb9518dee31ce2250aae272dc71db53e710b1626e526869374008cb4e"
+    },
+    {
+      "destination": "Packages/PreviewKit/Sources/PreviewKit/ExportHTMLResultPayload+Bridge.swift",
+      "origin": "Packages/PreviewKit/Sources/PreviewKit/ExportHTMLResultPayload+Bridge.swift",
+      "sha256": "9412fbc0e6052b37bcb26b6e19978c04f90488acfb223603705fc2e382a4c92f"
+    },
+    {
+      "destination": "Packages/PreviewKit/Sources/PreviewKit/ExportRasterSniffer.swift",
+      "origin": "Packages/PreviewKit/Sources/PreviewKit/ExportRasterSniffer.swift",
+      "sha256": "f3146ed3998f69cfbc695eb0476b437b95eda507b1d423573d582b6648c64979"
+    },
+    {
+      "destination": "Packages/PreviewKit/Sources/PreviewKit/ExportResourceResolver.swift",
+      "origin": "Packages/PreviewKit/Sources/PreviewKit/ExportResourceResolver.swift",
+      "sha256": "322d3496667c0be042880f69902d6e092bfb3bcdb9396ad9b008dfcb0716f42f"
+    },
+    {
+      "destination": "Packages/PreviewKit/Sources/PreviewKit/MarkdownPreviewWebView.swift",
+      "origin": "Packages/PreviewKit/Sources/PreviewKit/MarkdownPreviewWebView.swift",
+      "sha256": "0b4a50b9a9701d34c416d2f0dd011bddaf5673c6590b94caefe8eda601608e55"
+    },
+    {
+      "destination": "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift",
+      "origin": "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift",
+      "sha256": "5ec2bfc76bb6237f5ff019cc3381361f5219b2fa8e0f2d6eff8a43412113b593"
+    },
+    {
+      "destination": "Packages/PreviewKit/Sources/PreviewKit/PreviewContractExports.swift",
+      "origin": "Packages/PreviewKit/Sources/PreviewKit/PreviewContractExports.swift",
+      "sha256": "bea8b7f635a3705691f5c1016d08b2f016663b498409463d6b2f2453096f39fa"
+    },
+    {
+      "destination": "Packages/PreviewKit/Sources/PreviewKit/PreviewContracts.swift",
+      "origin": "Packages/PreviewKit/Sources/PreviewKit/PreviewContracts.swift",
+      "sha256": "ffae81620f5ceb09ea28aa4bab49a4319dfd30a965bbb89ad7ead81fa2d0fdfe"
+    },
+    {
+      "destination": "Packages/PreviewKit/Sources/PreviewKit/PreviewController+BridgeReceipt.swift",
+      "origin": "Packages/PreviewKit/Sources/PreviewKit/PreviewController+BridgeReceipt.swift",
+      "sha256": "b1b8356311eededc58200722c84e59604cdd255163a29e334aad22cb88166f7a"
+    },
+    {
+      "destination": "Packages/PreviewKit/Sources/PreviewKit/PreviewController+Export.swift",
+      "origin": "Packages/PreviewKit/Sources/PreviewKit/PreviewController+Export.swift",
+      "sha256": "864f20c51632d5944ff18572d63f6a52708c100f677e126b63e3591cd3d66351"
+    },
+    {
+      "destination": "Packages/PreviewKit/Sources/PreviewKit/PreviewController+ExportNetworkPolicy.swift",
+      "origin": "Packages/PreviewKit/Sources/PreviewKit/PreviewController+ExportNetworkPolicy.swift",
+      "sha256": "af25b86a5c96475eb2577b2fcc759eb554c1d033a400d682441ac168ade28467"
+    },
+    {
+      "destination": "Packages/PreviewKit/Sources/PreviewKit/PreviewController+ExportRender.swift",
+      "origin": "Packages/PreviewKit/Sources/PreviewKit/PreviewController+ExportRender.swift",
+      "sha256": "febd80f6006e04cc069dfe25fe426da730bcf02e2634d430c7fc464252b45270"
+    },
+    {
+      "destination": "Packages/PreviewKit/Sources/PreviewKit/PreviewController+ScrollDelivery.swift",
+      "origin": "Packages/PreviewKit/Sources/PreviewKit/PreviewController+ScrollDelivery.swift",
+      "sha256": "e277ce70a5da05179362bdf35df47c9ffb77d7f9784d914930e84d8210efd0c9"
+    },
+    {
+      "destination": "Packages/PreviewKit/Sources/PreviewKit/PreviewController.swift",
+      "origin": "Packages/PreviewKit/Sources/PreviewKit/PreviewController.swift",
+      "sha256": "6d4ad7e20e9254a7c0e7e3ae92499e22296874b7d29a155e05d65e2be41ac37b"
+    },
+    {
+      "destination": "Packages/PreviewKit/Sources/PreviewKit/PreviewHTMLExportResult+Omissions.swift",
+      "origin": "Packages/PreviewKit/Sources/PreviewKit/PreviewHTMLExportResult+Omissions.swift",
+      "sha256": "65e59045f6359208d48f9fe529c02ac3e68bc331f3faf5a6a05a8857c75bf7d4"
+    },
+    {
+      "destination": "Packages/PreviewKit/Sources/PreviewKit/PreviewKit.swift",
+      "origin": "Packages/PreviewKit/Sources/PreviewKit/PreviewKit.swift",
+      "sha256": "3e310b7903b2f47ee458fb4fc8514dbb66d4e53912af4682b95de25bd172d05f"
+    },
+    {
+      "destination": "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLBridgeDecodingTests.swift",
+      "origin": "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLBridgeDecodingTests.swift",
+      "sha256": "4ad82d4fe2c7d7537b6677fb67884ba4f12a78626f1d160dbb69e2eec2d4cdfa"
+    },
+    {
+      "destination": "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLHostedTests.swift",
+      "origin": "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLHostedTests.swift",
+      "sha256": "3288dccd3e9ed8176f7b798c023ca90ed63d27322710b5b8f2d2bc70fa7670f4"
+    },
+    {
+      "destination": "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLLifecycleTests.swift",
+      "origin": "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLLifecycleTests.swift",
+      "sha256": "f9f960cf5afadb150df7022c28191b52defee0fff6a6a303903cb3e62038af90"
+    },
+    {
+      "destination": "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLOfflineTests.swift",
+      "origin": "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLOfflineTests.swift",
+      "sha256": "b59add5e15309d06dadad159d17fd457a0c8db706ec939857d89959b85fc2b4a"
+    },
+    {
+      "destination": "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLOmissionCountTests.swift",
+      "origin": "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLOmissionCountTests.swift",
+      "sha256": "2d9cab1bc6e8290a42a131e488815cbbef9ed37cb269444fae82bf25914e1f42"
+    },
+    {
+      "destination": "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLProtocolTests.swift",
+      "origin": "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLProtocolTests.swift",
+      "sha256": "b5c9d4101a30a8f8412c6cb54fc6fbd98080d41649c575a761ca1ce886a3643c"
+    },
+    {
+      "destination": "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLTitleTests.swift",
+      "origin": "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLTitleTests.swift",
+      "sha256": "e3521f7153701f0e22ae49b65af89dfa08820369d1a867a78aaf51ba30e3fc38"
+    },
+    {
+      "destination": "Packages/PreviewKit/Tests/PreviewKitTests/ExportNetworkInterceptorTests.swift",
+      "origin": "Packages/PreviewKit/Tests/PreviewKitTests/ExportNetworkInterceptorTests.swift",
+      "sha256": "d03c7b742625852d238daff772941d34ff8b91a14943a70c1eacdbbc6c7f1817"
+    },
+    {
+      "destination": "Packages/PreviewKit/Tests/PreviewKitTests/ExportRenderLifecycleTests.swift",
+      "origin": "Packages/PreviewKit/Tests/PreviewKitTests/ExportRenderLifecycleTests.swift",
+      "sha256": "77b4de80f0ac45504582ed388514067ca72b74adaacfa98551f3a5dbd6f76005"
+    },
+    {
+      "destination": "Packages/PreviewKit/Tests/PreviewKitTests/ExportResourceResolverReviewTests.swift",
+      "origin": "Packages/PreviewKit/Tests/PreviewKitTests/ExportResourceResolverReviewTests.swift",
+      "sha256": "670b06bda9cae7f8e95e66fc4d1317b3ccc495c68453eaf2051c5c05cabab72c"
+    },
+    {
+      "destination": "Packages/PreviewKit/Tests/PreviewKitTests/ExportResourceResolverTests.swift",
+      "origin": "Packages/PreviewKit/Tests/PreviewKitTests/ExportResourceResolverTests.swift",
+      "sha256": "db31cd446f9df72c748a1a5638a7a525fe7912ec00b87987c40b6a24a5480dd0"
+    },
+    {
+      "destination": "Packages/PreviewKit/Tests/PreviewKitTests/PreviewKitTests.swift",
+      "origin": "Packages/PreviewKit/Tests/PreviewKitTests/PreviewKitTests.swift",
+      "sha256": "67a0cca491e1ef7625ba8197461634aefab57faad8832d876e54cc9e186783b5"
+    },
+    {
+      "destination": "Packages/PreviewKit/Tests/PreviewKitTests/PreviewScrollDeliveryTests.swift",
+      "origin": "Packages/PreviewKit/Tests/PreviewKitTests/PreviewScrollDeliveryTests.swift",
+      "sha256": "84dd4d4e1611f5273527a7a31f0ea939b0702c0ac051d9e30f87791dc8e4efb0"
+    },
+    {
+      "destination": "Sources/PlainsongIOS/Authoring/IOSAuthoringCatalog.swift",
+      "origin": "AppIOS/Features/Authoring/IOSAuthoringCatalog.swift",
+      "sha256": "ebbb9bdd1b95111d2fdce21f42d5d8a8aea8e6b50e8bf6cf62530b2e96afa201"
+    },
+    {
+      "destination": "Sources/PlainsongIOS/Authoring/IOSAuthoringController+Find.swift",
+      "origin": "AppIOS/Features/Authoring/IOSAuthoringController+Find.swift",
+      "sha256": "ebf5222522dd60ac0b5d1cfda3d39313a1459f2c69be58148f6756a9d4cfcb77"
+    },
+    {
+      "destination": "Sources/PlainsongIOS/Authoring/IOSAuthoringController+Frontmatter.swift",
+      "origin": "AppIOS/Features/Authoring/IOSAuthoringController+Frontmatter.swift",
+      "sha256": "23802f430befe942b5817157b65d4d43edbaee4647fb05be473fc0041b3b3f64"
+    },
+    {
+      "destination": "Sources/PlainsongIOS/Authoring/IOSAuthoringController+Link.swift",
+      "origin": "AppIOS/Features/Authoring/IOSAuthoringController+Link.swift",
+      "sha256": "7cd1b1c7690666750577c1af7716be9d5051616b64949c83cbd5a58350df434d"
+    },
+    {
+      "destination": "Sources/PlainsongIOS/Authoring/IOSAuthoringController.swift",
+      "origin": "AppIOS/Features/Authoring/IOSAuthoringController.swift",
+      "sha256": "557b3184a40e66af5113e9c123bd676d8730da103e6059db05a73ebcd6a0edd8"
+    },
+    {
+      "destination": "Sources/PlainsongIOS/Authoring/IOSAuthoringFindScheduler.swift",
+      "origin": "AppIOS/Features/Authoring/IOSAuthoringFindScheduler.swift",
+      "sha256": "df7753fb2433fad3565d80a5f4742cfa3087d35778c2045a5c736f2494eda618"
+    },
+    {
+      "destination": "Sources/PlainsongIOS/Authoring/IOSAuthoringLink.swift",
+      "origin": "AppIOS/Features/Authoring/IOSAuthoringLink.swift",
+      "sha256": "7bd60d63d7d7c9644a640d35315efa90010358423a04c9a9df8b0ac68cd2a002"
+    },
+    {
+      "destination": "Sources/PlainsongIOS/Authoring/IOSAuthoringModels.swift",
+      "origin": "AppIOS/Features/Authoring/IOSAuthoringModels.swift",
+      "sha256": "b38e52e7ae3dc867959e92926e97b2b311cf690f843cd07bd3896621704b9f06"
+    },
+    {
+      "destination": "Sources/PlainsongIOS/Authoring/IOSAuthoringSourceDiff.swift",
+      "origin": "AppIOS/Features/Authoring/IOSAuthoringSourceDiff.swift",
+      "sha256": "9c4f2137bbb07058cda130a47f7d5ee73e188f5d8c28ec2c8564f77642794698"
+    },
+    {
+      "destination": "Sources/PlainsongIOS/Authoring/IOSAuthoringViews.swift",
+      "origin": "AppIOS/Features/Authoring/IOSAuthoringViews.swift",
+      "sha256": "4e42ef7f60d2bc794606d5e62f87f04dfab36020a4fc92140765eab88bbbe0b0"
+    },
+    {
+      "destination": "Sources/PlainsongIOS/Images/IOSImageInsertionController.swift",
+      "origin": "AppIOS/Features/Images/IOSImageInsertionController.swift",
+      "sha256": "28d704bd33ad36bf0d5491775f06a626f9be32539bb5921238cb08f662ef5610"
+    },
+    {
+      "destination": "Sources/PlainsongIOS/Images/IOSImageInsertionGuard.swift",
+      "origin": "AppIOS/Features/Images/IOSImageInsertionGuard.swift",
+      "sha256": "9fa26c0bdd31bc85549d24b64d310140054b7f96887b319723f30aace9ad85a8"
+    },
+    {
+      "destination": "Sources/PlainsongIOS/Images/IOSImageInsertionSession.swift",
+      "origin": "AppIOS/Features/Images/IOSImageInsertionSession.swift",
+      "sha256": "c78e2c5e049eaeeaea9bbbd8d1397a8974d16b30df902007bfd89f20a49139f4"
+    },
+    {
+      "destination": "Sources/PlainsongIOS/Images/IOSImageInsertionTerminal.swift",
+      "origin": "AppIOS/Features/Images/IOSImageInsertionTerminal.swift",
+      "sha256": "1abfc456154a0740206e7dd748847891890a682a1ae3c415cbfada2145afb803"
+    },
+    {
+      "destination": "Sources/PlainsongIOS/Images/IOSImagePayloadNormalizer.swift",
+      "origin": "AppIOS/Features/Images/IOSImagePayloadNormalizer.swift",
+      "sha256": "34a729e256c78b68037aa72586a418adb1258dcd6dfc935a0a2ea826552439ab"
+    },
+    {
+      "destination": "Sources/PlainsongIOS/Images/IOSImageRasterTranscoder.swift",
+      "origin": "AppIOS/Features/Images/IOSImageRasterTranscoder.swift",
+      "sha256": "00bce42c9cea77e8191a088b2bcd4f513430311ebfa8d1efa3c890ca9523714c"
+    },
+    {
+      "destination": "Sources/PlainsongIOS/Images/IOSImageRasterValidation.swift",
+      "origin": "AppIOS/Features/Images/IOSImageRasterValidation.swift",
+      "sha256": "c467f76331553d4736563b671e4ecefebfe03a86bc3c3ad7f6f865418dd4281b"
+    },
+    {
+      "destination": "Sources/PlainsongIOS/FeatureContracts.swift",
+      "origin": "AppIOS/State/FeatureContracts.swift",
+      "sha256": "c6b19edb56e69d3ef64b7230ebbb9c1440ad7c2db09c9019435afa1bbfe78361"
+    },
+    {
+      "destination": "Sources/PlainsongIOS/Images/IOSImagePickedFileBytes.swift",
+      "fragment": "The exact final Foundation-only enum; only compiler import lines added.",
+      "fragment_sha256": "846607b125a21233b02ec43c539c12738e03d358f5bd5cf8fee28e8d0226f2b9",
+      "fragment_start_line": 172,
+      "origin": "AppIOS/Features/Images/IOSImagePickers.swift",
+      "origin_sha256": "06ada2cb3e1fade908fbcc5751db75b946df5beb101415a498ca97e19d649ee6"
+    },
+    {
+      "destination": "Tests/PlainsongIOSTests/Authoring/AuthoringTestSupport.swift",
+      "origin": "AppIOSTests/Authoring/AuthoringTestSupport.swift",
+      "sha256": "9c7a18c1ec9ef7c6d515e1680900a1721d32e7093dc3a0ad79b865bb402a1a24"
+    },
+    {
+      "destination": "Tests/PlainsongIOSTests/Authoring/IOSAcceptedFindProtectionTests.swift",
+      "origin": "AppIOSTests/Authoring/IOSAcceptedFindProtectionTests.swift",
+      "sha256": "5ff41135c1132d1952a67904849f36cc80d73422e70f10c82c4b0f96dee73562"
+    },
+    {
+      "destination": "Tests/PlainsongIOSTests/Authoring/IOSAuthoringGuardedEditTests.swift",
+      "origin": "AppIOSTests/Authoring/IOSAuthoringGuardedEditTests.swift",
+      "sha256": "f0843eaea61f86933cc55f4d0859906634a3538b8a6f5d2b2804b6482a7b4c02"
+    },
+    {
+      "destination": "Tests/PlainsongIOSTests/Authoring/IOSFindGenerationTests.swift",
+      "origin": "AppIOSTests/Authoring/IOSFindGenerationTests.swift",
+      "sha256": "8141e03590c1e939cdbbf205cc0d0a4eb6e9b5db2a1e65afb80f02bacc0c5d00"
+    },
+    {
+      "destination": "Tests/PlainsongIOSTests/Authoring/IOSFormattingActionTests.swift",
+      "origin": "AppIOSTests/Authoring/IOSFormattingActionTests.swift",
+      "sha256": "d6930ca13cdd96f2b71a477fde82aa6d34b473c2f4d1a0aa00d6305400ede29e"
+    },
+    {
+      "destination": "Tests/PlainsongIOSTests/Authoring/IOSFrontmatterPanelTests.swift",
+      "origin": "AppIOSTests/Authoring/IOSFrontmatterPanelTests.swift",
+      "sha256": "4542564f5c49511e23b9af853a779aa6131ec9b9820ba9030f3f30fb71f5dfee"
+    },
+    {
+      "destination": "Tests/PlainsongIOSTests/Authoring/IOSFrontmatterProjectionTests.swift",
+      "origin": "AppIOSTests/Authoring/IOSFrontmatterProjectionTests.swift",
+      "sha256": "5e907e428c5b1f6b697ecba2cab212b97b1489aa341bf5fa7f209ca14e8d3ee3"
+    },
+    {
+      "destination": "Tests/PlainsongIOSTests/Authoring/IOSProductionFindSchedulerTests.swift",
+      "origin": "AppIOSTests/Authoring/IOSProductionFindSchedulerTests.swift",
+      "sha256": "0cfb3c03431e21f933a3351d3117193f68a0be7a3eec45ef881fa8df7d2a6f16"
+    },
+    {
+      "destination": "Tests/PlainsongIOSTests/Authoring/IOSSingleReplaceTests.swift",
+      "origin": "AppIOSTests/Authoring/IOSSingleReplaceTests.swift",
+      "sha256": "88af0a5696f43f1af0be76e989f7335d32bd4fe5972513d3760bf2f84fe2b8a8"
+    },
+    {
+      "destination": "Tests/PlainsongIOSTests/Images/IOSImageInsertionOrderingTests.swift",
+      "origin": "AppIOSTests/Images/IOSImageInsertionOrderingTests.swift",
+      "sha256": "583b8ea3c4f7dfd8cc91c26bd0898900b9302fbbd5c8911ed23de11fb52121ed"
+    },
+    {
+      "destination": "Tests/PlainsongIOSTests/Images/IOSImageInsertionPathTests.swift",
+      "origin": "AppIOSTests/Images/IOSImageInsertionPathTests.swift",
+      "sha256": "7780978715b5cd87560dafed04b3a05a50e54ea25fa9332d75264f1a0188428c"
+    },
+    {
+      "destination": "Tests/PlainsongIOSTests/Images/IOSImageInsertionPolicyTests.swift",
+      "origin": "AppIOSTests/Images/IOSImageInsertionPolicyTests.swift",
+      "sha256": "99e3d53a290c6e34fe8c449910878327ab9b4c9380ee51d52fe1785e53869d52"
+    },
+    {
+      "destination": "Tests/PlainsongIOSTests/Images/IOSImageInsertionStaleTests.swift",
+      "origin": "AppIOSTests/Images/IOSImageInsertionStaleTests.swift",
+      "sha256": "c57a0b54f4accd4d521efd2023a89a48547774bd2f05733aeb20aea1a86e17db"
+    },
+    {
+      "destination": "Tests/PlainsongIOSTests/Images/IOSImageInsertionTerminalTests.swift",
+      "origin": "AppIOSTests/Images/IOSImageInsertionTerminalTests.swift",
+      "sha256": "2c4d542135f61ea04e0d71c24a2228278b123db0230bb103032594f2c8d45e60"
+    },
+    {
+      "destination": "Tests/PlainsongIOSTests/Images/IOSImageRasterValidationTests.swift",
+      "origin": "AppIOSTests/Images/IOSImageRasterValidationTests.swift",
+      "sha256": "12c7e8dfb4199c56349c513f696b3e1e24dfca56f0580168fc228c34e85b62e9"
+    },
+    {
+      "destination": "Tests/PlainsongIOSTests/Images/IOSImageTaskCancellationTests.swift",
+      "origin": "AppIOSTests/Images/IOSImageTaskCancellationTests.swift",
+      "sha256": "df1dcd69c3d5e6ad9bf18507954786ef5114420336cdcafbbe13e93fd5a20a6b"
+    },
+    {
+      "destination": "Tests/PlainsongIOSTests/Images/ImageInsertionHarness.swift",
+      "origin": "AppIOSTests/Images/ImageInsertionHarness.swift",
+      "sha256": "a75796d859fa684de253ad21a5e7089945b25b161250df75295401de2ad4e001"
+    },
+    {
+      "destination": "Tests/PlainsongIOSTests/Images/ImageInsertionTestSupport.swift",
+      "origin": "AppIOSTests/Images/ImageInsertionTestSupport.swift",
+      "sha256": "c96a1d03c12301ac06284ff4cebc1a8a118a574c21e6d8645e87661dde8c4766"
+    },
+    {
+      "destination": "Tests/PlainsongIOSTests/Images/PausableImageWriter.swift",
+      "origin": "AppIOSTests/Images/PausableImageWriter.swift",
+      "sha256": "e65565f8059fd8b018a17c3ef25d0f1f952a729037b5457fb93030f197c6fe94"
+    }
+  ],
+  "excluded": [
+    "UIKit Photos/Files picker adapters, Photos payload loader and image view",
+    "App entrypoint and production composition",
+    "App-host resource contract consumer tests and their Bundle.main assumptions",
+    "All package tests are copied to satisfy unchanged dependency manifests but are not executed as dependency tests."
+  ],
+  "purpose": "Portable Mac logic only, not iOS or native providers",
+  "source_root": "/Users/davis._.su/.codex/worktrees/ios-review-authoring/blogeditor",
+  "source_verification": "All production/frozen Swift source bytes remain exact; two temporary dependency manifests adapt platform metadata only."
+}

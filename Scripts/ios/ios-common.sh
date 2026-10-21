@@ -2,11 +2,12 @@
 # ios-common.sh — shared helpers for the lane-12 iOS runners (Scripts/ios/run-*.sh).
 # Sourced, never executed directly. Exit codes follow the C0 bootstrap convention
 # (Scripts/ios/c0.sh): 64 usage/config, 65 data error, 69 unavailable tool/SDK,
-# 75 still pending on the shared lock. Codes >= 3 are step-specific failures.
+# 75 admission still pending on the shared lock. A payload that already holds
+# the lock keeps its own exit code, including 75. Codes >= 3 are step-specific.
 #
 # Lock discipline (docs/ios/README.md "同一台 Mac 的測試排程"): only the outermost
-# public runner acquires the shared lock; inner helpers and --locked re-entries
-# never re-acquire it. The path is fixed so every lane serializes on one file —
+# public runner acquires the shared lock; verified nested helpers never
+# re-acquire it. Public --locked flags are rejected. The path is fixed so every lane serializes on one file —
 # a caller-supplied different lock path is refused, not silently unshared.
 
 IOS_CANONICAL_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
@@ -21,38 +22,68 @@ ios_require_canonical_lock() {
     echo "$IOS_CANONICAL_LOCK"
 }
 
-# Public-runner entry point: `ios_lock_or_exec "$0" "$@"`.
-# With a leading --locked arg the runner is already inside the lock and this
-# returns 0 (caller then shifts the flag). Otherwise the runner re-executes
-# itself under `lockf -k -t 0` on the shared lock and never returns — same
-# admission shape as Scripts/run-export-html-e9.sh: non-blocking probe, bounded
-# retry, exit 75 while still pending; other runs are never killed.
+# The wrapper PID and its actual lockf parent must both be in this process's
+# ancestry. Public flags/env alone cannot claim an already-held shared lock.
+ios_validate_lock_context() {
+    /usr/bin/python3 - "$IOS_RUNNER_LOCK_OWNER" "$IOS_RUNNER_LOCK_HOLDER" "$IOS_CANONICAL_LOCK" <<'PYLOCK'
+import os, subprocess, sys
+owner, holder = int(sys.argv[1]), int(sys.argv[2])
+def parent(pid):
+    return int(subprocess.check_output(["ps", "-p", str(pid), "-o", "ppid="], text=True).strip())
+pid = os.getppid()
+while pid > 1 and pid != owner:
+    pid = parent(pid)
+if pid != owner or parent(owner) != holder:
+    sys.exit("ios: invalid nested lock ancestry")
+command = subprocess.check_output(["ps", "-p", str(holder), "-o", "comm="], text=True).strip()
+arguments = subprocess.check_output(["ps", "-p", str(holder), "-o", "args="], text=True).split()
+if os.path.basename(command) != "lockf" or sys.argv[3] not in arguments:
+    sys.exit("ios: nested operation has no canonical lockf holder")
+PYLOCK
+}
+
 ios_lock_or_exec() {
     local script="$1" lock_path
     shift
     lock_path="$(ios_require_canonical_lock)" || exit $?
-    if [ "${1:-}" = "--locked" ]; then return 0; fi
-    mkdir -p "$(dirname "$lock_path")"
-    local deadline=$((SECONDS + 300))
+    [ "${1:-}" != "--locked" ] || ios_die "--locked is not a public option; invoke the runner normally" 64
+    if [ -n "${IOS_RUNNER_LOCK_OWNER:-}" ] || [ -n "${IOS_RUNNER_LOCK_HOLDER:-}" ]; then
+        [ -n "${IOS_RUNNER_LOCK_OWNER:-}" ] && [ -n "${IOS_RUNNER_LOCK_HOLDER:-}" ] \
+            || ios_die "incomplete nested lock context" 64
+        ios_validate_lock_context || ios_die "unverified nested lock context" 64
+        return 0
+    fi
+    local wait_seconds="${IOS_LOCK_WAIT_SECONDS:-45}"
+    case "$wait_seconds" in ''|*[!0-9]*) ios_die "IOS_LOCK_WAIT_SECONDS must be a nonnegative integer" 64 ;; esac
+    local deadline=$((SECONDS + wait_seconds))
+    local started
+    started="$(mktemp "${TMPDIR:-/tmp}/plainsong-ios-lock-started.XXXXXX")"
+    rm -f "$started"
     while true; do
+        rm -f "$started"
         set +e
-        lockf -k -t 0 "$lock_path" /bin/bash -c '
+        # The assignment is only on lockf. The marker is created after lockf
+        # starts the payload, so a busy lock cannot look like a payload exit.
+        IOS_RUNNER_LOCK_STARTED="$started" /usr/bin/lockf -k -t 0 "$lock_path" /bin/bash -c '
+            export IOS_RUNNER_LOCK_OWNER=$$
+            export IOS_RUNNER_LOCK_HOLDER=$PPID
+            : > "$IOS_RUNNER_LOCK_STARTED"
             "$@"; child=$?
             if [ "$child" = 1 ]; then exit 2; fi
             exit "$child"
-        ' ios-runner "$script" --locked "$@"
+        ' ios-runner "$script" "$@"
         local result=$?
         set -e
-        case "$result" in
-            0|65) exit "$result" ;;
-            1|75) ;;            # lock busy / tempfail: scheduling wait, retry
-            *) exit "$result" ;;
-        esac
+        if [ -f "$started" ]; then
+            rm -f "$started"
+            exit "$result"
+        fi
         if [ "$SECONDS" -ge "$deadline" ]; then
+            rm -f "$started"
             echo "ios: still pending; shared xcodebuild lock admission timeout" >&2
             exit 75
         fi
-        sleep 30
+        sleep 5
     done
 }
 
@@ -150,8 +181,11 @@ ios_signing_state() {
         elif printf '%s' "$out" | grep -q "Signature=adhoc"; then echo "adhoc"
         else echo "signed"
         fi
-    else
+    elif printf '%s' "$out" | grep -q 'code object is not signed at all'; then
         echo "unsigned"
+    else
+        echo "ios: cannot establish signing state for $1: $out" >&2
+        return 1
     fi
 }
 
@@ -160,7 +194,7 @@ ios_signing_state() {
 # signature survived, which must fail an "unsigned" delivery.
 ios_strip_signature() {
     local bundle="$1" before
-    before="$(ios_signing_state "$bundle")"
+    before="$(ios_signing_state "$bundle")" || return 1
     if [ "$before" != "unsigned" ]; then
         codesign --remove-signature "$bundle" 2>/dev/null || return 1
         rm -rf "$bundle/_CodeSignature" "$bundle/Contents/_CodeSignature" 2>/dev/null || true

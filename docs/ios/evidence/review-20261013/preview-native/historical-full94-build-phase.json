@@ -1,0 +1,33 @@
+{
+  "command": [
+    "xcodebuild",
+    "-scheme",
+    "PreviewKit-Package",
+    "-configuration",
+    "Debug",
+    "-sdk",
+    "iphonesimulator",
+    "-destination",
+    "platform=iOS Simulator,id=A24A1CB9-2861-4AA4-A79F-E53F768950D8",
+    "-derivedDataPath",
+    "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/DerivedData",
+    "-parallel-testing-enabled",
+    "NO",
+    "CODE_SIGNING_ALLOWED=NO",
+    "CODE_SIGNING_REQUIRED=NO",
+    "build-for-testing"
+  ],
+  "effective_exit_code": 0,
+  "elapsed_seconds": 15.238607375009451,
+  "exit_code": 0,
+  "log_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/build.log",
+  "log_sha256": "65601cc599ff8a97b2333e4ba5b5b307803219a323f49caefa8dc7a6a853837d",
+  "memory_scope": "sampled ps RSS, plus bounded vmmap summary for verified native hosts; helpers have unproven ownership and were never signalled",
+  "owned_native_hosts": {},
+  "sampled_peak_rss_kib_by_pid": {
+    "13819": 166800
+  },
+  "telemetry_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/build-process-rss.jsonl",
+  "terminal_cleanup": [],
+  "watchdog_reason": null
+}

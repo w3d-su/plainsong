@@ -1,0 +1,11 @@
+{
+  "source_head": "4135301915c74080641a321ec465cdd1bed38f61",
+  "command": "PATH=/private/tmp/plainsong-swiftformat-0.62.1:$PATH make lint",
+  "exit_code": 0,
+  "swiftformat_version": "0.62.1",
+  "format_files": 758,
+  "format_changes_needed": 0,
+  "swiftlint_files": 617,
+  "swiftlint_warnings": 367,
+  "swiftlint_serious": 0
+}

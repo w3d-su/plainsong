@@ -61,7 +61,21 @@ Performance：每裝置／fixture 先 warm-up，再至少 60 次固定位置與�
 
 ## Evidence（由執行者填寫）
 
-尚未執行；本文件沒有 iOS 自動驗收、真機、效能或無障礙通過證據。
+本次執行的起點是 PR #164 head `59f374ff9341289b91c0a4090b216dcf16510797`（`codex/ios-review-fixes-20261013`），分支 `codex/ios-11-validation-harness-20261015`。上文的 `phase3-ios-validation` 起點不適用於這次提交。M0 核取方塊維持未勾。
+
+- **local automated：** `6d65210` 的 `required-component-tests.txt` 有 29 個名稱。留存紀錄分開計，沒有一份 log 是這個 head 的完整 29 項：
+  - `4d16e2b`：`component-run-20261015.log`，18 項、0 失敗。這是最早一輪。
+  - `bcc8ab6`：`component-run-20261015-v11.log`，全套 component **26/26**、exit 0。該 log 的 `BoundedWaitFenceTests` 是 4 項，不含 `testPreCancelCompletesOnceAndDropsALaterTrue`、`testCancelWhileWaitingCompletesOnceAndDropsALaterTrue`、`testDeadlineRacesHandlePublicationAndResumesOnce`。
+  - `6d65210`：`bounded-wait-race/fence-tests.log`，`BoundedWaitFenceTests` **7/7**、`fence_exit:0`。這是 `--filter` 的 class run。
+  - isolated TSan：racy source exit **-6**、named data race（`racy-BoundedWait.swift:112`）；fixed source exit **0**、`PROBE_DONE`、無 warning。探針在 `docs/ios/evidence/validation/bounded-wait-race/`，不是 XCTest，也不併入上面任一份 log。
+  - 最新 head 完整 29-case run：**尚未留存**。
+  收據、指令與 SHA-256 在 `docs/ios/evidence/validation/README.md`。以上都不是產品 PASS。
+- **exact-head hosted：** 未跑。沒有本分支的 CI，也沒有 `IOSAcceptance` xcresult。
+- **owner device & manual：** 未跑。`docs/ios/evidence/validation/manual-matrix.md` 每一列仍是 OPEN。
+- **performance：** 未採樣。少於 60 次可視樣本、`textDidChange` 耗時，以及模擬器樣本都不能關閉關卡。
+- **hosted smoke：** `IOSAcceptanceLaunchSmokeTests` 只有原始碼，尚未編譯或執行。接線提案在 `docs/ios/evidence/validation/wiring-proposal.md`，狀態 BLOCKED，等 lane 12。
+
+Phase C 產品驗收仍等 lane 13 的整合 head 與 owner 真機紀錄。
 
 ## 可直接貼給 agent
 

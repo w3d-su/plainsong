@@ -1,0 +1,25 @@
+{
+  "candidate_only_testing_expected": 2,
+  "canonical_lock": "/private/tmp/plainsong-xcodebuild-test.lock",
+  "destination": "A24A1CB9-2861-4AA4-A79F-E53F768950D8",
+  "failure_diagnostics_policy": "on-failure",
+  "original_inventory_error": 46,
+  "outer_build_and_test_deadlines_seconds": 600,
+  "run_directories": {
+    "candidate-hosted2": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426",
+    "empty-plan": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-161446",
+    "historical-full94": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003"
+  },
+  "scope": "Simulator native module/hosted execution; no production composition, physical-device, IME, accessibility, signing, IPA or input/preview performance acceptance.",
+  "shared_platform_suite_expected": 94,
+  "source_commits": {
+    "candidate_test_fixture_only": "3fc31d4f60e4f6a494c30c302a266a8831ffa698",
+    "historical_207_inputs_equivalent_to": "c1c250a2b5c3e518108356b0c598064d4d1b0bb4",
+    "historical_original94": "f619cf674d77b737589fea4c2af77f3ab0a981e9"
+  },
+  "xcresult_paths": {
+    "candidate-hosted2": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/Results.xcresult",
+    "historical-full94": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/Results.xcresult"
+  },
+  "xcresult_policy": "Raw bundles remain at the retained absolute local paths; included test-results JSON is the actual sealed xcresult extraction, not a synthetic runner status."
+}

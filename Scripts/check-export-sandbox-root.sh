@@ -11,7 +11,7 @@ trap 'rm -rf "$probe_build"' EXIT
 bundle="$probe_build/PlainsongExportRootProbe.app"
 mkdir -p "$bundle/Contents/MacOS"
 objects=()
-for module in WorkspaceKit MarkdownCore Yams CYaml; do
+for module in WorkspaceKit WorkspaceCore MarkdownCore Yams CYaml; do
     if [[ -f "$build_path/$module.o" ]]; then
         objects+=("$build_path/$module.o")
     else

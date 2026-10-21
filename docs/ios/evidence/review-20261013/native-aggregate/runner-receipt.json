@@ -1,0 +1,19 @@
+{
+  "source_head": "c1c250a2b5c3e518108356b0c598064d4d1b0bb4",
+  "command": [
+    "make",
+    "ios-test",
+    "IOS_DESTINATION=platform=iOS Simulator,id=A24A1CB9-2861-4AA4-A79F-E53F768950D8",
+    "IOS_OUTPUT_ROOT=/private/tmp/plainsong-ios-review-native-20261013"
+  ],
+  "canonical_public_runner": true,
+  "launcher_pid": 8036,
+  "process_group": 8036,
+  "started_epoch": 1791878270.493484,
+  "finished_epoch": 1791878964.791071,
+  "exit_code": 0,
+  "timed_out": false,
+  "destination": "A24A1CB9-2861-4AA4-A79F-E53F768950D8",
+  "device": "iPhone17 iOS27.0",
+  "scope": "actual simulator execution; M0 physical/device gates separate"
+}

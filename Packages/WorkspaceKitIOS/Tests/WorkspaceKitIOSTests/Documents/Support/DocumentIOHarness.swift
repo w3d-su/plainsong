@@ -38,6 +38,9 @@ final class ScriptedFilePort: IOSDocumentFilePort {
     private var handler: (@MainActor (IOSDocumentFileEvent) -> Void)?
     private var completions: [UUID: @MainActor (IOSDocumentFileWriteDisposition) -> Void] = [:]
     var onSaveEntered: (() -> Void)?
+    var closeGate: (@MainActor () async -> Void)?
+    private(set) var closeCalls = 0
+    private(set) var openCalls = 0
 
     init(fileURL: URL, openedData: Data) {
         self.fileURL = fileURL
@@ -53,6 +56,7 @@ final class ScriptedFilePort: IOSDocumentFilePort {
     }
 
     func open() async throws -> IOSDocumentFileOpenResult {
+        openCalls += 1
         if blockOpen {
             await withCheckedContinuation { continuation in
                 self.blocked.append(continuation)
@@ -115,6 +119,8 @@ final class ScriptedFilePort: IOSDocumentFilePort {
     }
 
     func close() async throws {
+        closeCalls += 1
+        await closeGate?()
         if let closeFailure {
             throw closeFailure
         }
@@ -165,6 +171,12 @@ final class ScriptedCoordinator: IOSCoordinatedFileAccess, @unchecked Sendable {
     func setBlockReads(_ blocked: Bool) async {
         stateLock.lock()
         blockReads = blocked
+        stateLock.unlock()
+    }
+
+    func setReadFailure(_ failure: IOSWorkspaceFailure?) async {
+        stateLock.lock()
+        readFailure = failure
         stateLock.unlock()
     }
 

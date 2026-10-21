@@ -1,0 +1,92 @@
+[
+  {
+    "baseRefName": "phase3-ios-integration",
+    "headRefName": "phase3-ios-document-io",
+    "headRefOid": "b82d0c27e69ebe9260a1c71a0a4deb8a2cceec6b",
+    "number": 163,
+    "state": "OPEN",
+    "title": "Phase 3: add the iOS UIDocument store and durable recovery",
+    "url": "https://github.com/w3d-su/plainsong/pull/163"
+  },
+  {
+    "baseRefName": "phase3-ios-integration",
+    "headRefName": "phase3-ios-preview-ios",
+    "headRefOid": "6d93dcc29e586d5168946af0b66094389b4dd6f5",
+    "number": 162,
+    "state": "OPEN",
+    "title": "Phase 3: host PreviewKit on iOS without weakening asset checks",
+    "url": "https://github.com/w3d-su/plainsong/pull/162"
+  },
+  {
+    "baseRefName": "phase3-ios-integration",
+    "headRefName": "phase3-ios-image-insertion",
+    "headRefOid": "912aad7cf9f8d34f2de270fbc984742cc15f606a",
+    "number": 161,
+    "state": "OPEN",
+    "title": "Phase 3: add the iOS image insertion transaction",
+    "url": "https://github.com/w3d-su/plainsong/pull/161"
+  },
+  {
+    "baseRefName": "phase3-ios-integration",
+    "headRefName": "phase3-ios-editor-kit-ios",
+    "headRefOid": "953af3a20f32e3d463c5b87660b6975bdc494cb7",
+    "number": 160,
+    "state": "OPEN",
+    "title": "Phase 3: add the iOS TextKit 2 source editor",
+    "url": "https://github.com/w3d-su/plainsong/pull/160"
+  },
+  {
+    "baseRefName": "phase3-ios-integration",
+    "headRefName": "phase3-ios-syntax-kit",
+    "headRefOid": "bcbb79729aaced4eb6133aa811b0778d9c899e59",
+    "number": 159,
+    "state": "OPEN",
+    "title": "Phase 3: extract the shared SyntaxKit parser",
+    "url": "https://github.com/w3d-su/plainsong/pull/159"
+  },
+  {
+    "baseRefName": "phase3-ios-integration",
+    "headRefName": "phase3-ios-workspace-core",
+    "headRefOid": "203697b3fcb34cf4c1c5992c2569ae70f078e269",
+    "number": 158,
+    "state": "OPEN",
+    "title": "Phase 3: extract portable workspace tree and byte-path identity",
+    "url": "https://github.com/w3d-su/plainsong/pull/158"
+  },
+  {
+    "baseRefName": "main",
+    "headRefName": "phase3-ios-integration",
+    "headRefOid": "3274bfc8ad7f70105fe10c03cb111cf987ca1800",
+    "number": 157,
+    "state": "OPEN",
+    "title": "Phase 3 iOS: freeze C0 contracts and unavailable app scaffold",
+    "url": "https://github.com/w3d-su/plainsong/pull/157"
+  },
+  {
+    "baseRefName": "phase3-ios-parallel-handoffs",
+    "headRefName": "phase3-ios-m0-device-spike",
+    "headRefOid": "d7d1902f97e6d2ca8cb86cd5ea218d6e8464d44b",
+    "number": 156,
+    "state": "OPEN",
+    "title": "Phase 3: add iOS M0 device feasibility prototype (owner gates OPEN)",
+    "url": "https://github.com/w3d-su/plainsong/pull/156"
+  },
+  {
+    "baseRefName": "phase3-ios-integration",
+    "headRefName": "phase3-ios-authoring-tools",
+    "headRefOid": "501f6fea213993feb1e98d04c3ecc0ab73aa499a",
+    "number": 155,
+    "state": "OPEN",
+    "title": "Phase 3: add iOS authoring tools on the C0 editor contract",
+    "url": "https://github.com/w3d-su/plainsong/pull/155"
+  },
+  {
+    "baseRefName": "main",
+    "headRefName": "phase3-ios-parallel-handoffs",
+    "headRefOid": "2144c46c888360c84a42fef79e676e60b518048b",
+    "number": 153,
+    "state": "OPEN",
+    "title": "Document parallel iOS agent development and handoffs",
+    "url": "https://github.com/w3d-su/plainsong/pull/153"
+  }
+]

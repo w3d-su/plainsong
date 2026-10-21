@@ -7,7 +7,9 @@ import XCTest
 final class PreviewIOSHostedTests: XCTestCase {
     func testHostedPageBecomesReadyAndRendersTheLatestDocument() async throws {
         let indexURL = try writeBridgePage()
+        defer { try? FileManager.default.removeItem(at: indexURL.deletingLastPathComponent()) }
         let controller = PreviewController(previewIndexURL: indexURL)
+        defer { controller.shutdownForTesting() }
         var events: [IOSPreviewEvent] = []
         _ = controller.observe { events.append($0) }
         try await waitUntil("bridge ready") { controller.isReady }
@@ -31,7 +33,10 @@ final class PreviewIOSHostedTests: XCTestCase {
             assetAccess: nil
         )
         try await waitUntil("hosted text") {
-            let text = try await controller.webView.evaluateJavaScript("document.body.innerText") as? String
+            let text = try await PreviewHostedTestWait.javascript(
+                "document.body.innerText",
+                in: controller.webView
+            ) as? String
             return text?.contains("Hosted preview line") == true
         }
         try await waitUntil("render event") {
@@ -45,14 +50,15 @@ final class PreviewIOSHostedTests: XCTestCase {
         let renderID = try XCTUnwrap(controller.previewProvenanceForTesting.renderID)
         // A script that returns undefined makes this WebKit async API throw
         // InvalidTransition. Return a value after posting the checkbox.
-        _ = try await controller.webView.evaluateJavaScript(
+        _ = try await PreviewHostedTestWait.javascript(
             """
             window.webkit.messageHandlers.bridge.postMessage({
               name: "checkboxToggled",
               payload: { renderID: \(renderID), line: 1, checked: true, version: 3 }
             });
             "posted"
-            """
+            """,
+            in: controller.webView
         )
         try await waitUntil("checkbox event") {
             events.contains { event in
@@ -63,46 +69,81 @@ final class PreviewIOSHostedTests: XCTestCase {
                 return false
             }
         }
-        controller.shutdownForTesting()
     }
 
     func testBundledKitchenSinkAndMDXStayVisible() async throws {
-        #if os(iOS)
-            throw XCTSkip(
-                """
-                The iOS simulator WKWebView does not become ready for loadFileURL of the \
-                Mac repository preview bundle. Mac swift test runs this fixture. \
-                testHostedPageBecomesReadyAndRendersTheLatestDocument covers the iOS lifecycle.
-                """
-            )
-        #endif
         let indexURL = try bundledPreviewIndex()
-        let controller = PreviewController(previewIndexURL: indexURL)
+        #if os(iOS)
+            // Use the same packaged-resource lookup as production, in the real app host.
+            let controller = PreviewController()
+        #else
+            let controller = PreviewController(previewIndexURL: indexURL)
+        #endif
+        defer { controller.shutdownForTesting() }
         controller.installAssetReader(DirectPreviewAssetReader())
         try await waitUntil("bundle ready") { controller.isReady }
+        XCTAssertEqual(
+            controller.webView.url?.resolvingSymlinksInPath(),
+            indexURL.resolvingSymlinksInPath(),
+            "The first controller must load the verified real preview bundle"
+        )
 
         let markdown = try String(contentsOf: fixture("kitchen-sink.md"), encoding: .utf8)
         controller.render(DocumentTextChange(text: markdown, version: 1, fileKind: .markdown, fileURL: nil))
         try await waitUntil("kitchen sink") {
-            let text = try await controller.webView.evaluateJavaScript("document.body.innerText") as? String
+            let text = try await PreviewHostedTestWait.javascript(
+                "document.body.innerText",
+                in: controller.webView
+            ) as? String
             return text?.contains("Kitchen Sink Fixture") == true && text?.contains("Third Level") == true
+        }
+
+        try await waitUntil("tables, code, math, and Mermaid") {
+            try await PreviewHostedTestWait.javascript(
+                """
+                document.querySelectorAll('table').length > 0 &&
+                document.querySelectorAll('pre code.hljs').length > 0 &&
+                document.querySelectorAll('.katex').length > 0 &&
+                document.querySelectorAll('.mermaid-rendered svg').length >= 2 &&
+                document.querySelectorAll('.mermaid-error').length === 0
+                """,
+                in: controller.webView
+            ) as? Bool == true
         }
 
         let mdx = try String(contentsOf: fixture("kitchen-sink.mdx"), encoding: .utf8)
         controller.render(DocumentTextChange(text: mdx, version: 0, fileKind: .mdx, fileURL: nil))
         try await waitUntil("mdx placeholder") {
-            let text = try await controller.webView.evaluateJavaScript("document.body.innerText") as? String
+            let text = try await PreviewHostedTestWait.javascript(
+                "document.body.innerText",
+                in: controller.webView
+            ) as? String
             return text?.contains("MDX Kitchen Sink Fixture") == true
                 && text?.contains("Third Level") != true
         }
 
+        let hasPlaceholders = try await PreviewHostedTestWait.javascript(
+            "document.querySelectorAll('.mdx-component-card').length > 0 && " +
+                "document.querySelectorAll('.mdx-expression-chip').length > 0",
+            in: controller.webView
+        ) as? Bool
+        XCTAssertEqual(hasPlaceholders, true)
+
         let broken = try String(contentsOf: fixture("mdx-syntax-error.mdx"), encoding: .utf8)
         controller.render(DocumentTextChange(text: broken, version: 2, fileKind: .mdx, fileURL: nil))
+        try await waitUntil("mdx error banner") {
+            try await PreviewHostedTestWait.javascript(
+                "document.querySelector('.mdx-error-banner') !== null",
+                in: controller.webView
+            ) as? Bool == true
+        }
         try await waitUntil("mdx error keeps the previous document") {
-            let text = try await controller.webView.evaluateJavaScript("document.body.innerText") as? String
+            let text = try await PreviewHostedTestWait.javascript(
+                "document.body.innerText",
+                in: controller.webView
+            ) as? String
             return text?.contains("MDX Kitchen Sink Fixture") == true
         }
-        controller.shutdownForTesting()
     }
 
     private func writeBridgePage() throws -> URL {
@@ -115,9 +156,45 @@ final class PreviewIOSHostedTests: XCTestCase {
     }
 
     private func bundledPreviewIndex() throws -> URL {
-        let indexURL = repositoryRoot().appendingPathComponent("App/Resources/preview/index.html")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: indexURL.path))
-        return indexURL
+        let sourceRoot = repositoryRoot()
+            .appendingPathComponent("App/Resources/preview", isDirectory: true)
+            .resolvingSymlinksInPath()
+        #if os(iOS)
+            let indexURL = try XCTUnwrap(
+                PreviewController.defaultPreviewIndexURL(),
+                "Run make ios-preview in the app-hosted IOSPreview scheme; the host must bundle preview resources"
+            )
+            let destination = indexURL.deletingLastPathComponent()
+            let enumerator = try XCTUnwrap(FileManager.default.enumerator(
+                at: sourceRoot,
+                includingPropertiesForKeys: [.isRegularFileKey]
+            ))
+            var fileCount = 0
+            for case let file as URL in enumerator {
+                guard try file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else { continue }
+                // Foundation can enumerate /tmp through its /private/tmp alias.
+                // Compare canonical components before deriving the fixture-relative path.
+                let rootComponents = sourceRoot.pathComponents
+                let fileComponents = file.resolvingSymlinksInPath().pathComponents
+                guard fileComponents.starts(with: rootComponents),
+                      fileComponents.count > rootComponents.count
+                else {
+                    throw CocoaError(.fileReadInvalidFileName)
+                }
+                let relative = fileComponents.dropFirst(rootComponents.count).joined(separator: "/")
+                let copied = destination.appendingPathComponent(relative)
+                let expectedBytes = try Data(contentsOf: file)
+                let copiedBytes = try Data(contentsOf: copied)
+                XCTAssertEqual(copiedBytes, expectedBytes, relative)
+                fileCount += 1
+            }
+            XCTAssertGreaterThan(fileCount, 3, "Real preview resources must be present before WebKit loads")
+            return indexURL
+        #else
+            let indexURL = sourceRoot.appendingPathComponent("index.html")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: indexURL.path))
+            return indexURL
+        #endif
     }
 
     private func fixture(_ name: String) throws -> URL {
@@ -140,14 +217,11 @@ final class PreviewIOSHostedTests: XCTestCase {
         timeoutNanoseconds: UInt64 = 8_000_000_000,
         condition: @escaping @MainActor () async throws -> Bool
     ) async throws {
-        let start = DispatchTime.now().uptimeNanoseconds
-        while DispatchTime.now().uptimeNanoseconds - start < timeoutNanoseconds {
-            if try await condition() {
-                return
-            }
-            try await Task.sleep(nanoseconds: 50_000_000)
-        }
-        XCTFail("Timed out waiting for \(description)")
+        try await PreviewHostedTestWait.until(
+            description,
+            timeoutNanoseconds: timeoutNanoseconds,
+            condition: condition
+        )
     }
 
     private static let bridgeHTML = """
