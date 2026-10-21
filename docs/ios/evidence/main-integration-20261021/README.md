@@ -17,8 +17,8 @@ follow-up `a13c845e3536a147a6dfdbf6ce09c60bf1efda2c`.
 
 Native execution used clean merge candidate
 `318be8ddf9189b09e7e030e7b29d5e9d017005d8`, Xcode 27.0 (27A5194q), and an
-iOS 27.0 iPhone simulator. The subsequent fix changes the Mac sandbox linker and
-documentation only; all 755 captured iOS input records remain equal. This is
+iOS 27.0 iPhone simulator. The follow-up fixes change the Mac sandbox linker, Mac test setup and
+documentation; all 755 captured iOS input records remain equal. This is
 source-equivalent execution evidence, not a claim that the follow-up head was
 executed. The public `verify-source` also requires the same Git head and correctly
 rejects an older receipt at a follow-up head. Its archive guard is unchanged.
@@ -93,6 +93,21 @@ After source restoration, all7 E0 cases passed. `mac-fixture-controls.json` and
 `mac-fixture-source.json.gz` retain the sanitized control results and908 source
 records; raw overlays/logs/complete results remain with local evidence. These Mac
 test-only edits do not change the755 captured iOS inputs.
+
+A subsequent run [39542967428](https://github.com/w3d-su/plainsong/actions/runs/39542967428)
+passed Preview, Packages and UI/performance. One rejected-publication fixture was
+refused with `externalObservationPending` before its intended writer interception.
+It waited for external quiescence and then yielded during highlight settlement;
+the fixture now rechecks quiescence after that final suspension, immediately before
+the synchronous probe. Product authorization, assertions and deadlines are unchanged.
+
+A real production inspection injected into that setup gap reproduced the early
+refusal in both original cases. The same injection passed both fixed cases.
+Restoring the source passed both cases plus the pending-inspection zero-effect and
+two stopped/replaced-watcher regressions (5/5). Complete results, patches and source
+snapshots are retained; `mac-replace-readiness-controls.json` and the compressed
+908-record manifest summarize those controls. They establish the controlled
+interleaving, while the historical CI inspection producer remains unproven.
 
 The iOS preview gate retains every original required case and its 8 s / 2 s
 limits. Pure geometry cases added on main may increase the executed count;

@@ -1,0 +1,76 @@
+{
+  "base_head": "b86793dda8343b365774da48d4eca2e4a7779c03",
+  "source_records": 908,
+  "source_manifest": "mac-replace-readiness-source.json.gz",
+  "changed_paths": [
+    "AppTests/EditorReplaceHostedReconciledPresentationTests.swift"
+  ],
+  "product_guard_unchanged": true,
+  "limits_unchanged": true,
+  "fixed_source_restored_byte_equal": true,
+  "causal_limit": "A real inspection in the setup gap reproduces the observed early refusal and the final quiescence wait closes that controlled interleaving. The producer and timing in the historical CI run remain unproven.",
+  "runs": {
+    "baseline_fixed": {
+      "expected_cases": {
+        "EditorFindHostedGateTests/testHostedRejectedReplaceAutomaticallyRestoresWYSIWYGFoldsLinksAndImageMarkers": "Passed",
+        "EditorFindHostedGateTests/testHostedRejectedReplaceAutomaticallyRestoresSourceHighlightWithoutTypingOrSelectionChange": "Passed"
+      },
+      "expected_exit_code": 0,
+      "exit_code": 0,
+      "elapsed_seconds": 16.059,
+      "complete_xcresult": true,
+      "cases": {
+        "EditorFindHostedGateTests/testHostedRejectedReplaceAutomaticallyRestoresSourceHighlightWithoutTypingOrSelectionChange": "Passed",
+        "EditorFindHostedGateTests/testHostedRejectedReplaceAutomaticallyRestoresWYSIWYGFoldsLinksAndImageMarkers": "Passed"
+      }
+    },
+    "negative_original_with_inspection": {
+      "expected_cases": {
+        "EditorFindHostedGateTests/testHostedRejectedReplaceAutomaticallyRestoresWYSIWYGFoldsLinksAndImageMarkers": "Failed",
+        "EditorFindHostedGateTests/testHostedRejectedReplaceAutomaticallyRestoresSourceHighlightWithoutTypingOrSelectionChange": "Failed"
+      },
+      "expected_exit_code": 65,
+      "exit_code": 65,
+      "elapsed_seconds": 19.233,
+      "complete_xcresult": true,
+      "cases": {
+        "EditorFindHostedGateTests/testHostedRejectedReplaceAutomaticallyRestoresSourceHighlightWithoutTypingOrSelectionChange": "Failed",
+        "EditorFindHostedGateTests/testHostedRejectedReplaceAutomaticallyRestoresWYSIWYGFoldsLinksAndImageMarkers": "Failed"
+      }
+    },
+    "fixed_with_same_inspection": {
+      "expected_cases": {
+        "EditorFindHostedGateTests/testHostedRejectedReplaceAutomaticallyRestoresWYSIWYGFoldsLinksAndImageMarkers": "Passed",
+        "EditorFindHostedGateTests/testHostedRejectedReplaceAutomaticallyRestoresSourceHighlightWithoutTypingOrSelectionChange": "Passed"
+      },
+      "expected_exit_code": 0,
+      "exit_code": 0,
+      "elapsed_seconds": 9.766,
+      "complete_xcresult": true,
+      "cases": {
+        "EditorFindHostedGateTests/testHostedRejectedReplaceAutomaticallyRestoresSourceHighlightWithoutTypingOrSelectionChange": "Passed",
+        "EditorFindHostedGateTests/testHostedRejectedReplaceAutomaticallyRestoresWYSIWYGFoldsLinksAndImageMarkers": "Passed"
+      }
+    },
+    "restored_related_cases": {
+      "expected_cases": {
+        "EditorFindHostedGateTests/testHostedRejectedReplaceAutomaticallyRestoresWYSIWYGFoldsLinksAndImageMarkers": "Passed",
+        "EditorFindHostedGateTests/testHostedRejectedReplaceAutomaticallyRestoresSourceHighlightWithoutTypingOrSelectionChange": "Passed",
+        "EditorFindHostedGateTests/testHostedReplaceRefusesPendingDiskInspectionWithZeroEffect": "Passed",
+        "EditorFindHostedGateTests/testHostedWatcherHopQueuedBehindStopIsDropped": "Passed",
+        "EditorFindHostedGateTests/testHostedWatcherHopFromAReplacedWatcherIsDropped": "Passed"
+      },
+      "expected_exit_code": 0,
+      "exit_code": 0,
+      "elapsed_seconds": 13.009,
+      "complete_xcresult": true,
+      "cases": {
+        "EditorFindHostedGateTests/testHostedRejectedReplaceAutomaticallyRestoresSourceHighlightWithoutTypingOrSelectionChange": "Passed",
+        "EditorFindHostedGateTests/testHostedRejectedReplaceAutomaticallyRestoresWYSIWYGFoldsLinksAndImageMarkers": "Passed",
+        "EditorFindHostedGateTests/testHostedReplaceRefusesPendingDiskInspectionWithZeroEffect": "Passed",
+        "EditorFindHostedGateTests/testHostedWatcherHopFromAReplacedWatcherIsDropped": "Passed",
+        "EditorFindHostedGateTests/testHostedWatcherHopQueuedBehindStopIsDropped": "Passed"
+      }
+    }
+  }
+}
