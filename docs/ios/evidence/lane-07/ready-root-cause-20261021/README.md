@@ -1,122 +1,143 @@
-# Lane 07 real-bundle readiness: root cause — 2026-10-21
+# Lane 07 real-bundle readiness: retained observations — 2026-10-21
 
-**Result: the real-bundle readiness gate passes in the app-hosted process.**
-`make ios-preview` (scheme `IOSPreview`, host `IOSPreviewTestHost.app`) executed
-**94 / 94 passed, 0 failed, 0 skipped**. The first controller,
-`PreviewIOSHostedTests/testBundledKitchenSinkAndMDXStayVisible`, uses the
-production-default `Bundle.main` lookup and passed in 1.942 s. The 8 s
-readiness wait and the 2 s JavaScript deadline are unchanged.
+**The app-hosted readiness gate passes; the platform cause remains unproven.**
+The public `make ios-preview` run executed **94 Passed, 0 Failed, 0 Skipped**
+on `bd3dadcf5e0dd39e83896d6c463e285e8a0d6cb3`. Independent review re-extracted
+all original named cases from its complete `Results.xcresult` and matched all
+**684** captured source records to that Git tree. The driver returned 0,
+the built test image was app-hosted, and resource preflight passed.
 
-No product code changed. The timeout was a property of the **hostless**
-`PreviewKit-Package` test process, not of PreviewKit.
+This is historical simulator evidence for that tree, not an execution of
+the later #164 aggregate or main integration. This PR adds evidence and
+documentation only. It changes no product code, assertions, timeouts,
+fixtures, host, scheme, bridge, CSP, or production providers.
 
-## Source
+## Source and environment
 
-Tree `bd3dadcf5e0dd39e83896d6c463e285e8a0d6cb3`: `codex/ios-12-validation-wiring-20261015`
-(#176, `69d499c`) merged with `codex/ios-07-ready-repair-20261015` (#173, `af389cb`), no conflicts.
-Xcode 27.0 (27A5194q), iOS 27.0 simulator, iPhone 17
-`00FE8F01-CC81-4A3D-B319-19DBBD84F4A4`, `-parallel-testing-enabled NO`.
+The tested tree merges #176 `69d499ca356488b7487965812a8a9d57b735eab7`
+with #173 `af389cb7e054dca9fb182841f6fa8c440417300a`. The public runner
+recorded a clean tree, Xcode 27.0 (27A5194q), an iOS 27.0 simulator and
+`IOSPreviewTestHost.app`. No iOS 26 runtime or device result is inferred.
 
-## Root cause
+The full suite's bundle case passed in **1.942 s**, after earlier WebKit
+cases; it is not a first-WebView measurement. In a separate selected hosted
+run it was the first selected test and passed in **2.993 s**. That run has
+two production tests and two diagnostic probes (all four Passed), but no
+retained run-bound source manifest. Production acceptance keeps the original
+**8 s** readiness and **2 s** JavaScript deadlines.
 
-`PreviewKit-Package` on iOS runs the test bundle inside the bare `xctest` process.
-That process has no `UIApplication`; the log reports
-`This process does not have a UIApplication object` and
-`ProcessSuspension endowmentsForHandle: Process … is not running`.
-In that process the **first `WKWebView` never finishes navigation**, whoever
-creates it and whatever page it loads. Later web views mostly load in under 1 s,
-but they still stall now and then for several seconds.
-The historical failures were all recorded in this process:
+The independent October 19 first-controller receipt on
+`5f373ab66a3eb9dd2b47a1657485a27651606469` remains a separate source-bound
+measurement (2.758 s), not this run's measurement.
 
-- the real-bundle `bundle ready` timeout,
-- the synthetic-page `InvalidTransition` failure,
-- the three Export failures (below).
+## What the probes observed
 
-Earlier runs put the bundle case first, or near first, in the process. So it hit
-the deterministic first-view stall, and the result read as a "real bundle" problem.
+Hostless logs report that the process has no `UIApplication`. Several first
+default-store loads did not become ready within the diagnostic 20 s window;
+later loads often completed sooner. This is an association in these runs.
+It does not establish that missing `UIApplication`, RunningBoard, or one
+particular WebKit mechanism caused every historical timeout.
 
-The following are **ruled out** by controlled probes (each probe is a
-temporary test file, archived under `probes/`, never committed as a test):
+Temporary probe sources survive under `probes/` and match their original
+scratch copies byte for byte. They mostly print timing instead of asserting
+readiness: a Passed diagnostic case that prints `ready=never` is a completed
+observation, not a passing readiness assertion. Their 20 s loops and optional
+10 s diagnostic JS calls do not replace the production 8 s / 2 s limits.
 
-| Suspect | Evidence |
-|---|---|
-| Bundle resource lookup (`Bundle.module` vs app bundle) | The real 64-file bundle copied to the container loads in 0.66–0.85 s in a plain `WKWebView` when that view is not first (v1, v3). |
-| `loadFileURL` read-access scope | Same `loadFileURL(index, allowingReadAccessTo: dir)` call as the controller; finishes when not first (v3 `real`, `real-all`). |
-| `asset:` scheme handler, `bridge` script handler, zero frame, transparent background | A view with all of the controller's configuration loads the real bundle in 0.66 s when not first (v2 `real-all`); each knob alone is fine (v2). |
-| `PreviewController` itself | `PreviewController(previewIndexURL:)` on the real bundle becomes `isReady` in 0.736 s when it is the last test (v3). When it is the first, it is still `isLoading` after 20 s (v2). |
-| Process age / cold start | Sleeping 25 s before creating the first view does not help: navigation starts at 2.45 s, commits at 5.27 s, never finishes within 20 s (v4). |
-| `.nonPersistent()` data store | The first non-persistent view loads in 0.93 s (v5). In the same run, a later default-store view stalled 4.5 s with two 2 s JS timeouts. That intermittent stall is what the hostless Offline cases hit. |
+| Run | Observed order | Observation |
+|---|---|---|
+| v1 | Raw real/tiny views after selected controller cases | Later raw views loaded; this does not reproduce the original first-controller path. |
+| v2 | Controller first, raw variants later | Controller printed `readyAt=never`; later real-all configuration printed 0.660 s. The controller probe itself was marked Passed. |
+| v3 | Raw default-store real-all first, controller last | First raw view printed `ready=never`; later controller printed 0.736 s. |
+| v4 | First default-store real-all after 25 s idle | Start 2.452 s, commit 5.271 s, no finish within the diagnostic window. That idle delay did not avoid the observation in this run. |
+| v5 | Default-store real-all first; nonpersistent-1 second; nonpersistent-2 third; tiny fourth | First view printed `ready=never`; subsequent nonpersistent views printed 0.930 / 0.889 s; tiny printed 4.520 s with two diagnostic JS errors. |
 
-In the app host, the first web view in the process is normal. In the `hosted`
-probe run, `testBundledKitchenSinkAndMDXStayVisible` was the first test and
-passed in 2.993 s; the full run above passed it in 1.942 s.
+In v5, `testPPNonPersistentFirst` means the first *nonpersistent* test, not
+the first view in the process. Those cases load tiny HTML, while the preceding
+default-store case loads the real bundle. Order, content and data store vary
+together; this is not a controlled first-view nonpersistent comparison.
 
-Why a non-app process breaks WebKit's first WebContent launch is platform
-behavior, outside this repository. A likely factor is RunningBoard not tracking
-`xctest` as an app (`endowmentsForHandle … not running`, `Client not entitled`
-on terminate), but the probes do not prove it. The repo-level conclusion does
-not depend on that detail: WebKit cases need an app host, which lane 12 provides.
+Successful later raw loads do not rule out resource, configuration or
+controller defects in another ordering/build/historical failure. Modified
+probe runs have archived sources and logs, but no immutable per-run input
+manifests. A compiler path alone cannot certify their compiled bytes.
 
-## Probe results (hostless unless noted)
+## Export failures and historical boundaries
 
-| Run | Order in process | Label | Ready (s) | Navigation events |
-|---|---|---|---|---|
-| v1 | after 2 controller cases | real / tiny | 0.853 / 0.662 | start→commit→finish |
-| v1 hosted | after 2 controller cases | real / tiny | 1.161 / 0.673 | start→commit→finish |
-| v2 | **controller first** | controller-real | never (20 s) | `isLoading=true` |
-| v2 | later | real-all, tiny-zero, tiny-transparent, tiny-handlers | 0.58–0.66 | finish |
-| v3 | **raw view first** | real-all | never (20 s) | none |
-| v3 | last | controller-real | 0.736 | `readyState=complete` |
-| v4 | first, after 25 s idle | real-all | never (20 s) | start 2.45, commit 5.27 |
-| v5 | first / 2nd / 3rd / 4th | real-all / nonpersistent-1 / -2 / tiny | never / 0.930 / 0.889 / 4.520 | — |
+The retained app-hosted full94 result passes all three earlier failing names:
 
-## Export failures triage
+- `ExportHTMLHostedTests/testMDXPlaceholdersExportWithoutComponentExecution`
+- `ExportHTMLOfflineTests/testEscapedLessThanURLSinksStayNeutralInTheReopenedDocument`
+- `ExportHTMLOfflineTests/testOfflineReopenRendersEmbeddedResourcesWithoutNetwork`
 
-The three failures from `review-20261013/preview-native` came from a hostless
-`PreviewKit-Package` full-94 run:
+Their historical individual causes remain unproven. A hosted pass and a
+similar hostless stall do not prove a shared cause or exclude every product
+defect. #173 separately fixes a real harness issue: navigation/readiness
+failure throws before subsequent JavaScript, callbacks are bounded, and
+cleanup is installed before awaiting. This packet does not certify that no
+other export defect exists.
 
-| Case | Verdict |
-|---|---|
-| `ExportHTMLHostedTests/testMDXPlaceholdersExportWithoutComponentExecution` | Environment. It failed waiting for ready, the first-view stall. It passes app-hosted. |
-| `ExportHTMLOfflineTests/testEscapedLessThanURLSinksStayNeutralInTheReopenedDocument` | Environment. `didFinish` was missing, the intermittent hostless stall. It passes app-hosted. |
-| `ExportHTMLOfflineTests/testOfflineReopenRendersEmbeddedResourcesWithoutNetwork` | Environment for the missing `didFinish`. The follow-on 60 s XCTest overrun was a real test-harness defect: an unbounded JS await. #173 (`2565695`) already fixed it with the throwing bounded waits. It passes app-hosted. |
+The unmodified `59f374f` baseline and earlier interrupted instrumentation
+runs remain separate evidence. An interrupted driver or an xcresult without
+`Info.plist` is not a parseable result. These probes do not diagnose the
+historical 53.41 GB allocation or restore missing historical instrumentation.
 
-Neither is a product bug. There is no remaining Export test defect after #173.
+## Hostless full-suite result
 
-## Hostless `PreviewKit-Package` today
+The retained `PreviewKit-Package` full run is a complete **94-case** result:
+**58 Passed, 36 Failed, 0 Skipped**. Several iOS fixtures explicitly refuse
+missing packaged app resources and name `make ios-preview`. That failure path
+differs from the original readiness timeout and cannot reproduce its cause.
 
-#173 made every iOS fixture use the packaged app bundle. The hostless scheme has
-no such bundle, so its full run (`logs/hostless-full94.log.gz`, exit 65) now fails
-those cases immediately at the `PreviewBundleFixture` `XCTUnwrap`, which names
-`make ios-preview`. They no longer time out. `Scripts/ios/run-ios-tests.sh`
-already refuses `IOS_SCHEME=PreviewKit-Package` as a gate. The full 94-case
-PreviewKit suite on iOS is the `IOSPreview` app-hosted run.
+The public runner admits `IOSPreview` for iOS preview acceptance and refuses
+hostless package/library schemes. This established contract does not imply
+that every use of WebKit outside an app is unsupported.
 
-## Mac
+## Independent evidence review
 
-`swift test --package-path Packages/PreviewKit`: exit 0, **94 / 94 passed, 0 skipped** (`mac-previewkit.txt`).
+The original 16 checksum records match. Eight complete xcresults were
+recovered, copied before parsing, and re-extracted:
 
-## Files
+| Result | Passed | Failed | Skipped | Use |
+|---|---:|---:|---:|---|
+| Public app-hosted full suite | 94 | 0 | 0 | Required-name and no-skip gate passed |
+| Selected hosted controller + probes | 4 | 0 | 0 | Modified diagnostic run |
+| Hostless full suite | 58 | 36 | 0 | Failures preserved |
+| Hostless v1 selected cases + probes | 2 | 2 | 0 | Modified diagnostic run |
+| Hostless v2 / v3 / v4 / v5 | 7 / 7 / 2 / 4 | 0 | 0 | Diagnostic completion only; read printed readiness |
 
-- `probes/probe-v1.patch`, `probes/probe-v{2..5}.swift.txt`: the exact temporary probe sources for each run.
-- `logs/*.log.gz`: complete xcodebuild output for each run (`gzip -n`). `ios-preview-full94.test.log.gz`, `admission.json` and `resources.json` come from the `make ios-preview` evidence directory.
-- `SHA256SUMS`: hashes of the files above.
-- The xcresult bundles are outside the repo:
-  `side-session-notes/local_6bac6ea4-…/lane07-ready-root-cause-xcresults-20261021.tar.gz`
-  (SHA-256 `fa4a75e01753ab0b7a9c6b0dd18869292b1ddeb9be6e1cb38d1510f62f774c5e`).
+The recovered Mac raw log matches the SHA-256 in `mac-previewkit.txt`:
+**94 Passed, 0 Failed, 0 Skipped** on the stated historical tree. This is not
+a new Mac execution.
 
-Commands (destination `platform=iOS Simulator,id=00FE8F01-CC81-4A3D-B319-19DBBD84F4A4`):
+`review-20261021.json` indexes the verification. Original public source,
+driver, metadata, test-results, gate, required-name copy, admission and resource
+records are under `logs/`. All 684 records and the required-name copy match
+Git tree `bd3dadcf`. Probe text files are not compiled into the suite.
+
+Complete recovered xcresults, fresh extractions, the verification script
+and file hashes are retained locally under:
+
+`/Users/davis._.su/.codex/visualizations/2026/10/08/01a11aa3-ca4c-7832-aa4e-1a1bf0fbe88d/ios-main-integration-20261021/lane07-retained/`
+
+The earlier ellipsized archive locator was not reproducible. Review instead
+recovered the original scratch bundles. Another machine needs those bundles
+to repeat xcresult parsing; the committed manifests/logs remain inspectable.
 
 ```sh
-make ios-preview IOS_DESTINATION="$DEST" IOS_OUTPUT_ROOT=<out>          # exit 0, 94/94
-(cd Packages/PreviewKit && xcodebuild -scheme PreviewKit-Package -configuration Debug \
-  -destination "$DEST" -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO \
-  -collect-test-diagnostics never test [-only-testing:PreviewKitTests/ZZReadyProbeTests/...])
-xcodebuild -project Plainsong.xcodeproj -scheme IOSPreview -configuration Debug -destination "$DEST" \
-  -parallel-testing-enabled NO -collect-test-diagnostics never test \
-  -only-testing:IOSPreviewTests/ZZReadyProbeTests -only-testing:IOSPreviewTests/PreviewIOSHostedTests
+(cd docs/ios/evidence/lane-07/ready-root-cause-20261021 && shasum -a 256 -c SHA256SUMS)
 ```
 
-## Not covered
+## Current integration and remaining gates
 
-Exact-head CI, iOS 26 runtime, physical devices, and the other owner-only M0 gates.
+#173, #176 and #175 have merged into the #164 review branch. This PR was
+synchronized with #164 `fdd2a071c04f61f5259d31cf17699534d77fce9e` using a merge
+commit. All five incoming Decision Log rows are retained once; product and
+test source remains byte-equal to that aggregate.
+
+Exact-head CI is reported by the live PR check. Historical full94 evidence
+is separate from CI, and Mac CI does not run this UIKit gate.
+M0 iPhone/iPad IME/Undo, Files/iCloud/offline/conflict/background persistence,
+owner re-sign/install, production composition, composed-app acceptance,
+performance, accessibility, current-head release IPA and iOS 26 runtime remain
+open. The app still uses unavailable C0 capabilities.
