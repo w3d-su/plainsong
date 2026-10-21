@@ -33,6 +33,26 @@ final class EditorLineNumberGutterViewTests: XCTestCase {
         XCTAssertEqual(editor.textView.textContainer.size.width, 420 - editor.gutter.thickness, accuracy: 1)
     }
 
+    func testLegacyScrollersKeepTheGutterBesideTheClipView() throws {
+        let editor = try Support.makeEditor("one\ntwo\n", scrollerStyle: .legacy)
+        windows.append(editor.window)
+        let scroller = try XCTUnwrap(editor.scrollView.verticalScroller)
+
+        for width: CGFloat in [420, 560, 360] {
+            editor.window.setContentSize(NSSize(width: width, height: 320))
+            editor.textView.layoutSubtreeIfNeeded()
+            let clip = editor.scrollView.contentView.frame
+            XCTAssertGreaterThan(scroller.frame.width, 0, "legacy scrollers take space")
+            XCTAssertEqual(editor.gutter.frame.minX, 0)
+            XCTAssertEqual(editor.gutter.frame.maxX, clip.minX)
+            XCTAssertEqual(editor.gutter.frame.minY, clip.minY)
+            XCTAssertEqual(editor.gutter.frame.height, clip.height)
+            XCTAssertLessThanOrEqual(clip.maxX, scroller.frame.minX + 0.5)
+            XCTAssertEqual(editor.textView.frame.width, clip.width, accuracy: 1)
+            XCTAssertEqual(editor.textView.textContainer.size.width, clip.width, accuracy: 1)
+        }
+    }
+
     func testRetilingDoesNotPassTheTextThroughTheFullClipWidth() throws {
         let editor = try makeEditor("one\ntwo\n")
         let width = editor.textView.frame.width

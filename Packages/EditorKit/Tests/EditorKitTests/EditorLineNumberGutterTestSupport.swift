@@ -20,12 +20,18 @@ enum EditorLineNumberGutterTestSupport {
     )
 
     /// The caller closes the returned window.
+    ///
+    /// Overlay scrollers by default, so expected widths do not depend on the machine's
+    /// "Show scroll bars" setting (hosted CI runners use legacy scrollers, which take
+    /// 15-17 pt beside and below the clip view).
     static func makeEditor(
         _ text: String,
-        size: NSSize = NSSize(width: 420, height: 320)
+        size: NSSize = NSSize(width: 420, height: 320),
+        scrollerStyle: NSScroller.Style = .overlay
     ) throws -> Editor {
         let frame = NSRect(origin: .zero, size: size)
         let scrollView = MarkdownSTTextView.scrollableTextView(frame: frame)
+        scrollView.scrollerStyle = scrollerStyle
         let textView = try XCTUnwrap(scrollView.documentView as? MarkdownSTTextView)
         textView.isEditable = true
         textView.isSelectable = true
