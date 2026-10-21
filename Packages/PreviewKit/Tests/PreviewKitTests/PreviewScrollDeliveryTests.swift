@@ -141,15 +141,7 @@ final class PreviewScrollDeliveryTests: XCTestCase {
     }
 
     private func previewIndexFixtureURL() throws -> URL {
-        let repositoryRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        return repositoryRoot
-            .appendingPathComponent("App/Resources/preview/index.html")
-            .standardizedFileURL
+        try PreviewBundleFixture.indexURL()
     }
 
     private func makeLongDocument(target: String) -> (source: String, targetLine: Int) {

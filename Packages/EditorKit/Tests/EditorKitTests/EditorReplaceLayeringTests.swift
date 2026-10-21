@@ -122,8 +122,9 @@ final class EditorReplaceLayeringTests: XCTestCase {
             "SyntaxKit", "WorkspaceCore", "EditorKitIOS", "WorkspaceKitIOS",
         ])
         XCTAssertEqual(project.targets, [
-            "PerformanceTests", "Plainsong", "PlainsongTests", "PlainsongUITests",
-            "PlainsongIOS", "PlainsongIOSTests",
+            "IOSAcceptanceUITests", "PerformanceTests", "Plainsong", "PlainsongTests",
+            "PlainsongUITests", "PlainsongIOS", "PlainsongIOSTests",
+            "IOSPreviewTestHost", "IOSPreviewTests",
         ])
         XCTAssertEqual(project.dependencies, [
             "package: EditorKit",
@@ -133,6 +134,7 @@ final class EditorReplaceLayeringTests: XCTestCase {
             "sdk: PDFKit.framework",
             "target: Plainsong",
             "target: PlainsongIOS",
+            "target: IOSPreviewTestHost",
             "package: SyntaxKit",
             "package: WorkspaceCore",
             "package: EditorKitIOS",

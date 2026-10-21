@@ -270,6 +270,58 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ios.tests
         GENERATE_INFOPLIST_FILE: YES
 
+  # A real app process without statically duplicating the packages in its test bundle.
+  # It has no providers and never participates in production composition.
+  IOSPreviewTestHost:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: Scripts/ios/PreviewTestHost
+      - path: App/Resources/preview
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ios.preview-test-host
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+
+  # Full original lane 07 suite, in its own serial app-hosted scheme.
+  IOSPreviewTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: Packages/PreviewKit/Tests/PreviewKitTests
+    dependencies:
+      - target: IOSPreviewTestHost
+      - package: PreviewKit
+      - package: MarkdownCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ios.preview-tests
+        GENERATE_INFOPLIST_FILE: YES
+
+  # Lane 11 hosted smoke. Kept off the PlainsongIOS scheme so a 0-run or
+  # all-skip acceptance action cannot inherit the module suite's result.
+  IOSAcceptanceUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: IOSAcceptanceTests/UI
+    dependencies:
+      - target: PlainsongIOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ios.acceptance-ui
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: PlainsongIOS
+
 schemes:
   PlainsongIOS:
     build:
@@ -290,4 +342,26 @@ schemes:
         - package: EditorKitIOS/EditorKitIOSTests
           parallelizable: false
         - package: WorkspaceKitIOS/WorkspaceKitIOSTests
+          parallelizable: false
+  IOSPreview:
+    build:
+      targets:
+        IOSPreviewTestHost: [run, test]
+        IOSPreviewTests: [test]
+    test:
+      config: Debug
+      targets:
+        - name: IOSPreviewTests
+          parallelizable: false
+  IOSAcceptance:
+    build:
+      targets:
+        PlainsongIOS: [run, test]
+        IOSAcceptanceUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - name: IOSAcceptanceUITests
           parallelizable: false
