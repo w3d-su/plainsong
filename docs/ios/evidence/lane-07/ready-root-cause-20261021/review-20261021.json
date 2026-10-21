@@ -1,0 +1,166 @@
+{
+  "scope": "Historical evidence re-extraction, not a new native test execution.",
+  "original_checksum_records": [
+    {
+      "path": "probes/probe-v1.patch",
+      "match": true
+    },
+    {
+      "path": "probes/probe-v2.swift.txt",
+      "match": true
+    },
+    {
+      "path": "probes/probe-v3.swift.txt",
+      "match": true
+    },
+    {
+      "path": "probes/probe-v4.swift.txt",
+      "match": true
+    },
+    {
+      "path": "probes/probe-v5.swift.txt",
+      "match": true
+    },
+    {
+      "path": "logs/admission.json",
+      "match": true
+    },
+    {
+      "path": "logs/hosted.log.gz",
+      "match": true
+    },
+    {
+      "path": "logs/hostless-full94.log.gz",
+      "match": true
+    },
+    {
+      "path": "logs/hostless-v2.log.gz",
+      "match": true
+    },
+    {
+      "path": "logs/hostless-v3.log.gz",
+      "match": true
+    },
+    {
+      "path": "logs/hostless-v4.log.gz",
+      "match": true
+    },
+    {
+      "path": "logs/hostless-v5.log.gz",
+      "match": true
+    },
+    {
+      "path": "logs/hostless.log.gz",
+      "match": true
+    },
+    {
+      "path": "logs/ios-preview-full94.test.log.gz",
+      "match": true
+    },
+    {
+      "path": "logs/resources.json",
+      "match": true
+    },
+    {
+      "path": "mac-previewkit.txt",
+      "match": true
+    }
+  ],
+  "mac_raw_log_matches_original_receipt": true,
+  "probe_source_copies_match": {
+    "v1": true,
+    "v2": true,
+    "v3": true,
+    "v4": true,
+    "v5": true
+  },
+  "public_source": {
+    "head": "bd3dadcf5e0dd39e83896d6c463e285e8a0d6cb3",
+    "records": 684,
+    "mismatches": [],
+    "dirty": false
+  },
+  "xcresult_reextraction": [
+    {
+      "label": "public-full94",
+      "acceptance_gate_exit": 0,
+      "executed": 94,
+      "passed": 94,
+      "failed": 0,
+      "skipped": 0,
+      "complete_xcresult": true
+    },
+    {
+      "label": "hosted",
+      "acceptance_gate_exit": null,
+      "executed": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "complete_xcresult": true
+    },
+    {
+      "label": "hostless-full94",
+      "acceptance_gate_exit": null,
+      "executed": 94,
+      "passed": 58,
+      "failed": 36,
+      "skipped": 0,
+      "complete_xcresult": true
+    },
+    {
+      "label": "hostless-v2",
+      "acceptance_gate_exit": null,
+      "executed": 7,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "complete_xcresult": true
+    },
+    {
+      "label": "hostless-v3",
+      "acceptance_gate_exit": null,
+      "executed": 7,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "complete_xcresult": true
+    },
+    {
+      "label": "hostless-v4",
+      "acceptance_gate_exit": null,
+      "executed": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "complete_xcresult": true
+    },
+    {
+      "label": "hostless-v5",
+      "acceptance_gate_exit": null,
+      "executed": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "complete_xcresult": true
+    },
+    {
+      "label": "hostless",
+      "acceptance_gate_exit": null,
+      "executed": 4,
+      "passed": 2,
+      "failed": 2,
+      "skipped": 0,
+      "complete_xcresult": true
+    }
+  ],
+  "limits": [
+    "Probe sources and logs survive, but no run-bound source input manifests were retained for the modified probe runs.",
+    "Probe pass statuses do not assert readiness; printed ready=never can accompany a passed diagnostic case.",
+    "v5 nonpersistent-1 was the second web view after real-all, and uses a different page.",
+    "The full94 bundle case ran after earlier web-view tests. The separate selected hosted run put it first.",
+    "These results do not prove UIApplication or RunningBoard causality, exonerate every historical failure, or diagnose the historical memory spike."
+  ],
+  "reviewed_base": "fdd2a071c04f61f5259d31cf17699534d77fce9e",
+  "product_or_test_source_changes": false
+}

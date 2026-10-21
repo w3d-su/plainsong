@@ -1,0 +1,1018 @@
+{
+  "devices" : [
+    {
+      "architecture" : "arm64",
+      "deviceId" : "00FE8F01-CC81-4A3D-B319-19DBBD84F4A4",
+      "deviceName" : "iPhone 17",
+      "modelName" : "iPhone 17",
+      "osBuildNumber" : "24A5355p",
+      "osVersion" : "27.0",
+      "platform" : "iOS Simulator"
+    }
+  ],
+  "testNodes" : [
+    {
+      "children" : [
+        {
+          "children" : [
+            {
+              "children" : [
+                {
+                  "duration" : "0.006s",
+                  "durationInSeconds" : 0.006049036979675293,
+                  "name" : "testDirectDecoderMatchesCodableForAllResultStates()",
+                  "nodeIdentifier" : "ExportHTMLBridgeDecodingTests/testDirectDecoderMatchesCodableForAllResultStates()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLBridgeDecodingTests/testDirectDecoderMatchesCodableForAllResultStates",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00087s",
+                  "durationInSeconds" : 0.0008709430694580078,
+                  "name" : "testDirectDecoderRejectsMalformedIDsStatesAndResourceEntries()",
+                  "nodeIdentifier" : "ExportHTMLBridgeDecodingTests/testDirectDecoderRejectsMalformedIDsStatesAndResourceEntries()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLBridgeDecodingTests/testDirectDecoderRejectsMalformedIDsStatesAndResourceEntries",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.42s",
+                  "durationInSeconds" : 0.41684603691101074,
+                  "name" : "testMultiMegabyteReadyBridgeReceiptFitsExistingMainActorBudget()",
+                  "nodeIdentifier" : "ExportHTMLBridgeDecodingTests/testMultiMegabyteReadyBridgeReceiptFitsExistingMainActorBudget()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLBridgeDecodingTests/testMultiMegabyteReadyBridgeReceiptFitsExistingMainActorBudget",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "ExportHTMLBridgeDecodingTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLBridgeDecodingTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            },
+            {
+              "children" : [
+                {
+                  "duration" : "5s",
+                  "durationInSeconds" : 5.423245906829834,
+                  "name" : "testMDXPlaceholdersExportWithoutComponentExecution()",
+                  "nodeIdentifier" : "ExportHTMLHostedTests/testMDXPlaceholdersExportWithoutComponentExecution()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLHostedTests/testMDXPlaceholdersExportWithoutComponentExecution",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "1s",
+                  "durationInSeconds" : 1.7348970174789429,
+                  "name" : "testMDXSyntaxErrorFailsInsteadOfExportingLastGoodDOM()",
+                  "nodeIdentifier" : "ExportHTMLHostedTests/testMDXSyntaxErrorFailsInsteadOfExportingLastGoodDOM()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLHostedTests/testMDXSyntaxErrorFailsInsteadOfExportingLastGoodDOM",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "1s",
+                  "durationInSeconds" : 1.0092730522155762,
+                  "name" : "testNewerRenderFailsAPendingExport()",
+                  "nodeIdentifier" : "ExportHTMLHostedTests/testNewerRenderFailsAPendingExport()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLHostedTests/testNewerRenderFailsAPendingExport",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "1s",
+                  "durationInSeconds" : 1.8930929899215698,
+                  "name" : "testStaleRenderIDFailsWithoutEvaluatingOuterHTML()",
+                  "nodeIdentifier" : "ExportHTMLHostedTests/testStaleRenderIDFailsWithoutEvaluatingOuterHTML()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLHostedTests/testStaleRenderIDFailsWithoutEvaluatingOuterHTML",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "1s",
+                  "durationInSeconds" : 1.0079660415649414,
+                  "name" : "testSuccessfulMarkdownExportIsAStaticDocument()",
+                  "nodeIdentifier" : "ExportHTMLHostedTests/testSuccessfulMarkdownExportIsAStaticDocument()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLHostedTests/testSuccessfulMarkdownExportIsAStaticDocument",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "ExportHTMLHostedTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLHostedTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            },
+            {
+              "children" : [
+                {
+                  "duration" : "1s",
+                  "durationInSeconds" : 1.4609359502792358,
+                  "name" : "testAlreadyCancelledTaskNeverStartsExport()",
+                  "nodeIdentifier" : "ExportHTMLLifecycleTests/testAlreadyCancelledTaskNeverStartsExport()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLLifecycleTests/testAlreadyCancelledTaskNeverStartsExport",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.95s",
+                  "durationInSeconds" : 0.9522119760513306,
+                  "name" : "testCancellationResolvesPendingExportAndReleasesController()",
+                  "nodeIdentifier" : "ExportHTMLLifecycleTests/testCancellationResolvesPendingExportAndReleasesController()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLLifecycleTests/testCancellationResolvesPendingExportAndReleasesController",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "1s",
+                  "durationInSeconds" : 1.0052800178527832,
+                  "name" : "testDuplicateDiscoveredResourceIDsFailBeforeResolution()",
+                  "nodeIdentifier" : "ExportHTMLLifecycleTests/testDuplicateDiscoveredResourceIDsFailBeforeResolution()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLLifecycleTests/testDuplicateDiscoveredResourceIDsFailBeforeResolution",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "2s",
+                  "durationInSeconds" : 2.0874969959259033,
+                  "name" : "testInvalidationResolvesPendingExportAndReleasesController()",
+                  "nodeIdentifier" : "ExportHTMLLifecycleTests/testInvalidationResolvesPendingExportAndReleasesController()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLLifecycleTests/testInvalidationResolvesPendingExportAndReleasesController",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "1s",
+                  "durationInSeconds" : 1.0181570053100586,
+                  "name" : "testJavaScriptSendFailureResolvesPendingExport()",
+                  "nodeIdentifier" : "ExportHTMLLifecycleTests/testJavaScriptSendFailureResolvesPendingExport()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLLifecycleTests/testJavaScriptSendFailureResolvesPendingExport",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.96s",
+                  "durationInSeconds" : 0.9635230302810669,
+                  "name" : "testNewExportSupersedesOldAndLateResultCannotCompleteSuccessor()",
+                  "nodeIdentifier" : "ExportHTMLLifecycleTests/testNewExportSupersedesOldAndLateResultCannotCompleteSuccessor()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLLifecycleTests/testNewExportSupersedesOldAndLateResultCannotCompleteSuccessor",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "1s",
+                  "durationInSeconds" : 1.2574290037155151,
+                  "name" : "testNewRenderInvalidatesSharedBarrierBeforeCompletion()",
+                  "nodeIdentifier" : "ExportHTMLLifecycleTests/testNewRenderInvalidatesSharedBarrierBeforeCompletion()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLLifecycleTests/testNewRenderInvalidatesSharedBarrierBeforeCompletion",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.9s",
+                  "durationInSeconds" : 0.9037690162658691,
+                  "name" : "testReadyBeforeDiscoveryResponseIsRejected()",
+                  "nodeIdentifier" : "ExportHTMLLifecycleTests/testReadyBeforeDiscoveryResponseIsRejected()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLLifecycleTests/testReadyBeforeDiscoveryResponseIsRejected",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.012s",
+                  "durationInSeconds" : 0.012134909629821777,
+                  "name" : "testResourceResolutionTaskIsCancelledWhenExportFinishes()",
+                  "nodeIdentifier" : "ExportHTMLLifecycleTests/testResourceResolutionTaskIsCancelledWhenExportFinishes()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLLifecycleTests/testResourceResolutionTaskIsCancelledWhenExportFinishes",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.95s",
+                  "durationInSeconds" : 0.9454519748687744,
+                  "name" : "testTimeoutResolvesPendingExportAndReleasesController()",
+                  "nodeIdentifier" : "ExportHTMLLifecycleTests/testTimeoutResolvesPendingExportAndReleasesController()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLLifecycleTests/testTimeoutResolvesPendingExportAndReleasesController",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "1s",
+                  "durationInSeconds" : 1.0992070436477661,
+                  "name" : "testWebContentTerminationResolvesPendingExportAndReleasesController()",
+                  "nodeIdentifier" : "ExportHTMLLifecycleTests/testWebContentTerminationResolvesPendingExportAndReleasesController()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLLifecycleTests/testWebContentTerminationResolvesPendingExportAndReleasesController",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "ExportHTMLLifecycleTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLLifecycleTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            },
+            {
+              "children" : [
+                {
+                  "duration" : "3s",
+                  "durationInSeconds" : 3.031730055809021,
+                  "name" : "testEscapedLessThanURLSinksStayNeutralInTheReopenedDocument()",
+                  "nodeIdentifier" : "ExportHTMLOfflineTests/testEscapedLessThanURLSinksStayNeutralInTheReopenedDocument()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLOfflineTests/testEscapedLessThanURLSinksStayNeutralInTheReopenedDocument",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "3s",
+                  "durationInSeconds" : 3.1245659589767456,
+                  "name" : "testOfflineReopenRendersEmbeddedResourcesWithoutNetwork()",
+                  "nodeIdentifier" : "ExportHTMLOfflineTests/testOfflineReopenRendersEmbeddedResourcesWithoutNetwork()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLOfflineTests/testOfflineReopenRendersEmbeddedResourcesWithoutNetwork",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "ExportHTMLOfflineTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLOfflineTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            },
+            {
+              "children" : [
+                {
+                  "duration" : "0.84s",
+                  "durationInSeconds" : 0.8447530269622803,
+                  "name" : "testAuthoredLookalikeIsNotCountedButAMissingImageIs()",
+                  "nodeIdentifier" : "ExportHTMLOmissionCountTests/testAuthoredLookalikeIsNotCountedButAMissingImageIs()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLOmissionCountTests/testAuthoredLookalikeIsNotCountedButAMissingImageIs",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.0023s",
+                  "durationInSeconds" : 0.002279996871948242,
+                  "name" : "testOmittedImageCountCountsOnlySerializerPlaceholderTags()",
+                  "nodeIdentifier" : "ExportHTMLOmissionCountTests/testOmittedImageCountCountsOnlySerializerPlaceholderTags()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLOmissionCountTests/testOmittedImageCountCountsOnlySerializerPlaceholderTags",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "ExportHTMLOmissionCountTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLOmissionCountTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            },
+            {
+              "children" : [
+                {
+                  "duration" : "0.00071s",
+                  "durationInSeconds" : 0.0007069110870361328,
+                  "name" : "testExportHTMLDiscoveryRoundTrip()",
+                  "nodeIdentifier" : "ExportHTMLProtocolTests/testExportHTMLDiscoveryRoundTrip()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLProtocolTests/testExportHTMLDiscoveryRoundTrip",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00074s",
+                  "durationInSeconds" : 0.0007380247116088867,
+                  "name" : "testExportHTMLResultStatesRoundTrip()",
+                  "nodeIdentifier" : "ExportHTMLProtocolTests/testExportHTMLResultStatesRoundTrip()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLProtocolTests/testExportHTMLResultStatesRoundTrip",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00054s",
+                  "durationInSeconds" : 0.0005370378494262695,
+                  "name" : "testFinalizationOmitOutcomesRoundTrip()",
+                  "nodeIdentifier" : "ExportHTMLProtocolTests/testFinalizationOmitOutcomesRoundTrip()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLProtocolTests/testFinalizationOmitOutcomesRoundTrip",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00062s",
+                  "durationInSeconds" : 0.0006159543991088867,
+                  "name" : "testRepeatedEmbedOutcomeReferencesTheFirstDataURIRoundTrip()",
+                  "nodeIdentifier" : "ExportHTMLProtocolTests/testRepeatedEmbedOutcomeReferencesTheFirstDataURIRoundTrip()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLProtocolTests/testRepeatedEmbedOutcomeReferencesTheFirstDataURIRoundTrip",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "ExportHTMLProtocolTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLProtocolTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            },
+            {
+              "children" : [
+                {
+                  "duration" : "3s",
+                  "durationInSeconds" : 3.5134389400482178,
+                  "name" : "testDocumentTitleUsesFrontmatterThenFirstHeadingThenUntitled()",
+                  "nodeIdentifier" : "ExportHTMLTitleTests/testDocumentTitleUsesFrontmatterThenFirstHeadingThenUntitled()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLTitleTests/testDocumentTitleUsesFrontmatterThenFirstHeadingThenUntitled",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "ExportHTMLTitleTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportHTMLTitleTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            },
+            {
+              "children" : [
+                {
+                  "duration" : "7s",
+                  "durationInSeconds" : 7.239717960357666,
+                  "name" : "testExportIssuesNoHTTPRequestsEvenWhenTheLivePreviewAllowsRemoteImages()",
+                  "nodeIdentifier" : "ExportNetworkInterceptorTests/testExportIssuesNoHTTPRequestsEvenWhenTheLivePreviewAllowsRemoteImages()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportNetworkInterceptorTests/testExportIssuesNoHTTPRequestsEvenWhenTheLivePreviewAllowsRemoteImages",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "ExportNetworkInterceptorTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportNetworkInterceptorTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            },
+            {
+              "children" : [
+                {
+                  "duration" : "0.85s",
+                  "durationInSeconds" : 0.845255970954895,
+                  "name" : "testCancellationResolvesAPendingExportRender()",
+                  "nodeIdentifier" : "ExportRenderLifecycleTests/testCancellationResolvesAPendingExportRender()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportRenderLifecycleTests/testCancellationResolvesAPendingExportRender",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.014s",
+                  "durationInSeconds" : 0.014348030090332031,
+                  "name" : "testInvalidatedControllerRefusesWithoutSubmittingARender()",
+                  "nodeIdentifier" : "ExportRenderLifecycleTests/testInvalidatedControllerRefusesWithoutSubmittingARender()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportRenderLifecycleTests/testInvalidatedControllerRefusesWithoutSubmittingARender",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.91s",
+                  "durationInSeconds" : 0.9073010683059692,
+                  "name" : "testInvalidationResolvesAPendingExportRender()",
+                  "nodeIdentifier" : "ExportRenderLifecycleTests/testInvalidationResolvesAPendingExportRender()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportRenderLifecycleTests/testInvalidationResolvesAPendingExportRender",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "1s",
+                  "durationInSeconds" : 1.1632200479507446,
+                  "name" : "testNewerRenderSupersedesAPendingExportRender()",
+                  "nodeIdentifier" : "ExportRenderLifecycleTests/testNewerRenderSupersedesAPendingExportRender()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportRenderLifecycleTests/testNewerRenderSupersedesAPendingExportRender",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.86s",
+                  "durationInSeconds" : 0.8600609302520752,
+                  "name" : "testRenderQueuedBeforeReadyCompletesAtItsExactIDAndFeedsExportHTML()",
+                  "nodeIdentifier" : "ExportRenderLifecycleTests/testRenderQueuedBeforeReadyCompletesAtItsExactIDAndFeedsExportHTML()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportRenderLifecycleTests/testRenderQueuedBeforeReadyCompletesAtItsExactIDAndFeedsExportHTML",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.95s",
+                  "durationInSeconds" : 0.9518750905990601,
+                  "name" : "testTimeoutResolvesAPendingExportRender()",
+                  "nodeIdentifier" : "ExportRenderLifecycleTests/testTimeoutResolvesAPendingExportRender()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportRenderLifecycleTests/testTimeoutResolvesAPendingExportRender",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.85s",
+                  "durationInSeconds" : 0.849748969078064,
+                  "name" : "testWebContentTerminationResolvesAPendingExportRender()",
+                  "nodeIdentifier" : "ExportRenderLifecycleTests/testWebContentTerminationResolvesAPendingExportRender()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportRenderLifecycleTests/testWebContentTerminationResolvesAPendingExportRender",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "ExportRenderLifecycleTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportRenderLifecycleTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            },
+            {
+              "children" : [
+                {
+                  "duration" : "0.94s",
+                  "durationInSeconds" : 0.9393470287322998,
+                  "name" : "testHundredReferencesToOneImageSerializeItsDataURIOnce()",
+                  "nodeIdentifier" : "ExportResourceResolverReviewTests/testHundredReferencesToOneImageSerializeItsDataURIOnce()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportResourceResolverReviewTests/testHundredReferencesToOneImageSerializeItsDataURIOnce",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.0016s",
+                  "durationInSeconds" : 0.0016460418701171875,
+                  "name" : "testRepeatedAuthoredDataImagesAreLookedUpBeforeDecoding()",
+                  "nodeIdentifier" : "ExportResourceResolverReviewTests/testRepeatedAuthoredDataImagesAreLookedUpBeforeDecoding()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportResourceResolverReviewTests/testRepeatedAuthoredDataImagesAreLookedUpBeforeDecoding",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.0083s",
+                  "durationInSeconds" : 0.008322954177856445,
+                  "name" : "testTypeSniffedRastersThatDoNotDecodeAreOmitted()",
+                  "nodeIdentifier" : "ExportResourceResolverReviewTests/testTypeSniffedRastersThatDoNotDecodeAreOmitted()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportResourceResolverReviewTests/testTypeSniffedRastersThatDoNotDecodeAreOmitted",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "ExportResourceResolverReviewTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportResourceResolverReviewTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            },
+            {
+              "children" : [
+                {
+                  "duration" : "0.15s",
+                  "durationInSeconds" : 0.1453028917312622,
+                  "name" : "testAuthoredDataImageNormalizesAndRejectsMalformedOrOversize()",
+                  "nodeIdentifier" : "ExportResourceResolverTests/testAuthoredDataImageNormalizesAndRejectsMalformedOrOversize()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportResourceResolverTests/testAuthoredDataImageNormalizesAndRejectsMalformedOrOversize",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "9s",
+                  "durationInSeconds" : 9.396196961402893,
+                  "name" : "testContainedPNGAtTenMebibyteBoundaryEmbedsAndOneExtraByteIsOmitted()",
+                  "nodeIdentifier" : "ExportResourceResolverTests/testContainedPNGAtTenMebibyteBoundaryEmbedsAndOneExtraByteIsOmitted()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportResourceResolverTests/testContainedPNGAtTenMebibyteBoundaryEmbedsAndOneExtraByteIsOmitted",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "32s",
+                  "durationInSeconds" : 32.154268980026245,
+                  "name" : "testDistinctRasterBytesStopAtThirtyTwoMebibytesAndOneExtraByteOmits()",
+                  "nodeIdentifier" : "ExportResourceResolverTests/testDistinctRasterBytesStopAtThirtyTwoMebibytesAndOneExtraByteOmits()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportResourceResolverTests/testDistinctRasterBytesStopAtThirtyTwoMebibytesAndOneExtraByteOmits",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.028s",
+                  "durationInSeconds" : 0.028400897979736328,
+                  "name" : "testJPEGGifAndWebPEmbedWithMatchingMIME()",
+                  "nodeIdentifier" : "ExportResourceResolverTests/testJPEGGifAndWebPEmbedWithMatchingMIME()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportResourceResolverTests/testJPEGGifAndWebPEmbedWithMatchingMIME",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.0098s",
+                  "durationInSeconds" : 0.009801983833312988,
+                  "name" : "testManifestWoff2EmbedsAndOtherFontPathsOmit()",
+                  "nodeIdentifier" : "ExportResourceResolverTests/testManifestWoff2EmbedsAndOtherFontPathsOmit()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportResourceResolverTests/testManifestWoff2EmbedsAndOtherFontPathsOmit",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.013s",
+                  "durationInSeconds" : 0.012574911117553711,
+                  "name" : "testRejectedImagesOmitWithoutEmbedding()",
+                  "nodeIdentifier" : "ExportResourceResolverTests/testRejectedImagesOmitWithoutEmbedding()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportResourceResolverTests/testRejectedImagesOmitWithoutEmbedding",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "20s",
+                  "durationInSeconds" : 20.540364027023315,
+                  "name" : "testRepeatedAssetReferenceCountsDecodedBytesOnce()",
+                  "nodeIdentifier" : "ExportResourceResolverTests/testRepeatedAssetReferenceCountsDecodedBytesOnce()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportResourceResolverTests/testRepeatedAssetReferenceCountsDecodedBytesOnce",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "ExportResourceResolverTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/ExportResourceResolverTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            },
+            {
+              "children" : [
+                {
+                  "duration" : "0.59s",
+                  "durationInSeconds" : 0.5931119918823242,
+                  "name" : "testBlockedReadFromRootADoesNotDeliverIntoRootB()",
+                  "nodeIdentifier" : "PreviewAssetFenceTests/testBlockedReadFromRootADoesNotDeliverIntoRootB()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewAssetFenceTests/testBlockedReadFromRootADoesNotDeliverIntoRootB",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.017s",
+                  "durationInSeconds" : 0.016790032386779785,
+                  "name" : "testContainedReadDeliversBytes()",
+                  "nodeIdentifier" : "PreviewAssetFenceTests/testContainedReadDeliversBytes()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewAssetFenceTests/testContainedReadDeliversBytes",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.54s",
+                  "durationInSeconds" : 0.5382829904556274,
+                  "name" : "testInvalidateDropsALateRead()",
+                  "nodeIdentifier" : "PreviewAssetFenceTests/testInvalidateDropsALateRead()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewAssetFenceTests/testInvalidateDropsALateRead",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.1s",
+                  "durationInSeconds" : 0.10261106491088867,
+                  "name" : "testMissingAndWrongTokensDoNotRead()",
+                  "nodeIdentifier" : "PreviewAssetFenceTests/testMissingAndWrongTokensDoNotRead()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewAssetFenceTests/testMissingAndWrongTokensDoNotRead",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.0013s",
+                  "durationInSeconds" : 0.0013439655303955078,
+                  "name" : "testNilGrantDoesNotAuthorizeTheFileParent()",
+                  "nodeIdentifier" : "PreviewAssetFenceTests/testNilGrantDoesNotAuthorizeTheFileParent()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewAssetFenceTests/testNilGrantDoesNotAuthorizeTheFileParent",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.014s",
+                  "durationInSeconds" : 0.014073967933654785,
+                  "name" : "testOversizedBytesAfterSmallMetadataAreRejected()",
+                  "nodeIdentifier" : "PreviewAssetFenceTests/testOversizedBytesAfterSmallMetadataAreRejected()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewAssetFenceTests/testOversizedBytesAfterSmallMetadataAreRejected",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00081s",
+                  "durationInSeconds" : 0.0008090734481811523,
+                  "name" : "testPrefixSiblingFileURLIsOutsideTheRoot()",
+                  "nodeIdentifier" : "PreviewAssetFenceTests/testPrefixSiblingFileURLIsOutsideTheRoot()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewAssetFenceTests/testPrefixSiblingFileURLIsOutsideTheRoot",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.014s",
+                  "durationInSeconds" : 0.013767004013061523,
+                  "name" : "testProviderBytesOutsideTheRootAreRejected()",
+                  "nodeIdentifier" : "PreviewAssetFenceTests/testProviderBytesOutsideTheRootAreRejected()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewAssetFenceTests/testProviderBytesOutsideTheRootAreRejected",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.52s",
+                  "durationInSeconds" : 0.5202369689941406,
+                  "name" : "testSameURLNewGrantDropsThePreviousRead()",
+                  "nodeIdentifier" : "PreviewAssetFenceTests/testSameURLNewGrantDropsThePreviousRead()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewAssetFenceTests/testSameURLNewGrantDropsThePreviousRead",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.52s",
+                  "durationInSeconds" : 0.5171270370483398,
+                  "name" : "testStopDropsALateRead()",
+                  "nodeIdentifier" : "PreviewAssetFenceTests/testStopDropsALateRead()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewAssetFenceTests/testStopDropsALateRead",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.1s",
+                  "durationInSeconds" : 0.10344505310058594,
+                  "name" : "testSVGIsRejectedBeforeTheReader()",
+                  "nodeIdentifier" : "PreviewAssetFenceTests/testSVGIsRejectedBeforeTheReader()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewAssetFenceTests/testSVGIsRejectedBeforeTheReader",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.015s",
+                  "durationInSeconds" : 0.014751076698303223,
+                  "name" : "testSymlinkRetargetDuringReadIsRejected()",
+                  "nodeIdentifier" : "PreviewAssetFenceTests/testSymlinkRetargetDuringReadIsRejected()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewAssetFenceTests/testSymlinkRetargetDuringReadIsRejected",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "PreviewAssetFenceTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewAssetFenceTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            },
+            {
+              "children" : [
+                {
+                  "duration" : "0.022s",
+                  "durationInSeconds" : 0.02182602882385254,
+                  "name" : "testCompletedJavaScriptReplyIgnoresDuplicateAndCancelsDeadline()",
+                  "nodeIdentifier" : "PreviewHostedDeadlineTests/testCompletedJavaScriptReplyIgnoresDuplicateAndCancelsDeadline()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewHostedDeadlineTests/testCompletedJavaScriptReplyIgnoresDuplicateAndCancelsDeadline",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.053s",
+                  "durationInSeconds" : 0.05322003364562988,
+                  "name" : "testFalseConditionThrowsInsteadOfContinuingTheTest()",
+                  "nodeIdentifier" : "PreviewHostedDeadlineTests/testFalseConditionThrowsInsteadOfContinuingTheTest()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewHostedDeadlineTests/testFalseConditionThrowsInsteadOfContinuingTheTest",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.012s",
+                  "durationInSeconds" : 0.01175999641418457,
+                  "name" : "testMissingJavaScriptReplyTimesOutAndLateReplyCannotResumeTwice()",
+                  "nodeIdentifier" : "PreviewHostedDeadlineTests/testMissingJavaScriptReplyTimesOutAndLateReplyCannotResumeTwice()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewHostedDeadlineTests/testMissingJavaScriptReplyTimesOutAndLateReplyCannotResumeTwice",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "PreviewHostedDeadlineTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewHostedDeadlineTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            },
+            {
+              "children" : [
+                {
+                  "duration" : "1s",
+                  "durationInSeconds" : 1.941985011100769,
+                  "name" : "testBundledKitchenSinkAndMDXStayVisible()",
+                  "nodeIdentifier" : "PreviewIOSHostedTests/testBundledKitchenSinkAndMDXStayVisible()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewIOSHostedTests/testBundledKitchenSinkAndMDXStayVisible",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.73s",
+                  "durationInSeconds" : 0.7265180349349976,
+                  "name" : "testHostedPageBecomesReadyAndRendersTheLatestDocument()",
+                  "nodeIdentifier" : "PreviewIOSHostedTests/testHostedPageBecomesReadyAndRendersTheLatestDocument()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewIOSHostedTests/testHostedPageBecomesReadyAndRendersTheLatestDocument",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "PreviewIOSHostedTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewIOSHostedTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            },
+            {
+              "children" : [
+                {
+                  "duration" : "0.0065s",
+                  "durationInSeconds" : 0.006474018096923828,
+                  "name" : "testCancelledObservationReceivesNoLaterEvents()",
+                  "nodeIdentifier" : "PreviewIdentityTests/testCancelledObservationReceivesNoLaterEvents()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewIdentityTests/testCancelledObservationReceivesNoLaterEvents",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.0075s",
+                  "durationInSeconds" : 0.007472038269042969,
+                  "name" : "testHostReattachKeepsTheSameWebView()",
+                  "nodeIdentifier" : "PreviewIdentityTests/testHostReattachKeepsTheSameWebView()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewIdentityTests/testHostReattachKeepsTheSameWebView",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.037s",
+                  "durationInSeconds" : 0.03661501407623291,
+                  "name" : "testIOSCheckboxUsesDocumentIdentityAndIgnoresStaleRender()",
+                  "nodeIdentifier" : "PreviewIdentityTests/testIOSCheckboxUsesDocumentIdentityAndIgnoresStaleRender()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewIdentityTests/testIOSCheckboxUsesDocumentIdentityAndIgnoresStaleRender",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.0097s",
+                  "durationInSeconds" : 0.009729981422424316,
+                  "name" : "testLowerVersionDocumentDropsThePreviousCheckbox()",
+                  "nodeIdentifier" : "PreviewIdentityTests/testLowerVersionDocumentDropsThePreviousCheckbox()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewIdentityTests/testLowerVersionDocumentDropsThePreviousCheckbox",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.15s",
+                  "durationInSeconds" : 0.14532899856567383,
+                  "name" : "testSingleFileGrantReportsMissingDirectoryAccessAndDoesNotReadSiblings()",
+                  "nodeIdentifier" : "PreviewIdentityTests/testSingleFileGrantReportsMissingDirectoryAccessAndDoesNotReadSiblings()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewIdentityTests/testSingleFileGrantReportsMissingDirectoryAccessAndDoesNotReadSiblings",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.0087s",
+                  "durationInSeconds" : 0.008682012557983398,
+                  "name" : "testWebContentTerminationDoesNotMutateSource()",
+                  "nodeIdentifier" : "PreviewIdentityTests/testWebContentTerminationDoesNotMutateSource()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewIdentityTests/testWebContentTerminationDoesNotMutateSource",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "PreviewIdentityTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewIdentityTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            },
+            {
+              "children" : [
+                {
+                  "duration" : "0.0026s",
+                  "durationInSeconds" : 0.0026170015335083008,
+                  "name" : "testAssetPolicyRejectsOversizedFiles()",
+                  "nodeIdentifier" : "PreviewKitTests/testAssetPolicyRejectsOversizedFiles()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testAssetPolicyRejectsOversizedFiles",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.0026s",
+                  "durationInSeconds" : 0.002630949020385742,
+                  "name" : "testAssetPolicyRejectsUnsupportedTypes()",
+                  "nodeIdentifier" : "PreviewKitTests/testAssetPolicyRejectsUnsupportedTypes()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testAssetPolicyRejectsUnsupportedTypes",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.0012s",
+                  "durationInSeconds" : 0.001157999038696289,
+                  "name" : "testAssetResolverAllowsContainedPaths()",
+                  "nodeIdentifier" : "PreviewKitTests/testAssetResolverAllowsContainedPaths()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testAssetResolverAllowsContainedPaths",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00085s",
+                  "durationInSeconds" : 0.0008469820022583008,
+                  "name" : "testAssetResolverDecodesEscapedSpacesInContainedPaths()",
+                  "nodeIdentifier" : "PreviewKitTests/testAssetResolverDecodesEscapedSpacesInContainedPaths()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testAssetResolverDecodesEscapedSpacesInContainedPaths",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00079s",
+                  "durationInSeconds" : 0.0007939338684082031,
+                  "name" : "testAssetResolverRejectsEncodedTraversalEscapes()",
+                  "nodeIdentifier" : "PreviewKitTests/testAssetResolverRejectsEncodedTraversalEscapes()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testAssetResolverRejectsEncodedTraversalEscapes",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00065s",
+                  "durationInSeconds" : 0.0006519556045532227,
+                  "name" : "testAssetResolverRejectsHostOnlyEscapes()",
+                  "nodeIdentifier" : "PreviewKitTests/testAssetResolverRejectsHostOnlyEscapes()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testAssetResolverRejectsHostOnlyEscapes",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00071s",
+                  "durationInSeconds" : 0.0007070302963256836,
+                  "name" : "testAssetResolverRejectsNestedParentDirectoryTraversal()",
+                  "nodeIdentifier" : "PreviewKitTests/testAssetResolverRejectsNestedParentDirectoryTraversal()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testAssetResolverRejectsNestedParentDirectoryTraversal",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00073s",
+                  "durationInSeconds" : 0.0007259845733642578,
+                  "name" : "testAssetResolverRejectsParentDirectoryEscapes()",
+                  "nodeIdentifier" : "PreviewKitTests/testAssetResolverRejectsParentDirectoryEscapes()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testAssetResolverRejectsParentDirectoryEscapes",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.0022s",
+                  "durationInSeconds" : 0.0021669864654541016,
+                  "name" : "testAssetResolverRejectsSymlinkEscapesRoot()",
+                  "nodeIdentifier" : "PreviewKitTests/testAssetResolverRejectsSymlinkEscapesRoot()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testAssetResolverRejectsSymlinkEscapesRoot",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.0015s",
+                  "durationInSeconds" : 0.0014560222625732422,
+                  "name" : "testBridgeMessageRoundTrip()",
+                  "nodeIdentifier" : "PreviewKitTests/testBridgeMessageRoundTrip()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testBridgeMessageRoundTrip",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00059s",
+                  "durationInSeconds" : 0.0005900859832763672,
+                  "name" : "testBridgeProtocolVersionAndMessageOrder()",
+                  "nodeIdentifier" : "PreviewKitTests/testBridgeProtocolVersionAndMessageOrder()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testBridgeProtocolVersionAndMessageOrder",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00066s",
+                  "durationInSeconds" : 0.0006639957427978516,
+                  "name" : "testCheckboxPayloadRequiresRenderProvenance()",
+                  "nodeIdentifier" : "PreviewKitTests/testCheckboxPayloadRequiresRenderProvenance()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testCheckboxPayloadRequiresRenderProvenance",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00043s",
+                  "durationInSeconds" : 0.00043404102325439453,
+                  "name" : "testModuleLoads()",
+                  "nodeIdentifier" : "PreviewKitTests/testModuleLoads()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testModuleLoads",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00059s",
+                  "durationInSeconds" : 0.0005929470062255859,
+                  "name" : "testPreviewAssetContextFallsBackToFileParentWithoutWorkspace()",
+                  "nodeIdentifier" : "PreviewKitTests/testPreviewAssetContextFallsBackToFileParentWithoutWorkspace()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testPreviewAssetContextFallsBackToFileParentWithoutWorkspace",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.0007s",
+                  "durationInSeconds" : 0.0006960630416870117,
+                  "name" : "testPreviewAssetContextUsesWorkspaceRootAndWorkspaceRelativeBaseDir()",
+                  "nodeIdentifier" : "PreviewKitTests/testPreviewAssetContextUsesWorkspaceRootAndWorkspaceRelativeBaseDir()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testPreviewAssetContextUsesWorkspaceRootAndWorkspaceRelativeBaseDir",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.86s",
+                  "durationInSeconds" : 0.8627760410308838,
+                  "name" : "testPreviewControllerLoadsPreviewBundleAndRendersMarkdown()",
+                  "nodeIdentifier" : "PreviewKitTests/testPreviewControllerLoadsPreviewBundleAndRendersMarkdown()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testPreviewControllerLoadsPreviewBundleAndRendersMarkdown",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.95s",
+                  "durationInSeconds" : 0.9518300294876099,
+                  "name" : "testPreviewControllerLoadsWorkspaceRelativeImageAssets()",
+                  "nodeIdentifier" : "PreviewKitTests/testPreviewControllerLoadsWorkspaceRelativeImageAssets()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testPreviewControllerLoadsWorkspaceRelativeImageAssets",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.0078s",
+                  "durationInSeconds" : 0.007773995399475098,
+                  "name" : "testPreviewControllerUsesTransparentWebViewBackground()",
+                  "nodeIdentifier" : "PreviewKitTests/testPreviewControllerUsesTransparentWebViewBackground()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testPreviewControllerUsesTransparentWebViewBackground",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00078s",
+                  "durationInSeconds" : 0.0007818937301635742,
+                  "name" : "testPreviewNavigationPolicyOnlyAllowsBundledIndex()",
+                  "nodeIdentifier" : "PreviewKitTests/testPreviewNavigationPolicyOnlyAllowsBundledIndex()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testPreviewNavigationPolicyOnlyAllowsBundledIndex",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.86s",
+                  "durationInSeconds" : 0.8615440130233765,
+                  "name" : "testRenderingLowerVersionDocumentAfterHigherVersionStillUpdates()",
+                  "nodeIdentifier" : "PreviewKitTests/testRenderingLowerVersionDocumentAfterHigherVersionStillUpdates()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testRenderingLowerVersionDocumentAfterHigherVersionStillUpdates",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00059s",
+                  "durationInSeconds" : 0.0005949735641479492,
+                  "name" : "testSetThemePayloadCarriesRemoteImagePolicy()",
+                  "nodeIdentifier" : "PreviewKitTests/testSetThemePayloadCarriesRemoteImagePolicy()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests/testSetThemePayloadCarriesRemoteImagePolicy",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "PreviewKitTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewKitTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            },
+            {
+              "children" : [
+                {
+                  "duration" : "0.83s",
+                  "durationInSeconds" : 0.8333920240402222,
+                  "name" : "testDocumentNavigationWaitsForMatchingRenderBeforeScrolling()",
+                  "nodeIdentifier" : "PreviewScrollDeliveryTests/testDocumentNavigationWaitsForMatchingRenderBeforeScrolling()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewScrollDeliveryTests/testDocumentNavigationWaitsForMatchingRenderBeforeScrolling",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.82s",
+                  "durationInSeconds" : 0.8198399543762207,
+                  "name" : "testPendingDocumentNavigationFailsInsteadOfReplayingIntoAnotherDocument()",
+                  "nodeIdentifier" : "PreviewScrollDeliveryTests/testPendingDocumentNavigationFailsInsteadOfReplayingIntoAnotherDocument()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewScrollDeliveryTests/testPendingDocumentNavigationFailsInsteadOfReplayingIntoAnotherDocument",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.8s",
+                  "durationInSeconds" : 0.7977820634841919,
+                  "name" : "testScrollCompletionReportsJavaScriptDelivery()",
+                  "nodeIdentifier" : "PreviewScrollDeliveryTests/testScrollCompletionReportsJavaScriptDelivery()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewScrollDeliveryTests/testScrollCompletionReportsJavaScriptDelivery",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.006s",
+                  "durationInSeconds" : 0.005998015403747559,
+                  "name" : "testUnboundNavigationFailsWhenPresentedDocumentChangesBeforeRender()",
+                  "nodeIdentifier" : "PreviewScrollDeliveryTests/testUnboundNavigationFailsWhenPresentedDocumentChangesBeforeRender()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewScrollDeliveryTests/testUnboundNavigationFailsWhenPresentedDocumentChangesBeforeRender",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "PreviewScrollDeliveryTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests/PreviewScrollDeliveryTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            }
+          ],
+          "name" : "IOSPreviewTests",
+          "nodeIdentifierURL" : "test://com.apple.xcode/Plainsong/IOSPreviewTests",
+          "nodeType" : "Unit test bundle",
+          "result" : "Passed"
+        }
+      ],
+      "name" : "IOSPreview",
+      "nodeType" : "Test Plan",
+      "result" : "Passed"
+    }
+  ],
+  "testPlanConfigurations" : [
+    {
+      "configurationId" : "1",
+      "configurationName" : "Test Scheme Action"
+    }
+  ]
+}
