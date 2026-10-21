@@ -101,6 +101,17 @@ class RunnerEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "fingerprint changed"):
             self.verify()
 
+    def testAcceptanceSourceDriftIsIncludedInInputFingerprint(self):
+        directory = self.repository / "IOSAcceptanceTests/UI"
+        directory.mkdir(parents=True)
+        source = directory / "IOSAcceptanceLaunchSmokeTests.swift"
+        source.write_text("// original acceptance input\n")
+        proof.write_json(self.metadata / "source.json", proof.source_snapshot(self.repository))
+        self.record()
+        source.write_text("// changed acceptance input\n")
+        with self.assertRaisesRegex(ValueError, "fingerprint changed"):
+            self.verify()
+
     def testHostedTestSourceDriftIsIncludedInInputFingerprint(self):
         tests = self.repository / "AppIOSTests"
         tests.mkdir()
@@ -111,6 +122,84 @@ class RunnerEvidenceTests(unittest.TestCase):
         source.write_text("// changed hosted test input\n")
         with self.assertRaisesRegex(ValueError, "fingerprint changed"):
             self.verify()
+
+    def testRequiredValidationManifestDriftFailsSourceVerification(self):
+        manifests = (
+            "docs/ios/evidence/validation/required-hosted-smoke.txt",
+            "docs/ios/evidence/validation/required-component-tests.txt",
+        )
+        validation = self.repository / "docs/ios/evidence/validation"
+        validation.mkdir(parents=True)
+        for relative in manifests:
+            (self.repository / relative).write_text("Suite/requiredA\nSuite/requiredB\n")
+        self.git("add", "docs/ios/evidence/validation")
+        self.git("commit", "-qm", "Required validation manifests")
+        for relative in manifests:
+            with self.subTest(manifest=relative):
+                for item in manifests:
+                    (self.repository / item).write_text("Suite/requiredA\nSuite/requiredB\n")
+                snapshot = proof.source_snapshot(self.repository)
+                self.assertIn(relative, snapshot["files"])
+                proof.write_json(self.metadata / "source.json", snapshot)
+                self.record()
+                (self.repository / relative).write_text("Suite/requiredA\n")
+                with self.assertRaisesRegex(ValueError, "fingerprint changed"):
+                    proof.verify_source(self.metadata / "source.json", self.repository)
+                with self.assertRaisesRegex(ValueError, "fingerprint changed"):
+                    self.verify()
+
+    def required_copy_fixture(self, contents="Suite/requiredA\n"):
+        relative = "docs/ios/evidence/validation/required-hosted-smoke.txt"
+        manifest = self.repository / relative
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text(contents)
+        copied = self.root / "evidence/required-tests.txt"
+        copied.parent.mkdir(parents=True, exist_ok=True)
+        copied.write_bytes(manifest.read_bytes())
+        copied.chmod(0o444)
+        return relative, manifest, copied
+
+    def verify_required_copy_cli(self, source, copied, relative):
+        return subprocess.run([
+            sys.executable, str(SCRIPTS / "ios-provenance.py"), "verify-required-copy",
+            str(source), "--copy", str(copied), "--required-relative", relative,
+        ], text=True, capture_output=True)
+
+    def testRequiredCopyMatchesCapturedSourceIsAccepted(self):
+        relative, _, copied = self.required_copy_fixture()
+        source = self.root / "source.json"
+        proof.write_json(source, proof.source_snapshot(self.repository))
+        result = self.verify_required_copy_cli(source, copied, relative)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def testCopyThenManifestEditBeforeCaptureIsRejected(self):
+        relative, manifest, copied = self.required_copy_fixture()
+        manifest.write_text("Suite/requiredA\nSuite/requiredB\n")
+        source = self.root / "source.json"
+        proof.write_json(source, proof.source_snapshot(self.repository))
+        result = self.verify_required_copy_cli(source, copied, relative)
+        self.assertEqual(result.returncode, 65, result.stderr)
+        self.assertIn("does not match captured source", result.stderr)
+
+    def testRequiredCopyReplacementAfterCaptureIsRejected(self):
+        relative, _, copied = self.required_copy_fixture()
+        source = self.root / "source.json"
+        proof.write_json(source, proof.source_snapshot(self.repository))
+        copied.chmod(0o644)
+        copied.write_text("Suite/replaced\n")
+        result = self.verify_required_copy_cli(source, copied, relative)
+        self.assertEqual(result.returncode, 65, result.stderr)
+        self.assertIn("does not match captured source", result.stderr)
+
+    def testMissingRequiredSourceRecordExits65(self):
+        relative = "docs/ios/evidence/validation/required-hosted-smoke.txt"
+        copied = self.root / "required-tests.txt"
+        copied.write_text("Suite/requiredA\n")
+        source = self.root / "source.json"
+        proof.write_json(source, proof.source_snapshot(self.repository))
+        result = self.verify_required_copy_cli(source, copied, relative)
+        self.assertEqual(result.returncode, 65, result.stderr)
+        self.assertIn("lacks required-name file record", result.stderr)
 
     def testChangedHeadRejectsReuseEvenWhenCompiledInputsAreEqual(self):
         self.record()
@@ -217,6 +306,27 @@ class RunnerEvidenceTests(unittest.TestCase):
         self.assertEqual(report["executed"], 1)
         self.assertEqual(report["skipped"], 1)
 
+    def testFullSuiteCLIRejectsSkippedCasesOutsideTheRequiredList(self):
+        document = {"testNodes": [
+            {"nodeType": "Test Case", "nodeIdentifier": "Suite/required()", "result": "Passed"},
+            {"nodeType": "Test Case", "nodeIdentifier": "Suite/additional()", "result": "Skipped"},
+        ]}
+        source = self.root / "tests.json"
+        required = self.root / "required.txt"
+        required.write_text("Suite/required\n")
+        report = self.root / "report.json"
+        for status, expected in (("Skipped", 65), ("Passed", 0)):
+            document["testNodes"][1]["result"] = status
+            source.write_text(json.dumps(document))
+            result = subprocess.run([
+                sys.executable, str(SCRIPTS / "ios-test-results.py"), str(source),
+                "--required", str(required), "--report", str(report),
+                "--names", str(self.root / "names.txt"), "--no-skips",
+            ], text=True, capture_output=True)
+            self.assertEqual(result.returncode, expected, result.stderr)
+            if expected:
+                self.assertIn("skipped cases", json.loads(report.read_text())["reason"])
+
 
 class RunnerLockTests(unittest.TestCase):
     def setUp(self):
@@ -224,7 +334,11 @@ class RunnerLockTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.probe = Path(self.temporary.name) / "probe.sh"
         self.probe.write_text("#!/bin/bash\nset -euo pipefail\nsource " + shlex.quote(str(SCRIPTS / "ios-common.sh")) +
-                              '\nios_lock_or_exec "$0" "$@"\nif [ "${1:-}" = nested ]; then "$0" inner; else echo entered; fi\n')
+                              '\nios_lock_or_exec "$0" "$@"\n'
+                              'if [ "${1:-}" = nested ]; then "$0" inner\n'
+                              'elif [ "${1:-}" = fail75 ]; then echo entered; exit 75\n'
+                              'elif [ "${1:-}" = fail65 ]; then echo entered; exit 65\n'
+                              'else echo entered; fi\n')
         self.probe.chmod(0o700)
         self.environment = dict(os.environ, IOS_LOCK_WAIT_SECONDS="0")
         self.environment.pop("IOS_RUNNER_LOCK_OWNER", None)
@@ -248,6 +362,55 @@ class RunnerLockTests(unittest.TestCase):
         result = self.run_probe("nested")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "entered")
+
+    def testPayloadFailureStaysDistinctFromAdmission(self):
+        for argument, code in (("fail65", 65), ("fail75", 75)):
+            with self.subTest(argument=argument):
+                result = self.run_probe(argument, IOS_LOCK_WAIT_SECONDS="30")
+                self.assertEqual(result.returncode, code, result.stderr)
+                self.assertEqual(result.stdout.strip(), "entered")
+                self.assertNotIn("admission timeout", result.stderr)
+
+    def testBusyLockAdmissionExits75WithoutRunningPayload(self):
+        import os
+        import signal
+        import time
+        lock = "/private/tmp/plainsong-xcodebuild-test.lock"
+        probe = subprocess.run(["/usr/bin/lockf", "-k", "-t", "0", lock, "true"],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        holder = None
+        if probe.returncode == 0:
+            holder = subprocess.Popen(
+                ["/usr/bin/lockf", "-k", "-t", "0", lock, "sleep", "8"], start_new_session=True)
+            held = False
+            for _ in range(50):
+                busy = subprocess.run(["/usr/bin/lockf", "-k", "-t", "0", lock, "true"],
+                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if busy.returncode != 0:
+                    held = True
+                    break
+                time.sleep(0.05)
+            self.assertTrue(held, "canonical lock was not observed busy")
+        try:
+            result = self.run_probe()
+            self.assertEqual(result.returncode, 75, result.stderr)
+            self.assertIn("admission timeout", result.stderr)
+            self.assertNotIn("entered", result.stdout)
+        finally:
+            if holder is not None:
+                os.killpg(holder.pid, signal.SIGKILL)
+                holder.wait(timeout=5)
+                for _ in range(50):
+                    released = subprocess.run(["/usr/bin/lockf", "-k", "-t", "0", lock, "true"],
+                                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    if released.returncode == 0:
+                        break
+                    time.sleep(0.05)
+
+    def testDefaultAdmissionWaitIs45Seconds(self):
+        text = (SCRIPTS / "ios-common.sh").read_text()
+        self.assertIn('IOS_LOCK_WAIT_SECONDS:-45', text)
+        self.assertNotIn('IOS_LOCK_WAIT_SECONDS:-300', text)
 
 
 if __name__ == "__main__":

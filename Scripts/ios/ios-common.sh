@@ -2,7 +2,8 @@
 # ios-common.sh — shared helpers for the lane-12 iOS runners (Scripts/ios/run-*.sh).
 # Sourced, never executed directly. Exit codes follow the C0 bootstrap convention
 # (Scripts/ios/c0.sh): 64 usage/config, 65 data error, 69 unavailable tool/SDK,
-# 75 still pending on the shared lock. Codes >= 3 are step-specific failures.
+# 75 admission still pending on the shared lock. A payload that already holds
+# the lock keeps its own exit code, including 75. Codes >= 3 are step-specific.
 #
 # Lock discipline (docs/ios/README.md "同一台 Mac 的測試排程"): only the outermost
 # public runner acquires the shared lock; verified nested helpers never
@@ -52,22 +53,33 @@ ios_lock_or_exec() {
         ios_validate_lock_context || ios_die "unverified nested lock context" 64
         return 0
     fi
-    local wait_seconds="${IOS_LOCK_WAIT_SECONDS:-300}"
+    local wait_seconds="${IOS_LOCK_WAIT_SECONDS:-45}"
     case "$wait_seconds" in ''|*[!0-9]*) ios_die "IOS_LOCK_WAIT_SECONDS must be a nonnegative integer" 64 ;; esac
     local deadline=$((SECONDS + wait_seconds))
+    local started
+    started="$(mktemp "${TMPDIR:-/tmp}/plainsong-ios-lock-started.XXXXXX")"
+    rm -f "$started"
     while true; do
+        rm -f "$started"
         set +e
-        /usr/bin/lockf -k -t 0 "$lock_path" /bin/bash -c '
+        # The assignment is only on lockf. The marker is created after lockf
+        # starts the payload, so a busy lock cannot look like a payload exit.
+        IOS_RUNNER_LOCK_STARTED="$started" /usr/bin/lockf -k -t 0 "$lock_path" /bin/bash -c '
             export IOS_RUNNER_LOCK_OWNER=$$
             export IOS_RUNNER_LOCK_HOLDER=$PPID
+            : > "$IOS_RUNNER_LOCK_STARTED"
             "$@"; child=$?
             if [ "$child" = 1 ]; then exit 2; fi
             exit "$child"
         ' ios-runner "$script" "$@"
         local result=$?
         set -e
-        case "$result" in 1|75) ;; *) exit "$result" ;; esac
+        if [ -f "$started" ]; then
+            rm -f "$started"
+            exit "$result"
+        fi
         if [ "$SECONDS" -ge "$deadline" ]; then
+            rm -f "$started"
             echo "ios: still pending; shared xcodebuild lock admission timeout" >&2
             exit 75
         fi

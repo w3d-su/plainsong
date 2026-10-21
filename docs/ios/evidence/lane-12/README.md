@@ -1,5 +1,7 @@
 # Lane 12 — iOS 建置、CI 與 unsigned IPA：交付摘要
 
+> 2026-10-15 acceptance wiring：見 [acceptance-wiring-20261015.md](acceptance-wiring-20261015.md)。那次只接 `IOSAcceptance` scheme 與 admission。hosted smoke 1/1 只證明 scaffold 仍不可用。沒有新的 archive／IPA，也沒有 hosted PASS。
+>
 > 2026-10-13 review fixes 與新的 clean-head receipts：見 [review-fixes-20261013/README.md](review-fixes-20261013/README.md)。下列 2026-10-08 內容為歷史交付；不能授權新的 HEAD 或關閉 simulator／真機／product gates。
 
 日期：2026-10-08。契約版本：IOS-C0-v1。**C0 已交付**（`ios-c0-v1` =
