@@ -27,6 +27,15 @@ owns the gutter:
   STTextView centered the number on the first line instead: for body text the two differ
   by about a point, but on taller lines (scaled headings, WYSIWYG image thumbnails, whose
   baseline is the thumbnail's bottom edge) the baseline keeps one rule for every line.
+- That baseline is the one STTextView *paints*, not TextKit's. `STTextLayoutFragment.draw`
+  raises each line by `height * (lineHeightMultiple - 1) / 2`, using the paragraph's own
+  style or else the text view's default, and the gutter applies the same shift. The first
+  version used TextKit's baseline, which put numbers 2.5 pt below 13 pt body text at the
+  default 1.25 multiple, and further below headings and image lines. Its tests compared
+  against TextKit's segment baselines, so they could not see the offset. An independent
+  review (Grok, 2026-10-21) caught it. `EditorLineNumberGutterPaintedBaselineTests` now
+  renders the editor and requires each number's digit to end on the same pixel row as the
+  same digit in the text. Without the shift it is 5 px (2.5 pt at 2x) lower on every line.
 - The width is sized for the document's line count (at least 3 digits). It grows at once
   but shrinks only below 90% of the narrower width's limit, so typing around 999/1000 lines
   does not re-wrap the document, and it never changes while marked text is composed.

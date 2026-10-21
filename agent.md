@@ -230,8 +230,9 @@ Line numbers are EditorKit's `EditorLineNumberGutterView`, which `EditorScrollVi
 left of the clip view; STTextView's `showsLineNumbers` gutter stays off (it rebuilt one view
 per visible line and counted the paragraphs above the viewport on every layout pass). The
 gutter only draws: the laid-out viewport fragments it shows, numbered from the shared
-`EditorScrollLineIndex` (only `\n` starts a line), on the baseline of each source line's
-first visual line. Its width follows the line count's digits with hysteresis and never
+`EditorScrollLineIndex` (only `\n` starts a line), on the painted baseline of each source
+line's first visual line (STTextView raises lines by half their line-height multiple's
+extra height). Its width follows the line count's digits with hysteresis and never
 changes while marked text is composed.
 
 **Abstraction rule:** App/ and MarkdownCore/ must never import STTextView types. Only

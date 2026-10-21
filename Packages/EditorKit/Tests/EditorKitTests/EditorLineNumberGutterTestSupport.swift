@@ -88,12 +88,30 @@ enum EditorLineNumberGutterTestSupport {
                 type: .standard,
                 options: [.upstreamAffinity]
             ) { _, frame, baselinePosition, _ in
-                baseline = frame.minY + baselinePosition
+                // STTextView paints the line raised by half its line-height multiple's
+                // extra height; `EditorLineNumberGutterPaintedBaselineTests` checks the
+                // pixels, this checks every label against the same rule.
+                let shift = EditorLineNumberGutterFragments.paintedBaselineShift(
+                    lineHeight: frame.height,
+                    paragraphStyle: paragraphStyle(at: offset, in: textView)
+                )
+                baseline = frame.minY + baselinePosition + shift
                 return false
             }
             let expected = try XCTUnwrap(baseline, file: file, line: line)
             XCTAssertEqual(label.baseline, expected, accuracy: 0.5, "line \(label.number)", file: file, line: line)
         }
+    }
+
+    /// The paragraph style STTextView paints the line at `offset` with: the paragraph's
+    /// own, else the text view's default.
+    static func paragraphStyle(at offset: Int, in textView: STTextView) -> NSParagraphStyle {
+        if let storage = MarkdownTextView.textStorage(of: textView), offset < storage.length,
+           let style = storage.attribute(.paragraphStyle, at: offset, effectiveRange: nil) as? NSParagraphStyle
+        {
+            return style
+        }
+        return textView.defaultParagraphStyle
     }
 
     static func lineHeight(_ textView: STTextView) -> CGFloat {
