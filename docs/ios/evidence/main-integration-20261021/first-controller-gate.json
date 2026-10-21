@@ -1,0 +1,12 @@
+{
+  "cases": {
+    "PreviewIOSHostedTests/testBundledKitchenSinkAndMDXStayVisible": "Passed"
+  },
+  "executed": 1,
+  "failed": 0,
+  "passed": 1,
+  "required": [
+    "PreviewIOSHostedTests/testBundledKitchenSinkAndMDXStayVisible"
+  ],
+  "skipped": 0
+}

@@ -23,8 +23,15 @@ follow-up. No GitHub PR is merged by the agent.
 
 Current aggregate Mac CI at `fdd2a071` passed [39533452831](https://github.com/w3d-su/plainsong/actions/runs/39533452831).
 That run does not execute UIKit tests and is not the main-integration candidate's CI.
-The combined candidate's local/native and exact-head CI gates are **PENDING** until
-recorded in `evidence/main-integration-20261021/README.md`.
+The combined source has now executed app-hosted preview **155/155**, modules
+**362/362**, and a separate first real-bundle controller **1/1** (2.792 s), all with
+zero failures/skips and complete results. Original preview 94 and module 300 names
+are retained. The tested source is `318be8dd`; all 755 captured iOS inputs remain
+equal after the Mac-only sandbox linker fix and documentation updates. Tooling44,
+frozen13, pinned lint and the actual signed sandbox save probe pass. The first
+main-integration CI exposed the missing WorkspaceCore objects in that probe and is
+retained as FAILED; final CI is the live check on [#188](https://github.com/w3d-su/plainsong/pull/188).
+See [the source-bound receipt](evidence/main-integration-20261021/README.md).
 
 The historical app-hosted preview 94/94, modules 300/300 and lane 06 107/107
 remain source-specific evidence. The #187 diagnostics retain eight complete

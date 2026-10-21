@@ -1,0 +1,58 @@
+{
+  "native_tested_head": "318be8ddf9189b09e7e030e7b29d5e9d017005d8",
+  "source_fingerprint": "7fe210e128ca198649bc6a93aee1d5fe23b7185030145f49e141933f3139d884",
+  "native_source_records": 755,
+  "source_equivalence_rule": "Re-run verify-source against native-source.json. The subsequent change is a Mac sandbox linker plus documentation outside these iOS inputs.",
+  "preview": {
+    "executed": 155,
+    "passed": 155,
+    "failed": 0,
+    "skipped": 0,
+    "original_required94_retained": true
+  },
+  "modules": {
+    "executed": 362,
+    "passed": 362,
+    "failed": 0,
+    "skipped": 0,
+    "historical300_retained": true
+  },
+  "first_controller": {
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0,
+    "case_seconds": 2.792,
+    "readiness_limit_seconds": 8,
+    "javascript_limit_seconds": 2,
+    "test_sources_unchanged_from_173": true
+  },
+  "tooling": {
+    "passed": 44,
+    "failed": 0,
+    "sandbox_restricted_attempt_retained_separately": true
+  },
+  "lint": {
+    "swiftformat_version": "0.62.1",
+    "swiftformat_requires_formatting": 0,
+    "swiftlint_serious": 0,
+    "swiftlint_warnings": 404
+  },
+  "single_file_save_probe": {
+    "exit_code": 0,
+    "signed_app_sandbox": true,
+    "sibling_create_refused": true,
+    "durable_saves": 2,
+    "script_sha256": "aa821b7a768b458574c5abb0ecec1a0687f0e7dec1d1389c8485deb43ce1faf7"
+  },
+  "first_ci": {
+    "run": 39537624932,
+    "head": "318be8ddf9189b09e7e030e7b29d5e9d017005d8",
+    "result": "FAILED",
+    "reason": "Missing WorkspaceCore objects in the manual single-file-save sandbox linker.",
+    "hosted_app": "PASS",
+    "hosted_ui_performance": "PASS",
+    "preview": "PASS"
+  },
+  "final_ci": "Read the current #188 check; no final CI pass is inferred from these local results.",
+  "physical_device_or_product_acceptance": false
+}

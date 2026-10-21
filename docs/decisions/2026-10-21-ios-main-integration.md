@@ -27,3 +27,11 @@ shared module; exposing Mac capture code to UIKit would expand unvalidated scope
 appending the old iOS rows to the immutable archive would reintroduce shared-line
 conflicts. A green historical component result cannot substitute for tests of the
 combined source.
+
+The first combined CI passed the package test suites and hosted shards, then exposed
+one more integration boundary: main's single-file-save sandbox probe manually linked
+WorkspaceKit without the extracted WorkspaceCore object files. Add that module to the
+existing object collector, retaining its recursive enumeration, non-empty checks,
+real ad-hoc signature, file-only LaunchServices grant and durable-byte assertions.
+This follows the export sandbox probe's existing link policy. No production save
+behavior or sandbox assertion changes.
