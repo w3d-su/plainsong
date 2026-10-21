@@ -74,12 +74,19 @@ final class PreviewIOSHostedTests: XCTestCase {
     func testBundledKitchenSinkAndMDXStayVisible() async throws {
         let indexURL = try bundledPreviewIndex()
         #if os(iOS)
-            defer { try? FileManager.default.removeItem(at: indexURL.deletingLastPathComponent()) }
+            // Use the same packaged-resource lookup as production, in the real app host.
+            let controller = PreviewController()
+        #else
+            let controller = PreviewController(previewIndexURL: indexURL)
         #endif
-        let controller = PreviewController(previewIndexURL: indexURL)
         defer { controller.shutdownForTesting() }
         controller.installAssetReader(DirectPreviewAssetReader())
         try await waitUntil("bundle ready") { controller.isReady }
+        XCTAssertEqual(
+            controller.webView.url?.resolvingSymlinksInPath(),
+            indexURL.resolvingSymlinksInPath(),
+            "The first controller must load the verified real preview bundle"
+        )
 
         let markdown = try String(contentsOf: fixture("kitchen-sink.md"), encoding: .utf8)
         controller.render(DocumentTextChange(text: markdown, version: 1, fileKind: .markdown, fileURL: nil))
@@ -153,17 +160,11 @@ final class PreviewIOSHostedTests: XCTestCase {
             .appendingPathComponent("App/Resources/preview", isDirectory: true)
             .resolvingSymlinksInPath()
         #if os(iOS)
-            // WebKit's read grant is for this XCTest-owned container directory.
-            // Keep the real committed HTML/JS/CSS/fonts intact, including CSP.
-            let destination = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-                .appendingPathComponent("PlainsongPreviewFixture-" + UUID().uuidString, isDirectory: true)
-            var verifiedCopy = false
-            defer {
-                if !verifiedCopy {
-                    try? FileManager.default.removeItem(at: destination)
-                }
-            }
-            try FileManager.default.copyItem(at: sourceRoot, to: destination)
+            let indexURL = try XCTUnwrap(
+                PreviewController.defaultPreviewIndexURL(),
+                "Run make ios-preview in the app-hosted IOSPreview scheme; the host must bundle preview resources"
+            )
+            let destination = indexURL.deletingLastPathComponent()
             let enumerator = try XCTUnwrap(FileManager.default.enumerator(
                 at: sourceRoot,
                 includingPropertiesForKeys: [.isRegularFileKey]
@@ -188,8 +189,7 @@ final class PreviewIOSHostedTests: XCTestCase {
                 fileCount += 1
             }
             XCTAssertGreaterThan(fileCount, 3, "Real preview resources must be present before WebKit loads")
-            verifiedCopy = true
-            return destination.appendingPathComponent("index.html")
+            return indexURL
         #else
             let indexURL = sourceRoot.appendingPathComponent("index.html")
             XCTAssertTrue(FileManager.default.fileExists(atPath: indexURL.path))
