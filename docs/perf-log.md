@@ -2713,6 +2713,22 @@ each layout pass after an edit costs 9-16 ms more (one `NSView` per visible line
 plus `textElements(for:)` over every paragraph above the viewport); this is the
 largest remaining editor cost and is not addressed here.
 
+## Whole-source assignment presentation reset — 2026-10-08
+
+Resolves the "Known follow-up, not fixed here" note at the end of the Keep Mine
+presentation entry above (fixed in `phase3-incoming-text-presentation`):
+`MarkdownTextView.applyIncomingTextIfNeeded` used to assign `textView.text` for an
+App-initiated text change without the presentation reset, so a clean (conflict-free)
+external reload, or any App text replacement, with the same UTF-16 length and the same
+first and last 64 units restored folds but left no image markers. A throwaway hosted
+test reproduced it two of two times (folds 36, markers 0 after 3 s). The fix routes
+every whole-source assignment — this path, the deferred document-transition retry, the
+reconciled-source restore and the Reload/Keep Mine synchronizer — through one
+`assignWholeSource` helper that discards the bookkeeping (including image ownership)
+after the write; hosted tests now pin the silent same-length reload and the same-length
+local edit directly. No per-keystroke work was added: the helper runs only for whole-source
+writes, never on the native typing path, so the typing measurements above are unaffected.
+
 ## EditorKit line-number gutter, paired A/B (recorded load) — 2026-10-21
 
 Two trees: main `15913f8` plus this branch's probe files, and this branch. Apple M1 Pro;
