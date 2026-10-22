@@ -494,7 +494,7 @@ private extension WKWebView {
     }
 }
 
-// Same file as the class: re-submission sets its private provenance fields.
+/// Same file as the class: re-submission sets its private provenance fields.
 extension PreviewController {
     /// Sends `request`'s text again under a new render ID, keeping its session, version and
     /// iOS identity, so the scroll/export barrier and checkbox provenance name the render
