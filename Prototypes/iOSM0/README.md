@@ -33,6 +33,10 @@ device execution and signing are manual; see the evidence checklist. Use the
 same lock for owner device work on this Mac. Signing identities, profiles,
 accounts and device IDs must stay outside the repository and logs.
 
+Packaging requires the bundled `m0.md` to match `Fixtures/m0.md` byte for byte,
+checks the same resource inside the resulting IPA, and records its digest.
+A missing resource also produces an explicit on-screen Fixture error.
+
 The prototype has these controls:
 
 - **Fixture** creates a uniquely named app-private copy of the public fixture;
@@ -40,7 +44,9 @@ The prototype has these controls:
   resolves one app-private `.minimalBookmark` and refuses stale/denied grants.
   Folder view lists top-level Markdown files, excluding symlinks. Single-file
   access has no sibling enumeration or assets capability.
-- **Delay** enables a three-second presentation/save delay. Type N, press Save,
+- **3秒：關 / 3秒：開** toggles a three-second presentation/save delay. Typing
+  remains immediate; inline instructions persist across status updates. The control
+  area scrolls in compact/keyboard layouts so the editor keeps space. Type N, press Save,
   then type N+1. Save captures N immediately; its acknowledgement changes only
   the durable baseline. N+1 stays dirty. Press Save again to persist N+1.
 - **Undo/Redo** use the native editor UndoManager and refuse during composition.

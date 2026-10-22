@@ -27,8 +27,10 @@ final class SpikeScene: UIResponder, UIWindowSceneDelegate {
 final class SpikeViewController: UIViewController, UIDocumentPickerDelegate {
     private let editor = SourceEditor()
     private let probe = Probe()
-    private lazy var session = DocumentSession(editor: editor, probe: probe)
+    private(set) lazy var session = DocumentSession(editor: editor, probe: probe)
     private let status = UILabel()
+    private let delayHelp = UILabel()
+    private let delayButton = UIButton(type: .system)
     private var pickerScope: AccessGrant.Scope = .singleFile
 
     override func viewDidLoad() {
@@ -38,25 +40,51 @@ final class SpikeViewController: UIViewController, UIDocumentPickerDelegate {
         status.numberOfLines = 0
         status.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
         status.accessibilityIdentifier = "m0-status"
+        delayHelp.numberOfLines = 0
+        delayHelp.font = .preferredFont(forTextStyle: .caption1)
+        delayHelp.adjustsFontForContentSizeCategory = true
+        delayHelp.accessibilityIdentifier = "m0-delay-help"
+        delayButton.accessibilityIdentifier = "m0-delay"
+        delayButton.addTarget(self, action: #selector(delay), for: .touchUpInside)
+        let fixtureButton = button("Fixture", #selector(fixture))
+        fixtureButton.accessibilityIdentifier = "m0-fixture"
         let controls = UIStackView(arrangedSubviews: [
-            row([button("Fixture", #selector(fixture)), button("File", #selector(pickFile)),
+            row([fixtureButton, button("File", #selector(pickFile)),
                  button("Folder", #selector(pickFolder)), button("Recent", #selector(recent))]),
             row([button("Save", #selector(save)), button("Undo", #selector(undo)),
-                 button("Redo", #selector(redo)), button("Delay", #selector(delay))]),
+                 button("Redo", #selector(redo)), delayButton]),
             row([button("Inspect", #selector(inspect)), button("Recovery", #selector(recovery)),
                  button("Save copy", #selector(saveCopy)), button("Export log", #selector(exportLog))]),
             row([button("View switch", #selector(viewSwitch)), button("External probe", #selector(externalProbe))]),
-            status, editor.textView,
+            status, delayHelp,
         ])
         controls.axis = .vertical
         controls.spacing = 8
         controls.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(controls)
+        // Keep the editor usable with a tall keyboard or a compact window. Controls
+        // and the persistent instructions can scroll without changing input focus.
+        let controlScroll = UIScrollView()
+        controlScroll.accessibilityIdentifier = "m0-controls"
+        controlScroll.addSubview(controls)
+        let layout = UIStackView(arrangedSubviews: [controlScroll, editor.textView])
+        layout.axis = .vertical
+        layout.spacing = 8
+        layout.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(layout)
+        let preferredControlHeight = controlScroll.heightAnchor.constraint(equalTo: controls.heightAnchor)
+        preferredControlHeight.priority = UILayoutPriority(749)
         NSLayoutConstraint.activate([
-            controls.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
-            controls.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
-            controls.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
-            controls.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -8),
+            controls.topAnchor.constraint(equalTo: controlScroll.contentLayoutGuide.topAnchor),
+            controls.leadingAnchor.constraint(equalTo: controlScroll.contentLayoutGuide.leadingAnchor),
+            controls.trailingAnchor.constraint(equalTo: controlScroll.contentLayoutGuide.trailingAnchor),
+            controls.bottomAnchor.constraint(equalTo: controlScroll.contentLayoutGuide.bottomAnchor),
+            controls.widthAnchor.constraint(equalTo: controlScroll.frameLayoutGuide.widthAnchor),
+            preferredControlHeight,
+            controlScroll.heightAnchor.constraint(lessThanOrEqualTo: layout.heightAnchor, multiplier: 0.65),
+            layout.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+            layout.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
+            layout.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
+            layout.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -8),
         ])
         session.updated = { [weak self] in self?.refresh() }
         refresh()
@@ -77,6 +105,12 @@ final class SpikeViewController: UIViewController, UIDocumentPickerDelegate {
     }
 
     private func refresh() {
+        delayButton.setTitle(session.delaySave ? "3秒：開" : "3秒：關", for: .normal)
+        delayButton.accessibilityLabel = "儲存與上色延遲三秒"
+        delayButton.accessibilityValue = session.delaySave ? "開啟" : "關閉"
+        delayHelp.text = session.delaySave
+            ? "儲存與上色延遲 3 秒，輸入仍立即顯示。\n在原有內容後輸入 A → 按 Save → 立刻輸入 B。第一次完成後應保留 AB 且 dirty=true；再按 Save 才完整儲存 AB。"
+            : "「3秒」用來測試儲存期間繼續輸入；開啟後會顯示操作步驟。"
         let selection = editor.textView.selectedRange
         status.text = "M0 OPEN | TextKit2=\(editor.textView.textLayoutManager != nil)\n" +
             "v=\(editor.revision) UTF16=\(editor.textView.text.utf16.count) sel=\(selection) " +
@@ -85,7 +119,10 @@ final class SpikeViewController: UIViewController, UIDocumentPickerDelegate {
     }
 
     @objc private func fixture() {
-        guard let fixture = Bundle.main.url(forResource: "m0", withExtension: "md") else { return }
+        guard let fixture = Bundle.main.url(forResource: "m0", withExtension: "md") else {
+            session.report("Fixture 範例檔遺失，請安裝修正版 IPA。", event: "fixture-resource-missing")
+            return
+        }
         Task {
             do {
                 let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
