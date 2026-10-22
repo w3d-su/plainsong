@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 import type { BridgeMessage, RenderPayload } from "../src/bridge";
 
-vi.mock("mermaid", () => ({ default: { initialize: vi.fn(), render: vi.fn() } }));
 let messages: BridgeMessage[];
 let highlightElement: MockInstance<(element: HTMLElement) => void>;
 let maxLength: number;

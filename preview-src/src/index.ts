@@ -1,4 +1,3 @@
-import mermaid from "mermaid";
 import {
   type BridgeMessage,
   PROTOCOL_VERSION,
@@ -20,6 +19,7 @@ import {
   patchPreviewRoot,
   rerenderVisibleMermaidBlocks,
 } from "./mermaid-dom";
+import { LazyMermaid, loadMermaidScript } from "./mermaid-loader";
 import { MermaidRenderCoordinator } from "./mermaid-renderer";
 import { mdxErrorDetails } from "./mdx-error";
 import { renderMarkdown, renderMdx } from "./pipeline";
@@ -34,6 +34,11 @@ type ScrollOwner = "editor" | "preview" | "none";
 
 const previewRoot = requirePreviewRoot();
 const scrollIndex = new PreviewScrollIndex(previewRoot);
+// Rendered HTML is parsed here, where nothing loads: an <img> parsed into the live
+// document starts fetching before rewriteImageSources can strip a remote src, which
+// sent requests even with Allow Remote Images off. Nodes morphdom moves into the live
+// tree are adopted with their rewritten sources.
+const parsingDocument = document.implementation.createHTMLDocument("");
 
 // Drop-ordering key. Monotonic across document switches, unlike `version` which
 // resets per document — using `version` here stranded the preview on the previous
@@ -55,10 +60,8 @@ let anchoredPosition: number | undefined;
 let layoutWidth: number | undefined;
 const scrollAnchorOffset = 12;
 
-const mermaidRenderer = new MermaidRenderCoordinator(
-  (id, source) => mermaid.render(id, source),
-  (configuration) => mermaid.initialize(configuration),
-);
+const mermaid = new LazyMermaid(() => loadMermaidScript(document));
+const mermaidRenderer = new MermaidRenderCoordinator(mermaid.render, mermaid.initialize);
 
 registerHighlightLanguages();
 initializeMermaid("system");
@@ -214,7 +217,7 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
 
   if (payload.renderID < latestRenderID) return;
 
-  const nextRoot = document.createElement("main");
+  const nextRoot = parsingDocument.createElement("main");
   nextRoot.id = "preview-root";
   nextRoot.innerHTML = html;
   rewriteImageSources(nextRoot, payload.baseDir, payload.allowRemoteImages, payload.assetRootID);

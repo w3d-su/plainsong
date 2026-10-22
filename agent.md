@@ -93,7 +93,7 @@ blogeditor/
 ```
 
 Build artifacts: `preview-src` builds to `App/Resources/preview/` (`index.html`, `bundle.js`,
-`bundle.css`). The dist output **is committed** so Swift-only agents can build the app without
+`mermaid.js`, `bundle.css`, woff2 KaTeX `fonts/`). The dist output **is committed** so Swift-only agents can build the app without
 Node installed; regenerate with `make preview-bundle` whenever `preview-src/` changes.
 
 ---
@@ -381,7 +381,8 @@ descriptor and `.mermaid-pending` state while retaining its previous SVG childre
 as a stale visual until rendering settles; pending wrappers are never authoritative,
 and success or `.mermaid-error` replaces those children. Remaining placeholders use a
 64-entry success-only LRU keyed by the exact JavaScript source string + ordinal tuple,
-and misses call `mermaid.render`. Exact-string comparison, not the removed 32-bit djb2
+and misses call `mermaid.render` (the first miss loads `mermaid.js`, §7.4; a failed load is
+an ordinary `.mermaid-error` and the next render retries). Exact-string comparison, not the removed 32-bit djb2
 hash, authorizes reuse. The ordinal is part of the key because Mermaid output embeds its
 render ID in SVG IDs and references; reusing one SVG string for identical fences at two
 positions would duplicate IDs. Inserting or removing a fence therefore deliberately
@@ -422,8 +423,12 @@ the Frontmatter panel, §10). Optional toggle to show it as a styled block.
 
 ### 7.4 Build
 
-`make preview-bundle`: `npm ci && esbuild src/index.ts --bundle --minify` →
-`App/Resources/preview/`. KaTeX fonts/CSS and Mermaid are bundled; syntax highlighting uses the preview
+`make preview-bundle`: `npm ci && node build.mjs` → `App/Resources/preview/`. esbuild emits two
+classic IIFE scripts: `bundle.js` (everything parsed at start-up, kept under 1 MB by
+`test/bundle-budget.test.ts`) and `mermaid.js`, which `src/mermaid-loader.ts` injects on the
+first diagram so documents without diagrams never parse Mermaid. Do not switch to ES module
+splitting: the page is a file: URL, where module scripts hit CORS. Only the woff2 KaTeX fonts
+ship, and the build strips the woff/ttf fallbacks from KaTeX's CSS. Syntax highlighting uses the preview
 stylesheet’s Apple system palette and Xcode-inspired light/dark token colors, with dark
 function/link/comment colors raised to meet 4.5:1 on code background `#2a2a2c`.
 The highlight.js `github.css` theme is no longer bundled. All assets are bundled
