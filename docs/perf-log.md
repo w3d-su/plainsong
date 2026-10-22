@@ -1782,8 +1782,9 @@ They are not substituted for stack evidence. No absolute-budget conclusion or
 gate closure is possible; R9, real IME and owner-only acceptance remain open.
 
 
-Evidence: `docs/evidence/handoff22-pr137-20261004-paired.json`. Committed raw logs and rejected-attempt
-metadata: `docs/evidence/h22-paired-20261004/`; xcresult paths remain in each JSON.
+Evidence: `docs/evidence/handoff22-pr137-20261004-paired.json`. Rejected-attempt metadata (JSON):
+`docs/evidence/h22-paired-20261004/`; its raw logs left the tree and remain at commit
+`d666e64f7907c9d10b9e3037957141b0ea4b1caf` (`git show <sha>:<path>`). xcresult paths remain in each JSON.
 Pinned `make lint` passed (existing warnings, zero serious), statistical boundary
 checks passed, and `git diff --check` is clean. A full correctness suite was not run.
 
@@ -1858,8 +1859,9 @@ keystroke samples are in the run3 JSON. No absolute-budget conclusion or gate
 closure is possible; R9, real IME and owner-only acceptance remain open.
 
 
-Evidence: `docs/evidence/handoff22-pr136-20261004-paired.json`. Committed raw logs and rejected-attempt
-metadata: `docs/evidence/h22-paired-20261004/`; xcresult paths remain in each JSON.
+Evidence: `docs/evidence/handoff22-pr136-20261004-paired.json`. Rejected-attempt metadata (JSON):
+`docs/evidence/h22-paired-20261004/`; its raw logs left the tree and remain at commit
+`d666e64f7907c9d10b9e3037957141b0ea4b1caf` (`git show <sha>:<path>`). xcresult paths remain in each JSON.
 Pinned `make lint` passed (existing warnings, zero serious), statistical boundary
 checks passed, and `git diff --check` is clean. A full correctness suite was not run.
 
@@ -1929,8 +1931,9 @@ signal; these observations remain visible and are not dismissed or called idle p
 No absolute 16 ms pass/fail is claimed. R9 / PR I, real IME, physical input and
 owner-only acceptance remain open. No performance budget changed or gate closed.
 
-Evidence: `docs/evidence/handoff22-pr136-20261004-paired-final.json`; complete batch metadata, raw logs,
-and admission checks: `docs/evidence/h22-paired-20261004/run5/`. xcresult bundles
+Evidence: `docs/evidence/handoff22-pr136-20261004-paired-final.json`; complete batch metadata and
+admission checks: `docs/evidence/h22-paired-20261004/run5/` (raw logs left the tree and remain at commit
+`d666e64f7907c9d10b9e3037957141b0ea4b1caf`). xcresult bundles
 are retained at the printed paths in those JSONs. Named tests:
 `EditorFindHostedGateTests.testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget`
 and `testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget`. Both executed in every
@@ -2135,8 +2138,9 @@ and `testTypingWithoutHTMLExportForRecordedLoadComparison`. All 40 batches produ
 complete named samples and valid functional checks; three Debug export batches
 exited 65 solely for the existing 16 ms assertion. Other 37 batches exited 0.
 
-Evidence: `docs/evidence/handoff22-pr138-20261004-paired-final.json`; raw logs and start/end snapshots under
-`docs/evidence/h22-e9-paired-20261004/`. xcresults are retained at paths in JSON.
+Evidence: `docs/evidence/handoff22-pr138-20261004-paired-final.json`; start/end snapshots under
+`docs/evidence/h22-e9-paired-20261004/` (raw logs left the tree and remain at commit
+`d666e64f7907c9d10b9e3037957141b0ea4b1caf`). xcresults are retained at paths in JSON.
 Only E9's measuring-and-recording checkbox is closed. Absolute 16 ms, keyboard,
 VoiceOver, Powerbox/iCloud and broad regression-suite acceptance remain open.
 Pinned lint, Bash syntax, bootstrap boundary and diff checks passed; no full-suite
@@ -2201,8 +2205,9 @@ signal; these observations remain visible and are not dismissed or called idle p
 No absolute 16 ms pass/fail is claimed. R9 / PR I, real IME, physical input and
 owner-only acceptance remain open. No performance budget changed or gate closed.
 
-Evidence: `docs/evidence/handoff22-pr137-20261004-paired-final.json`; complete batch metadata, raw logs,
-and admission checks: `docs/evidence/h22-paired-20261004/run5/`. xcresult bundles
+Evidence: `docs/evidence/handoff22-pr137-20261004-paired-final.json`; complete batch metadata and
+admission checks: `docs/evidence/h22-paired-20261004/run5/` (raw logs left the tree and remain at commit
+`d666e64f7907c9d10b9e3037957141b0ea4b1caf`). xcresult bundles
 are retained at the printed paths in those JSONs. Named tests:
 `EditorFindHostedGateTests.testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget`
 and `testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget`. Both executed in every
