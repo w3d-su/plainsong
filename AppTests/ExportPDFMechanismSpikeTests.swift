@@ -170,11 +170,7 @@ final class ExportPDFMechanismSpikeTests: XCTestCase {
             version: 71
         )
         try await visibleProbe.scroll(toY: 900)
-        try await visibleProbe.waitUntil("visible preview scrolled", timeoutNanoseconds: 5_000_000_000) {
-            try await visibleProbe.domState().scrollY > 0
-        }
-
-        let before = try await visibleProbe.domState()
+        let before = try await visibleProbe.settledVisibleDOMState()
         let beforeResponder = windowFixture.window.firstResponder
         let beforeCompletedRenderIDs = visibleProbe.completedRenders.keys.sorted()
 

@@ -1,0 +1,31 @@
+{
+  "base_head": "048124e5d9e08648cfbccd6e51091542615fa9e6",
+  "source_records": 908,
+  "changed_paths": [
+    "AppTests/ExportPDFMechanismSpikeTests.swift",
+    "AppTests/ExportPDFMechanismSpikeSupport.swift"
+  ],
+  "initial_class_passed": 7,
+  "positive_repeat_executions": 5,
+  "negative_control": {
+    "expected_exit": 65,
+    "actual_exit": 65,
+    "cases": {
+      "ExportPDFMechanismSpikeTests/testVisiblePreviewStateAndFirstResponderRemainUnchangedDuringOffscreenCapture": "Failed"
+    },
+    "forced_scroll_delta_points": 64
+  },
+  "restored_class_cases": {
+    "ExportPDFMechanismSpikeTests/testDedicatedOffscreenControllerRendersNamedMarkdownAndMDXAtExactSubmittedRenderIDs": "Passed",
+    "ExportPDFMechanismSpikeTests/testDiagnosticPDFCallStaysTestOnlyInMemoryWithProtocolV5AndNoDestinationWrite": "Passed",
+    "ExportPDFMechanismSpikeTests/testExplicitFullContentRectAndNegativeViewportControlProveMultiViewportPDF": "Passed",
+    "ExportPDFMechanismSpikeTests/testRenderCompleteAloneIsInsufficientAndFailureTimeoutCancellationReleaseResources": "Passed",
+    "ExportPDFMechanismSpikeTests/testSourceOnlyAndExperimentalWYSIWYGExportWithoutMountingVisiblePreview": "Passed",
+    "ExportPDFMechanismSpikeTests/testTallCaptureEnumeratesBoundOutcomeAndPaginatesWithoutDuplicateOrDroppedSentinels": "Passed",
+    "ExportPDFMechanismSpikeTests/testVisiblePreviewStateAndFirstResponderRemainUnchangedDuringOffscreenCapture": "Passed"
+  },
+  "sources_restored_byte_equal": true,
+  "original_scroll_tolerance_points": 0.5,
+  "settlement_deadline_seconds": 5,
+  "cause_unproven": "The CI 899 versus900 observation does not prove a particular font/WebKit/production cause."
+}

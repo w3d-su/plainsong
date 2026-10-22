@@ -6,6 +6,7 @@ options:
   createIntermediateGroups: true
   deploymentTarget:
     macOS: "14.0"
+    iOS: "26.0"
 
 fileGroups:
   - agent.md
@@ -23,6 +24,15 @@ packages:
     path: Packages/PreviewKit
   WorkspaceKit:
     path: Packages/WorkspaceKit
+
+  SyntaxKit:
+    path: Packages/SyntaxKit
+  WorkspaceCore:
+    path: Packages/WorkspaceCore
+  EditorKitIOS:
+    path: Packages/EditorKitIOS
+  WorkspaceKitIOS:
+    path: Packages/WorkspaceKitIOS
 
 settings:
   base:
@@ -189,3 +199,191 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ui-tests
         GENERATE_INFOPLIST_FILE: YES
+
+  # C0 links declarations only. Full PreviewKit's UIKit port belongs to 07.
+  PlainsongIOS:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: AppIOS
+        excludes:
+          - Info.plist
+          - "**/.gitkeep"
+      - path: App/Resources/preview
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - package: MarkdownCore
+      - package: SyntaxKit
+      - package: WorkspaceCore
+      - package: EditorKitIOS
+      - package: WorkspaceKitIOS
+      - package: PreviewKit
+        product: PreviewKitContracts
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ios
+        PRODUCT_NAME: PlainsongIOS
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: AppIOS/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # Same document types as the Mac app: .md/.markdown (imported UTI) and
+        # .mdx (exported UTI). Opening in place keeps Files/iCloud semantics —
+        # no copy-to-container masquerade (contracts.md §4).
+        LSSupportsOpeningDocumentsInPlace: true
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Markdown Document
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Default
+            LSItemContentTypes:
+              - net.daringfireball.markdown
+          - CFBundleTypeName: MDX Document
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Owner
+            LSItemContentTypes:
+              - app.plainsong.mdx
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: net.daringfireball.markdown
+            UTTypeDescription: Markdown Document
+            UTTypeConformsTo:
+              - public.plain-text
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - md
+                - markdown
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: app.plainsong.mdx
+            UTTypeDescription: MDX Document
+            UTTypeConformsTo:
+              - public.plain-text
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - mdx
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+
+  PlainsongIOSTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: AppIOSTests
+        excludes:
+          - "**/.gitkeep"
+    dependencies:
+      - target: PlainsongIOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ios.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+  # A real app process without statically duplicating the packages in its test bundle.
+  # It has no providers and never participates in production composition.
+  IOSPreviewTestHost:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: Scripts/ios/PreviewTestHost
+      - path: App/Resources/preview
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ios.preview-test-host
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+
+  # Full original lane 07 suite, in its own serial app-hosted scheme.
+  IOSPreviewTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: Packages/PreviewKit/Tests/PreviewKitTests
+    dependencies:
+      - target: IOSPreviewTestHost
+      - package: PreviewKit
+      - package: MarkdownCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ios.preview-tests
+        GENERATE_INFOPLIST_FILE: YES
+
+  # Lane 11 hosted smoke. Kept off the PlainsongIOS scheme so a 0-run or
+  # all-skip acceptance action cannot inherit the module suite's result.
+  IOSAcceptanceUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: IOSAcceptanceTests/UI
+    dependencies:
+      - target: PlainsongIOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ios.acceptance-ui
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: PlainsongIOS
+
+schemes:
+  PlainsongIOS:
+    build:
+      targets:
+        PlainsongIOS: all
+    test:
+      targets:
+        - name: PlainsongIOSTests
+          parallelizable: false
+        - package: MarkdownCore/MarkdownCoreTests
+          parallelizable: false
+          selectedTests:
+            - IOSDocumentContractTests
+        - package: SyntaxKit/SyntaxKitTests
+          parallelizable: false
+        - package: WorkspaceCore/WorkspaceCoreTests
+          parallelizable: false
+        - package: EditorKitIOS/EditorKitIOSTests
+          parallelizable: false
+        - package: WorkspaceKitIOS/WorkspaceKitIOSTests
+          parallelizable: false
+  IOSPreview:
+    build:
+      targets:
+        IOSPreviewTestHost: [run, test]
+        IOSPreviewTests: [test]
+    test:
+      config: Debug
+      targets:
+        - name: IOSPreviewTests
+          parallelizable: false
+  IOSAcceptance:
+    build:
+      targets:
+        PlainsongIOS: [run, test]
+        IOSAcceptanceUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - name: IOSAcceptanceUITests
+          parallelizable: false

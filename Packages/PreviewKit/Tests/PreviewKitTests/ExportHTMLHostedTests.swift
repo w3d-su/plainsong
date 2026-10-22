@@ -1,4 +1,6 @@
-import AppKit
+#if os(macOS)
+    import AppKit
+#endif
 import MarkdownCore
 @testable import PreviewKit
 import XCTest
@@ -177,21 +179,7 @@ final class ExportHTMLHostedTests: XCTestCase {
     }
 
     func previewIndexFixtureURL() throws -> URL {
-        let testFile = URL(fileURLWithPath: #filePath)
-        let repositoryRoot = testFile
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let indexURL = repositoryRoot
-            .appendingPathComponent("App/Resources/preview/index.html")
-            .standardizedFileURL
-        XCTAssertTrue(
-            FileManager.default.fileExists(atPath: indexURL.path),
-            "Missing preview bundle fixture"
-        )
-        return indexURL
+        try PreviewBundleFixture.indexURL()
     }
 
     func waitUntil(
@@ -199,13 +187,10 @@ final class ExportHTMLHostedTests: XCTestCase {
         timeoutNanoseconds: UInt64 = 5_000_000_000,
         condition: @escaping @MainActor () async throws -> Bool
     ) async throws {
-        let start = DispatchTime.now().uptimeNanoseconds
-        while DispatchTime.now().uptimeNanoseconds - start < timeoutNanoseconds {
-            if try await condition() {
-                return
-            }
-            try await Task.sleep(nanoseconds: 50_000_000)
-        }
-        XCTFail("Timed out waiting for \(description)")
+        try await PreviewHostedTestWait.until(
+            description,
+            timeoutNanoseconds: timeoutNanoseconds,
+            condition: condition
+        )
     }
 }

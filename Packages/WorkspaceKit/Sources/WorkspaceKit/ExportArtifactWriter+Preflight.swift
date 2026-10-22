@@ -233,7 +233,9 @@ extension ExportArtifactWriter {
         case .success:
             break
         }
-        let kernelPath = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+        let returnedPath = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+        hooks.kernelPathObserver?(leafPath, returnedPath)
+        let kernelPath = hooks.kernelPathOverrideForTesting?(leafPath, returnedPath) ?? returnedPath
         guard kernelPath.elementsEqual(leafPath.utf8) else {
             return .destinationAlias
         }
