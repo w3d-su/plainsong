@@ -160,8 +160,12 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 - UI mutation on `@MainActor` only.
 - tree-sitter parsing and highlight query execution off main thread (`MarkdownHighlightService`
   handles this; do not block it).
-- Preview render requests are coalesced: only the latest version may be in flight; stale
-  `renderComplete` responses are ignored.
+- Preview render requests are single-flight: one render is in JavaScript at a time and the
+  newest request replaces the pending one, sent when the in-flight render posts
+  `renderComplete` or after a 2 s watchdog (a throwing md pipeline or a stale-dropped render
+  posts nothing). Stale `renderComplete` responses still free the slot but are otherwise
+  ignored. A session render whose (session, version, file, presented document, asset root,
+  theme, remote-image policy) equals the last submission is dropped as a duplicate.
 - Editor highlight requests restart through `EditorHighlightScheduler`: each request cancels
   the executing request and replaces the pending revision in the caller's turn. One runner
   waits for cancelled work to return before starting the latest request, so at most one
@@ -416,8 +420,12 @@ the Frontmatter panel, §10). Optional toggle to show it as a styled block.
 
 ### 7.3 Swift ↔ JS bridge protocol
 
-`window.webkit.messageHandlers.bridge.postMessage(...)` (JS→Swift) and
-`webView.evaluateJavaScript("render(payloadJSON)")` (Swift→JS). Keep the protocol in
+`window.webkit.messageHandlers.bridge.postMessage(...)` (JS→Swift, read field by field from
+the Foundation body, never through `JSONSerialization`) and
+`window.PlainsongBridge.receive(message)` (Swift→JS). `render` goes through
+`callAsyncJavaScript` with the message as a Foundation argument, so the document text is
+never JSON-encoded, interpolated into a script, or parsed as source; the other messages are
+JSON-encoded into an `evaluateJavaScript` script. Both carry the same message shape. Keep the protocol in
 `BridgeMessage.swift` + `ExportBridgeMessages.swift` (Codable) and `bridge.ts` —
 **these must be kept in sync; both sides list message names in the same order with a
 `PROTOCOL_VERSION` constant checked at `ready`.**
@@ -477,7 +485,11 @@ block-level element.
   (O(log n) per keystroke; a full rebuild walked the 1 MiB storage on every selection
   change), with a length check and a change-notification fallback that rebuild in bulk.
 - **Loop prevention:** a `scrollOwner` token (`editor` | `preview` | `none`) with 100 ms
-  decay; messages from the non-owner are dropped.
+  decay (a deadline timestamp, not a timer per event); messages from the non-owner are
+  dropped.
+- Editor viewport traffic carries no completion: one `scrollToLine` is in flight and only
+  the newest line waits. Document navigation keeps its render barrier and receipt, and
+  discards waiting viewport lines so they cannot scroll back over it.
 - Cursor-follow option: "typewriter sync" — on text edit, preview scrolls to the edited
   line (on by default, like Typora).
 
