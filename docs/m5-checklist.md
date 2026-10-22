@@ -148,7 +148,7 @@ exist.
 
 ## Performance Acceptance
 
-Record results in `docs/perf-log.md` before accepting M5.
+M5 results are in the `docs/perf-log.md` archive. A later measurement is a new file under `docs/perf/`.
 
 - [x] Typing latency remains below 16 ms on `Fixtures/large-1mb.md`. Current sweep max was 0.465 ms.
 - [x] Highlight update for visible range remains below 50 ms with visible-range plumbing/instrumentation in place; do not count the current 250 KB inline cutoff as passing. Current sweep max was Markdown 20.828 ms, MDX 22.468 ms.

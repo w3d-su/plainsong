@@ -131,7 +131,7 @@ Additional consumers of `currentDocument` / `sessionCache` that I2 must migrate:
 | UI tests pick "the" window as the first hittable one and query identifiers app-wide. | `PlainsongUITests/EditorFindAcceptanceTests.swift:119-129`, `PlainsongUITests/WorkspaceSearchAcceptanceTests.swift:29-37` |
 | Accessibility identifiers are not unique across windows. | `App/Views/DocumentJumpBar.swift` (`plainsong.editor.fileName`) |
 | Real dual-window key activation has never been verified. | `docs/editor-find-gates.md:776-781`, `docs/decision-log.md:180` |
-| The memory gate is 8 warm sessions + 2 live webviews under 400 MB host RSS. Recorded runs: 141.6–149.8 MB host, with about 500 MB across two WebKit helpers (diagnostic, R16). | `PerformanceTests/PerformanceBudgetTests.swift:309`, `:431`, `docs/perf-log.md:51`, `:69`, `docs/risk-register.md:26` |
+| The memory gate is 8 warm sessions + 2 live webviews under 400 MB host RSS. Recorded runs: 141.6–149.8 MB host, with about 500 MB across two WebKit helpers (diagnostic, R16). | `PerformanceTests/PerformanceBudgetTests.swift:309`, `:431`, `docs/perf-log.md:76`, `:94`, `docs/risk-register.md:26` |
 | The typing-latency gate. | `PerformanceTests/PerformanceBudgetTests.swift:12` |
 
 ## 3. State partition
@@ -478,7 +478,8 @@ sessions, and a session warm in two windows would still need one cross-window ow
 ### 7.3 Restated §12 memory budget (proposal)
 
 < 400 MB host RSS: 8 warm sessions, 4 windows, 2 visible settled previews, 2 hidden windows
-past teardown. Record host delta per preview and helper RSS diagnostics in `docs/perf-log.md`;
+past teardown. Record host delta per preview and helper RSS diagnostics in
+`docs/perf/YYYY-MM-DD-<slug>.md`;
 keep the two-webview test (`PerformanceTests/PerformanceBudgetTests.swift:309`).
 
 ### 7.4 Typing latency
@@ -606,7 +607,7 @@ final layout instead of a layout that is about to move. It changes chrome and it
 ## 11. Gates
 
 Boxes start unchecked. Each bullet names the evidence it needs: a named hosted test, a
-named XCUITest, a perf measurement recorded in `docs/perf-log.md`, or an owner smoke
+named XCUITest, a perf measurement recorded in `docs/perf/YYYY-MM-DD-<slug>.md`, or an owner smoke
 recorded in the closing commit.
 
 ### W0 — Baseline inventory and mechanism probe
@@ -722,7 +723,7 @@ scheduling root cause remains unknown. This is an additional gate, not closure b
 
 ### W11 — Memory
 
-- [ ] The §7.3 configuration stays under 400 MB host RSS. Helper RSS and the per-preview host delta are recorded. *Perf measurement in `docs/perf-log.md`.*
+- [ ] The §7.3 configuration stays under 400 MB host RSS. Helper RSS and the per-preview host delta are recorded. *Perf measurement in `docs/perf/YYYY-MM-DD-<slug>.md`.*
 - [ ] Hidden previews beyond two are torn down after the grace period (controller released), and visible previews are never torn down. *Named hosted test.*
 - [ ] Separate installedURLs allows 8 warm sessions plus installed ones; other protectedURLs still count and failed/fenced evictions retain the over-limit cache. `testZZZMemoryWithEightWarmSessionsAndTwoLiveWebViewsStaysUnderBudget` still passes. *Named policy/hosted/perf tests.*
 - Evidence: _open_

@@ -1581,7 +1581,7 @@ hosted spike PR #112.
   the 256-code-unit v1 replacement ceiling.
 - [ ] Record at least three Debug and three Release runs, exact match count,
   replacement lengths, commit SHA, machine/toolchain, and reproduction command
-  in `docs/perf-log.md`.
+  in `docs/perf/YYYY-MM-DD-<slug>.md`. Do not append to the `docs/perf-log.md` archive.
 - [ ] With the replacement row open and a near-ceiling plan preparing/
   cancelling, ordinary typing remains under the hard §12 `< 16 ms` budget.
 - [ ] After Replace All, Undo, and Redo, the same typing probe remains under
@@ -1626,7 +1626,7 @@ hosted spike PR #112.
 | Fixture | `Fixtures/large-1mb.md`, exact source copy, production App authorization + EditorKit writer path. |
 | Required stress | Exact high-count/non-truncated Replace All, cancellation before commit, one commit, one rescan, Undo, Redo, source-only/source+preview/Experimental WYSIWYG. |
 | Typing gate | `< 16 ms` remains hard while the bar is open, while preparation is active, and after batch/undo/redo. Any regression rejects the PR regardless of Replace output correctness. |
-| Measurement | At least three Debug + three Release runs; record medians and raw runs in `docs/perf-log.md`. |
+| Measurement | At least three Debug + three Release runs; record medians and raw runs in `docs/perf/YYYY-MM-DD-<slug>.md`. |
 | Batch/cancel budgets | Measure end-to-end batch phases and Cancel-to-task-drain first; freeze named local bounds from Debug medians. Do not invent or widen a number to make an implementation pass. |
 | CI | Wall-clock informational on hosted CI under risk R15 (`docs/risk-register.md`); exact source, counts, undo, stale-drop, and fence assertions hard everywhere. |
 

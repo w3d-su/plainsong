@@ -1,8 +1,33 @@
 # M5 Performance Log
 
-Record M5 performance measurements here before accepting the milestone. Each entry should identify
-the commit, environment, fixture, measurement procedure, measured value, and pass/fail result. Keep
-raw profiler exports or screenshots outside the repo unless they are small and intentionally useful.
+**New measurements go in [`docs/perf/`](perf/), one file per entry**, named
+`YYYY-MM-DD-<short-slug>.md` after the measurement date. A new file cannot conflict
+with another PR's new file. This document is the archive and takes no new sections:
+performance PRs appended to its end, so any two open PRs conflicted here and each
+resolution forced a full CI run.
+
+Each file identifies the commit, environment, fixture, measurement procedure, measured
+value, and pass/fail result:
+
+```markdown
+# <What was measured, in one line>
+
+- Date: YYYY-MM-DD
+- Commit: `<sha>`
+- Environment: macOS, Xcode, machine, and Debug or Release
+- Fixture: path, and the agent.md §12 budget when one applies
+- Procedure: the command that produced the number
+- Result: measured value, budget, and pass or fail
+
+<What the number means. Include raw samples when a gate asks for them.>
+```
+
+Keep raw profiler exports or screenshots outside the repo unless they are small and
+intentionally useful. Order within a date is not meaningful. Read this archive, then
+`ls docs/perf` for every measurement after it.
+
+`Scripts/editor_find_f2_evidence_tests` checks the F2 trust-root rows in the sections
+below. Gate docs cite those sections by name. Leave the sections in place.
 
 ## Environment
 

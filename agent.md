@@ -565,6 +565,11 @@ parsing cutoff. The memory budget is scoped to deterministic app host-process RS
 OS-managed WebKit helper processes should be recorded as diagnostic/informational
 data because helper reuse and process-pool ownership vary across runs and CI hosts.
 
+Record a new measurement as `docs/perf/YYYY-MM-DD-<slug>.md`, one file per entry.
+`docs/perf-log.md` is the archive and takes no new sections; its header has the file
+format. The 2026-10-18 profile above, and every earlier budget, stay in that archive.
+`Scripts/editor_find_f2_evidence_tests` still reads the F2 trust-root rows there.
+
 ---
 
 ## 13. Phase 2 — Typora-Style WYSIWYG (Experimental; gates in `docs/wysiwyg-release-checklist.md`)
@@ -739,7 +744,10 @@ make format           # swiftformat . && swiftlint --fix
 7. **No new dependencies** (Swift or npm) without a Decision Log entry with rationale and
    alternatives considered.
 8. **Performance budgets (§12) are gates**, not suggestions. When touching the edit path,
-   state how you verified typing latency.
+   state how you verified typing latency. Record the measurement as a new file,
+   `docs/perf/YYYY-MM-DD-<slug>.md` (format in the `docs/perf-log.md` header). Do not
+   append a section to `docs/perf-log.md`: that shared end made open performance PRs
+   conflict, and resolving the conflict forced a full CI run.
 9. **Main-thread discipline:** parsing/rendering off main; UI on `@MainActor`. No new
    `DispatchQueue.global` calls.
 10. **Naming/style:** Swift API Design Guidelines; SwiftFormat config is authoritative;

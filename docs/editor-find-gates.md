@@ -225,7 +225,7 @@ one-shot overflow probe in a single engine call — no implementer choice of str
    later hits).
 
 Revising `retainedMatchCeiling` requires measured evidence (Debug/Release, recorded in
-`docs/perf-log.md`) — the same discipline as WS4B. Do not widen the ceiling to rescue a
+`docs/perf/YYYY-MM-DD-<slug>.md`) — the same discipline as WS4B. Do not widen the ceiling to rescue a
 failing run.
 
 ### 5.2 Deferred (each needs its own gate later)
@@ -320,7 +320,7 @@ No I/O, no actors, no AppKit.
 Add a `PerformanceTests` probe over `Fixtures/large-1mb.md`:
 
 1. Measure first (Debug and Release), at least three runs each.
-2. Record numbers in `docs/perf-log.md`.
+2. Record numbers in `docs/perf/YYYY-MM-DD-<slug>.md`.
 3. Freeze the budget from measured Debug medians (same discipline as WS4B).
 4. Do not invent a budget; do not widen a budget to rescue a failing run.
 5. Wall-clock budgets are hard locally and informational on hosted CI under R15.
@@ -1137,7 +1137,7 @@ which designate key status (F7 bullet 4).
 | Step | Rule |
 |---|---|
 | Measure first | Probe real find over `Fixtures/large-1mb.md` through the production controller path (or the nearest production-shaped API), including a find-open live-query typing sample for F2. |
-| Sample size | ≥ 3 Debug + ≥ 3 Release runs, recorded in `docs/perf-log.md` with commit SHA and reproduction commands. |
+| Sample size | ≥ 3 Debug + ≥ 3 Release runs, recorded in `docs/perf/YYYY-MM-DD-<slug>.md` with commit SHA and reproduction commands. The closed F2 result stays in the `docs/perf-log.md` archive. |
 | Freeze | Budget from Debug medians (because `make test` is Debug), same as WS4B. |
 | Discipline | No invented budgets; no widening to rescue a run — fix harness or code. |
 | CI | Wall-clock hard locally, informational on hosted CI under R15; deterministic correctness assertions hard everywhere. |
