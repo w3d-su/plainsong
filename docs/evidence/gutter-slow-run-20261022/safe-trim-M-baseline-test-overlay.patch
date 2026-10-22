@@ -1,0 +1,920 @@
+diff --git a/AppTests/EditorFindHostedFocusGateTestSupport.swift b/AppTests/EditorFindHostedFocusGateTestSupport.swift
+index f0ef66dae42043cb578a16b12f168e31ab3c7b66..82ec98edb0adbbcfa6012188cd9dcc397e873b4f 100644
+--- a/AppTests/EditorFindHostedFocusGateTestSupport.swift
++++ b/AppTests/EditorFindHostedFocusGateTestSupport.swift
+@@ -51,9 +51,9 @@ extension EditorFindHostedGateTests {
+     func mountDesignatedKeyWorkspace(
+         in group: HostedWorkspaceGroup,
+         appState: AppState,
+-        originX: CGFloat = 0
++        originX: CGFloat = 0,
++        width: CGFloat = 1000
+     ) -> DesignatedKeyWindow {
+-        let width: CGFloat = 1000
+         let height: CGFloat = 680
+         #if DEBUG
+             EditorPreviewScrollCoordinator.latestDebugInstance = nil
+diff --git a/AppTests/EditorHighlightScheduleHostedTests.swift b/AppTests/EditorHighlightScheduleHostedTests.swift
+index 65b6dca68983f90eae31abe719b7433bfddafdc6..3fec6bf3f53331600ead935d672aeee0777e705d 100644
+--- a/AppTests/EditorHighlightScheduleHostedTests.swift
++++ b/AppTests/EditorHighlightScheduleHostedTests.swift
+@@ -74,7 +74,9 @@ extension EditorFindHostedGateTests {
+                                    query: String? = nil,
+                                    localEdit: String? = nil,
+                                    assets: [String: Data] = [:],
+-                                   layoutMode: EditorLayoutMode = .sourceOnly) async throws -> HostedReplaceWorkspace
++                                   layoutMode: EditorLayoutMode = .sourceOnly,
++                                   showsLineNumbers: Bool = true,
++                                   windowWidth: CGFloat = 1000) async throws -> HostedReplaceWorkspace
+     {
+         let fixture = try makeWorkspaceFixture(files: ["post.md": source])
+         for (name, data) in assets {
+@@ -86,12 +88,13 @@ extension EditorFindHostedGateTests {
+         }
+         appState.setLayoutMode(layoutMode)
+         appState.preferences.setAutosaveIntervalSeconds(30)
++        appState.preferences.setShowsLineNumbers(showsLineNumbers)
+         appState.openExternalFile(fixture.root)
+         try await waitUntil("workspace document opens") {
+             appState.currentDocument.fileURL?.lastPathComponent == "post.md"
+         }
+         let group = makeHostedWorkspaceGroup(fixture: fixture)
+-        let window = mountDesignatedKeyWorkspace(in: group, appState: appState)
++        let window = mountDesignatedKeyWorkspace(in: group, appState: appState, width: windowWidth)
+         designateKeyWindow(window, in: group)
+         let hosted = HostedReplaceWorkspace(fixture: fixture, group: group, window: window)
+         try await waitUntil("editor installs and applies its initial styling", timeout: 20) {
+diff --git a/AppTests/MainThreadStallHostedTests.swift b/AppTests/MainThreadStallHostedTests.swift
+index eea06550028861200c5bf9e57d593c180cf6caa4..145ed5b73eb45fd8a51587d2ffab42fc298d079f 100644
+--- a/AppTests/MainThreadStallHostedTests.swift
++++ b/AppTests/MainThreadStallHostedTests.swift
+@@ -10,61 +10,258 @@ import XCTest
+ @MainActor
+ extension EditorFindHostedGateTests {
+     func testHostedSourcePreviewTypingMainThreadBusySlices() async throws {
+-        try await recordSourcePreviewTypingBusySlices(visitingDocumentEnd: false)
++        try await recordTypingBusySlices(layoutMode: .sourcePreview, visitingDocumentEnd: false)
+     }
+ 
+     /// Viewing the end once leaves TextKit's element cache filled to there (see
+     /// `EditorTextElementCacheTrimmer`); typing above it is the common case afterwards.
+     func testHostedSourcePreviewTypingAfterViewingDocumentEndMainThreadBusySlices() async throws {
+-        try await recordSourcePreviewTypingBusySlices(visitingDocumentEnd: true)
++        try await recordTypingBusySlices(layoutMode: .sourcePreview, visitingDocumentEnd: true)
+     }
+ 
+-    private func recordSourcePreviewTypingBusySlices(visitingDocumentEnd: Bool) async throws {
++    /// The same workload without the preview, whose layer-tree commits dominate the
++    /// slices above and vary between runs: what remains is the editor's own work.
++    func testHostedSourceOnlyTypingMainThreadBusySlices() async throws {
++        try await recordTypingBusySlices(layoutMode: .sourceOnly, visitingDocumentEnd: false)
++    }
++
++    private func recordTypingBusySlices(layoutMode: EditorLayoutMode, visitingDocumentEnd: Bool) async throws {
+         try requireScrollProbe()
+         let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "large-1mb", withExtension: "md"))
+         let source = try String(contentsOf: fixture, encoding: .utf8)
+-        let hosted = try await makeHostedEditorWorkspace(source: source, layoutMode: .sourcePreview)
+-        try await waitUntil("preview mounts", timeout: 20) {
+-            hosted.group.members.first?.host.previewLifecycle.controllerForShutdown?.isReady == true
+-        }
+-        let preview = try XCTUnwrap(hosted.group.members.first?.host.previewLifecycle.controllerForShutdown)
+-        try await waitUntil("initial large preview render", timeout: 60) {
+-            let count = try? await preview.webView.evaluateJavaScript(
+-                "document.querySelectorAll('[data-line]').length"
+-            ) as? Int
+-            return (count ?? 0) > 10000
++        let lineNumbers = scrollProbeShowsLineNumbers
++        let environment = ProcessInfo.processInfo.environment
++        let requestedChunks = environment["PLAINSONG_SCROLL_PROBE_TRIM_CHUNKS"].flatMap { $0.isEmpty ? nil : $0 }
++        let trimChunks = try requestedChunks.map { value in
++            try XCTUnwrap(Int(value).flatMap { $0 >= 0 ? $0 : nil }, "Trim chunk count must be nonnegative")
+         }
++        let trimYieldMilliseconds = try environment["PLAINSONG_SCROLL_PROBE_TRIM_YIELD_MS"].map { value in
++            try XCTUnwrap(Int(value).flatMap { $0 >= 0 && $0 <= Int.max / 1_000_000 ? $0 : nil },
++                          "Trim yield milliseconds must be nonnegative and representable as nanoseconds")
++        } ?? 0
++        let hideGutterDraw = environment["PLAINSONG_SCROLL_PROBE_HIDE_GUTTER_DRAW"] == "1"
++        let useAdmission = environment["PLAINSONG_SCROLL_PROBE_USE_ADMISSION"] == "1"
++        let requestedWidth = environment["PLAINSONG_SCROLL_PROBE_WINDOW_WIDTH"].flatMap { $0.isEmpty ? nil : $0 }
++        let windowWidth = try requestedWidth.map { value in
++            try XCTUnwrap(Double(value).flatMap { $0.isFinite && $0 > 0 ? $0 : nil },
++                          "Window width must be finite and positive")
++        } ?? 1000
++        let hosted = try await makeHostedEditorWorkspace(
++            source: source,
++            layoutMode: layoutMode,
++            showsLineNumbers: lineNumbers,
++            windowWidth: CGFloat(windowWidth)
++        )
+         let editor = try hostedEditor(hosted)
++        let hideGutterEarly = environment["PLAINSONG_SCROLL_PROBE_HIDE_GUTTER_EARLY"] == "1"
++        if hideGutterEarly {
++            editor.gutterView?.isHidden = true
++        }
++        let tracedTrimmer = environment["PLAINSONG_SCROLL_PROBE_TRIM_TRACE"] == "1"
++            ? (editor.textDelegate as? MarkdownTextViewCoordinator)?.textElementCacheTrimmer : nil
++        let trimmerEvents = tracedTrimmer.map { _ in TypingProbeTrimmerEvents(editor: editor) }
++        tracedTrimmer?.probeHandler = { [weak trimmerEvents] event, range in
++            trimmerEvents?.record(event, range: range)
++        }
++        defer { tracedTrimmer?.probeHandler = nil }
++        let paragraphSpy = environment["PLAINSONG_SCROLL_PROBE_PARAGRAPH_TRACE"] == "1"
++            ? TypingProbeParagraphRequests(
++                viewport: MarkdownTextView.visibleTextRange(of: editor),
++                captureBeyondLocation: Int(environment["PLAINSONG_SCROLL_PROBE_CAPTURE_BEYOND_OFFSET"] ?? "")
++            ) : nil
++        let contentStorage = editor.textContentManager as? NSTextContentStorage
++        let previousDelegate = contentStorage?.delegate
++        if let paragraphSpy {
++            contentStorage?.delegate = try XCTUnwrap(
++                previousDelegate == nil ? paragraphSpy : nil,
++                "Paragraph tracing requires the default NSTextContentStorage paragraph provider"
++            )
++        }
++        defer {
++            if paragraphSpy != nil {
++                contentStorage?.delegate = previousDelegate
++            }
++        }
++        let trimmer: EditorTextElementCacheTrimmer? = if trimChunks != nil {
++            try XCTUnwrap((editor.textDelegate as? MarkdownTextViewCoordinator)?.textElementCacheTrimmer)
++        } else {
++            nil
++        }
++        trimmer?.cancel()
++        if layoutMode == .sourcePreview {
++            try await waitForLargePreview(hosted)
++        }
+         let middle = (source as NSString).lineRange(for: NSRange(location: source.utf16.count / 2, length: 0))
++        let trimScrollAfter = Int(environment["PLAINSONG_SCROLL_PROBE_TRIM_SCROLL_AFTER"] ?? "") ?? -1
++        if let delay = UInt64(environment["PLAINSONG_SCROLL_PROBE_TOP_SETTLE_MS"] ?? "") {
++            try await Task.sleep(nanoseconds: delay * 1_000_000)
++        }
++        var scrolledDuringTrim = false
++        var explicitTrimRanges: [[String: Int]] = []
++        if let trimChunks {
++            // Match an interrupted top-of-document trim exactly, without depending on
++            // which run-loop turn admits the 400 ms production settle task.
++            try await settleTypingProbe(nanoseconds: 300_000_000, cancelling: trimmer)
++            let length = try XCTUnwrap(MarkdownTextView.textStorage(of: editor)?.length)
++            let count = try XCTUnwrap(
++                trimChunks <= length / EditorTextElementCacheTrimmer.chunkLength ? trimChunks : nil,
++                "Requested trim chunks exceed the fixture length"
++            )
++            if environment["PLAINSONG_SCROLL_PROBE_USE_PRODUCTION_TRIM"] == "1" {
++                explicitTrimRanges = try await TypingProbePreparation.productionTrim(
++                    chunks: count,
++                    navigatingAfter: trimScrollAfter,
++                    to: NSRange(location: middle.location, length: 0),
++                    in: editor
++                )
++                scrolledDuringTrim = trimScrollAfter > 0
++            } else {
++                let prepared = try await TypingProbePreparation.manualTrim(
++                    .init(
++                        chunks: count,
++                        initialLength: length,
++                        navigatingAfter: trimScrollAfter,
++                        navigationRange: NSRange(location: middle.location, length: 0),
++                        yieldMilliseconds: trimYieldMilliseconds,
++                        drawAfterTrim: Int(environment["PLAINSONG_SCROLL_PROBE_DRAW_AFTER_TRIM"] ?? ""),
++                        layoutBetweenTrims: environment["PLAINSONG_SCROLL_PROBE_TRIM_LAYOUT"] == "1",
++                        useAdmission: useAdmission
++                    ),
++                    in: editor,
++                    cancelling: trimmer
++                )
++                explicitTrimRanges = prepared.ranges
++                scrolledDuringTrim = prepared.navigated
++            }
++        }
+         if visitingDocumentEnd {
+             editor.scrollRangeToVisible(NSRange(location: source.utf16.count, length: 0))
+-            try await Task.sleep(nanoseconds: 500_000_000)
++            try await settleTypingProbe(nanoseconds: 500_000_000, cancelling: trimmer)
++        }
++        if !scrolledDuringTrim {
++            editor.textSelection = NSRange(location: middle.location, length: 0)
++            editor.scrollRangeToVisible(editor.selectedRange())
++        }
++        try await settleTypingProbe(nanoseconds: 1_000_000_000, cancelling: trimmer)
++        if hideGutterDraw {
++            // Hide the native gutter while preserving the current editor width.
++            // This removes drawing while preserving the same text-container width.
++            editor.gutterView?.isHidden = true
+         }
+-        editor.textSelection = NSRange(location: middle.location, length: 0)
+-        editor.scrollRangeToVisible(editor.selectedRange())
+-        try await Task.sleep(nanoseconds: 1_000_000_000)
+ 
++        if environment["PLAINSONG_SCROLL_PROBE_RESCROLL_AFTER_SETTLE"] == "1" {
++            editor.scrollRangeToVisible(editor.selectedRange())
++            try await settleTypingProbe(nanoseconds: 1_000_000_000, cancelling: trimmer)
++        }
++        let preparationRequests = paragraphSpy?.report() ?? [:]
++        let geometryBefore = TypingProbeGeometry(editor)
++        var geometries = [geometryBefore]
++        var insertMilliseconds: [Double] = []
++        var paragraphRequests: [[String: Any]] = []
++        var completedKeys = 0
++        var recoveryMilliseconds: Double = 0
++        let countersBefore = EditorProbeCounters(editor)
+         let monitor = MainRunLoopBusyMonitor()
+         // Lets an external `sample` attach to the measured phase only (stdout is buffered).
+         let marker = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("main-thread-probe-begin")
+         try Data().write(to: marker)
+         defer { try? FileManager.default.removeItem(at: marker) }
++        trimmerEvents?.record("typing-start", range: nil)
+         monitor.start()
+         // Bursts below the 150 ms preview debounce, then pauses that let every render run.
+         for (count, interval) in [(30, 90), (20, 250)] {
+             for _ in 0 ..< count {
++                paragraphSpy?.reset(viewport: MarkdownTextView.visibleTextRange(of: editor))
++                let started = DispatchTime.now().uptimeNanoseconds
+                 editor.insertText("a", replacementRange: editor.selectedRange())
++                insertMilliseconds.append(Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000)
++                let insertionRequests = paragraphSpy?.report() ?? [:]
++                completedKeys += 1
++                if completedKeys == Int(environment["PLAINSONG_SCROLL_PROBE_RECOVER_AFTER_KEY"] ?? "") {
++                    let length = MarkdownTextView.textStorage(of: editor)?.length ?? 0
++                    let tail = min(length, editor.selectedRange().location + 8192)
++                    let started = DispatchTime.now().uptimeNanoseconds
++                    XCTAssertTrue(EditorTextElementCacheTrimmer.trim(
++                        NSRange(location: tail, length: length - tail),
++                        in: editor
++                    ))
++                    recoveryMilliseconds = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000
++                    trimmerEvents?.record(
++                        "diagnostic-tail-recovery",
++                        range: NSRange(location: tail, length: length - tail)
++                    )
++                }
++                trimmer?.cancel()
++                if trimChunks != nil || hideGutterDraw || requestedWidth != nil {
++                    geometries.append(TypingProbeGeometry(editor))
++                }
+                 try await Task.sleep(nanoseconds: UInt64(interval) * 1_000_000)
++                if trimChunks != nil || hideGutterDraw || requestedWidth != nil {
++                    geometries.append(TypingProbeGeometry(editor))
++                }
++                if let paragraphSpy {
++                    paragraphRequests.append(["insert": insertionRequests, "throughRunLoop": paragraphSpy.report()])
++                }
+             }
+         }
+-        try await Task.sleep(nanoseconds: 1_000_000_000)
++        try await settleTypingProbe(nanoseconds: 1_000_000_000, cancelling: trimmer)
+         let slices = monitor.stop()
++        trimmerEvents?.record("typing-end", range: nil)
+ 
++        // Native main has no EditorKit gutter snapshot or draw counters to assert.
+         XCTAssertEqual(MarkdownTextView.textStorage(of: editor)?.string, hosted.appState.currentDocument.text)
++        let name = visitingDocumentEnd ? "after viewing the end" : "from the middle"
++        let mode = layoutMode == .sourcePreview ? "Source+preview" : "Source-only"
++        var report = busySliceReport(slices)
++        report.merge(EditorProbeCounters(editor).report(since: countersBefore)) { $1 }
++        let diagnostics: [String: Any] = [
++            "lineNumbers": lineNumbers,
++            "hiddenGutterDraw": hideGutterDraw,
++            "hiddenGutterEarly": hideGutterEarly,
++            "recoveryMilliseconds": recoveryMilliseconds,
++            "controlledTrimChunks": trimChunks ?? -1,
++            "useProductionTrim": environment["PLAINSONG_SCROLL_PROBE_USE_PRODUCTION_TRIM"] == "1",
++            "useAdmission": useAdmission,
++            "trimYieldMilliseconds": trimYieldMilliseconds,
++            "trimScrollAfter": trimScrollAfter,
++            "drawAfterTrim": Int(environment["PLAINSONG_SCROLL_PROBE_DRAW_AFTER_TRIM"] ?? "") ?? -1,
++            "layoutBetweenTrims": environment["PLAINSONG_SCROLL_PROBE_TRIM_LAYOUT"] == "1",
++            "requestedWindowWidth": windowWidth,
++            "explicitTrimRanges": explicitTrimRanges,
++            "explicitTrimmedCharacters": explicitTrimRanges.reduce(0) { $0 + ($1["length"] ?? 0) },
++            "insertMilliseconds": insertMilliseconds,
++            "paragraphPreparation": preparationRequests,
++            "trimmerEvents": trimmerEvents?.events ?? [],
++            "paragraphRequests": paragraphRequests,
++            "geometryBeforeTyping": geometryBefore.report,
++            "geometryAfterTyping": TypingProbeGeometry(editor).report,
++            "geometrySamples": geometries.map(\.report),
++            "displayedLineNumbers": [Int](),
++            "displayedCurrentLines": [Int](),
++            "geometryMinimum": TypingProbeGeometry.extrema(geometries, minimum: true),
++            "geometryMaximum": TypingProbeGeometry.extrema(geometries, minimum: false),
++        ]
++        report.merge(diagnostics) { $1 }
++        let reportFile = URL(fileURLWithPath: NSTemporaryDirectory())
++            .appendingPathComponent("typing-probe-\(UUID().uuidString).json")
++        try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]).write(to: reportFile)
++        print("TypingProbeReportFile: \(reportFile.path)")
++        recordScrollReport("\(mode) typing \(name) main-thread busy slices", report)
++    }
++
++    /// A controlled run cancels every 100 ms so a later viewport notification cannot
++    /// restart the production trimmer while the explicitly selected state settles.
++    private func settleTypingProbe(
++        nanoseconds: UInt64,
++        cancelling trimmer: EditorTextElementCacheTrimmer?
++    ) async throws {
++        try await TypingProbePreparation.settle(nanoseconds: nanoseconds, cancelling: trimmer)
++    }
++
++    private func busySliceReport(_ slices: [MainRunLoopBusyMonitor.Slice]) -> [String: Any] {
+         let sorted = slices.map(\.wallMilliseconds).sorted()
+         let longest = slices.sorted { $0.wallMilliseconds < $1.wallMilliseconds }.suffix(12)
+-        let name = visitingDocumentEnd ? "after viewing the end" : "from the middle"
+-        recordScrollReport("Source+preview typing \(name) main-thread busy slices", [
++        return [
+             "slices": slices.count,
+             "maxMilliseconds": sorted.last ?? 0,
+             "p95Milliseconds": sorted.isEmpty ? 0 : sorted[Int(Double(sorted.count - 1) * 0.95)],
+@@ -75,7 +272,26 @@ extension EditorFindHostedGateTests {
+             "longest": longest.map(\.wallMilliseconds),
+             "longestCPU": longest.map(\.cpuMilliseconds),
+             "longestStart": longest.map(\.startMilliseconds),
+-        ])
++        ]
++    }
++
++    private func waitForLargePreview(_ hosted: HostedReplaceWorkspace) async throws {
++        try await waitUntil("preview mounts", timeout: 20) {
++            hosted.group.members.first?.host.previewLifecycle.controllerForShutdown?.isReady == true
++        }
++        let preview = try XCTUnwrap(hosted.group.members.first?.host.previewLifecycle.controllerForShutdown)
++        try await waitUntil("initial large preview render", timeout: 60) {
++            let count = try? await preview.webView.evaluateJavaScript(
++                "document.querySelectorAll('[data-line]').length"
++            ) as? Int
++            return (count ?? 0) > 10000
++        }
++    }
++
++    /// `TEST_RUNNER_PLAINSONG_SCROLL_PROBE_LINE_NUMBERS=0` measures the same workload with
++    /// line numbers hidden from the start (the app shows them by default).
++    var scrollProbeShowsLineNumbers: Bool {
++        ProcessInfo.processInfo.environment["PLAINSONG_SCROLL_PROBE_LINE_NUMBERS"] != "0"
+     }
+ }
+ 
+diff --git a/Packages/EditorKit/Sources/EditorKit/EditorTextElementCacheTrimmer.swift b/Packages/EditorKit/Sources/EditorKit/EditorTextElementCacheTrimmer.swift
+index cbb1ad293b7ae5d5863be455ef505a19e8f497ae..51dc4202edd84ab69b277bcbfc4da86437bccba2 100644
+--- a/Packages/EditorKit/Sources/EditorKit/EditorTextElementCacheTrimmer.swift
++++ b/Packages/EditorKit/Sources/EditorKit/EditorTextElementCacheTrimmer.swift
+@@ -21,6 +21,10 @@ final class EditorTextElementCacheTrimmer {
+     private var task: Task<Void, Never>?
+     /// Characters released since creation (diagnostics and tests).
+     private(set) var trimmedLength = 0
++    /// Optional hosted-probe diagnostics; nil in ordinary editors. Events are schedule,
++    /// start, trim, trimmed, refused, cancel, cancelled and complete. Ranges describe
++    /// the captured viewport for task events or the requested chunk for trim events.
++    var probeHandler: ((String, NSRange?) -> Void)?
+ 
+     deinit {
+         task?.cancel()
+@@ -29,24 +33,34 @@ final class EditorTextElementCacheTrimmer {
+     /// Restarts the settle delay; edits and scrolling report a new visible range first.
+     func visibleRangeDidChange(_ visibleRange: NSRange, in textView: STTextView, canTrim: @escaping () -> Bool) {
+         task?.cancel()
++        probeHandler?("schedule", visibleRange)
+         task = Task { [weak self, weak textView] in
+             do {
+                 try await Task.sleep(nanoseconds: Self.settleNanoseconds)
++                self?.probeHandler?("start", visibleRange)
+                 var end = textView.flatMap { MarkdownTextView.textStorage(of: $0)?.length } ?? 0
+                 while let textView, let range = Self.nextChunk(below: visibleRange, endingAt: end, in: textView) {
+-                    guard canTrim(), Self.trim(range, in: textView) else { return }
++                    self?.probeHandler?("trim", range)
++                    guard canTrim(), Self.trim(range, in: textView) else {
++                        self?.probeHandler?("refused", range)
++                        return
++                    }
+                     self?.trimmedLength += range.length
++                    self?.probeHandler?("trimmed", range)
+                     end = range.location
+                     // Let input and display run between chunks.
+                     try await Task.sleep(nanoseconds: 1_000_000)
+                 }
++                self?.probeHandler?("complete", visibleRange)
+             } catch {
++                self?.probeHandler?("cancelled", visibleRange)
+                 return
+             }
+         }
+     }
+ 
+     func cancel() {
++        probeHandler?("cancel", nil)
+         task?.cancel()
+         task = nil
+     }
+diff --git a/AppTests/MainThreadStallProbeCounters.swift b/AppTests/MainThreadStallProbeCounters.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..12327d5c0c76e46278aad0c55bfdaecabcc31724
+--- /dev/null
++++ b/AppTests/MainThreadStallProbeCounters.swift
+@@ -0,0 +1,83 @@
++import AppKit
++@testable import EditorKit
++
++/// Editor work around a measured phase: separates the gutter's own cost from the rest, and
++/// records the TextKit element-cache state typing started from.
++@MainActor
++struct EditorProbeCounters {
++    let gutterDraws: Int
++    let gutterDrawMilliseconds: Double
++    let gutterWidthChanges: Int
++    let lineIndexRebuilds: Int
++    /// Characters `EditorTextElementCacheTrimmer` has released so far.
++    let trimmedLength: Int
++    let editorHeight: CGFloat
++
++    init(_ editor: MarkdownSTTextView) {
++        // Main has STTextView's gutter and no shared EditorKit line-index cache.
++        gutterDraws = 0
++        gutterDrawMilliseconds = 0
++        gutterWidthChanges = 0
++        lineIndexRebuilds = 0
++        trimmedLength = (editor.textDelegate as? MarkdownTextViewCoordinator)?.textElementCacheTrimmer
++            .trimmedLength ?? 0
++        editorHeight = editor.frame.height
++    }
++
++    func report(since start: Self) -> [String: Any] {
++        [
++            "gutterDraws": gutterDraws - start.gutterDraws,
++            "gutterDrawMilliseconds": gutterDrawMilliseconds - start.gutterDrawMilliseconds,
++            "gutterWidthChanges": gutterWidthChanges - start.gutterWidthChanges,
++            "lineIndexRebuilds": lineIndexRebuilds - start.lineIndexRebuilds,
++            "trimmedBeforeTyping": start.trimmedLength,
++            "trimmedAfterTyping": trimmedLength,
++            "trimmedDuringTyping": trimmedLength - start.trimmedLength,
++            "editorHeightBeforeTyping": start.editorHeight,
++        ]
++    }
++}
++
++/// Reads existing geometry only; no layout, display or element walk is forced.
++@MainActor
++struct TypingProbeGeometry {
++    let report: [String: Double]
++
++    init(_ editor: MarkdownSTTextView) {
++        let viewport = MarkdownTextView.visibleTextRange(of: editor)
++        report = [
++            "textContainerWidth": editor.textContainer.size.width,
++            "editorWidth": editor.frame.width,
++            "editorHeight": editor.frame.height,
++            "windowContentWidth": Double(editor.window?.contentView?.bounds.width ?? 0),
++            "clipWidth": Double(editor.enclosingScrollView?.contentView.bounds.width ?? 0),
++            "clipHeight": Double(editor.enclosingScrollView?.contentView.bounds.height ?? 0),
++            "visibleY": editor.visibleRect.origin.y,
++            "viewportLocation": Double(viewport?.location ?? NSNotFound),
++            "viewportLength": Double(viewport?.length ?? 0),
++        ]
++    }
++
++    static func extrema(_ samples: [Self], minimum: Bool) -> [String: Double] {
++        var result: [String: Double] = [:]
++        for sample in samples {
++            for (key, value) in sample.report {
++                guard let previous = result[key] else {
++                    result[key] = value
++                    continue
++                }
++                result[key] = minimum ? min(previous, value) : max(previous, value)
++            }
++        }
++        return result
++    }
++}
++
++/// Baseline-only admission shim: the pre-fix loop admitted every proposed range using
++/// its captured viewport and coordinator canTrim closure, without reading live geometry.
++@MainActor
++extension EditorTextElementCacheTrimmer {
++    static func protectedChunk(_ range: NSRange, in _: MarkdownSTTextView) -> NSRange? {
++        range
++    }
++}
+diff --git a/AppTests/TypingProbeParagraphRequests.swift b/AppTests/TypingProbeParagraphRequests.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..f446b225908044e119f20748b8f5dcfc2c5bda95
+--- /dev/null
++++ b/AppTests/TypingProbeParagraphRequests.swift
+@@ -0,0 +1,182 @@
++import AppKit
++@testable import EditorKit
++
++/// Counts TextKit paragraph cache misses without replacing its default paragraphs.
++/// The hosted typing probe retains this delegate only while diagnostics are enabled.
++final class TypingProbeParagraphRequests: NSObject, NSTextContentStorageDelegate {
++    private static let retainedRangeCount = 8
++    private var viewport: NSRange?
++    private let captureOutsideCallStack: Bool
++    let captureBeyondLocation: Int?
++    private(set) var requestCount = 0
++    private(set) var requestedUTF16Length = 0
++    private(set) var outsideViewportRequestCount = 0
++    private(set) var firstRequestedRanges: [NSRange] = []
++    private(set) var lastRequestedRanges: [NSRange] = []
++    private(set) var firstOutsideViewportCallStack: [String]?
++    private(set) var firstBeyondLocationCallStack: [String]?
++    private(set) var firstBeyondLocationRange: NSRange?
++    private var minimumRequestedLocation: Int?
++    private var maximumRequestedEnd: Int?
++
++    init(
++        viewport: NSRange?,
++        captureOutsideCallStack: Bool = false,
++        captureBeyondLocation: Int? = nil
++    ) {
++        self.viewport = viewport
++        self.captureOutsideCallStack = captureOutsideCallStack
++        self.captureBeyondLocation = captureBeyondLocation
++        super.init()
++    }
++
++    func textContentStorage(
++        _: NSTextContentStorage,
++        textParagraphWith range: NSRange
++    ) -> NSTextParagraph? {
++        requestCount += 1
++        requestedUTF16Length += range.length
++        minimumRequestedLocation = min(minimumRequestedLocation ?? range.location, range.location)
++        maximumRequestedEnd = max(maximumRequestedEnd ?? NSMaxRange(range), NSMaxRange(range))
++        if firstRequestedRanges.count < Self.retainedRangeCount {
++            firstRequestedRanges.append(range)
++        }
++        lastRequestedRanges.append(range)
++        if lastRequestedRanges.count > Self.retainedRangeCount {
++            lastRequestedRanges.removeFirst()
++        }
++        if let viewport, viewport.location != NSNotFound,
++           range.location < viewport.location || NSMaxRange(range) > NSMaxRange(viewport)
++        {
++            outsideViewportRequestCount += 1
++            if captureOutsideCallStack, firstOutsideViewportCallStack == nil {
++                firstOutsideViewportCallStack = Thread.callStackSymbols
++            }
++        }
++        if let captureBeyondLocation, range.location >= captureBeyondLocation,
++           firstBeyondLocationCallStack == nil
++        {
++            firstBeyondLocationRange = range
++            firstBeyondLocationCallStack = Thread.callStackSymbols
++        }
++        return nil
++    }
++
++    /// Starts another measured phase while keeping the same viewport reference.
++    func reset() {
++        requestCount = 0
++        requestedUTF16Length = 0
++        outsideViewportRequestCount = 0
++        firstRequestedRanges.removeAll(keepingCapacity: true)
++        lastRequestedRanges.removeAll(keepingCapacity: true)
++        firstOutsideViewportCallStack = nil
++        firstBeyondLocationCallStack = nil
++        firstBeyondLocationRange = nil
++        minimumRequestedLocation = nil
++        maximumRequestedEnd = nil
++    }
++
++    /// Starts another phase against a newly captured viewport.
++    func reset(viewport: NSRange?) {
++        self.viewport = viewport
++        reset()
++    }
++
++    /// Primitive JSON values, with bounded first/last ranges even for a full-document miss.
++    func report() -> [String: Any] {
++        var result: [String: Any] = [
++            "paragraphRequests": requestCount,
++            "paragraphRequestUTF16Length": requestedUTF16Length,
++            "paragraphOutsideViewportRequests": outsideViewportRequestCount,
++            "paragraphFirstRequests": firstRequestedRanges.map(Self.reportRange),
++            "paragraphLastRequests": lastRequestedRanges.map(Self.reportRange),
++        ]
++        if let viewport {
++            result["paragraphReferenceViewport"] = Self.reportRange(viewport)
++        }
++        if let minimumRequestedLocation, let maximumRequestedEnd {
++            result["paragraphRequestedExtent"] = Self.reportRange(NSRange(
++                location: minimumRequestedLocation,
++                length: maximumRequestedEnd - minimumRequestedLocation
++            ))
++        }
++        if let firstOutsideViewportCallStack {
++            result["paragraphFirstOutsideViewportCallStack"] = firstOutsideViewportCallStack
++        }
++        if let captureBeyondLocation {
++            result["paragraphCaptureBeyondLocation"] = captureBeyondLocation
++        }
++        if let firstBeyondLocationCallStack, let firstBeyondLocationRange {
++            result["paragraphFirstBeyondLocationCallStack"] = firstBeyondLocationCallStack
++            result["paragraphFirstBeyondLocationRange"] = Self.reportRange(firstBeyondLocationRange)
++        }
++        return result
++    }
++
++    private static func reportRange(_ range: NSRange) -> [String: Int] {
++        ["location": range.location, "length": range.length]
++    }
++}
++
++@MainActor
++final class TypingProbeTrimmerEvents {
++    private weak var editor: MarkdownSTTextView?
++    private let start = DispatchTime.now().uptimeNanoseconds
++    private(set) var events: [[String: Any]] = []
++    private var observers: [TypingProbeNotificationObserver] = []
++
++    init(editor: MarkdownSTTextView) {
++        self.editor = editor
++        let center = NotificationCenter.default
++        editor.postsFrameChangedNotifications = true
++        observers.append(TypingProbeNotificationObserver(center.addObserver(
++            forName: NSView.frameDidChangeNotification,
++            object: editor,
++            queue: .main
++        ) { [weak self] _ in
++            MainActor.assumeIsolated { self?.record("editor-frame", range: nil) }
++        }))
++        if let clipView = editor.enclosingScrollView?.contentView {
++            clipView.postsBoundsChangedNotifications = true
++            observers.append(TypingProbeNotificationObserver(center.addObserver(
++                forName: NSView.boundsDidChangeNotification,
++                object: clipView,
++                queue: .main
++            ) { [weak self] _ in
++                MainActor.assumeIsolated { self?.record("clip-bounds", range: nil) }
++            }))
++        }
++    }
++
++    func record(_ event: String, range: NSRange?) {
++        guard let editor, events.count < 3000 else { return }
++        let viewport = MarkdownTextView.visibleTextRange(of: editor)
++        events.append([
++            "event": event,
++            "milliseconds": Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000,
++            "rangeLocation": range?.location ?? -1,
++            "rangeLength": range?.length ?? 0,
++            "viewportLocation": viewport?.location ?? -1,
++            "viewportLength": viewport?.length ?? 0,
++            "selectionLocation": editor.selectedRange().location,
++            "height": editor.frame.height,
++            "frameWidth": editor.frame.width,
++            "textContainerWidth": editor.textContainer.size.width,
++            "clipWidth": editor.enclosingScrollView?.contentView.bounds.width ?? -1,
++            "clipHeight": editor.enclosingScrollView?.contentView.bounds.height ?? -1,
++            "clipY": editor.enclosingScrollView?.contentView.bounds.minY ?? -1,
++        ])
++    }
++}
++
++private final class TypingProbeNotificationObserver {
++    private let token: NSObjectProtocol
++
++    init(_ token: NSObjectProtocol) {
++        self.token = token
++    }
++
++    deinit {
++        NotificationCenter.default.removeObserver(token)
++    }
++}
+diff --git a/AppTests/TypingProbePreparation.swift b/AppTests/TypingProbePreparation.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..4ddc2abc8ac46616a97386c25c6a03e812d8f7e5
+--- /dev/null
++++ b/AppTests/TypingProbePreparation.swift
+@@ -0,0 +1,229 @@
++import AppKit
++@testable import EditorKit
++import XCTest
++
++@MainActor
++enum TypingProbePreparation {
++    struct ManualTrimPlan {
++        let chunks: Int
++        let initialLength: Int
++        let navigatingAfter: Int
++        let navigationRange: NSRange
++        let yieldMilliseconds: Int
++        let drawAfterTrim: Int?
++        let layoutBetweenTrims: Bool
++        let useAdmission: Bool
++    }
++
++    /// Keep the original synchronous trim/draw/navigation sequence, optionally asking
++    /// the real production planner to admit each chunk against the current viewport.
++    static func manualTrim(
++        _ plan: ManualTrimPlan,
++        in editor: MarkdownSTTextView,
++        cancelling trimmer: EditorTextElementCacheTrimmer?
++    ) async throws -> (ranges: [[String: Int]], navigated: Bool) {
++        var end = plan.initialLength
++        var ranges: [[String: Int]] = []
++        var navigated = false
++        for chunkIndex in 0 ..< plan.chunks {
++            guard end >= EditorTextElementCacheTrimmer.chunkLength else { break }
++            let candidate = NSRange(location: end - EditorTextElementCacheTrimmer.chunkLength,
++                                    length: EditorTextElementCacheTrimmer.chunkLength)
++            let range: NSRange
++            if plan.useAdmission {
++                guard let admitted = EditorTextElementCacheTrimmer.protectedChunk(candidate, in: editor) else { break }
++                range = admitted
++            } else {
++                range = candidate
++            }
++            // Admission and this capture are synchronous in the same main-actor turn.
++            // Read the native viewport directly; the general helper can fall back to selection.
++            let entry = plan.useAdmission ? admissionState(range, in: editor)
++                : ["location": range.location, "length": range.length]
++            let trimmed = EditorTextElementCacheTrimmer.trim(range, in: editor)
++            _ = try XCTUnwrap(trimmed ? range : nil, "Explicit cache trim must succeed")
++            ranges.append(entry)
++            if plan.drawAfterTrim == 0 || chunkIndex + 1 == plan.drawAfterTrim {
++                try drawGutter(in: editor)
++            }
++            end = range.location
++            if chunkIndex + 1 == plan.navigatingAfter {
++                editor.textSelection = plan.navigationRange
++                editor.scrollRangeToVisible(editor.selectedRange())
++                navigated = true
++                try await settle(nanoseconds: 10_000_000, cancelling: trimmer)
++            }
++            if plan.layoutBetweenTrims {
++                editor.needsLayout = true
++                editor.layoutSubtreeIfNeeded()
++            }
++            if plan.yieldMilliseconds > 0 {
++                try await settle(nanoseconds: UInt64(plan.yieldMilliseconds) * 1_000_000, cancelling: trimmer)
++            }
++        }
++        return (ranges, navigated)
++    }
++
++    private static func admissionState(_ range: NSRange, in editor: MarkdownSTTextView) -> [String: Int] {
++        let selection = editor.selectedRange()
++        var entry = [
++            "location": range.location,
++            "length": range.length,
++            "nativeViewportBeforeLocation": -1,
++            "nativeViewportBeforeLength": 0,
++            "viewportPrefetchBeforeEnd": -1,
++            "selectionBeforeLocation": selection.location,
++            "selectionBeforeLength": selection.length,
++            "selectedParagraphBeforeLocation": -1,
++            "selectedParagraphBeforeLength": 0,
++            "selectedProtectionBeforeStart": -1,
++            "selectedProtectionBeforeEnd": -1,
++        ]
++        guard let storage = MarkdownTextView.textStorage(of: editor) else { return entry }
++        if let viewport = editor.textLayoutManager.textViewportLayoutController.viewportRange, !viewport.isEmpty {
++            let manager = editor.textContentManager
++            let documentStart = manager.documentRange.location
++            let start = manager.offset(from: documentStart, to: viewport.location)
++            let end = manager.offset(from: documentStart, to: viewport.endLocation)
++            if start != NSNotFound, end != NSNotFound, start >= 0, end > start, end <= storage.length {
++                entry["nativeViewportBeforeLocation"] = start
++                entry["nativeViewportBeforeLength"] = end - start
++                entry["viewportPrefetchBeforeEnd"] = min(storage.length, end + max(end - start, 8192))
++            }
++        }
++        if selection.location != NSNotFound, selection.location >= 0, selection.length >= 0,
++           selection.location <= storage.length, selection.length <= storage.length - selection.location
++        {
++            let paragraphs = storage.mutableString.paragraphRange(for: selection)
++            entry["selectedParagraphBeforeLocation"] = paragraphs.location
++            entry["selectedParagraphBeforeLength"] = paragraphs.length
++            entry["selectedProtectionBeforeStart"] = max(0, paragraphs.location - 8192)
++            entry["selectedProtectionBeforeEnd"] = min(storage.length, NSMaxRange(paragraphs) + 8192)
++        }
++        return entry
++    }
++
++    /// Cancel every 100 ms so a viewport notification cannot restart a coordinator
++    /// trim while an explicitly selected cache state settles.
++    static func settle(nanoseconds: UInt64, cancelling trimmer: EditorTextElementCacheTrimmer?) async throws {
++        guard let trimmer else {
++            try await Task.sleep(nanoseconds: nanoseconds)
++            return
++        }
++        var remaining = nanoseconds
++        while remaining > 0 {
++            trimmer.cancel()
++            let delay = min(remaining, 100_000_000)
++            try await Task.sleep(nanoseconds: delay)
++            remaining -= delay
++        }
++        trimmer.cancel()
++    }
++
++    /// Force the actual draw callback without AppKit display preparation, which may
++    /// otherwise perform native layout before drawing and hide the ordering under test.
++    static func drawGutter(in editor: MarkdownSTTextView) throws {
++        guard let gutter = editor.gutterView,
++              !gutter.isHiddenOrHasHiddenAncestor,
++              gutter.bounds.width > 0,
++              gutter.bounds.height > 0
++        else {
++            return
++        }
++        let scale = gutter.window?.backingScaleFactor ?? 1
++        let width = max(1, Int(ceil(gutter.bounds.width * scale)))
++        let height = max(1, Int(ceil(gutter.bounds.height * scale)))
++        let bitmap = try XCTUnwrap(NSBitmapImageRep(
++            bitmapDataPlanes: nil,
++            pixelsWide: width,
++            pixelsHigh: height,
++            bitsPerSample: 8,
++            samplesPerPixel: 4,
++            hasAlpha: true,
++            isPlanar: false,
++            colorSpaceName: .deviceRGB,
++            bytesPerRow: 0,
++            bitsPerPixel: 0
++        ))
++        bitmap.size = gutter.bounds.size
++        let context = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: bitmap))
++        NSGraphicsContext.saveGraphicsState()
++        defer { NSGraphicsContext.restoreGraphicsState() }
++        NSGraphicsContext.current = context
++        context.cgContext.clear(CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
++        context.cgContext.translateBy(x: 0, y: CGFloat(height))
++        context.cgContext.scaleBy(x: scale, y: -scale)
++        gutter.effectiveAppearance.performAsCurrentDrawingAppearance {
++            gutter.draw(gutter.bounds)
++        }
++    }
++
++    /// A local production-loop job keeps its captured top range even after navigation.
++    /// Coordinator jobs are cancelled while waiting, so both guarded and unguarded
++    /// implementations see exactly the same deliberately stale job admission.
++    static func productionTrim(
++        chunks: Int,
++        navigatingAfter navigationChunk: Int,
++        to navigationRange: NSRange,
++        in editor: MarkdownSTTextView
++    ) async throws -> [[String: Int]] {
++        let coordinator = try XCTUnwrap(editor.textDelegate as? MarkdownTextViewCoordinator)
++        let coordinatorTrimmer = coordinator.textElementCacheTrimmer
++        coordinatorTrimmer.cancel()
++        let trimmer = EditorTextElementCacheTrimmer()
++        let recordEvent = coordinatorTrimmer.probeHandler
++        var ranges: [[String: Int]] = []
++        var navigated = false
++        var finished = false
++        trimmer.probeHandler = { event, range in
++            recordEvent?(event, range)
++            if event == "trimmed", let range {
++                ranges.append(["location": range.location, "length": range.length])
++                if ranges.count == navigationChunk {
++                    editor.textSelection = navigationRange
++                    editor.scrollRangeToVisible(editor.selectedRange())
++                    navigated = true
++                }
++                if ranges.count == chunks {
++                    finished = true
++                    trimmer.cancel()
++                }
++            }
++            if event == "refused" || event == "complete" {
++                finished = true
++            }
++        }
++        defer {
++            trimmer.cancel()
++            trimmer.probeHandler = nil
++            coordinatorTrimmer.cancel()
++        }
++        guard chunks > 0 else { return [] }
++        if navigationChunk > 0 {
++            _ = try XCTUnwrap(navigationChunk <= chunks ? navigationChunk : nil,
++                              "Navigation must occur within the requested trim chunks")
++        }
++        let visible = try XCTUnwrap(MarkdownTextView.visibleTextRange(of: editor))
++        XCTAssertLessThan(NSMaxRange(visible), navigationRange.location,
++                          "Stale-job preparation must capture a viewport above the navigation target")
++        trimmer.visibleRangeDidChange(visible, in: editor) { [weak coordinator] in
++            guard let coordinator else { return false }
++            return !coordinator.isUpdating && !coordinator.hasPendingWriterLease
++        }
++        let deadline = Date().addingTimeInterval(10)
++        while !finished, Date() < deadline {
++            // Do not cancel the local job: it models a task that is still admitted
++            // with its old capture before the asynchronous bounds reporter replaces it.
++            coordinatorTrimmer.cancel()
++            try await Task.sleep(nanoseconds: 10_000_000)
++        }
++        XCTAssertTrue(finished, "The stale production-loop job must reach a boundary or refuse a chunk")
++        if navigationChunk > 0 {
++            XCTAssertTrue(navigated, "The production-loop job must reach the selected navigation boundary")
++            XCTAssertGreaterThanOrEqual(ranges.count, navigationChunk)
++        } else {
++            XCTAssertEqual(ranges.count, chunks, "An unchanged viewport must reach the requested boundary")
++        }
++        return ranges
++    }
++}

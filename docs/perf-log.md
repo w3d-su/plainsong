@@ -2832,3 +2832,143 @@ one unmeasured warm-up each (scratchpad harness, not committed):
 Documents without diagrams reach `ready` about 46% sooner in every web view (live preview,
 export and print). A document with diagrams moves the Mermaid parse to its first render
 (+68 ms there), so ready plus first render is about the same as before (338 ms vs 327 ms).
+
+
+## Intermittent hosted typing: revalidate every cache trim — 2026-10-22
+
+PR #189's intermittent slowdown is reproducible with a controlled interrupted trim.
+The retained repair is in `EditorTextElementCacheTrimmer`, with selection-based
+rescheduling in the coordinator. It preserves the EditorKit gutter implementation.
+[Evidence and replay instructions](evidence/gutter-slow-run-20261022/README.md),
+[all final runs](evidence/gutter-slow-run-20261022/final-typing-runs.csv),
+[per-key mechanism and range checks](evidence/gutter-slow-run-20261022/mechanism.json),
+and [design decision](decisions/2026-10-22-revalidate-cache-trim-navigation.md).
+
+### Reproduction and mechanism
+
+The fixture is `large-1mb.md` (1,048,962 UTF-16 units). Walk backward from the end in
+32,768-unit trim candidates; after chunk 16, move the caret to 524,480 and scroll it
+into view, settle 10 ms, then continue with 1 ms yields and an actual gutter draw
+after each trim. This fixes the navigation/trim ordering and requested ranges. Native
+AppKit display scheduling still decides whether the full slow layout trajectory
+persists to typing; the timing outcome is not deterministic. The production-loop
+regressions instead deterministically assert the safety invariant at that navigation
+boundary.
+
+The old seventeenth chunk `[491906,524674)` discards the selected paragraph
+`[524480,524488)`. The eighteenth `[459138,491906)` also discards the new native
+viewport, `[460354,461927)` in final reference run H4. Cancellation after a new
+visible-range report can arrive after these attribute edits. Cumulative trim counters
+count requested ranges, not cached-element inventory; the explicit replay calls the
+static trim and records its own ranges without incrementing the instance counter.
+
+H4 starts at height 882,743.5 with a 1,575-unit viewport. Native relocation then
+shrinks the frame to 349,673.33 and clamps the clip position; its viewport subsequently
+jumps through offset 23,177 and reaches 901,107 at key 5. That key recreates **10,896
+paragraphs through offset 903,133**. The captured threshold stack is
+`NSTextContentStorage` → `NSTextLayoutManager.enumerateTextLayoutFragments` →
+`NSTextViewportLayoutController.layoutViewport` → `STTextView.layoutViewport/layout`
+→ AppKit display. Subsequent insertions remain expensive (40.25 ms run median, 76.99 ms maximum)
+while requesting only one new paragraph each, matching the retained cached-suffix
+range-update cost identified in #180. No trim runs during typing. Gutter drawing totals only 15.32 ms, with no width
+changes or line-index rebuilds.
+
+Fresh admission checks the real nonempty native viewport immediately before each
+attribute edit, and independently protects complete selected paragraphs with an
+8,192-unit margin. It shortens or skips unsafe candidates and advances from the
+actual returned location. F4 redirects the offending candidates to
+`[483520,516288)` and `[470119,483520)`, then stops: 18 ranges instead of 30.
+All **90/90** final F ranges are bounded, descending and disjoint from the live
+viewport prefix/prefetch and selected-paragraph band; all 390 H/F/M ranges have
+same-main-actor-turn before-state captures. Every H/M replay includes the old
+post-navigation collisions. F still permits native height and clip adjustments;
+it avoids destroying the live elements and the distant tail refill, rather than
+suppressing all resizing.
+
+A matched-width gutter-off reference also reproduced 5,325 ms / 46.40 ms insertion
+median; hiding drawing early reproduced a slow run too. A gutter snapshot candidate
+that avoided draw-time TextKit enumeration still reproduced 5,299 ms. Therefore
+neither draw-time enumeration nor `needsDisplay` alone is necessary for the slow
+mode. Earlier main formation controls stayed fast, and final M4 has stale collisions
+without H4's tail fill. The changed gutter geometry/cache history appears to expose
+the pre-existing #180 stale-task race; that frequency explanation is an inference.
+**This does not exonerate #189.** The snapshot and native-height adapters were
+rejected; an earlier suffix-only guard was superseded because it missed native
+viewport absence and prevented useful trimming before an offscreen end caret.
+Those measurements remain separate cohorts in the evidence.
+
+### Final interleaved comparison
+
+H = PR #189 head `808190415ec80fa30acb0c81e206025343349177`;
+M = main `2138165e703644f87494518fb113e11f5dcc04e1` (the pinned PR base, not the
+subsequently moving main tip); F = tested fix `73adc68`. All use the same fixture,
+50 native insertions and ensuing main-run-loop work, source-only, line numbers on,
+1,000 pt outer window / 408 pt text-container width. M's native gutter leaves a
+459 pt clip/text-view width; H/F's separate gutter leaves 408 pt. Baseline overlays
+only add equivalent diagnostics and a test-only identity `protectedChunk` to retain
+the old admission policy; their production coordinator/admission remain unchanged.
+The F replay calls the exact production interval planner. Scheduled-loop tests cover
+its actual task integration separately.
+
+Apple M1 Pro, 8 cores, 16 GiB; macOS 27.0 (26A428), Xcode 27.0 (27A5194q), STTextView
+2.4.1. Optimized Debug (`SWIFT_OPTIMIZATION_LEVEL=-O`, `GCC_OPTIMIZATION_LEVEL=s`),
+serialized under `/private/tmp/plainsong-xcodebuild-test.lock`. One-minute load
+start/end **5.30–32.22**, recorded inside the admitted lock; no idle-machine gate.
+Other user work and a serialized package-check interval are part of the recorded
+load. Executable, test-bundle, fixture and source hashes, toolchain and baseline
+overlay patches are bound in the final build manifest.
+
+| Round / order | H busy ms / insertion median ms | F busy ms / insertion median ms | M busy ms / insertion median ms | F − H busy |
+|---|---:|---:|---:|---:|
+| 1 / HFM | 2,080.9 / 5.47 | 1,966.4 / 5.80 | 3,440.8 / 5.75 | -5.50% |
+| 2 / FMH | 2,165.5 / 6.03 | 2,131.8 / 5.71 | 3,476.8 / 5.81 | -1.56% |
+| 3 / MHF | 2,122.1 / 5.98 | 2,079.2 / 5.99 | 3,459.7 / 5.70 | -2.02% |
+| 4 / HMF | 4,932.9 / 40.25 | 2,149.8 / 6.23 | 3,498.4 / 5.35 | -56.42% |
+| 5 / FHM | 1,974.8 / 5.76 | 1,995.0 / 5.79 | 3,757.0 / 6.00 | +1.03% |
+
+Median run busy: H 2,122.1 ms, F 2,079.2 ms, M 3,476.8 ms. F is **38.5–46.9%
+lower than main in every pair**. Against ordinary fast H, busy changes range from
+−5.50% to +1.03%; insertion-median differences range from −0.321 to +0.326 ms.
+Keep the +20.25 ms round-5 busy result rather than calling all H comparisons faster.
+The slow H4 pair improves 56.42% busy and 84.5% insertion median. F4 remains fast
+at load 25.99→30.95. H has one ≥10,000-paragraph refill in five runs; F and M have
+none. F's peak is 1,474 paragraphs in each run. These five runs demonstrate the
+controlled mechanism and recorded-load comparison; they do not establish a zero
+future slow-run rate, idle acceptance or screen-to-photon latency.
+
+### Validation and remaining gates
+
+- Full EditorKit Debug: 513 tests, 8 existing opt-in skips, 0 failures. The 13 focused
+  trimmer/coordinator tests pass; substituting the old production trimmer/coordinator
+  produces 40 failing assertions across that suite, confirming behavioral coverage.
+  Cases include actual navigation during a scheduled pass, changing selection between
+  chunks, old end-caret/top-scroll trimming, long paragraphs, missing native viewports,
+  Select All collapse without scrolling and duplicate-notification timer liveness.
+- Remaining packages: MarkdownCore 323, PreviewKit 133, WorkspaceKit 371 tests,
+  0 failures. F2 tooling 86 tests/inventory pass; both sandbox probes pass. The
+  historical retained F2 pack remains partial with its existing open manual gates.
+- Preview: 21 files / 150 tests passed. No preview product sources changed.
+- Complete app-hosted XCTest: PlainsongTests 976 (16 opt-in skips) and
+  PerformanceTests 30 (4 skips), 0 failures; the same optimized F binaries were
+  tested without rebuilding, with `TEST_RUNNER_CI=1` for recorded-load budget policy.
+  This is local verification of code commit `73adc68`, not exact-head CI.
+- Pinned SwiftFormat 0.62.1 `make format` and `make lint`: 0/708 files need formatting,
+  0 serious lint violations. Two new size warnings remain (53-line admission function
+  and 340-line test class), alongside existing warnings. The formatter's unrelated
+  WorkspaceFilesSidebar autofix was restored to the branch baseline.
+- A full optimized SwiftPM Release attempt hit existing IME deferred-install fixtures
+  that assume progress after 16 `Task.yield` calls; one then indexes an empty array.
+  The old production baseline reproduces six assertions in the two focused Release
+  controls. This is not a green Release-package result; full Debug and the optimized
+  app-hosted probes are the validation above. The raw failure/control logs are retained.
+- **No PlainsongUITests or other XCUITest executed.** Existing CI includes that bundle,
+  so pushed commits use `[skip ci]` to honor this task's restriction. Exact-head CI is
+  intentionally unrun and must not be reported green. Maintainer manual/IME testing
+  remains separate; this investigation does not claim its completion or merge readiness.
+
+Raw reports, logs and result bundles remain outside Git under
+`/private/tmp/plainsong-gutter-slow-evidence` and the three recorded DerivedData paths.
+The compact checked-in pack includes all final rows, representative per-key/stack and
+admission evidence, historical controls in separate groups, source/binary manifests,
+full baseline test overlays and replay/postprocessing scripts. Its raw manifest gives
+local paths and SHA-256 digests; those paths are retained evidence, not public links.

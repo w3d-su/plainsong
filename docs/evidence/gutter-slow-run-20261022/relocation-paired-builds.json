@@ -1,0 +1,32 @@
+{
+  "H": {
+    "head": "808190415ec80fa30acb0c81e206025343349177",
+    "sources": {
+      "Packages/EditorKit/Sources/EditorKit/MarkdownSTTextView.swift": "972ea1d5ef7165b6d26869187a1fb0a34f2532067a0e15e2a6432e8ca7de4d75",
+      "Packages/EditorKit/Sources/EditorKit/EditorTextElementCacheTrimmer.swift": "38b3028d46e2beb2002be705121b68a83782af26c5212e44082f76e5f7fd5678",
+      "AppTests/MainThreadStallHostedTests.swift": "5fbdab1e74e68e966735881c8f17bec9ce34983f43a610c5ce6e43b15414761e",
+      "Fixtures/large-1mb.md": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247"
+    },
+    "productSha256": "f30ecc257cb54c9c91327f3ded6b1ab1e599660ee5e7df7d37ed11d6aa2d8583"
+  },
+  "F": {
+    "head": "808190415ec80fa30acb0c81e206025343349177",
+    "sources": {
+      "Packages/EditorKit/Sources/EditorKit/MarkdownSTTextView.swift": "5a22ccd47b31885cf72faa7228a4ebe75613a8049f4591107e643ff2f39249c8",
+      "Packages/EditorKit/Sources/EditorKit/EditorTextElementCacheTrimmer.swift": "38b3028d46e2beb2002be705121b68a83782af26c5212e44082f76e5f7fd5678",
+      "AppTests/MainThreadStallHostedTests.swift": "4161af56f350cfc8cbf1b466bd7968a813dea1d260bec1e2f51fdc10f4dda534",
+      "Fixtures/large-1mb.md": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247"
+    },
+    "productSha256": "077884fd84373ce20770821dd585b5eec9ebcad0005af1c18080845407bc1ce0"
+  },
+  "M": {
+    "head": "2138165e703644f87494518fb113e11f5dcc04e1",
+    "sources": {
+      "Packages/EditorKit/Sources/EditorKit/MarkdownSTTextView.swift": "d88cc75e1d8427dcb112bbd47faededdbda5423244adccaf85c4affdec54f240",
+      "Packages/EditorKit/Sources/EditorKit/EditorTextElementCacheTrimmer.swift": "38b3028d46e2beb2002be705121b68a83782af26c5212e44082f76e5f7fd5678",
+      "AppTests/MainThreadStallHostedTests.swift": "14310649fc666169c5a777b42a7bffb0e6e1746c6fda9b7f72e6d282e71d526c",
+      "Fixtures/large-1mb.md": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247"
+    },
+    "productSha256": "c8ff62f83f83990441f786f2691a328105e5f6a0a0f1fe294054f22cda45f164"
+  }
+}

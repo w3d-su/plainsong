@@ -1,0 +1,175 @@
+{
+  "testedCodeCommit": "73adc68cd3535a92e0f267cc3389173beb9d7c69",
+  "capturedAtUTC": "2026-10-22T12:50:06.405558+00:00",
+  "packageDebug": {
+    "EditorKit": {
+      "tests": 513,
+      "skips": 8,
+      "failures": 0
+    },
+    "MarkdownCore": {
+      "tests": 323,
+      "failures": 0
+    },
+    "PreviewKit": {
+      "tests": 133,
+      "failures": 0
+    },
+    "WorkspaceKit": {
+      "tests": 371,
+      "failures": 0
+    },
+    "environment": {
+      "CI": "1"
+    },
+    "scope": "All four package groups; explicit split commands equivalent to make test package scope"
+  },
+  "focusedRegression": {
+    "tests": 13,
+    "failures": 0,
+    "oldProductionCounterfactual": "40 failing assertions; expected behavioral failures, restored before positive suite"
+  },
+  "hosted": {
+    "PlainsongTests": {
+      "tests": 976,
+      "skips": 16,
+      "failures": 0
+    },
+    "PerformanceTests": {
+      "tests": 30,
+      "skips": 4,
+      "failures": 0
+    },
+    "environment": {
+      "TEST_RUNNER_CI": "1"
+    },
+    "action": "test-without-building",
+    "optimization": "same optimized Debug binaries as final paired campaign",
+    "executedBundles": [
+      "PerformanceTests",
+      "PlainsongTests"
+    ],
+    "uiTestsExecuted": false
+  },
+  "preview": {
+    "files": 21,
+    "tests": 150,
+    "failures": 0
+  },
+  "tooling": {
+    "tests": 86,
+    "failures": 0,
+    "inventory": "PASS",
+    "retainedF2Pack": "Existing PARTIAL evidence with six OPEN manual gates"
+  },
+  "sandbox": {
+    "exportRoot": "PASS",
+    "singleFileSave": "PASS"
+  },
+  "style": {
+    "swiftFormatVersion": "0.62.1",
+    "filesRequiringFormatting": 0,
+    "seriousLintViolations": 0,
+    "totalLintWarnings": 360,
+    "newSizeWarnings": 2,
+    "unrelatedAutoFix": "Restored WorkspaceFilesSidebar baseline"
+  },
+  "unsuccessfulReleaseAttempt": {
+    "fullSuite": "Not green; existing IME deferred-install assertions then unexpected signal5",
+    "oldProductionFocusedControl": "Two Release tests reproduce six assertions; Debug full suite and optimized hosted suite pass; no claim of Release package acceptance"
+  },
+  "finalTiming": {
+    "runs": 15,
+    "triplets": 5,
+    "rawReports": "safe-trim-paired-*.json",
+    "protectedFTrimRanges": 90,
+    "protectedFCollisions": 0,
+    "allBeforeStateCaptures": 390
+  },
+  "exactHeadCI": "Intentionally unrun; [skip ci] because existing workflow executes PlainsongUITests",
+  "manualAcceptance": "Maintainer testing remains separate and not claimed",
+  "binarySha256RecheckedAfterHostedSuite": {
+    "F:PerformanceTests": "5b5b6bb55dbed6e376053e151177cd4b4de5a138216d7711ff9e02e4672c08dd",
+    "F:Plainsong": "fd73538a3de133a7a8061038eac6c97d5a5866c08f2432017eab5bc2f030b924",
+    "F:PlainsongTests": "e8488c58ec16d0076e32e36e9e3fededcff1a4cffe0b930a2976835038c7fb55",
+    "H:PerformanceTests": "09bfc4291cb868b3b8b24a10e7c4fd8e7ff6c1db2d1e4f5209875d9bf2736f72",
+    "H:Plainsong": "981985e38728a32a321b8b4fca5bb9110869a93f4fbea78d90cf0c014c05f378",
+    "H:PlainsongTests": "811569da033a892f58b89ea001dae7024487b73f2c3ab047ef580593a6b87205",
+    "M:PerformanceTests": "386345c8c8462f94020c65902b6776d3b391d76da6590352853abd4a006e2537",
+    "M:Plainsong": "9cc124f6857b1bc684df037868f4050a3bb425210d8b8e10f14615f11ac2da09",
+    "M:PlainsongTests": "3f7c3749b83ae5014b2fb2fb0010dc901cee45ecb195860561baa8fa999d4a8d"
+  },
+  "sourceHashesRecheckedAfterHostedSuite": true,
+  "logs": [
+    {
+      "file": "final-admission-focused.log",
+      "path": "/private/tmp/plainsong-gutter-slow-evidence/final-admission-focused.log",
+      "bytes": 6405,
+      "sha256": "1a5bf0b7bb469ddaeb183b6d741786dd7fd8dd1c27065a2bf6ccf05505f651ff"
+    },
+    {
+      "file": "final-guard-negative.log",
+      "path": "/private/tmp/plainsong-gutter-slow-evidence/final-guard-negative.log",
+      "bytes": 20508,
+      "sha256": "416a0361f055e3e2c68500539c28630b1ee555c1aae35b0c37d74f2b94ce18e5"
+    },
+    {
+      "file": "final-editorkit-debug.log",
+      "path": "/private/tmp/plainsong-gutter-slow-evidence/final-editorkit-debug.log",
+      "bytes": 164505,
+      "sha256": "d1cec6049a0f147def59fd5566d5b93b15dd618eb67a8505e37864f9398f45c1"
+    },
+    {
+      "file": "safe-trim-other-packages.log",
+      "path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-other-packages.log",
+      "bytes": 283890,
+      "sha256": "411c91ce4c031dff1dbb694990953403bd7f6d17fc9c7a6a638c61de0410b41c"
+    },
+    {
+      "file": "safe-trim-preview.log",
+      "path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-preview.log",
+      "bytes": 463,
+      "sha256": "b94401294bb9b69bbbbb1afab57459d7452373f56d13631c2cd106b2ca1be21b"
+    },
+    {
+      "file": "safe-trim-tooling.log",
+      "path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-tooling.log",
+      "bytes": 11666,
+      "sha256": "c0962ea1b705a6fd34ef946c20ac09a1eb605d7b978e7ab54af6e3a55f6374f2"
+    },
+    {
+      "file": "safe-trim-hosted-correctness.log",
+      "path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-hosted-correctness.log",
+      "bytes": 5523912,
+      "sha256": "86e73d1ac7d6824c22277ccf5b63a8527b1990ead329fd06d95acf0a8937ec85"
+    },
+    {
+      "file": "safe-trim-format.log",
+      "path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-format.log",
+      "bytes": 353,
+      "sha256": "bffef127ce04738a3ad3f2ce9fdd1e0af5434ccfde0002c18549ea7d0a14aebe"
+    },
+    {
+      "file": "safe-trim-lint.log",
+      "path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-lint.log",
+      "bytes": 130474,
+      "sha256": "4c3db48c348744ee4b109320c38b8cf656925ab5d3c66f1ce92d485b4dc428ad"
+    },
+    {
+      "file": "editorkit-full-final.log",
+      "path": "/private/tmp/plainsong-gutter-slow-evidence/editorkit-full-final.log",
+      "bytes": 81538,
+      "sha256": "bf360e71e3d5d6efbb61d4a1b2e23f6fdb9ec472fafe988a1f0f959a5020f6a9"
+    },
+    {
+      "file": "baseline-release-ime-control.log",
+      "path": "/private/tmp/plainsong-gutter-slow-evidence/baseline-release-ime-control.log",
+      "bytes": 17747,
+      "sha256": "eef4de4c1f2da3b0d4114c61c7cb974b8860d7ea5d3034ebcc46f43a011288ea"
+    }
+  ],
+  "diffWhitespaceCheck": {
+    "result": "PASS",
+    "excluded": "*.patch only; retained unified-diff context-prefix spaces are intentional and digest-bound"
+  }
+}

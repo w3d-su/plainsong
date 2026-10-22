@@ -1,0 +1,955 @@
+{
+  "baseline_overlay_patches": {
+    "safe-trim-H-baseline-test-overlay.patch": {
+      "bytes": 45284,
+      "sha256": "05331e89af521b08c14986736fb1266ce14698e13c3d47608433dec01a96283f"
+    },
+    "safe-trim-M-baseline-test-overlay.patch": {
+      "bytes": 46303,
+      "sha256": "4f9e2eca9172735032b1eee4431300abac08636544286e385ccf2168263d397c"
+    }
+  },
+  "build_manifests": {
+    "admission-paired-builds.json": "2882e038b09a2f3dc2a8f8f56785a420591df7b19b4cb5571bc5770d10dc4ecc",
+    "relocation-paired-builds.json": "88223ed1f98c28504b1356aaf0dcab3e6c8e909f28c4b28c95e044a7136d881e",
+    "safe-trim-paired-builds.json": "97561d1279caeb4c5d505b28fbc3cbfc5c023c5ee2c7246ef758a4264db925a0"
+  },
+  "fixture": {
+    "path": "/Users/davis._.su/.codex/worktrees/gutter-slow-run-probe/blogeditor/Fixtures/large-1mb.md",
+    "sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+    "utf16_length": 1048962
+  },
+  "generator_sha256": "344a1871137e1b2679e077252ced28b1b3a974098d98b0479a9d9235bd53dbe8",
+  "reports": [
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/admission-paired-1-F.json",
+      "build_provenance": "admission-paired-builds.json:F",
+      "bytes": 293230,
+      "candidate_status": "SUPERSEDED",
+      "file": "admission-paired-1-F.json",
+      "group": "SUPERSEDED_suffix_only_admission_triplets",
+      "sha256": "c12a05d20ab24d4808007b9696840b9037e7fd71e67652c3e01526fdd2d9b17b",
+      "variant": "SUPERSEDED suffix-only guard; unavailable-viewport fallback and offscreen-caret policy replaced"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/admission-paired-1-H.json",
+      "build_provenance": "admission-paired-builds.json:H",
+      "bytes": 311188,
+      "candidate_status": "SUPERSEDED",
+      "file": "admission-paired-1-H.json",
+      "group": "SUPERSEDED_suffix_only_admission_triplets",
+      "sha256": "9040db46b166414c5307a8987512f5cbde4fad8063d5b99d2bbdd6dd93c5d607",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/admission-paired-1-M.json",
+      "build_provenance": "admission-paired-builds.json:M",
+      "bytes": 320178,
+      "candidate_status": "SUPERSEDED",
+      "file": "admission-paired-1-M.json",
+      "group": "SUPERSEDED_suffix_only_admission_triplets",
+      "sha256": "fac9d26bec54f756ae382ee1a281774fdff7af2678dd50ca9896a26fcc2a02be",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/admission-paired-2-F.json",
+      "build_provenance": "admission-paired-builds.json:F",
+      "bytes": 293237,
+      "candidate_status": "SUPERSEDED",
+      "file": "admission-paired-2-F.json",
+      "group": "SUPERSEDED_suffix_only_admission_triplets",
+      "sha256": "a5042097a5d04dafcb6bbda675d478a2a412c64fff78feee8fa22ae9661ec474",
+      "variant": "SUPERSEDED suffix-only guard; unavailable-viewport fallback and offscreen-caret policy replaced"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/admission-paired-2-H.json",
+      "build_provenance": "admission-paired-builds.json:H",
+      "bytes": 311202,
+      "candidate_status": "SUPERSEDED",
+      "file": "admission-paired-2-H.json",
+      "group": "SUPERSEDED_suffix_only_admission_triplets",
+      "sha256": "b0eea0c27bad0eea97f1b20b0314fd5ed87b5d88aca2a1f031e06c04bd9d573c",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/admission-paired-2-M.json",
+      "build_provenance": "admission-paired-builds.json:M",
+      "bytes": 319001,
+      "candidate_status": "SUPERSEDED",
+      "file": "admission-paired-2-M.json",
+      "group": "SUPERSEDED_suffix_only_admission_triplets",
+      "sha256": "fc8c11fcb2fb14de6b464642b122df72c931df86a0fd83165fcc35bd45b72bc4",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/admission-paired-3-F.json",
+      "build_provenance": "admission-paired-builds.json:F",
+      "bytes": 293244,
+      "candidate_status": "SUPERSEDED",
+      "file": "admission-paired-3-F.json",
+      "group": "SUPERSEDED_suffix_only_admission_triplets",
+      "sha256": "aeb186f89f8c79e8e208d956664dbe396d1302ecd1d0ff7cc4d4edeac554b564",
+      "variant": "SUPERSEDED suffix-only guard; unavailable-viewport fallback and offscreen-caret policy replaced"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/admission-paired-3-H.json",
+      "build_provenance": "admission-paired-builds.json:H",
+      "bytes": 311231,
+      "candidate_status": "SUPERSEDED",
+      "file": "admission-paired-3-H.json",
+      "group": "SUPERSEDED_suffix_only_admission_triplets",
+      "sha256": "c4bd927af773add343506ad63e0ecc461e067979bace21a25ddae73b82fe99bd",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/admission-paired-3-M.json",
+      "build_provenance": "admission-paired-builds.json:M",
+      "bytes": 319372,
+      "candidate_status": "SUPERSEDED",
+      "file": "admission-paired-3-M.json",
+      "group": "SUPERSEDED_suffix_only_admission_triplets",
+      "sha256": "c2f349970710bbdd3bc6a5a59964cf4d7e10d2af80f47061a5ab31a1eb6cb3db",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/admission-paired-4-F.json",
+      "build_provenance": "admission-paired-builds.json:F",
+      "bytes": 293208,
+      "candidate_status": "SUPERSEDED",
+      "file": "admission-paired-4-F.json",
+      "group": "SUPERSEDED_suffix_only_admission_triplets",
+      "sha256": "403e031eeb5eacf5600ee12ecc2a522a788c54e1912ed33159644860715855bb",
+      "variant": "SUPERSEDED suffix-only guard; unavailable-viewport fallback and offscreen-caret policy replaced"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/admission-paired-4-H.json",
+      "build_provenance": "admission-paired-builds.json:H",
+      "bytes": 311208,
+      "candidate_status": "SUPERSEDED",
+      "file": "admission-paired-4-H.json",
+      "group": "SUPERSEDED_suffix_only_admission_triplets",
+      "sha256": "a9917a1b2248e8766a9e495167479ea1aa8f902a88a96f6e52a4f737425ef2f0",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/admission-paired-4-M.json",
+      "build_provenance": "admission-paired-builds.json:M",
+      "bytes": 319781,
+      "candidate_status": "SUPERSEDED",
+      "file": "admission-paired-4-M.json",
+      "group": "SUPERSEDED_suffix_only_admission_triplets",
+      "sha256": "37aa04c71d1f552798b872751f20a0539aee647545fe81a804df2030d916292c",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/admission-paired-5-F.json",
+      "build_provenance": "admission-paired-builds.json:F",
+      "bytes": 293575,
+      "candidate_status": "SUPERSEDED",
+      "file": "admission-paired-5-F.json",
+      "group": "SUPERSEDED_suffix_only_admission_triplets",
+      "sha256": "32f333bb0f4deb06bcba511e3154731a50dbf84dfbc573b10ece5e755417011f",
+      "variant": "SUPERSEDED suffix-only guard; unavailable-viewport fallback and offscreen-caret policy replaced"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/admission-paired-5-H.json",
+      "build_provenance": "admission-paired-builds.json:H",
+      "bytes": 309568,
+      "candidate_status": "SUPERSEDED",
+      "file": "admission-paired-5-H.json",
+      "group": "SUPERSEDED_suffix_only_admission_triplets",
+      "sha256": "294c816d6a101176ae461de88b3848549a1c1ba3824e433ff5a88ea25892d576",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/admission-paired-5-M.json",
+      "build_provenance": "admission-paired-builds.json:M",
+      "bytes": 324755,
+      "candidate_status": "SUPERSEDED",
+      "file": "admission-paired-5-M.json",
+      "group": "SUPERSEDED_suffix_only_admission_triplets",
+      "sha256": "fc14eda0d18a8131d93ad0fe6fe9af95169ef0730cd64dec799159ac807224f0",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/branch-split15-on-1.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 188733,
+      "candidate_status": "CONTROL",
+      "file": "branch-split15-on-1.json",
+      "group": "reproduction_and_order_neighbors",
+      "sha256": "e7afa4e16300bd99ea18057d39d8ff38a287dd4776aee9e0522faa99b8649700",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/branch-split16-on-1.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 187372,
+      "candidate_status": "CONTROL",
+      "file": "branch-split16-on-1.json",
+      "group": "reproduction_and_order_neighbors",
+      "sha256": "74e314cc6ca01e45deee84fb4a2256af57d012aff9e3c80dcc8b896efc067b79",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/branch-split17-on-1.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 188705,
+      "candidate_status": "CONTROL",
+      "file": "branch-split17-on-1.json",
+      "group": "reproduction_and_order_neighbors",
+      "sha256": "3bbf24130d0458aca4a4682f27456244de12fa3c3f278ff2bcefb9650c7062ab",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/forced-draw0-1-H.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 313249,
+      "candidate_status": "REJECTED",
+      "file": "forced-draw0-1-H.json",
+      "group": "REJECTED_snapshot_forced_draw_controls",
+      "sha256": "bc780011ec34e0fc887339cb5cca8b8af272e5de084120403c1005b6d3e7cb0b",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/forced-draw0-2-F.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 288666,
+      "candidate_status": "REJECTED",
+      "file": "forced-draw0-2-F.json",
+      "group": "REJECTED_snapshot_forced_draw_controls",
+      "sha256": "a843f4179160b5771dbd01324ce56d0fe60c3c83d858c84b99e5389d0a346b4a",
+      "variant": "REJECTED viewport-snapshot gutter candidate"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/forced-draw0-3-F.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 314144,
+      "candidate_status": "REJECTED",
+      "file": "forced-draw0-3-F.json",
+      "group": "REJECTED_snapshot_forced_draw_controls",
+      "sha256": "39b802afceb9fdb63d4560fd6d949a6e49dd2b5b868e5aa26ef596ee79e59235",
+      "variant": "REJECTED viewport-snapshot gutter candidate"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/forced-draw0-4-H.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 314113,
+      "candidate_status": "REJECTED",
+      "file": "forced-draw0-4-H.json",
+      "group": "REJECTED_snapshot_forced_draw_controls",
+      "sha256": "1031effd030c2d54e883d6c70ef980474d5186d95298d47a069a1dacf90776ea",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/forced-draw18-1-H.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 312400,
+      "candidate_status": "REJECTED",
+      "file": "forced-draw18-1-H.json",
+      "group": "REJECTED_snapshot_forced_draw_controls",
+      "sha256": "99207920629f72d159a4f3d354c0eddd5034e557ce5b646326bf4f070d88e772",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/forced-draw18-2-F.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 287709,
+      "candidate_status": "REJECTED",
+      "file": "forced-draw18-2-F.json",
+      "group": "REJECTED_snapshot_forced_draw_controls",
+      "sha256": "97beef164472102f30eba5cfc5010e27d680db254dbb498b3400458a59aee6d2",
+      "variant": "REJECTED viewport-snapshot gutter candidate"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/forced-draw18-3-F.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 288700,
+      "candidate_status": "REJECTED",
+      "file": "forced-draw18-3-F.json",
+      "group": "REJECTED_snapshot_forced_draw_controls",
+      "sha256": "90edf9b541779d2da056831cf2cc4fd8ee6a94ccc137bad790ea8c005b4b0fdd",
+      "variant": "REJECTED viewport-snapshot gutter candidate"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/forced-draw18-4-H.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 288644,
+      "candidate_status": "REJECTED",
+      "file": "forced-draw18-4-H.json",
+      "group": "REJECTED_snapshot_forced_draw_controls",
+      "sha256": "c378314ba93c126f5c83f2362fd7a010d2a825cc3dc0d982aaf9e8cedb48748f",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/formation-control-1-hidden.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 287709,
+      "candidate_status": "CONTROL",
+      "file": "formation-control-1-hidden.json",
+      "group": "PR189_formation_controls",
+      "sha256": "51663d82f56b52f96d364b8e3d1c16ad1a43a8245f49e3fd6d2288a6620e6451",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/formation-control-1-off408.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 312757,
+      "candidate_status": "CONTROL",
+      "file": "formation-control-1-off408.json",
+      "group": "PR189_formation_controls",
+      "sha256": "b753bb4dacc95a5bb038e82a1fc6be524cfc776253847a861f96606131457c27",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/formation-control-2-hidden.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 288873,
+      "candidate_status": "CONTROL",
+      "file": "formation-control-2-hidden.json",
+      "group": "PR189_formation_controls",
+      "sha256": "143f2a8f064c2c070f0a72045e199448376bfedffcd9f9fd9aafb87f92bff075",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/formation-control-2-off408.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 288162,
+      "candidate_status": "CONTROL",
+      "file": "formation-control-2-off408.json",
+      "group": "PR189_formation_controls",
+      "sha256": "9fea29414fa94a2f1a57a5a154032481fdbb318a482886237a53f301046a939f",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/formation-control-3-hidden.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 314035,
+      "candidate_status": "CONTROL",
+      "file": "formation-control-3-hidden.json",
+      "group": "PR189_formation_controls",
+      "sha256": "cb1dd9ed30fdcfc4a389ec031cc6d5b12117874bad7b1a80379ca7c9ecd9f139",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/formation-control-3-off408.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 287293,
+      "candidate_status": "CONTROL",
+      "file": "formation-control-3-off408.json",
+      "group": "PR189_formation_controls",
+      "sha256": "1fa99a17202bdb2df02157a64059214fb22a0811227ce4ad2a01da963a321458",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/formation-control-4-hidden.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 288575,
+      "candidate_status": "CONTROL",
+      "file": "formation-control-4-hidden.json",
+      "group": "PR189_formation_controls",
+      "sha256": "62015d16efd93d44f301e3bca2e5a871c6b3a8961527af0034eafe92265a55ca",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/formation-control-4-off408.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 313986,
+      "candidate_status": "CONTROL",
+      "file": "formation-control-4-off408.json",
+      "group": "PR189_formation_controls",
+      "sha256": "334cafad978bdec997fabffd28edf948dfc43a45b92bee38d6187a1adef0f12d",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/head-early-hidden-forced-split16.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 288567,
+      "candidate_status": "CONTROL",
+      "file": "head-early-hidden-forced-split16.json",
+      "group": "reproduction_and_order_neighbors",
+      "sha256": "d6d62aa09bf6f6f148ee43e4e6ec8f6c051634f997c15259aad69cbf6e550f98",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/head-split16-on-2.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 187364,
+      "candidate_status": "CONTROL",
+      "file": "head-split16-on-2.json",
+      "group": "reproduction_and_order_neighbors",
+      "sha256": "653663636901ed9eb8739a76bd17ad12c7419b6d4d09f09375610a738f6dd67c",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/main-formation-1-off408.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 288160,
+      "candidate_status": "CONTROL",
+      "file": "main-formation-1-off408.json",
+      "group": "main_formation_controls",
+      "sha256": "b6be02d26fba73a8e2af137607c9600bc37d56bd55befe0824e00455ae197942",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/main-formation-1-on.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 290500,
+      "candidate_status": "CONTROL",
+      "file": "main-formation-1-on.json",
+      "group": "main_formation_controls",
+      "sha256": "6d1ebf92b66c0930bd277f5221c8cb036ec2a785014e65761921250266323935",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/main-formation-2-off408.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 287697,
+      "candidate_status": "CONTROL",
+      "file": "main-formation-2-off408.json",
+      "group": "main_formation_controls",
+      "sha256": "991abc143c694a423fa0352c82e8790f589f927a3d3a1103ffb831192112b402",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/main-formation-2-on.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 297458,
+      "candidate_status": "CONTROL",
+      "file": "main-formation-2-on.json",
+      "group": "main_formation_controls",
+      "sha256": "505f56aba22a6dc180932660827ac92f83d7997bbc76249687702ae19f8d42d9",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/main-formation-3-off408.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 287332,
+      "candidate_status": "CONTROL",
+      "file": "main-formation-3-off408.json",
+      "group": "main_formation_controls",
+      "sha256": "dfc978e61d4296ff84411ba959028e635740ea9ce14b6766b523cc63fc8420e0",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/main-formation-3-on.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 291748,
+      "candidate_status": "CONTROL",
+      "file": "main-formation-3-on.json",
+      "group": "main_formation_controls",
+      "sha256": "c2b7bc87dcdfccaf45a22f7c8de90096cb6a43dc630d9db5a99c03b7fd4cc7dc",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/main-formation-4-off408.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 287305,
+      "candidate_status": "CONTROL",
+      "file": "main-formation-4-off408.json",
+      "group": "main_formation_controls",
+      "sha256": "fb1f1a02056e46951e05aaef0289b93fcec559d035f4f4f43a707faaab77f215",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/main-formation-4-on.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 292995,
+      "candidate_status": "CONTROL",
+      "file": "main-formation-4-on.json",
+      "group": "main_formation_controls",
+      "sha256": "0e22c11b3e2d479ac6b4a3dc949ff8d7c02d0a52c41873ec87afe7e0ebb83070",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/paired-split16-1-F-retry.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 36434,
+      "candidate_status": "REJECTED",
+      "file": "paired-split16-1-F-retry.json",
+      "group": "REJECTED_snapshot_triplets",
+      "sha256": "d2d1d1669ca3f86b7924f73f3bb0e7206249240bc1f02bb60f7c47ae3dafbffe",
+      "variant": "REJECTED viewport-snapshot gutter candidate"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/paired-split16-1-H.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 36432,
+      "candidate_status": "REJECTED",
+      "file": "paired-split16-1-H.json",
+      "group": "REJECTED_snapshot_triplets",
+      "sha256": "8a6189192063dcb4215c0980edd77dfbf9db2821f9ef579f1244d45a1015a679",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/paired-split16-1-M-retry.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 5864,
+      "candidate_status": "REJECTED",
+      "file": "paired-split16-1-M-retry.json",
+      "group": "REJECTED_snapshot_triplets",
+      "sha256": "ad2379f03a9da0b1efaee214bbf8f5bb2576f63c6998caec439d06c765a87d3f",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/paired-split16-2-F.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 36440,
+      "candidate_status": "REJECTED",
+      "file": "paired-split16-2-F.json",
+      "group": "REJECTED_snapshot_triplets",
+      "sha256": "fa1e8d83607a7cece1119536cf492585719fbd91707013f86ffa1d6a4816ef50",
+      "variant": "REJECTED viewport-snapshot gutter candidate"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/paired-split16-2-H.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 36431,
+      "candidate_status": "REJECTED",
+      "file": "paired-split16-2-H.json",
+      "group": "REJECTED_snapshot_triplets",
+      "sha256": "776274d4fd463579224809ee93c31014dfc49960e4e5375da2bd4fb0d49b997d",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/paired-split16-2-M.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 5836,
+      "candidate_status": "REJECTED",
+      "file": "paired-split16-2-M.json",
+      "group": "REJECTED_snapshot_triplets",
+      "sha256": "9e716d3af56a0220913bdb3548f1a53f5e9cc2ca1b677b2161e18d25edcdf98e",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/paired-split16-3-F.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 36446,
+      "candidate_status": "REJECTED",
+      "file": "paired-split16-3-F.json",
+      "group": "REJECTED_snapshot_triplets",
+      "sha256": "9cc57c2f1d931fbf54d4c0de4ee11aca2181ea321abc6a1113ad54b964137ce1",
+      "variant": "REJECTED viewport-snapshot gutter candidate"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/paired-split16-3-H.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 36431,
+      "candidate_status": "REJECTED",
+      "file": "paired-split16-3-H.json",
+      "group": "REJECTED_snapshot_triplets",
+      "sha256": "4be3b6cd832f97b0a9879d43234b01f24953ee9239f30988ce4e527899aa2740",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/paired-split16-3-M.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 5874,
+      "candidate_status": "REJECTED",
+      "file": "paired-split16-3-M.json",
+      "group": "REJECTED_snapshot_triplets",
+      "sha256": "43907c0052b035c9de4618972fd80d596ab7b0041a5f1fa9b9f2232d46a7a607",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/paired-split16-4-F.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 36421,
+      "candidate_status": "REJECTED",
+      "file": "paired-split16-4-F.json",
+      "group": "REJECTED_snapshot_triplets",
+      "sha256": "ba7ea7dd1553db3808519f1d9d1ce64d41bf190d5f11936dae30f8fa5da1db4d",
+      "variant": "REJECTED viewport-snapshot gutter candidate"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/paired-split16-4-H.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 36436,
+      "candidate_status": "REJECTED",
+      "file": "paired-split16-4-H.json",
+      "group": "REJECTED_snapshot_triplets",
+      "sha256": "82ea120b9d20129705e09eb829aa5134b3e07530f6dbc39e4defba18e6a1a42b",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/paired-split16-4-M.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 5880,
+      "candidate_status": "REJECTED",
+      "file": "paired-split16-4-M.json",
+      "group": "REJECTED_snapshot_triplets",
+      "sha256": "a6f34be101b7e918c66faa1638ed1a8e9024c7acee08621a44f74b418276477f",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/paired-split16-5-F.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 36422,
+      "candidate_status": "REJECTED",
+      "file": "paired-split16-5-F.json",
+      "group": "REJECTED_snapshot_triplets",
+      "sha256": "8825816c453ebb93420b9aadb9340bedbd92652162cc1774cba01600cf63538b",
+      "variant": "REJECTED viewport-snapshot gutter candidate"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/paired-split16-5-H.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 36414,
+      "candidate_status": "REJECTED",
+      "file": "paired-split16-5-H.json",
+      "group": "REJECTED_snapshot_triplets",
+      "sha256": "850e25e26527f5165bf11ebeb2cca00582206bebe905f9fd65d1652675c3a529",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/paired-split16-5-M.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 5883,
+      "candidate_status": "REJECTED",
+      "file": "paired-split16-5-M.json",
+      "group": "REJECTED_snapshot_triplets",
+      "sha256": "af5a2a7b8e7b1da4979fe1581199d7b1f31614254f17249b197c2d203abf9b38",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/relocation-paired-1-F.json",
+      "build_provenance": "relocation-paired-builds.json:F",
+      "bytes": 296918,
+      "candidate_status": "REJECTED",
+      "file": "relocation-paired-1-F.json",
+      "group": "REJECTED_height_adapter_triplets",
+      "sha256": "da9f75784ceaafc176b61a3597af3a75ffc73c8aaa17fcbfc83bd40639e60218",
+      "variant": "REJECTED empty-viewport middle-relocation height adapter"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/relocation-paired-1-H.json",
+      "build_provenance": "relocation-paired-builds.json:H",
+      "bytes": 289058,
+      "candidate_status": "REJECTED",
+      "file": "relocation-paired-1-H.json",
+      "group": "REJECTED_height_adapter_triplets",
+      "sha256": "3470030ed3abd632db6758dcf29ff93f5c10a2b51afce6d8c5b1535029827a4d",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/relocation-paired-1-M.json",
+      "build_provenance": "relocation-paired-builds.json:M",
+      "bytes": 292948,
+      "candidate_status": "REJECTED",
+      "file": "relocation-paired-1-M.json",
+      "group": "REJECTED_height_adapter_triplets",
+      "sha256": "43bdc76eb69608b490eafc1a370d93004f0947063007275134fa64f01b084ae6",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/relocation-paired-2-F.json",
+      "build_provenance": "relocation-paired-builds.json:F",
+      "bytes": 297394,
+      "candidate_status": "REJECTED",
+      "file": "relocation-paired-2-F.json",
+      "group": "REJECTED_height_adapter_triplets",
+      "sha256": "6f5f737ce9eb30a8fd7f57ee2ae55d4de3a3bc03bd58664c2e648ece72662c19",
+      "variant": "REJECTED empty-viewport middle-relocation height adapter"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/relocation-paired-2-H.json",
+      "build_provenance": "relocation-paired-builds.json:H",
+      "bytes": 313258,
+      "candidate_status": "REJECTED",
+      "file": "relocation-paired-2-H.json",
+      "group": "REJECTED_height_adapter_triplets",
+      "sha256": "04d39ca7ea3d5621c625fa3b8ee4d2fe4bc577600500b62a27258904a6f0e9db",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/relocation-paired-2-M.json",
+      "build_provenance": "relocation-paired-builds.json:M",
+      "bytes": 294267,
+      "candidate_status": "REJECTED",
+      "file": "relocation-paired-2-M.json",
+      "group": "REJECTED_height_adapter_triplets",
+      "sha256": "3b384665aab440bb25659bdcb2b1202ae475fdc26f994d3aa0e6ff8561baba96",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/relocation-paired-3-F.json",
+      "build_provenance": "relocation-paired-builds.json:F",
+      "bytes": 296555,
+      "candidate_status": "REJECTED",
+      "file": "relocation-paired-3-F.json",
+      "group": "REJECTED_height_adapter_triplets",
+      "sha256": "b040229c0a38fd95e798c99ada26c0e97ebd4bcc7aa1b808c4d9c050b67ca9cc",
+      "variant": "REJECTED empty-viewport middle-relocation height adapter"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/relocation-paired-3-H.json",
+      "build_provenance": "relocation-paired-builds.json:H",
+      "bytes": 287852,
+      "candidate_status": "REJECTED",
+      "file": "relocation-paired-3-H.json",
+      "group": "REJECTED_height_adapter_triplets",
+      "sha256": "e3f303902724ceba1c806be3f5c10709bb6e01844fea80410bd53cd01afcffe3",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/relocation-paired-3-M.json",
+      "build_provenance": "relocation-paired-builds.json:M",
+      "bytes": 299545,
+      "candidate_status": "REJECTED",
+      "file": "relocation-paired-3-M.json",
+      "group": "REJECTED_height_adapter_triplets",
+      "sha256": "85a59d1d624abb2bed80f074c498e3e087f92252e0ff277195a8ce783b219e93",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/relocation-paired-4-F.json",
+      "build_provenance": "relocation-paired-builds.json:F",
+      "bytes": 312839,
+      "candidate_status": "REJECTED",
+      "file": "relocation-paired-4-F.json",
+      "group": "REJECTED_height_adapter_triplets",
+      "sha256": "79eb91c9e2196a4cf9aad3de8fbf29019ebc34a4dbe3a0e7c32a4909cf486bdb",
+      "variant": "REJECTED empty-viewport middle-relocation height adapter"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/relocation-paired-4-H.json",
+      "build_provenance": "relocation-paired-builds.json:H",
+      "bytes": 288704,
+      "candidate_status": "REJECTED",
+      "file": "relocation-paired-4-H.json",
+      "group": "REJECTED_height_adapter_triplets",
+      "sha256": "09361c17db1cb9acc51c124bddd0cc4173bb3a773c1e932a3b7a8d253da35fcd",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/relocation-paired-4-M.json",
+      "build_provenance": "relocation-paired-builds.json:M",
+      "bytes": 294982,
+      "candidate_status": "REJECTED",
+      "file": "relocation-paired-4-M.json",
+      "group": "REJECTED_height_adapter_triplets",
+      "sha256": "50471e61b13e448b63bc2c17f8f815dc1da38bd8b7e8a26abcdcb0c1614c41fb",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/relocation-paired-5-F.json",
+      "build_provenance": "relocation-paired-builds.json:F",
+      "bytes": 298455,
+      "candidate_status": "REJECTED",
+      "file": "relocation-paired-5-F.json",
+      "group": "REJECTED_height_adapter_triplets",
+      "sha256": "64fb03149cbc4653987e7aa264ca8c2174067a2ac243782b7317b6f76d1637e1",
+      "variant": "REJECTED empty-viewport middle-relocation height adapter"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/relocation-paired-5-H.json",
+      "build_provenance": "relocation-paired-builds.json:H",
+      "bytes": 313249,
+      "candidate_status": "REJECTED",
+      "file": "relocation-paired-5-H.json",
+      "group": "REJECTED_height_adapter_triplets",
+      "sha256": "563d060db70474fdb484b2c81d65084a1a59dc635d8a6c6e954fa617a16c26d2",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/relocation-paired-5-M.json",
+      "build_provenance": "relocation-paired-builds.json:M",
+      "bytes": 294228,
+      "candidate_status": "REJECTED",
+      "file": "relocation-paired-5-M.json",
+      "group": "REJECTED_height_adapter_triplets",
+      "sha256": "cf7d3f61f9f4ed785591d32bbfab987a008b88f218ff9f2089a178194cd7d9fc",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/relocation-stress-1-F.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 297369,
+      "candidate_status": "REJECTED",
+      "file": "relocation-stress-1-F.json",
+      "group": "REJECTED_height_adapter_stress",
+      "sha256": "6b417c1db50f9daef51741da3070547b51e9d57ae2cc1eb27cc1dd6bac831375",
+      "variant": "REJECTED middle-relocation height adapter; exploratory stress"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/relocation-stress-2-F.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 298516,
+      "candidate_status": "REJECTED",
+      "file": "relocation-stress-2-F.json",
+      "group": "REJECTED_height_adapter_stress",
+      "sha256": "16da6c7ea94665474612409f1dd627030d24ba2dd04888a1896d4ed27ca36da5",
+      "variant": "REJECTED middle-relocation height adapter; exploratory stress"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/relocation-stress-3-F.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 296552,
+      "candidate_status": "REJECTED",
+      "file": "relocation-stress-3-F.json",
+      "group": "REJECTED_height_adapter_stress",
+      "sha256": "4105b05a4e1c4997c03ae2896ae9b3e2e6f8f60fd5eb6ae5a04e53a861ac1cd0",
+      "variant": "REJECTED middle-relocation height adapter; exploratory stress"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/relocation-stress-4-F.json",
+      "build_provenance": "Exploratory report; no matching retained binary attestation",
+      "bytes": 296838,
+      "candidate_status": "REJECTED",
+      "file": "relocation-stress-4-F.json",
+      "group": "REJECTED_height_adapter_stress",
+      "sha256": "7a40d8a5459ab65e29e78aeba16d6388e3c891a61c37338a2b8f12f769a8ca80",
+      "variant": "REJECTED middle-relocation height adapter; exploratory stress"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-paired-1-F.json",
+      "build_provenance": "safe-trim-paired-builds.json:F",
+      "bytes": 322801,
+      "candidate_status": "FINAL",
+      "file": "safe-trim-paired-1-F.json",
+      "group": "FINAL_safe_trim_triplets",
+      "sha256": "cb0b409c6008905a1411bb8d5ec72452c3def4600411c605f3ea9117fa21921a",
+      "variant": "live native viewport and selected-paragraph interval planner plus selection-report liveness dedup"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-paired-1-H.json",
+      "build_provenance": "safe-trim-paired-builds.json:H",
+      "bytes": 300512,
+      "candidate_status": "FINAL",
+      "file": "safe-trim-paired-1-H.json",
+      "group": "FINAL_safe_trim_triplets",
+      "sha256": "2dd55502cbeb6c414efb0c370fcc74880388fcbe3d4fc8387fb802cec7466979",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-paired-1-M.json",
+      "build_provenance": "safe-trim-paired-builds.json:M",
+      "bytes": 306833,
+      "candidate_status": "FINAL",
+      "file": "safe-trim-paired-1-M.json",
+      "group": "FINAL_safe_trim_triplets",
+      "sha256": "9a1ebeb460e81d0eea41310bc058284cb716fbbdd232b32f22e93be98f56d612",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-paired-2-F.json",
+      "build_provenance": "safe-trim-paired-builds.json:F",
+      "bytes": 321986,
+      "candidate_status": "FINAL",
+      "file": "safe-trim-paired-2-F.json",
+      "group": "FINAL_safe_trim_triplets",
+      "sha256": "5630a1790ef1e1cfd0712b740239c729b5e6e2136f5cc7c81663a1e80c02a218",
+      "variant": "live native viewport and selected-paragraph interval planner plus selection-report liveness dedup"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-paired-2-H.json",
+      "build_provenance": "safe-trim-paired-builds.json:H",
+      "bytes": 300522,
+      "candidate_status": "FINAL",
+      "file": "safe-trim-paired-2-H.json",
+      "group": "FINAL_safe_trim_triplets",
+      "sha256": "59f16d1c03050df6b23ae79817764a93f1e70d1b75f483e0632941cd89dfce34",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-paired-2-M.json",
+      "build_provenance": "safe-trim-paired-builds.json:M",
+      "bytes": 306830,
+      "candidate_status": "FINAL",
+      "file": "safe-trim-paired-2-M.json",
+      "group": "FINAL_safe_trim_triplets",
+      "sha256": "c7a303687f203ee0b96d200966e11216b99c5e8a578b6f5f069944250973a3a7",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-paired-3-F.json",
+      "build_provenance": "safe-trim-paired-builds.json:F",
+      "bytes": 322766,
+      "candidate_status": "FINAL",
+      "file": "safe-trim-paired-3-F.json",
+      "group": "FINAL_safe_trim_triplets",
+      "sha256": "91c1d9bfe5b2e52649b4ce77ba95a06587454fe8b402f85778f823deb106e07e",
+      "variant": "live native viewport and selected-paragraph interval planner plus selection-report liveness dedup"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-paired-3-H.json",
+      "build_provenance": "safe-trim-paired-builds.json:H",
+      "bytes": 300527,
+      "candidate_status": "FINAL",
+      "file": "safe-trim-paired-3-H.json",
+      "group": "FINAL_safe_trim_triplets",
+      "sha256": "90bb931d99674366f77dc828a0a849819ac9d93a558980df6442b349dd583bdb",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-paired-3-M.json",
+      "build_provenance": "safe-trim-paired-builds.json:M",
+      "bytes": 306812,
+      "candidate_status": "FINAL",
+      "file": "safe-trim-paired-3-M.json",
+      "group": "FINAL_safe_trim_triplets",
+      "sha256": "cd33fe96cb3106914e908ce78ca2d488a9754a00057cccf5224501fb3c1a7626",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-paired-4-F.json",
+      "build_provenance": "safe-trim-paired-builds.json:F",
+      "bytes": 321983,
+      "candidate_status": "FINAL",
+      "file": "safe-trim-paired-4-F.json",
+      "group": "FINAL_safe_trim_triplets",
+      "sha256": "ce22d97df6ecfb81c691d7f397df3df2d0ab832fe14686d59bc8278e17957d05",
+      "variant": "live native viewport and selected-paragraph interval planner plus selection-report liveness dedup"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-paired-4-H.json",
+      "build_provenance": "safe-trim-paired-builds.json:H",
+      "bytes": 324243,
+      "candidate_status": "FINAL",
+      "file": "safe-trim-paired-4-H.json",
+      "group": "FINAL_safe_trim_triplets",
+      "sha256": "65665454573ecddc0b3b52ad00da95179a1966426db665a8941314cf986f88fb",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-paired-4-M.json",
+      "build_provenance": "safe-trim-paired-builds.json:M",
+      "bytes": 305143,
+      "candidate_status": "FINAL",
+      "file": "safe-trim-paired-4-M.json",
+      "group": "FINAL_safe_trim_triplets",
+      "sha256": "c14ad39de85b7bf32df996b2af7fe21929addbb3822c4d3e70a6e285143074a4",
+      "variant": "main; unchanged native-gutter production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-paired-5-F.json",
+      "build_provenance": "safe-trim-paired-builds.json:F",
+      "bytes": 321979,
+      "candidate_status": "FINAL",
+      "file": "safe-trim-paired-5-F.json",
+      "group": "FINAL_safe_trim_triplets",
+      "sha256": "ccad06d005b55c34d7a6f53caab4cb25f672c21391fa755b605612973d295fec",
+      "variant": "live native viewport and selected-paragraph interval planner plus selection-report liveness dedup"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-paired-5-H.json",
+      "build_provenance": "safe-trim-paired-builds.json:H",
+      "bytes": 300519,
+      "candidate_status": "FINAL",
+      "file": "safe-trim-paired-5-H.json",
+      "group": "FINAL_safe_trim_triplets",
+      "sha256": "76422e534661021e059ed26d09d4d37e0a97404f4c5994c0f876b1fc9f577317",
+      "variant": "PR189 reference; unchanged pre-fix production"
+    },
+    {
+      "absolute_local_path": "/private/tmp/plainsong-gutter-slow-evidence/safe-trim-paired-5-M.json",
+      "build_provenance": "safe-trim-paired-builds.json:M",
+      "bytes": 310961,
+      "candidate_status": "FINAL",
+      "file": "safe-trim-paired-5-M.json",
+      "group": "FINAL_safe_trim_triplets",
+      "sha256": "6fc29576761ebc589ffdf7ab9d4dca428bcd8454803f867f365f41afbc91beab",
+      "variant": "main; unchanged native-gutter production"
+    }
+  ]
+}
