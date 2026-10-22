@@ -33,4 +33,3 @@ for i,order in enumerate(['HFM','FMH','MHF','HMF','FHM'],1):
     if entry['nativeViewportBeforeLength']<=0 or start<entry['viewportPrefetchBeforeEnd']:raise RuntimeError('Admitted chunk overlaps live viewport prefix')
     if start<entry['selectedProtectionBeforeEnd'] and end>entry['selectedProtectionBeforeStart']:raise RuntimeError('Admitted chunk overlaps selected paragraph band')
    if any(a['location']<b['location']+b['length'] for a,b in zip(ranges,ranges[1:])):raise RuntimeError('Admitted chunks did not descend')
-

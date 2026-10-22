@@ -105,8 +105,9 @@ remaining fast, so those collisions do not force the rare mode on every layout.
 - `summarize.py`: unchanged bytes of the final generator; its SHA-256 matches
   `raw-manifest.json`'s `generator_sha256` despite the shorter filename.
 - `run-safe-trim-pairs.py`, `run-probes.py`, `build-hosted.py`,
-  `measure-command.py`: unchanged local campaign helpers, retaining the original
-  absolute worktree, DerivedData and evidence paths.
+  `measure-command.py`: local campaign helpers retaining the original absolute
+  worktree, DerivedData and evidence paths. Their bytes are unchanged except that
+  the paired runner omits its final extra blank line.
 
 Each campaign manifest binds only the source paths it lists. The final manifest
 cannot attest an older binary; exploratory rows without a matching retained
@@ -140,7 +141,8 @@ was not used for the retained final output. The generator runs no benchmark.
 
 ## Repeat a benchmark
 
-The retained helper bytes describe the actual local campaign. Review their paths
+The retained helpers describe the actual local campaign; the final extra blank
+line normalization noted above changes no command. Review their paths
 before use; editing those paths or changing a product creates a new run with new
 source/product hashes. Preserve these originals, write new evidence to a separate
 folder, and regenerate provenance for any new campaign.
