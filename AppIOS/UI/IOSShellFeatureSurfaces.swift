@@ -33,8 +33,9 @@ final class IOSShellSheetContext {
     let facade: any IOSAppSceneControlling
     let editor: (any IOSSourceEditorControlling)?
     let presentation: IOSShellPresentation
-    /// For the image flow: the directory next to the open document. The hosted
-    /// picker passes it to `IOSImageInsertionControlling.captureContext`.
+    /// For the image flow: the open Markdown document. The writer persists
+    /// assets beside that document. The hosted picker passes this location
+    /// to `IOSImageInsertionControlling.captureContext`.
     let destination: IOSFileLocation?
     /// For the image flow: the workspace grant captured at presentation time
     /// (surfaces.currentGrant). Nil disables the insert path inside the sheet.

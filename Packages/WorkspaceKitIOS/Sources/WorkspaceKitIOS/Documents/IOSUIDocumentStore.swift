@@ -13,6 +13,7 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
     var byResource: [IOSDocumentResourceKey: IOSDocumentEntry] = [:]
     var byIdentity: [IOSDocumentIdentity: IOSDocumentEntry] = [:]
     var observations: [UUID: IOSDocumentStoreObservation] = [:]
+    var grantObservations: [ObjectIdentifier: any IOSObservation] = [:]
     let maximumExternalBytes = 16 * 1024 * 1024
 
     public convenience init(
@@ -136,6 +137,7 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
         let entry = makeEntry(location: location, lease: lease, key: key)
         byResource[key] = entry
         byIdentity[entry.identity] = entry
+        attachGrantWatch(lease)
         emitState(entry)
         do {
             let text: String
@@ -245,16 +247,40 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
         if entry.accessGeneration != generation {
             return false
         }
-        if entry.lease.isReleased {
+        return leaseStillAuthorizes(entry, generation: generation)
+    }
+
+    /// Issue and completion both use this. Scripted leases only have their
+    /// snapshot; a service lease also has to match the live record.
+    func leaseStillAuthorizes(_ entry: IOSDocumentEntry, generation: UInt64) -> Bool {
+        let lease = entry.lease
+        if lease.isReleased {
             return false
         }
-        if entry.lease.grant.accessGeneration != generation {
+        if lease.grant.accessGeneration != generation || lease.grant.workspaceID != entry.location.workspaceID {
             return false
         }
-        if entry.lease.grant.workspaceID != entry.location.workspaceID {
-            return false
+        guard let retained = lease as? IOSRetainedAccessLease else { return true }
+        return retained.authorizesCapturedGeneration()
+    }
+
+    func attachGrantWatch(_ lease: any IOSWorkspaceAccessLease) {
+        guard let retained = lease as? IOSRetainedAccessLease, let service = retained.accessService else { return }
+        let key = ObjectIdentifier(service)
+        guard grantObservations[key] == nil else { return }
+        grantObservations[key] = service.observe { [weak self] event in
+            self?.noteGrantEvent(event)
         }
-        return true
+    }
+
+    /// Invalidate publishes synchronously. Fence open documents in that turn
+    /// so a later save issue or an in-flight completion sees the new generation.
+    func noteGrantEvent(_ event: IOSWorkspaceEvent) {
+        guard case let .invalidated(workspaceID, _) = event else { return }
+        for entry in byIdentity.values where entry.location.workspaceID == workspaceID {
+            guard entry.openFinished, entry.session != nil else { continue }
+            refreshWritableState(entry)
+        }
     }
 
     func setState(_ state: IOSDocumentState, entry: IOSDocumentEntry) {

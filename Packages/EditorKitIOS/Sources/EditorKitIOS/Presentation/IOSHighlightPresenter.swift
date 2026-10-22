@@ -35,7 +35,7 @@ enum IOSHighlightPresenter {
         }
 
         storage.beginEditing()
-        clearOwnedAttributes(in: coveredRange, storage: storage)
+        clearOwnedAttributes(in: coveredRange, storage: storage, restoring: theme)
         for token in tokens {
             guard let range = intersection(token.range, coveredRange), range.length > 0 else { continue }
             storage.addAttributes(
@@ -51,26 +51,40 @@ enum IOSHighlightPresenter {
         return true
     }
 
-    static func clearOwnedAttributes(in range: NSRange, of textView: IOSMarkdownTextView) {
+    static func clearOwnedAttributes(
+        in range: NSRange,
+        of textView: IOSMarkdownTextView,
+        theme: IOSEditorTheme
+    ) {
         guard range.length > 0 else { return }
         textView.suppressesUndoRegistration = true
         textView.textStorage.beginEditing()
-        clearOwnedAttributes(in: range, storage: textView.textStorage)
+        clearOwnedAttributes(in: range, storage: textView.textStorage, restoring: theme)
         textView.textStorage.endEditing()
         textView.suppressesUndoRegistration = false
     }
 
-    private static func clearOwnedAttributes(in range: NSRange, storage: NSTextStorage) {
+    /// Drops the syntax key only on ranges that currently carry it, and puts
+    /// the theme base font and color back on those same ranges. Plain text
+    /// outside the owned ranges is left alone.
+    private static func clearOwnedAttributes(
+        in range: NSRange,
+        storage: NSTextStorage,
+        restoring theme: IOSEditorTheme
+    ) {
         guard range.length > 0, NSMaxRange(range) <= storage.length else { return }
         var owned: [NSRange] = []
         storage.enumerateAttribute(IOSSyntaxAttribute.key, in: range) { value, attributeRange, _ in
             guard value != nil else { return }
             owned.append(attributeRange)
         }
+        let baseStyle: [NSAttributedString.Key: Any] = [
+            .font: theme.baseFont,
+            .foregroundColor: theme.baseColor,
+        ]
         for attributeRange in owned {
             storage.removeAttribute(IOSSyntaxAttribute.key, range: attributeRange)
-            storage.removeAttribute(.foregroundColor, range: attributeRange)
-            storage.removeAttribute(.font, range: attributeRange)
+            storage.addAttributes(baseStyle, range: attributeRange)
         }
     }
 

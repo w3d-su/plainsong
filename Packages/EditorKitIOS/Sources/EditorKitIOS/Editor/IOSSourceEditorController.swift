@@ -27,6 +27,7 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
     var presentationFloor: UInt64 = 0
     var lastSelectionViewport = NSRange(location: NSNotFound, length: 0)
     var beforeNativeMutation: (@MainActor (IOSSourceEditorController) -> Void)?
+    var needsBaseStyle = false
 
     public convenience init(
         syntaxTokenizer: (any MarkdownSyntaxTokenizing)? = nil,
@@ -213,7 +214,59 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
 
     private func applyThemeChrome() {
         textView.backgroundColor = theme.background
+        if textView.markedTextRange != nil {
+            needsBaseStyle = true
+            raisePresentationFloor()
+            return
+        }
+        applyBaseTextStyle()
         raisePresentationFloor()
         scheduleHighlight()
+    }
+
+    /// Plain paragraphs and new typing use the theme. Syntax paint runs after
+    /// this and only restyles token ranges. Source, undo, and marked text stay.
+    func applyBaseTextStyle() {
+        needsBaseStyle = false
+        isReconciling = true
+        textView.suppressesUndoRegistration = true
+        let selectedRange = textView.selectedRange
+        let contentOffset = textView.contentOffset
+        defer {
+            if textView.selectedRange != selectedRange {
+                textView.selectedRange = selectedRange
+            }
+            if textView.contentOffset != contentOffset {
+                textView.contentOffset = contentOffset
+            }
+            textView.suppressesUndoRegistration = false
+            isReconciling = false
+        }
+        let storage = textView.textStorage
+        let full = NSRange(location: 0, length: storage.length)
+        if full.length > 0 {
+            var plainRanges: [NSRange] = []
+            storage.enumerateAttribute(IOSSyntaxAttribute.key, in: full) { value, range, _ in
+                guard value == nil else { return }
+                plainRanges.append(range)
+            }
+            storage.beginEditing()
+            for range in plainRanges {
+                storage.addAttributes(
+                    [
+                        .font: theme.baseFont,
+                        .foregroundColor: theme.baseColor,
+                    ],
+                    range: range
+                )
+            }
+            storage.endEditing()
+        }
+        textView.font = theme.baseFont
+        textView.textColor = theme.baseColor
+        var typing = textView.typingAttributes
+        typing[.font] = theme.baseFont
+        typing[.foregroundColor] = theme.baseColor
+        textView.typingAttributes = typing
     }
 }

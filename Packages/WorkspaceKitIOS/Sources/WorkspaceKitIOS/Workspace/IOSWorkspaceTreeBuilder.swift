@@ -70,7 +70,10 @@ enum IOSWorkspaceTreeBuilder {
         parent: String,
         record: IOSWorkspaceScopeRecord
     ) -> [IOSWorkspaceEntry] {
-        let children = items.filter { IOSWorkspacePathAuthority.parentSpelling($0.relativePath) == parent }
+        let parentKey = WorkspacePathByteKey(parent)
+        let children = items.filter {
+            WorkspacePathByteKey(IOSWorkspacePathAuthority.parentSpelling($0.relativePath)) == parentKey
+        }
         return children.compactMap { item in
             guard let location = location(record: record, relativePath: item.relativePath, item: item) else {
                 return nil

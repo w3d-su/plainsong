@@ -91,12 +91,20 @@ extension IOSUIDocumentStore {
         entry.inFlightText = operation.snapshotText
         setState(
             .saving(
-                canWrite: !writeBarrier(entry) && entry.allowsProviderWrite && !entry.lease.isReleased,
+                canWrite: !writeBarrier(entry)
+                    && entry.allowsProviderWrite
+                    && leaseStillAuthorizes(entry, generation: entry.accessGeneration),
                 accessGeneration: entry.accessGeneration,
                 operationID: operation.operationID
             ),
             entry: entry
         )
+        // Observers run inside setState and can invalidate the live grant
+        // before this returns. Do not start the provider write on that grant.
+        if let failure = refusalAfterSavingNotification(entry, operation) {
+            abandonUnstartedSave(entry)
+            throw failure
+        }
         let disposition: IOSDocumentFileWriteDisposition = await withCheckedContinuation { continuation in
             var resumed = false
             entry.filePort.save(
@@ -125,6 +133,31 @@ extension IOSUIDocumentStore {
         }
     }
 
+    /// Authority and the write barrier after the synchronous saving notification.
+    func refusalAfterSavingNotification(
+        _ entry: IOSDocumentEntry,
+        _ operation: IOSDocumentSaveOperation
+    ) -> IOSDocumentFailure? {
+        if !guardSaveAuthority(entry, operation) {
+            return .documentChanged
+        }
+        if writeBarrier(entry, allowsClosing: operation.allowsClosing) {
+            return .conflict
+        }
+        if !entry.allowsProviderWrite {
+            return .access(.readOnly)
+        }
+        return nil
+    }
+
+    func abandonUnstartedSave(_ entry: IOSDocumentEntry) {
+        entry.inFlightText = nil
+        guard entry.openFinished, !entry.closed, !entry.superseded, byResource[entry.resourceKey] === entry else {
+            return
+        }
+        refreshWritableState(entry)
+    }
+
     func baselineAlreadyHolds(_ entry: IOSDocumentEntry, _ operation: IOSDocumentSaveOperation) -> Bool {
         guard let baseline = entry.lastPersistedText, let session = entry.session else { return false }
         return !session.isDirty
@@ -151,6 +184,9 @@ extension IOSUIDocumentStore {
     ) {
         guard let acknowledged = entryForAcknowledgement(entry, operation) else {
             entry.inFlightText = nil
+            if entry.openFinished, !entry.closed, !entry.superseded, byResource[entry.resourceKey] === entry {
+                refreshWritableState(entry)
+            }
             return
         }
         guard operation.sequence > acknowledged.lastAcknowledgedSequence else { return }
