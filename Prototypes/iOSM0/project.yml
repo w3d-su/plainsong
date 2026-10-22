@@ -12,8 +12,10 @@ targets:
   PlainsongIOSM0:
     type: application
     platform: iOS
-    sources: [Sources]
-    resources: [Fixtures]
+    sources:
+      - path: Sources
+      - path: Fixtures/m0.md
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.plainsong.ios-m0

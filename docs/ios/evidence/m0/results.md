@@ -1,5 +1,14 @@
 # M0 result — OPEN, production composition prohibited
 
+## 2026-10-22 Fixture / delay repair
+
+The owner reports iPhone 14 Pro / iOS 27, with Fixture doing nothing and Delay
+unclear. The original IPA lacked its fixture resource; its earlier 17-test suite
+had no bundled-resource/button coverage. The [repair receipt](fixture-fix-20261022/README.md)
+records the corrected IPA, 20/20 named cases on each simulator family, executed
+writer/packaging negative controls and the limited owner observation. The fixed
+artifact still needs physical retesting; all five owner gates remain OPEN.
+
 ## 2026-10-22 follow-up
 
 The [dated runtime and owner-kit receipt](runtime-20261022/README.md) executes
