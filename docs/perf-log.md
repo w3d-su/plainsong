@@ -2733,3 +2733,35 @@ reconciled-source restore and the Reload/Keep Mine synchronizer — through one
 after the write; hosted tests now pin the silent same-length reload and the same-length
 local edit directly. No per-keystroke work was added: the helper runs only for whole-source
 writes, never on the native typing path, so the typing measurements above are unaffected.
+
+## Preview bundle split: Mermaid on demand, woff2-only KaTeX — 2026-10-22
+
+`bundle.js` no longer contains Mermaid; `mermaid.js` is injected on the first diagram
+(`preview-src/src/mermaid-loader.ts`). KaTeX ships woff2 only, and `acorn` is aliased to one
+copy. Machine: Apple M1 Pro; recorded load average 83-107 during the WebKit runs (heavily
+loaded; numbers are relative, not gates).
+
+| Output | Before | After |
+|---|---|---|
+| `bundle.js` | 4,048,505 B | 797,165 B |
+| `mermaid.js` | — | 3,456,088 B (only parsed by documents with diagrams) |
+| `fonts/` | 60 files, 1.1 MB | 20 woff2 files, 296 KB |
+| `App/Resources/preview/` total | 5.1 MB | 4.4 MB |
+
+Top-level evaluation of the bundle in jsdom (Node/V8, three runs each): about 110 ms before,
+about 30 ms with Mermaid and the duplicate acorn removed.
+
+WKWebView, `loadFileURL` to the bridge `ready` message and then one `render` to
+`renderComplete`, fresh non-persistent web view per sample, 10 interleaved A/B pairs after
+one unmeasured warm-up each (scratchpad harness, not committed):
+
+| Document | Build | Median ready | Ready range | Median first render |
+|---|---|---|---|---|
+| `meeting-notes.md` (no diagram) | Before | 192.3 ms | 161.5-213.6 ms | 16.7 ms |
+| `meeting-notes.md` (no diagram) | After | 103.1 ms | 93.1-122.2 ms | 13.6 ms |
+| `kitchen-sink.md` (2 diagrams) | Before | 181.9 ms | 166.3-227.4 ms | 156.2 ms |
+| `kitchen-sink.md` (2 diagrams) | After | 103.5 ms | 94.4-171.3 ms | 223.9 ms |
+
+Documents without diagrams reach `ready` about 46% sooner in every web view (live preview,
+export and print). A document with diagrams moves the Mermaid parse to its first render
+(+68 ms there), so ready plus first render is about the same as before (338 ms vs 327 ms).

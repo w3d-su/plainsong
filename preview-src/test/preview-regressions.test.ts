@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BridgeMessage, RenderPayload } from "../src/bridge";
 import { renderMarkdown, renderMdx } from "../src/pipeline";
 
-vi.mock("mermaid", () => ({ default: { initialize: vi.fn(), render: vi.fn() } }));
 let messages: BridgeMessage[];
 const scrollIntoView = vi.fn();
 beforeEach(async () => {
