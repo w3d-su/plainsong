@@ -133,7 +133,7 @@ final class WorkflowTests: XCTestCase {
                 XCTAssertTrue(success)
                 // Assert inside the acknowledgement, before another autosave can advance the disk.
                 XCTAssertGreaterThanOrEqual(Date().timeIntervalSince(start), 2.8)
-                XCTAssertEqual(try Data(contentsOf: url), sourceN)
+                XCTAssertEqual(try? Data(contentsOf: url), sourceN)
                 XCTAssertEqual(Data(editor.textView.text.utf8), state.sourceNPlusOne)
                 XCTAssertEqual(editor.revision, state.revisionNPlusOne)
                 XCTAssertEqual(editor.textView.selectedRange, state.selectionNPlusOne)
@@ -147,7 +147,7 @@ final class WorkflowTests: XCTestCase {
                     state.secondCompleted = true
                     XCTAssertTrue(secondSuccess)
                     XCTAssertGreaterThanOrEqual(Date().timeIntervalSince(state.secondStarted), 2.8)
-                    XCTAssertEqual(try Data(contentsOf: url), state.sourceNPlusOne)
+                    XCTAssertEqual(try? Data(contentsOf: url), state.sourceNPlusOne)
                     XCTAssertEqual(Data(editor.textView.text.utf8), state.sourceNPlusOne)
                     XCTAssertEqual(editor.revision, state.revisionNPlusOne)
                     XCTAssertEqual(editor.textView.selectedRange, state.selectionNPlusOne)
