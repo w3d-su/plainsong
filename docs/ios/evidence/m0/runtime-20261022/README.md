@@ -31,7 +31,11 @@ all assertions passed. Their causes are not established or treated as device acc
 
 ## Reproduction
 
-At the recorded commit, use the existing prototype public entry:
+Before checking out the recorded commit, copy this packet's
+`required-hosted-tests.txt` and `prototype-source.json` (also in the owner kit) to
+a private receipt directory outside the checkout. Those new receipt files do not
+exist at the older executed commit. At the recorded commit, use the existing
+prototype public entry:
 
 ```sh
 Prototypes/iOSM0/Scripts/run.sh inventory
@@ -51,12 +55,13 @@ For named-result validation from the repository root:
 ```sh
 xcrun xcresulttool get test-results tests --path <attempt>/Tests.xcresult --format json > <private-output>/tests.json
 python3 Scripts/ios/ios-test-results.py <private-output>/tests.json \
-  --required docs/ios/evidence/m0/runtime-20261022/required-hosted-tests.txt \
+  --required <receipt-directory>/required-hosted-tests.txt \
   --report <private-output>/gate.json --names <private-output>/names.txt --no-skips
 ```
 
-Before using this manifest on another checkout, verify all three `Tests/*.swift`
-SHA-256 values against the recorded `prototype-source.json`. Require exactly17
+Before using this manifest on another checkout, verify all 17 prototype input
+SHA-256 values, including the three `Tests/*.swift` files, against the copied
+`prototype-source.json`. Require exactly17
 passed names, not just an exit0, a build-for-testing result or a total without names.
 Run result parsing under the canonical lock after the test runner releases it.
 
