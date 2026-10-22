@@ -83,7 +83,7 @@ extension AppState {
             return
         }
 
-        restartActiveWorkspaceSearchWithFreshOverlays()
+        scheduleEditDrivenWorkspaceSearchRefresh()
     }
 
     func invalidateWorkspaceSearchForWorkspaceGenerationAdvance() {
@@ -598,6 +598,9 @@ extension AppState {
         _ query: TextSearchQuery,
         cancellingPendingEditorNavigation: Bool
     ) {
+        // Any start (a new query, a reload refresh, or the edit refresh itself) supersedes a
+        // waiting edit-driven refresh.
+        workspaceSearchEditRefresh.cancel()
         cancelWorkspaceSearchTask()
         if cancellingPendingEditorNavigation {
             cancelPendingWorkspaceSearchNavigationIfNeeded()

@@ -211,6 +211,9 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   fresh capture in the same generation; a newer reload, workspace switch, or close cancels it.
 - External change to the open file: if editor is clean → silently reload; if dirty →
   non-modal banner "File changed on disk: Reload / Keep mine".
+- An active workspace search refreshes for document edits only after a 500 ms typing
+  pause, and only while the Search navigator shows (an edit made while Files shows
+  refreshes when Search shows again); typing never resets the search state.
 - Multiple workspace windows are structurally allowed, one preview per editor pane, but
   Phase 1 currently shares one App-scoped `AppState` across the `WindowGroup`. Separate
   windows mirror the same workspace/current document until window-scoped state is built.

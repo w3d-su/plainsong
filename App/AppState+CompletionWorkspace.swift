@@ -279,17 +279,31 @@ extension AppState {
         }
     }
 
+    /// `fileResults` stays sorted by path, so a result is placed by binary search instead of
+    /// a linear lookup plus a full re-sort per event (quadratic over a large result set).
     func applyWorkspaceSearchFileResult(_ result: WorkspaceSearchFileResult) {
-        if let existingIndex = workspaceSearchState.fileResults.firstIndex(where: {
-            ExactSourceText.matches($0.relativePath, result.relativePath)
-        }) {
-            workspaceSearchState.fileResults[existingIndex] = result
-        } else {
-            workspaceSearchState.fileResults.append(result)
+        let results = workspaceSearchState.fileResults
+        var lower = 0
+        var upper = results.count
+        while lower < upper {
+            let middle = lower + (upper - lower) / 2
+            if Self.workspaceSearchPathLessThan(results[middle].relativePath, result.relativePath) {
+                lower = middle + 1
+            } else {
+                upper = middle
+            }
         }
-        workspaceSearchState.fileResults.sort {
-            Self.workspaceSearchPathLessThan($0.relativePath, $1.relativePath)
+        var index = lower
+        while index < results.count,
+              !Self.workspaceSearchPathLessThan(result.relativePath, results[index].relativePath)
+        {
+            if ExactSourceText.matches(results[index].relativePath, result.relativePath) {
+                workspaceSearchState.fileResults[index] = result
+                return
+            }
+            index += 1
         }
+        workspaceSearchState.fileResults.insert(result, at: lower)
     }
 
     func applyWorkspaceSearchSkippedFile(_ skippedFile: WorkspaceSearchSkippedFile) {

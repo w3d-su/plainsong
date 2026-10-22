@@ -244,6 +244,7 @@ final class AppState: ObservableObject {
         WorkspaceNoFollowFileWriteExpectation
     ) throws -> WorkspaceFileWriteOutcome)?
     var workspaceSearchTask: Task<Void, Never>?
+    var workspaceSearchEditRefresh = WorkspaceSearchEditRefresh()
     var workspaceSearchTaskToken: UUID?
     var workspaceSearchQueryGeneration: UInt64 = 0
     var workspaceSearchRefreshIntent: WorkspaceSearchRefreshIntent?

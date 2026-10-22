@@ -134,7 +134,6 @@ extension WorkspaceSearchPipeline {
         state: inout WorkspaceSearchExecutionState
     ) throws {
         try Task.checkCancellation()
-        let contentFingerprint = WorkspaceSearchContentFingerprint(text: text)
         try failureInjector.checkpoint(.beforeMatching(relativePath))
         let discoveredMatches = TextSearchEngine.matches(
             in: text,
@@ -155,6 +154,9 @@ extension WorkspaceSearchPipeline {
             state.truncatedFilePaths.append(relativePath)
         }
         if !emittedMatches.isEmpty {
+            // Hash only files that produce a result: most searched files match nothing,
+            // and the fingerprint identifies the text a result's ranges point into.
+            let contentFingerprint = WorkspaceSearchContentFingerprint(text: text)
             try yield(.fileResult(
                 context,
                 WorkspaceSearchFileResult(
