@@ -152,7 +152,7 @@ final class AppState: ObservableObject {
         }
     }
 
-    @Published var isSaving = false
+    var isSaving = false // Synchronous save guard; unpublished, since no view can observe `true`.
     @Published private(set) var layoutMode: EditorLayoutMode
     @Published var workspaceRootURL: URL? {
         didSet {
