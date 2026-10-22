@@ -115,7 +115,7 @@ final class ExportNetworkInterceptorTests: XCTestCase {
             proxy.stop()
         }
         let directory = try makeDirectory()
-        let live = makeController(dataStore: dataStore)
+        let live = try makeController(dataStore: dataStore)
         live.setAllowsRemoteImages(false)
 
         for (fileKind, source) in [(FileKind.markdown, Self.markdown), (FileKind.mdx, Self.mdx)] {
