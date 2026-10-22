@@ -68,13 +68,12 @@ struct WorkspaceFilesSidebar: View {
         List(selection: selectionBinding) {
             DisclosureGroup(isExpanded: $isRootExpanded) {
                 ForEach(tree.root.children) { node in
-                    WorkspaceTreeNodeRow(
+                    WorkspaceTreeNodeRow.row(
                         node: node,
                         rootURL: appState.workspaceRootURL,
                         expandedNodeIDs: tree.expandedNodeIDs,
                         actions: rowActions
                     )
-                    .equatable()
                 }
             } label: {
                 rootLabel
