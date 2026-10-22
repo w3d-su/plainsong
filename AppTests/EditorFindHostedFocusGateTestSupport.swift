@@ -51,9 +51,9 @@ extension EditorFindHostedGateTests {
     func mountDesignatedKeyWorkspace(
         in group: HostedWorkspaceGroup,
         appState: AppState,
-        originX: CGFloat = 0
+        originX: CGFloat = 0,
+        width: CGFloat = 1000
     ) -> DesignatedKeyWindow {
-        let width: CGFloat = 1000
         let height: CGFloat = 680
         #if DEBUG
             EditorPreviewScrollCoordinator.latestDebugInstance = nil

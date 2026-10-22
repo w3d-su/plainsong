@@ -565,6 +565,10 @@ which normalizes a bridged string from its first character. Edit derived indexes
 place. Release TextKit 2's cached text elements below the viewport once scrolling
 settles (`EditorTextElementCacheTrimmer`): each edit rewrites the range of every cached
 element after it, so typing above a once-viewed document end cost ~50 ms per keystroke.
+Admit each chunk against the real live viewport and selected paragraphs immediately
+before its attribute edit; a captured range is only a candidate. Keep their prefetch
+protection while releasing safe ranges around an offscreen selection. Selection-only
+changes reschedule trimming without republishing an unchanged viewport.
 The synchronous typing gates do not see SwiftUI, layout or display work a keystroke
 schedules; typing with the preview visible is measured by the opt-in hosted
 busy-slice probe (`MainThreadStallHostedTests`, `TEST_RUNNER_PLAINSONG_RUN_SCROLL_PROBE=1`).

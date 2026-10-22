@@ -30,48 +30,244 @@ extension EditorFindHostedGateTests {
         let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "large-1mb", withExtension: "md"))
         let source = try String(contentsOf: fixture, encoding: .utf8)
         let lineNumbers = scrollProbeShowsLineNumbers
+        let environment = ProcessInfo.processInfo.environment
+        let requestedChunks = environment["PLAINSONG_SCROLL_PROBE_TRIM_CHUNKS"].flatMap { $0.isEmpty ? nil : $0 }
+        let trimChunks = try requestedChunks.map { value in
+            try XCTUnwrap(Int(value).flatMap { $0 >= 0 ? $0 : nil }, "Trim chunk count must be nonnegative")
+        }
+        let trimYieldMilliseconds = try environment["PLAINSONG_SCROLL_PROBE_TRIM_YIELD_MS"].map { value in
+            try XCTUnwrap(Int(value).flatMap { $0 >= 0 && $0 <= Int.max / 1_000_000 ? $0 : nil },
+                          "Trim yield milliseconds must be nonnegative and representable as nanoseconds")
+        } ?? 0
+        let hideGutterDraw = environment["PLAINSONG_SCROLL_PROBE_HIDE_GUTTER_DRAW"] == "1"
+        let useAdmission = environment["PLAINSONG_SCROLL_PROBE_USE_ADMISSION"] == "1"
+        let requestedWidth = environment["PLAINSONG_SCROLL_PROBE_WINDOW_WIDTH"].flatMap { $0.isEmpty ? nil : $0 }
+        let windowWidth = try requestedWidth.map { value in
+            try XCTUnwrap(Double(value).flatMap { $0.isFinite && $0 > 0 ? $0 : nil },
+                          "Window width must be finite and positive")
+        } ?? 1000
         let hosted = try await makeHostedEditorWorkspace(
             source: source,
             layoutMode: layoutMode,
-            showsLineNumbers: lineNumbers
+            showsLineNumbers: lineNumbers,
+            windowWidth: CGFloat(windowWidth)
         )
+        let editor = try hostedEditor(hosted)
+        let hideGutterEarly = environment["PLAINSONG_SCROLL_PROBE_HIDE_GUTTER_EARLY"] == "1"
+        if hideGutterEarly {
+            editor.lineNumberGutter?.isHidden = true
+        }
+        let tracedTrimmer = environment["PLAINSONG_SCROLL_PROBE_TRIM_TRACE"] == "1"
+            ? (editor.textDelegate as? MarkdownTextViewCoordinator)?.textElementCacheTrimmer : nil
+        let trimmerEvents = tracedTrimmer.map { _ in TypingProbeTrimmerEvents(editor: editor) }
+        tracedTrimmer?.probeHandler = { [weak trimmerEvents] event, range in
+            trimmerEvents?.record(event, range: range)
+        }
+        defer { tracedTrimmer?.probeHandler = nil }
+        let paragraphSpy = environment["PLAINSONG_SCROLL_PROBE_PARAGRAPH_TRACE"] == "1"
+            ? TypingProbeParagraphRequests(
+                viewport: MarkdownTextView.visibleTextRange(of: editor),
+                captureBeyondLocation: Int(environment["PLAINSONG_SCROLL_PROBE_CAPTURE_BEYOND_OFFSET"] ?? "")
+            ) : nil
+        let contentStorage = editor.textContentManager as? NSTextContentStorage
+        let previousDelegate = contentStorage?.delegate
+        if let paragraphSpy {
+            contentStorage?.delegate = try XCTUnwrap(
+                previousDelegate == nil ? paragraphSpy : nil,
+                "Paragraph tracing requires the default NSTextContentStorage paragraph provider"
+            )
+        }
+        defer {
+            if paragraphSpy != nil {
+                contentStorage?.delegate = previousDelegate
+            }
+        }
+        let trimmer: EditorTextElementCacheTrimmer? = if trimChunks != nil {
+            try XCTUnwrap((editor.textDelegate as? MarkdownTextViewCoordinator)?.textElementCacheTrimmer)
+        } else {
+            nil
+        }
+        trimmer?.cancel()
         if layoutMode == .sourcePreview {
             try await waitForLargePreview(hosted)
         }
-        let editor = try hostedEditor(hosted)
         let middle = (source as NSString).lineRange(for: NSRange(location: source.utf16.count / 2, length: 0))
+        let trimScrollAfter = Int(environment["PLAINSONG_SCROLL_PROBE_TRIM_SCROLL_AFTER"] ?? "") ?? -1
+        if let delay = UInt64(environment["PLAINSONG_SCROLL_PROBE_TOP_SETTLE_MS"] ?? "") {
+            try await Task.sleep(nanoseconds: delay * 1_000_000)
+        }
+        var scrolledDuringTrim = false
+        var explicitTrimRanges: [[String: Int]] = []
+        if let trimChunks {
+            // Match an interrupted top-of-document trim exactly, without depending on
+            // which run-loop turn admits the 400 ms production settle task.
+            try await settleTypingProbe(nanoseconds: 300_000_000, cancelling: trimmer)
+            let length = try XCTUnwrap(MarkdownTextView.textStorage(of: editor)?.length)
+            let count = try XCTUnwrap(
+                trimChunks <= length / EditorTextElementCacheTrimmer.chunkLength ? trimChunks : nil,
+                "Requested trim chunks exceed the fixture length"
+            )
+            if environment["PLAINSONG_SCROLL_PROBE_USE_PRODUCTION_TRIM"] == "1" {
+                explicitTrimRanges = try await TypingProbePreparation.productionTrim(
+                    chunks: count,
+                    navigatingAfter: trimScrollAfter,
+                    to: NSRange(location: middle.location, length: 0),
+                    in: editor
+                )
+                scrolledDuringTrim = trimScrollAfter > 0
+            } else {
+                let prepared = try await TypingProbePreparation.manualTrim(
+                    .init(
+                        chunks: count,
+                        initialLength: length,
+                        navigatingAfter: trimScrollAfter,
+                        navigationRange: NSRange(location: middle.location, length: 0),
+                        yieldMilliseconds: trimYieldMilliseconds,
+                        drawAfterTrim: Int(environment["PLAINSONG_SCROLL_PROBE_DRAW_AFTER_TRIM"] ?? ""),
+                        layoutBetweenTrims: environment["PLAINSONG_SCROLL_PROBE_TRIM_LAYOUT"] == "1",
+                        useAdmission: useAdmission
+                    ),
+                    in: editor,
+                    cancelling: trimmer
+                )
+                explicitTrimRanges = prepared.ranges
+                scrolledDuringTrim = prepared.navigated
+            }
+        }
         if visitingDocumentEnd {
             editor.scrollRangeToVisible(NSRange(location: source.utf16.count, length: 0))
-            try await Task.sleep(nanoseconds: 500_000_000)
+            try await settleTypingProbe(nanoseconds: 500_000_000, cancelling: trimmer)
         }
-        editor.textSelection = NSRange(location: middle.location, length: 0)
-        editor.scrollRangeToVisible(editor.selectedRange())
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+        if !scrolledDuringTrim {
+            editor.textSelection = NSRange(location: middle.location, length: 0)
+            editor.scrollRangeToVisible(editor.selectedRange())
+        }
+        try await settleTypingProbe(nanoseconds: 1_000_000_000, cancelling: trimmer)
+        if hideGutterDraw {
+            // EditorScrollView tiles the attached gutter by thickness, even when hidden.
+            // This removes drawing while preserving the same text-container width.
+            editor.lineNumberGutter?.isHidden = true
+        }
 
+        if environment["PLAINSONG_SCROLL_PROBE_RESCROLL_AFTER_SETTLE"] == "1" {
+            editor.scrollRangeToVisible(editor.selectedRange())
+            try await settleTypingProbe(nanoseconds: 1_000_000_000, cancelling: trimmer)
+        }
+        let preparationRequests = paragraphSpy?.report() ?? [:]
+        let geometryBefore = TypingProbeGeometry(editor)
+        var geometries = [geometryBefore]
+        var insertMilliseconds: [Double] = []
+        var paragraphRequests: [[String: Any]] = []
+        var completedKeys = 0
+        var recoveryMilliseconds: Double = 0
         let countersBefore = EditorProbeCounters(editor)
         let monitor = MainRunLoopBusyMonitor()
         // Lets an external `sample` attach to the measured phase only (stdout is buffered).
         let marker = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("main-thread-probe-begin")
         try Data().write(to: marker)
         defer { try? FileManager.default.removeItem(at: marker) }
+        trimmerEvents?.record("typing-start", range: nil)
         monitor.start()
         // Bursts below the 150 ms preview debounce, then pauses that let every render run.
         for (count, interval) in [(30, 90), (20, 250)] {
             for _ in 0 ..< count {
+                paragraphSpy?.reset(viewport: MarkdownTextView.visibleTextRange(of: editor))
+                let started = DispatchTime.now().uptimeNanoseconds
                 editor.insertText("a", replacementRange: editor.selectedRange())
+                insertMilliseconds.append(Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000)
+                let insertionRequests = paragraphSpy?.report() ?? [:]
+                completedKeys += 1
+                if completedKeys == Int(environment["PLAINSONG_SCROLL_PROBE_RECOVER_AFTER_KEY"] ?? "") {
+                    let length = MarkdownTextView.textStorage(of: editor)?.length ?? 0
+                    let tail = min(length, editor.selectedRange().location + 8192)
+                    let started = DispatchTime.now().uptimeNanoseconds
+                    XCTAssertTrue(EditorTextElementCacheTrimmer.trim(
+                        NSRange(location: tail, length: length - tail),
+                        in: editor
+                    ))
+                    recoveryMilliseconds = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000
+                    trimmerEvents?.record(
+                        "diagnostic-tail-recovery",
+                        range: NSRange(location: tail, length: length - tail)
+                    )
+                }
+                trimmer?.cancel()
+                if trimChunks != nil || hideGutterDraw || requestedWidth != nil {
+                    geometries.append(TypingProbeGeometry(editor))
+                }
                 try await Task.sleep(nanoseconds: UInt64(interval) * 1_000_000)
+                if trimChunks != nil || hideGutterDraw || requestedWidth != nil {
+                    geometries.append(TypingProbeGeometry(editor))
+                }
+                if let paragraphSpy {
+                    paragraphRequests.append(["insert": insertionRequests, "throughRunLoop": paragraphSpy.report()])
+                }
             }
         }
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+        try await settleTypingProbe(nanoseconds: 1_000_000_000, cancelling: trimmer)
         let slices = monitor.stop()
+        trimmerEvents?.record("typing-end", range: nil)
 
+        // Check the naturally displayed result after settling, with no forced layout:
+        // a faster but blank gutter is not a successful typing result.
+        if lineNumbers, !hideGutterDraw, !hideGutterEarly {
+            let gutter = try XCTUnwrap(editor.lineNumberGutter)
+            XCTAssertGreaterThan(gutter.drawCount, countersBefore.gutterDraws,
+                                 "Typing must naturally redraw the gutter after preparation")
+            let caretLine = editor.lineIndexCache.currentIndex().oneBasedLine(
+                containingUTF16Offset: editor.selectedRange().location
+            )
+            XCTAssertFalse(gutter.lastDrawnLabels.isEmpty, "Typing must leave displayed line numbers")
+            XCTAssertTrue(gutter.lastDrawnLabels.contains { $0.number == caretLine && $0.isCurrent },
+                          "The naturally displayed gutter must mark the caret line")
+        }
         XCTAssertEqual(MarkdownTextView.textStorage(of: editor)?.string, hosted.appState.currentDocument.text)
         let name = visitingDocumentEnd ? "after viewing the end" : "from the middle"
         let mode = layoutMode == .sourcePreview ? "Source+preview" : "Source-only"
-        let report = busySliceReport(slices)
-            .merging(EditorProbeCounters(editor).report(since: countersBefore)) { $1 }
-            .merging(["lineNumbers": lineNumbers]) { $1 }
+        var report = busySliceReport(slices)
+        report.merge(EditorProbeCounters(editor).report(since: countersBefore)) { $1 }
+        let diagnostics: [String: Any] = [
+            "lineNumbers": lineNumbers,
+            "hiddenGutterDraw": hideGutterDraw,
+            "hiddenGutterEarly": hideGutterEarly,
+            "recoveryMilliseconds": recoveryMilliseconds,
+            "controlledTrimChunks": trimChunks ?? -1,
+            "useProductionTrim": environment["PLAINSONG_SCROLL_PROBE_USE_PRODUCTION_TRIM"] == "1",
+            "useAdmission": useAdmission,
+            "trimYieldMilliseconds": trimYieldMilliseconds,
+            "trimScrollAfter": trimScrollAfter,
+            "drawAfterTrim": Int(environment["PLAINSONG_SCROLL_PROBE_DRAW_AFTER_TRIM"] ?? "") ?? -1,
+            "layoutBetweenTrims": environment["PLAINSONG_SCROLL_PROBE_TRIM_LAYOUT"] == "1",
+            "requestedWindowWidth": windowWidth,
+            "explicitTrimRanges": explicitTrimRanges,
+            "explicitTrimmedCharacters": explicitTrimRanges.reduce(0) { $0 + ($1["length"] ?? 0) },
+            "insertMilliseconds": insertMilliseconds,
+            "paragraphPreparation": preparationRequests,
+            "trimmerEvents": trimmerEvents?.events ?? [],
+            "paragraphRequests": paragraphRequests,
+            "geometryBeforeTyping": geometryBefore.report,
+            "geometryAfterTyping": TypingProbeGeometry(editor).report,
+            "geometrySamples": geometries.map(\.report),
+            "displayedLineNumbers": editor.lineNumberGutter?.lastDrawnLabels.map(\.number) ?? [],
+            "displayedCurrentLines": editor.lineNumberGutter?.lastDrawnLabels.filter(\.isCurrent).map(\.number) ?? [],
+            "geometryMinimum": TypingProbeGeometry.extrema(geometries, minimum: true),
+            "geometryMaximum": TypingProbeGeometry.extrema(geometries, minimum: false),
+        ]
+        report.merge(diagnostics) { $1 }
+        let reportFile = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("typing-probe-\(UUID().uuidString).json")
+        try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]).write(to: reportFile)
+        print("TypingProbeReportFile: \(reportFile.path)")
         recordScrollReport("\(mode) typing \(name) main-thread busy slices", report)
+    }
+
+    /// A controlled run cancels every 100 ms so a later viewport notification cannot
+    /// restart the production trimmer while the explicitly selected state settles.
+    private func settleTypingProbe(
+        nanoseconds: UInt64,
+        cancelling trimmer: EditorTextElementCacheTrimmer?
+    ) async throws {
+        try await TypingProbePreparation.settle(nanoseconds: nanoseconds, cancelling: trimmer)
     }
 
     private func busySliceReport(_ slices: [MainRunLoopBusyMonitor.Slice]) -> [String: Any] {
@@ -178,39 +374,5 @@ final class MainRunLoopBusyMonitor {
         let user = Double(info.user_time.seconds) * 1000 + Double(info.user_time.microseconds) / 1000
         let system = Double(info.system_time.seconds) * 1000 + Double(info.system_time.microseconds) / 1000
         return user + system
-    }
-}
-
-/// Editor work around a measured phase: separates the gutter's own cost from the rest, and
-/// records the TextKit element-cache state typing started from.
-@MainActor
-private struct EditorProbeCounters {
-    let gutterDraws: Int
-    let gutterDrawMilliseconds: Double
-    let gutterWidthChanges: Int
-    let lineIndexRebuilds: Int
-    /// Characters `EditorTextElementCacheTrimmer` has released so far.
-    let trimmedLength: Int
-    let editorHeight: CGFloat
-
-    init(_ editor: MarkdownSTTextView) {
-        gutterDraws = editor.lineNumberGutter?.drawCount ?? 0
-        gutterDrawMilliseconds = editor.lineNumberGutter?.totalDrawMilliseconds ?? 0
-        gutterWidthChanges = editor.lineNumberGutter?.thicknessChangeCount ?? 0
-        lineIndexRebuilds = editor.lineIndexCache.rebuildCount
-        trimmedLength = (editor.textDelegate as? MarkdownTextViewCoordinator)?.textElementCacheTrimmer
-            .trimmedLength ?? 0
-        editorHeight = editor.frame.height
-    }
-
-    func report(since start: Self) -> [String: Any] {
-        [
-            "gutterDraws": gutterDraws - start.gutterDraws,
-            "gutterDrawMilliseconds": gutterDrawMilliseconds - start.gutterDrawMilliseconds,
-            "gutterWidthChanges": gutterWidthChanges - start.gutterWidthChanges,
-            "lineIndexRebuilds": lineIndexRebuilds - start.lineIndexRebuilds,
-            "trimmedBeforeTyping": start.trimmedLength,
-            "editorHeightBeforeTyping": start.editorHeight,
-        ]
     }
 }

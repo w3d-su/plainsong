@@ -75,7 +75,8 @@ extension EditorFindHostedGateTests {
                                    localEdit: String? = nil,
                                    assets: [String: Data] = [:],
                                    layoutMode: EditorLayoutMode = .sourceOnly,
-                                   showsLineNumbers: Bool = true) async throws -> HostedReplaceWorkspace
+                                   showsLineNumbers: Bool = true,
+                                   windowWidth: CGFloat = 1000) async throws -> HostedReplaceWorkspace
     {
         let fixture = try makeWorkspaceFixture(files: ["post.md": source])
         for (name, data) in assets {
@@ -93,7 +94,7 @@ extension EditorFindHostedGateTests {
             appState.currentDocument.fileURL?.lastPathComponent == "post.md"
         }
         let group = makeHostedWorkspaceGroup(fixture: fixture)
-        let window = mountDesignatedKeyWorkspace(in: group, appState: appState)
+        let window = mountDesignatedKeyWorkspace(in: group, appState: appState, width: windowWidth)
         designateKeyWindow(window, in: group)
         let hosted = HostedReplaceWorkspace(fixture: fixture, group: group, window: window)
         try await waitUntil("editor installs and applies its initial styling", timeout: 20) {
