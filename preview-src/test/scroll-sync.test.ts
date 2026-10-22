@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BridgeMessage, RenderPayload } from "../src/bridge";
 
-vi.mock("mermaid", () => ({ default: { initialize: vi.fn(), render: vi.fn() } }));
 
 let messages: BridgeMessage[];
 let resize: (width: number) => void;
