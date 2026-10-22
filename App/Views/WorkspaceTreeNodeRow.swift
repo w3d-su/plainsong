@@ -32,17 +32,29 @@ struct WorkspaceTreeNodeRow: View, Equatable {
             && lhs.expandedNodeIDs == rhs.expandedNodeIDs
     }
 
+    /// A file row skips re-rendering through `.equatable()`. A directory row stays a bare
+    /// `DisclosureGroup`: `List` draws an outline row with a disclosure triangle only for a
+    /// `DisclosureGroup` it sees directly, not one inside an `EquatableView`.
+    @ViewBuilder
+    static func row(
+        node: WorkspaceFileNode,
+        rootURL: URL?,
+        expandedNodeIDs: Set<WorkspaceFileNode.ID>,
+        actions: WorkspaceTreeRowActions
+    ) -> some View {
+        let row = WorkspaceTreeNodeRow(node: node, rootURL: rootURL, expandedNodeIDs: expandedNodeIDs, actions: actions)
+        if node.isDirectory {
+            row
+        } else {
+            row.equatable()
+        }
+    }
+
     var body: some View {
         if node.isDirectory {
             DisclosureGroup(isExpanded: expandedBinding) {
                 ForEach(node.children) { child in
-                    WorkspaceTreeNodeRow(
-                        node: child,
-                        rootURL: rootURL,
-                        expandedNodeIDs: expandedNodeIDs,
-                        actions: actions
-                    )
-                    .equatable()
+                    Self.row(node: child, rootURL: rootURL, expandedNodeIDs: expandedNodeIDs, actions: actions)
                 }
             } label: {
                 rowLabel
