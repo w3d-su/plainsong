@@ -69,7 +69,7 @@ final class WorkflowTests: XCTestCase {
         let fullFrame = host.window.frame
         let layoutSource = Data(editor.textView.text.utf8)
         // Model a compact content area; this is not a physical keyboard acceptance test.
-        host.window.frame = CGRect(origin: fullFrame.origin, size: CGSize(width: 393, height: 500))
+        host.window.frame = CGRect(origin: fullFrame.origin, size: CGSize(width: 393, height: 390))
         host.window.layoutIfNeeded()
         let controls: UIScrollView = try host.control("m0-controls")
         XCTAssertGreaterThan(editor.textView.bounds.height, 80,
