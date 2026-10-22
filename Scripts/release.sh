@@ -1,7 +1,9 @@
 #!/bin/bash
 # Plainsong release pipeline (docs/release-engineering-plan.md P1–P3):
-# clean Release build → sign → notarize → staple → DMG → SHA-256 checksum.
-# Artifacts land in build/release/.
+# clean Release build (stripped, then signed) → notarize → staple → DMG →
+# SHA-256 checksum, plus a zipped dSYM for symbolication.
+# Artifacts land in build/release/. The dSYM zip is for crash symbolication
+# only: CI keeps it as a workflow artifact, never as a public release asset.
 #
 # Two modes:
 #
@@ -39,11 +41,16 @@ BUILD_NUMBER="${PLAINSONG_BUILD_NUMBER:-$(git rev-list --count HEAD)}"
 OUT_DIR="build/release"
 DERIVED_DATA="$OUT_DIR/DerivedData"
 APP_PATH="$DERIVED_DATA/Build/Products/Release/Plainsong.app"
+EXECUTABLE_PATH="$APP_PATH/Contents/MacOS/Plainsong"
+DSYM_PATH="$APP_PATH.dSYM"
 if [[ "$UNSIGNED" == "1" ]]; then
     DMG_PATH="$OUT_DIR/Plainsong-$MARKETING_VERSION-$BUILD_NUMBER-unsigned.dmg"
 else
     DMG_PATH="$OUT_DIR/Plainsong-$MARKETING_VERSION-$BUILD_NUMBER.dmg"
 fi
+# Named after the DMG so a crash report's build maps to one dSYM; no .sha256,
+# so release.yml's checksum glob still matches only the DMG's.
+DSYM_ZIP_PATH="${DMG_PATH%.dmg}.dSYM.zip"
 
 echo "==> Release $MARKETING_VERSION ($BUILD_NUMBER)"
 mkdir -p "$OUT_DIR"
@@ -66,15 +73,44 @@ else
         OTHER_CODE_SIGN_FLAGS=--timestamp
     )
 fi
+# Strip the shipped executable (docs/decisions/2026-10-22-release-strips-symbols-keeps-dsym.md):
+# the unstripped universal binary was 32.2 MiB, 14 MiB of it symbol tables.
+# project.yml turns this switch into DEPLOYMENT_POSTPROCESSING=YES,
+# STRIP_INSTALLED_PRODUCT=YES and STRIP_STYLE=all on the app target alone, so
+# the build itself strips the way an archive does: Xcode writes the dSYM from
+# the linked binary first, strips second and signs last, so the signature
+# covers the stripped bytes. (Passing those STRIP_* settings here would apply
+# them to every SwiftPM target too, and stripping their object files fails.)
+STRIP_SETTINGS=(
+    PLAINSONG_STRIP_SHIPPED_BINARY=YES
+)
 xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Release \
     -derivedDataPath "$DERIVED_DATA" \
     MARKETING_VERSION="$MARKETING_VERSION" \
     CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
     "${SIGN_SETTINGS[@]}" \
+    "${STRIP_SETTINGS[@]}" \
     clean build
 
 echo "==> Verify code signature"
 codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+
+echo "==> Verify the dSYM matches the stripped executable"
+if [[ ! -d "$DSYM_PATH" ]]; then
+    echo "error: no dSYM at $DSYM_PATH; crash reports from this build could not be symbolicated" >&2
+    exit 1
+fi
+# One "UUID: <uuid> (<arch>)" line per slice; compare the uuid/arch pairs only.
+app_uuids="$(dwarfdump --uuid "$EXECUTABLE_PATH" | awk '{print $2, $3}' | sort)"
+dsym_uuids="$(dwarfdump --uuid "$DSYM_PATH" | awk '{print $2, $3}' | sort)"
+if [[ -z "$app_uuids" || "$app_uuids" != "$dsym_uuids" ]]; then
+    echo "error: dSYM UUIDs do not match the executable" >&2
+    echo "  executable: $app_uuids" >&2
+    echo "  dSYM:       $dsym_uuids" >&2
+    exit 1
+fi
+echo "$app_uuids" | sed 's/^/    /'
+echo "    executable: $(stat -f%z "$EXECUTABLE_PATH") bytes"
 
 if [[ "$UNSIGNED" == "1" ]]; then
     echo "==> Skipping notarization (unsigned alpha); Gatekeeper will block first launch on other Macs"
@@ -108,7 +144,12 @@ echo "==> Checksum"
 # downloaders then verify with `shasum -c` next to the downloaded DMG.
 (cd "$(dirname "$DMG_PATH")" && shasum -a 256 "$(basename "$DMG_PATH")") | tee "$DMG_PATH.sha256"
 
+echo "==> Archive dSYM (keep privately; not a release asset)"
+rm -f "$DSYM_ZIP_PATH"
+ditto -c -k --keepParent "$DSYM_PATH" "$DSYM_ZIP_PATH"
+
 echo "==> Done: $DMG_PATH"
+echo "    dSYM: $DSYM_ZIP_PATH (symbolication only; docs/release-engineering-plan.md P3)"
 if [[ "$UNSIGNED" == "1" ]]; then
     echo "    Unsigned alpha: recipients must allow the app once via"
     echo "    System Settings > Privacy & Security > Open Anyway, or run:"

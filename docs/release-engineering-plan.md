@@ -96,6 +96,31 @@ hdiutil still works and stays until compatibility needs force a change.
   documented env (unsigned path verified 2026-07-05, build 56). The signed-path run
   re-verifies this gate when P1/P2 resume.
 
+**Stripped executable + private dSYM (2026-10-22).** `Scripts/release.sh` passes
+`PLAINSONG_STRIP_SHIPPED_BINARY=YES`; `project.yml` turns it into
+`DEPLOYMENT_POSTPROCESSING=YES`, `STRIP_INSTALLED_PRODUCT=YES` and `STRIP_STYLE=all` on the
+app target's Release configuration only, so Xcode writes the dSYM, strips, then signs (the
+signature covers the stripped bytes). Ordinary Release builds and Release test runs stay
+unstripped. The script fails unless the dSYM's per-architecture UUIDs equal the
+executable's, then zips it next to the DMG as `Plainsong-<version>-<build>[-unsigned].dSYM.zip`
+(no `.sha256`, so it never matches the release upload globs). Measured with
+`PLAINSONG_UNSIGNED=1 make release` (build 161 before, 162 after; only docs changed between
+them):
+
+| | Before | After |
+|---|---|---|
+| `Contents/MacOS/Plainsong` (universal) | 32.2 MiB | 18.3 MiB |
+| `Plainsong.app` | 37.4 MiB | 23.5 MiB |
+| DMG | 12.1 MiB | 9.4 MiB |
+| dSYM (zip) | 62.3 MiB (not packaged) | 17.1 MiB |
+
+A copy re-signed under a separate bundle ID launched and kept running. In a live `sample`
+of it the app frame reads `??? (in Plainsong)`; `atos` against the dSYM from the zip resolves
+the same address to `main (in Plainsong) (PlainsongApp.swift:0)`. To symbolicate a crash
+report: unzip the build's dSYM, check `dwarfdump --uuid` against the report's binary image
+UUID, then run `atos -arch <arch> -o Plainsong.app.dSYM/Contents/Resources/DWARF/Plainsong
+-l <load address> <addresses…>`.
+
 ## P4 — Release CI (unsigned path implemented 2026-07-05)
 
 `.github/workflows/release.yml` runs on `v*` tags and `workflow_dispatch` only (never
@@ -103,7 +128,10 @@ per-push, per the 2026-07-02 CI-cost decision): macos-15 runner, full-history ch
 (build number = commit count), `PLAINSONG_UNSIGNED=1 make release`. Tag runs upload the
 DMG + SHA-256 to the tag's GitHub Release — created as a **draft prerelease** when absent,
 so the owner still authors the notes and presses publish. Dispatch runs attach the DMG as
-a workflow artifact for pipeline verification without touching Releases. No secrets are
+a workflow artifact for pipeline verification without touching Releases. Every run (tag or
+dispatch) also uploads the zipped dSYM as the `plainsong-dsym` workflow artifact, kept 90
+days and never attached to a Release; download it for any build that gets published, since
+crash reports from that DMG can only be symbolicated with it. No secrets are
 required on the unsigned path, and public-repo macOS minutes are free.
 
 - Secrets (Developer ID cert keychain import + notary API key) become repo secrets only
