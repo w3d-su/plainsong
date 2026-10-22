@@ -552,8 +552,8 @@ and checksum; that draft was never published. `v0.1.0-alpha.3` was published as 
 prerelease on 2026-10-15 (Release run 38696363613, `main` at `05bcc30`, build 146,
 `Plainsong-0.1.0-146-unsigned.dmg`, verified universal with a valid ad-hoc signature and the
 sandbox + network-client entitlements); its auto-generated changelog compares against alpha.1.
-`v0.1.0-alpha.4` was published as a GitHub prerelease on @@DATE@@ (Release run @@RUN_ID@@,
-`main` at `@@TAG_SHA@@`, build @@BUILD@@, `Plainsong-0.1.0-@@BUILD@@-unsigned.dmg`); it is a
+`v0.1.0-alpha.4` was published as a GitHub prerelease on 2026-10-21 (Release run 39605975561,
+`main` at `60e5ac1`, build 160, `Plainsong-0.1.0-160-unsigned.dmg`); it is a
 fix and performance release and its changelog compares against alpha.3.
 Per-DMG clean-machine spot-checking remains good practice and is not a release
 blocker (artifact family already passed P5 with alpha.1). P1/P2 signing and notarization remain

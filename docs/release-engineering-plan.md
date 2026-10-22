@@ -5,7 +5,7 @@
 > notarization scripted later; direct distribution first, App Store optional. This document
 > turns that into ordered work packages with gates. Owner decisions are marked **[owner]**.
 
-Created 2026-07-02. Current state (@@DATE@@): MIT `LICENSE` committed; packaging
+Created 2026-07-02. Current state (2026-10-21): MIT `LICENSE` committed; packaging
 (`make release`, P3) and unsigned release CI (`release.yml`, P4) landed; v0.1.0-alpha.1 is
 published. The `v0.1.0-alpha.2` tag completed the first end-to-end P4 CI run and created a
 draft prerelease with the build-67 unsigned DMG and filename-only `.sha256`; that GitHub
@@ -16,15 +16,19 @@ as a GitHub prerelease, built by Release workflow run 38696363613 from `main` at
 universal (arm64 + x86_64) with a valid ad-hoc signature and the sandbox +
 `com.apple.security.network.client` entitlements present. Because alpha.2 was never
 published, alpha.3's auto-generated changelog compares against alpha.1.
-**v0.1.0-alpha.4 was published @@DATE@@** as a GitHub prerelease, built by Release
-workflow run @@RUN_ID@@ from `main` at `@@TAG_SHA@@` (build @@BUILD@@). It is a fix and
+**v0.1.0-alpha.4 was published 2026-10-21** as a GitHub prerelease, built by Release
+workflow run 39605975561 from `main` at `60e5ac1` (build 160). It is a fix and
 performance release (single-file open/save under the sandbox, large-document typing and
-scroll, Files sidebar, preview leak on close) with no new features. Its asset
-`Plainsong-0.1.0-@@BUILD@@-unsigned.dmg` (SHA-256
-`@@DMG_SHA256@@`) passed the alpha.3
-checks (universal arm64 + x86_64, valid ad-hoc signature, sandbox entitlements present).
-`PLAINSONG_UNSIGNED=1 make release` was also run locally from the same `main` commit before
-the tag. `MARKETING_VERSION` stays `0.1.0` and the build number stays the commit count
+scroll, Files sidebar, preview leak on close, Experimental WYSIWYG thumbnails after a
+same-length reload) with no new features. Its asset
+`Plainsong-0.1.0-160-unsigned.dmg` (SHA-256
+`f0d8ef32cfbfbd9df70df2bc50c50ffb6a7604abdeb1f4140e4abb2b89c1e716`) passed the alpha.3
+checks (universal arm64 + x86_64, valid ad-hoc signature, sandbox entitlements present;
+`CFBundleVersion` 160). Its entitlements also carry `com.apple.security.get-task-allow`,
+which Xcode adds for the ad-hoc "Sign to Run Locally" identity and is not in
+`App/Plainsong.entitlements`; it is harmless for an unsigned alpha but must be absent from a
+Developer ID build (P1). `PLAINSONG_UNSIGNED=1 make release` was also run locally before the
+tag, from `main` at `15913f8` (build 159, one commit before the tag, without #154). `MARKETING_VERSION` stays `0.1.0` and the build number stays the commit count
 (P0.5): the prerelease label lives only in the tag name. Alpha.3 was already published, so
 alpha.4's auto-generated changelog compares against alpha.3. Per-DMG
 clean-machine spot-checking remains good practice and is not a release blocker after R14/P5
