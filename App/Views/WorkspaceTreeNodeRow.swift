@@ -3,14 +3,34 @@ import SwiftUI
 import UniformTypeIdentifiers
 import WorkspaceKit
 
-struct WorkspaceTreeNodeRow: View {
-    @EnvironmentObject private var appState: AppState
+/// What a Files row can do. Built by the navigator, so rows read no `AppState` themselves.
+struct WorkspaceTreeRowActions {
+    let setExpanded: (Bool, WorkspaceFileNode.ID) -> Void
+    let rename: (WorkspaceFileNode) -> Void
+    let create: (WorkspaceSidebarCreationKind, WorkspaceFileNode.ID?) -> Void
+    let fileClick: (WorkspaceFileNode.ID) -> Void
+    let trash: (WorkspaceFileNode.ID) -> Void
+    /// Moves the dropped item (first ID) into the directory (second ID).
+    let move: @MainActor @Sendable (WorkspaceFileNode.ID, WorkspaceFileNode.ID) -> Void
+}
 
+/// One Files row and, for a directory, its subtree.
+///
+/// Rows take the tree's values instead of observing `AppState`: an environment object made
+/// every row re-render on each AppState change (a typing pause, a statistics refresh). As an
+/// `Equatable` view a row re-renders only when its subtree, its expansion state, or the
+/// root changes; `actions` are stable behavior and are not compared.
+struct WorkspaceTreeNodeRow: View, Equatable {
     let node: WorkspaceFileNode
     let rootURL: URL?
-    let onRename: (WorkspaceFileNode) -> Void
-    let onCreate: (WorkspaceSidebarCreationKind, WorkspaceFileNode.ID?) -> Void
-    let onFileClick: (WorkspaceFileNode.ID) -> Void
+    let expandedNodeIDs: Set<WorkspaceFileNode.ID>
+    let actions: WorkspaceTreeRowActions
+
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.node == rhs.node
+            && lhs.rootURL == rhs.rootURL
+            && lhs.expandedNodeIDs == rhs.expandedNodeIDs
+    }
 
     var body: some View {
         if node.isDirectory {
@@ -19,10 +39,10 @@ struct WorkspaceTreeNodeRow: View {
                     WorkspaceTreeNodeRow(
                         node: child,
                         rootURL: rootURL,
-                        onRename: onRename,
-                        onCreate: onCreate,
-                        onFileClick: onFileClick
+                        expandedNodeIDs: expandedNodeIDs,
+                        actions: actions
                     )
+                    .equatable()
                 }
             } label: {
                 rowLabel
@@ -53,23 +73,23 @@ struct WorkspaceTreeNodeRow: View {
         // List's selection binding sees it. A completed tap joins the same deferred
         // selection path; dragging still uses the native provider above.
         .simultaneousGesture(node.isEditableMarkdown ? TapGesture().onEnded {
-            onFileClick(node.id)
+            actions.fileClick(node.id)
         } : nil)
         .accessibilityIdentifier("plainsong.workspaceFiles.row.\(node.relativePath)")
         .help(node.relativePath)
         .contextMenu {
             if node.isDirectory {
                 Button("New File") {
-                    onCreate(.file, node.id)
+                    actions.create(.file, node.id)
                 }
                 Button("New Folder") {
-                    onCreate(.folder, node.id)
+                    actions.create(.folder, node.id)
                 }
                 Divider()
             }
 
             Button("Rename…") {
-                onRename(node)
+                actions.rename(node)
             }
 
             if let itemURL {
@@ -81,7 +101,7 @@ struct WorkspaceTreeNodeRow: View {
             Divider()
 
             Button("Move to Trash", role: .destructive) {
-                appState.trashWorkspaceItem(id: node.id)
+                actions.trash(node.id)
             }
         }
     }
@@ -100,10 +120,11 @@ struct WorkspaceTreeNodeRow: View {
     }
 
     private var expandedBinding: Binding<Bool> {
-        Binding(
-            get: { appState.workspaceTree?.isExpanded(node.id) == true },
-            set: { isExpanded in
-                appState.setWorkspaceNodeExpanded(isExpanded, id: node.id)
+        let isExpanded = expandedNodeIDs.contains(node.id)
+        return Binding(
+            get: { isExpanded },
+            set: { [actions, nodeID = node.id] isExpanded in
+                actions.setExpanded(isExpanded, nodeID)
             }
         )
     }
@@ -129,6 +150,8 @@ struct WorkspaceTreeNodeRow: View {
             return false
         }
 
+        let move = actions.move
+        let directoryID = node.id
         provider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { item, _ in
             let droppedID: String? = if let data = item as? Data {
                 String(data: data, encoding: .utf8)
@@ -136,9 +159,9 @@ struct WorkspaceTreeNodeRow: View {
                 item as? String
             }
 
-            guard let droppedID, droppedID != node.id else { return }
+            guard let droppedID, droppedID != directoryID else { return }
             Task { @MainActor in
-                appState.moveWorkspaceItem(id: droppedID, toDirectoryID: node.id)
+                move(droppedID, directoryID)
             }
         }
 

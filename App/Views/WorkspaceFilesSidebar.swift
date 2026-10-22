@@ -71,10 +71,10 @@ struct WorkspaceFilesSidebar: View {
                     WorkspaceTreeNodeRow(
                         node: node,
                         rootURL: appState.workspaceRootURL,
-                        onRename: beginRename(_:),
-                        onCreate: beginCreation(_:inDirectoryID:),
-                        onFileClick: { selectFile(id: $0, requestingEditorFocus: true) }
+                        expandedNodeIDs: tree.expandedNodeIDs,
+                        actions: rowActions
                     )
+                    .equatable()
                 }
             } label: {
                 rootLabel
@@ -215,6 +215,23 @@ struct WorkspaceFilesSidebar: View {
         ) {
             selectionRevertTick += 1
         }
+    }
+
+    private var rowActions: WorkspaceTreeRowActions {
+        WorkspaceTreeRowActions(
+            setExpanded: { [appState] isExpanded, nodeID in
+                appState.setWorkspaceNodeExpanded(isExpanded, id: nodeID)
+            },
+            rename: beginRename(_:),
+            create: beginCreation(_:inDirectoryID:),
+            fileClick: { selectFile(id: $0, requestingEditorFocus: true) },
+            trash: { [appState] nodeID in
+                appState.trashWorkspaceItem(id: nodeID)
+            },
+            move: { [appState] droppedID, directoryID in
+                appState.moveWorkspaceItem(id: droppedID, toDirectoryID: directoryID)
+            }
+        )
     }
 
     private var showAllFilesBinding: Binding<Bool> {

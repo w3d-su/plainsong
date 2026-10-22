@@ -47,6 +47,15 @@ struct EditorFindUIState: Equatable {
     /// Validity of `replacementText`, computed when the value changes — never in a view body.
     var replacementValidity: EditorReplaceValueValidity = .valid
 
+    /// `==` compares strings by canonical equivalence; the query and replacement are literal
+    /// values, so a change between NFC and NFD spellings is still a change.
+    func isLiterallyIdentical(to other: EditorFindUIState) -> Bool {
+        self == other
+            && ExactSourceText.matches(queryText, other.queryText)
+            && ExactSourceText.matches(replacementText, other.replacementText)
+            && ExactSourceText.matches(matchCounterText, other.matchCounterText)
+    }
+
     /// Replace / Replace All may run only while the bar is visible **and** the row expanded.
     /// Hidden retained replacement text can never execute.
     var isReplaceRowActive: Bool {

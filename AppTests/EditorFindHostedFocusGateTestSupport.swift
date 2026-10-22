@@ -168,7 +168,8 @@ extension EditorFindHostedGateTests {
     /// Forces SwiftUI to re-run every mounted find field's `updateNSView` without issuing a
     /// new focus or select-all request.
     func republishFindChrome(_ appState: AppState) {
-        appState.setEditorFindUI(appState.editorFindHost.ui)
+        // `setEditorFindUI` no longer publishes an identical value; publish directly.
+        appState.objectWillChange.send()
     }
 
     private func registerTeardown(group: HostedWorkspaceGroup, fixture: WorkspaceFixture) {

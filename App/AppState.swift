@@ -292,6 +292,7 @@ final class AppState: ObservableObject {
         EditorDocumentBindingInstallation: EditorDocumentSourceSynchronizer
     ] = [:]
     var completionWorkspaceTask: Task<Void, Never>?
+    var completionWorkspaceBaseCache: CompletionWorkspaceBaseCache?
     var sessionAutosaveTasks: [ObjectIdentifier: SessionBackgroundTask] = [:]
     var sessionStatisticsTasks: [ObjectIdentifier: SessionBackgroundTask] = [:]
     var documentChangeCancellable: AnyCancellable?
@@ -949,11 +950,6 @@ final class RetiredWorkspaceAuthorityOwner: @unchecked Sendable {
             authority.stop()
         }
     }
-}
-
-struct SessionBackgroundTask {
-    let token: UUID
-    let task: Task<Void, Never>
 }
 
 enum AppStateError: LocalizedError {

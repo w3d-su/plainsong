@@ -4,16 +4,16 @@ import SwiftUI
 /// Frontmatter rows for the inspector's Frontmatter section; the source text stays the only
 /// model.
 ///
-/// The inspector owns text observation (one `.task` for the whole inspector). These rows
-/// parse `text` and hand every edit back as a complete replacement document. They are
+/// The inspector owns text observation and parsing (one debounced, memoized `.task` for the
+/// whole inspector). These rows show `result` and hand every edit back as a complete
+/// replacement document derived from the session's text at the moment of the edit. They are
 /// `InspectorSection` grid children: `InspectorRow`s, or full-width status views.
 struct FrontmatterRows: View {
-    let text: String
+    let result: FrontmatterParseResult
+    let currentText: () -> String
     let replaceText: (String) -> Void
 
     var body: some View {
-        let result = Frontmatter.parse(text)
-
         if let error = result.error, let block = result.block {
             MalformedFrontmatterRows(rawYAML: block.rawYAML, message: error.message)
         } else if let block = result.block {
@@ -36,7 +36,7 @@ struct FrontmatterRows: View {
     }
 
     private func updateField(key: String, value: FrontmatterValue) {
-        guard let updatedText = Frontmatter.updating(text, key: key, value: value) else {
+        guard let updatedText = Frontmatter.updating(currentText(), key: key, value: value) else {
             return
         }
         replaceText(updatedText)
@@ -45,7 +45,7 @@ struct FrontmatterRows: View {
     private func insertDefaultBlock() {
         replaceText(
             Frontmatter.insertingDefaultBlock(
-                into: text,
+                into: currentText(),
                 date: FrontmatterDateFormatting.string(from: Date())
             )
         )

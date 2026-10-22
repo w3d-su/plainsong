@@ -155,3 +155,8 @@ extension AppState {
             missingFilePrompt.map { !exactFileURLSpellingMatches($0.fileURL, url) } != false
     }
 }
+
+struct SessionBackgroundTask {
+    let token: UUID
+    let task: Task<Void, Never>
+}

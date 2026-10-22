@@ -345,6 +345,11 @@ the trigger characters below, or ⌃Space manually. Engine is pure Swift in Mark
 Ranking: prefix match > fuzzy; recently used boosted. Max 50 items. Never block typing —
 compute async, cancel stale requests.
 
+Workspace paths and sibling frontmatter keys are read once per installed workspace capture
+and current file (keys from the first 32 KiB of up to 50 siblings, no digest); a typing
+pause recomputes only heading anchors and MDX component names, and `completionWorkspace`
+republishes only when its value changes literally.
+
 ---
 
 ## 7. Preview (PreviewKit + preview-src)
@@ -520,7 +525,9 @@ attempt without a Decision Log entry.
   type-aware controls (string, date picker for `date`, tag token field for `tags`, toggle
   for `draft`).
 - Edits write back into the source text (panel ↔ text always derived from the document;
-  the text is the single source of truth).
+  the text is the single source of truth). An inspector edit is computed from the session's
+  text at that moment and shown at once; editor typing reaches the panel after a 150 ms
+  pause, and the Yams parse reruns only when the frontmatter block itself changed.
 - Malformed YAML → panel shows raw text + error, never crashes, never rewrites what it
   cannot parse.
 - String and string-list form writes use explicitly quoted YAML scalars with serializer-owned
