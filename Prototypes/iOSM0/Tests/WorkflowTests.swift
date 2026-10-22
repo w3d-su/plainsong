@@ -13,8 +13,16 @@ final class WorkflowTests: XCTestCase {
             XCTAssertFalse(expected.isEmpty)
             let button: UIButton = try host.control("m0-fixture")
             button.sendActions(for: .touchUpInside)
-            try await waitUntil(timeout: 6) {
-                host.session.document != nil && !host.session.opening && host.session.editor.textView.isEditable
+            let waitStarted = Date()
+            do {
+                try await waitUntil(timeout: 6) {
+                    host.session.document != nil && !host.session.opening && host.session.editor.textView.isEditable
+                }
+            } catch WorkflowFailure.timeout {
+                // Capture before cleanup changes the document state. Avoid a UIKit snapshot here:
+                // rendering could stall and obscure when the readiness deadline actually expired.
+                attachFixtureTimeout(session: host.session, elapsed: Date().timeIntervalSince(waitStarted))
+                throw WorkflowFailure.timeout
             }
             let document = try XCTUnwrap(host.session.document)
             let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -209,6 +217,30 @@ final class WorkflowTests: XCTestCase {
     }
 
     @MainActor
+    private func attachFixtureTimeout(session: DocumentSession, elapsed: TimeInterval) {
+        let editor = session.editor
+        let marked = editor.textView.markedTextRange.map { textRange($0, in: editor.textView) }
+        let snapshot = FixtureTimeoutDiagnostic(
+            capturedAt: Date(), elapsedSeconds: elapsed, message: session.message,
+            opening: session.opening, documentPresent: session.document != nil,
+            documentStateRawValue: session.document?.documentState.rawValue,
+            ledgerAvailable: session.ledger?.available, ledgerConflict: session.ledger?.conflict,
+            dirty: session.dirty, saving: session.saving, editable: editor.textView.isEditable,
+            markedUTF16: marked.map { [$0.location, $0.length] },
+            events: session.probe.events
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        let payload = (try? encoder.encode(snapshot)).map { String(decoding: $0, as: UTF8.self) }
+            ?? "Fixture readiness timeout diagnostics could not be encoded."
+        let attachment = XCTAttachment(string: payload)
+        attachment.name = "Fixture readiness timeout state and redacted probe events"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    @MainActor
     private func waitUntil(timeout: TimeInterval, _ predicate: @MainActor () -> Bool) async throws {
         let deadline = Date().addingTimeInterval(timeout)
         while !predicate() {
@@ -253,6 +285,23 @@ final class WorkflowTests: XCTestCase {
 }
 
 private enum WorkflowFailure: Error { case timeout }
+
+// Existing ProbeEvent payloads contain hashes/ranges only: never source, URLs or bookmarks.
+private struct FixtureTimeoutDiagnostic: Encodable {
+    let capturedAt: Date
+    let elapsedSeconds: TimeInterval
+    let message: String
+    let opening: Bool
+    let documentPresent: Bool
+    let documentStateRawValue: UInt?
+    let ledgerAvailable: Bool?
+    let ledgerConflict: Bool?
+    let dirty: Bool
+    let saving: Bool
+    let editable: Bool
+    let markedUTF16: [Int]?
+    let events: [ProbeEvent]
+}
 
 @MainActor
 private final class SaveWorkflowState {
