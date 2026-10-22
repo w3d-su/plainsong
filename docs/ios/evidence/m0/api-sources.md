@@ -1,5 +1,7 @@
 # API verification — 2026-10-08
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 Context7 queried outside the sandbox using the required library → docs sequence.
 No quota error. UIKit resolved to `/websites/developer_apple_uikit` (Apple, High
 reputation); XcodeGen resolved to `/yonaskolb/xcodegen` (official project, High).

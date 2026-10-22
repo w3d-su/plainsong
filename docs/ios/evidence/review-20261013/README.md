@@ -1,5 +1,7 @@
 # iOS 並行開發驗收修正交接 — 2026-10-13
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 本批 source 修正已整合到獨立審查分支；**完整 iOS 首版驗收仍為 OPEN**。06 的正式 Workspace/Access provider、11 的產品驗收 harness、13 的 production composition 尚未交付。M0 真機關卡未關閉，這次沒有啟用正式產品接線。
 
 ## 審查基準
@@ -54,7 +56,7 @@ Readonly Undo 的原始反例已通過，沒有為未證實問題修改 editor h
 
 初次 exact-head CI 在未經本批修改的 `testHardLinkInspectionUsesCurrentKernelSpelling` 出現 `destinationAlias`。舊測試假設最後一次open決定vnode pathname；當時未記錄actual bytes，具體kernel/cache原因仍未歸因。新增nil-default原始syscall observer與明確test-only spelling seam；production仍做一次真fcntl及同一byte-exact guard。Native測試依同次actual bytes、非空absolute path斷言；另兩個controlled cases要求matching成功、mismatch inspect/publish拒絕、零staging/零publish、原檔不變。
 
-Final source `f426077` 的**69 focused/362 full PASS、0 skip**；移除guard時**1 named FAIL**，恢復三個source hashes後重跑通過。這是Mac regression，不是iOS provider或IME證據。見[完整receipt](mac-ci-hardlink.md)、[proof](mac-ci-hardlink-proof.json)、[實際telemetry](mac-ci-hardlink-telemetry.json)。Local observation不解釋歷史CI kernel/cache cause。
+Final source `f426077` 的**69 focused/362 full PASS、0 skip**；移除guard時**1 named FAIL**，恢復三個source hashes後重跑通過。這是Mac regression，不是iOS provider或IME證據。見[完整receipt](mac-ci-hardlink.md)、[proof](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/review-20261013/mac-ci-hardlink-proof.json)、[實際telemetry](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/review-20261013/mac-ci-hardlink-telemetry.json)。Local observation不解釋歷史CI kernel/cache cause。
 
 ## 模擬器與 hosted 入口
 
@@ -103,11 +105,11 @@ Lane12有已驗證的 unsigned **C0 tooling IPA**，source `3d4f671545eb41190b1b
 
 ## 直接證據索引
 
-- [actual294/原17/C0 smoke12](native-aggregate/receipt.json)、[storage六負向與restore46](../lane-05/native-guard-receipt.md)
-- [native Preview詳細失敗與fixture修正](preview-native/README.md)、[manual sandbox link修正](mac-sandbox-link/receipt.json)
-- [最新aggregate編譯](aggregate-generic-receipt-2.json)、[當時source inputs](aggregate-tested-source-2.json)、[compiled methods](aggregate-compiled-test-symbols-2.json)
-- [跨快照source核對](proof-scope-verification.json)、[frozen合約](frozen-contracts-verification.json)
-- [MacPreview94](preview-mac-receipt.json)、[MacWorkspace29](workspace-core-receipt.json)、[最新architecture](mac-architecture-receipt-2.json)、[最新lint](lint-receipt-3.json)、[原lane PR當前heads](original-lane-pr-heads.json)
-- [05 latest](../lane-05/autosave-review-receipt.json)、[08 latest](../lane-08/exact-source-delivery-review.md)、[09 latest](../lane-09/acceptance-review-fixes.md)、[03/10/12](../lane-12/review-fixes-20261013/README.md)
+- [actual294/原17/C0 smoke12](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/review-20261013/native-aggregate/receipt.json)、[storage六負向與restore46](../lane-05/native-guard-receipt.md)
+- [native Preview詳細失敗與fixture修正](preview-native/README.md)、[manual sandbox link修正](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/review-20261013/mac-sandbox-link/receipt.json)
+- [最新aggregate編譯](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/review-20261013/aggregate-generic-receipt-2.json)、[當時source inputs](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/review-20261013/aggregate-tested-source-2.json)、[compiled methods](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/review-20261013/aggregate-compiled-test-symbols-2.json)
+- [跨快照source核對](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/review-20261013/proof-scope-verification.json)、[frozen合約](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/review-20261013/frozen-contracts-verification.json)
+- [MacPreview94](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/review-20261013/preview-mac-receipt.json)、[MacWorkspace29](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/review-20261013/workspace-core-receipt.json)、[最新architecture](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/review-20261013/mac-architecture-receipt-2.json)、[最新lint](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/review-20261013/lint-receipt-3.json)、[原lane PR當前heads](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/review-20261013/original-lane-pr-heads.json)
+- [05 latest](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/lane-05/autosave-review-receipt.json)、[08 latest](../lane-08/exact-source-delivery-review.md)、[09 latest](../lane-09/acceptance-review-fixes.md)、[03/10/12](../lane-12/review-fixes-20261013/README.md)
 
 Raw Xcode logs以可逆gzip保留，`gzip -dc <file.log.gz>`取得原始bytes；log-packaging.json列未壓縮/壓縮雜湊。沒有修改raw內容來通過diff check。

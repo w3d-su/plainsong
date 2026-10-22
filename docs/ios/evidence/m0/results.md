@@ -1,5 +1,7 @@
 # M0 result — OPEN, production composition prohibited
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 Date: 2026-10-08 (Asia/Taipei). Branch `phase3-ios-m0-device-spike`.
 Dedicated checkout `/private/tmp/plainsong-ios-m0-device-spike`.
 Base ref `phase3-ios-parallel-handoffs`, SHA

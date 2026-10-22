@@ -1,5 +1,7 @@
 # Lane 10 來源調查 — macOS shell 盤點 → iOS 設計輸入
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 基準：`2144c46`（snapshot `b13aa62`）。目的：實作前盤點既有 shell 機制中可移植的模式、
 不可移植的部分、以及 iOS 必須新增的東西。所有行號對應 base commit。
 

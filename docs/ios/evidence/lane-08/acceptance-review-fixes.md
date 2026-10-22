@@ -1,5 +1,7 @@
 # Lane 08 acceptance review fixes — 2026-10-09
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 Worktree: `/Users/davis._.su/.codex/worktrees/ios-review-authoring/blogeditor`.
 Branch: `codex/ios-authoring-review-fixes`.
 Local starting commit: `8875de5cfb9e7ced54c0f7a9cedbadf982e04c65`, combining original lane 08 `501f6fea213993feb1e98d04c3ecc0ab73aa499a` and lane 09 `912aad7cf9f8d34f2de270fbc984742cc15f606a`. Frozen contracts remain `ios-c0-v1` (`642cb212703220409874a2741c5adbfb8c80fe8a`). Original lane worktrees/PRs were not changed or merged. This receipt belongs to the same additive commit as the lane 08 fixes.

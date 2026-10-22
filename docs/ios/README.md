@@ -1,5 +1,7 @@
 # Plainsong iOS — 平行開發入口
 
+[Evidence index and historical archive](evidence/README.md).
+
 日期：2026-10-08。規格版本：IOS-C0-v1。
 
 本包將核准的 iPhone／iPad、iOS／iPadOS 26 首版拆為 **12 條開發線 + 1 個整合角色**。每份 handoff 都可交給不同 LLM；[啟動提示詞](launch-prompts.md) 可直接複製。C0 另以整合 PR 提供唯一契約與 unavailable scaffold；[台帳](integration-ledger.md) 分列編譯／測試執行／CI／真機狀態，沒有宣稱完整 iOS 功能、真機關卡或 IPA 已完成。

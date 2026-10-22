@@ -1,5 +1,7 @@
 # Lane 12 — 測試與 failure-gate 計畫
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 「已跑」與「設計」分列；pre-C0 無 iOS target 可建，所有 build/test/archive/IPA
 實跑都是 post-handoff 項目。
 

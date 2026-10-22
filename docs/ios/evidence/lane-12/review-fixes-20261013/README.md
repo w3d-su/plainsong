@@ -1,5 +1,7 @@
 # 03／10／12 review 修正與真實工具驗證
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../../README.md); run historical local-path commands from that restored checkout.
+
 日期：2026-10-13。隔離 branch `codex/ios-shell-build-review-fixes`；owner checkout 與原 lane worktrees 未修改。
 本次 source fixes 是 03 opaque ID、10 workspace publication／empty-folder grant、12 tooling evidence gates；沒有實作 06 provider、11 harness，沒有接上 production composition，也沒有改 frozen C0 declarations。
 
@@ -30,16 +32,16 @@
 
 前三個 WorkspaceCore admission attempts 都 exit 75、**0 execution**；tooling 曾因 positive admission 被其他 run 占鎖而回報一個 infrastructure pending，隨後完整 21-case run 已實際通過。C0 generic 第一次 runner admission exit 75（make wrapper exit 2），第二次才真正 build exit 0。保留所有 logs，不將排程未執行算成產品測試 failure。
 
-`xcodebuild -help` 支援的四個 options 留在 [xcodebuild-help-options.txt](xcodebuild-help-options.txt)。Context7 解到官方 Apple Xcode library，但詳細 CLI 查詢沒有相符頁面，具體 flags 以已安裝官方 help 為準。Timeout 只約束個別測試，不解決或掩蓋 simulator installation stall；driver failure／0-run／malformed／missing required cases 仍失敗。
+`xcodebuild -help` 支援的四個 options 留在 [xcodebuild-help-options.txt](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/lane-12/review-fixes-20261013/xcodebuild-help-options.txt)。Context7 解到官方 Apple Xcode library，但詳細 CLI 查詢沒有相符頁面，具體 flags 以已安裝官方 help 為準。Timeout 只約束個別測試，不解決或掩蓋 simulator installation stall；driver failure／0-run／malformed／missing required cases 仍失敗。
 
 ## 產物與重現
 
 - IPA：`/private/tmp/plainsong-shell-build-review-20261013/release/PlainsongIOS-3d4f671545eb.ipa`，2,516,957 bytes。
 - SHA-256：`138096c65c31faa674864cf6f093119d3dbc055cb26df0e86797730c238becdd`。
-- Source fingerprint：`b0a6a7273be3da51500e210796e89fe7dee08a3abe6471e0bb5455e81fdc5343`；完整 [source-inputs.json](source-inputs.json)。
-- Archive digest：`73c6d00f2280569edaed781d843a195c7ce940d4edd0a78822cd61b7f4c84d10`；[c0-archive.json](c0-archive.json) 與 [c0-ipa.json](c0-ipa.json)。
+- Source fingerprint：`b0a6a7273be3da51500e210796e89fe7dee08a3abe6471e0bb5455e81fdc5343`；完整 [source-inputs.json](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/lane-12/review-fixes-20261013/source-inputs.json)。
+- Archive digest：`73c6d00f2280569edaed781d843a195c7ce940d4edd0a78822cd61b7f4c84d10`；[c0-archive.json](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/lane-12/review-fixes-20261013/c0-archive.json) 與 [c0-ipa.json](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/lane-12/review-fixes-20261013/c0-ipa.json)。
 - Full local logs／binary／archive：`/private/tmp/plainsong-shell-build-review-20261013/`。這個目錄屬本次 task，沒有寫入 owner repo。
-- [workspace-core.log](workspace-core.log)、[tooling-21.log](tooling-21.log)、[checkpoint.json](checkpoint.json)、[verification.json](verification.json) 保留實際 counts、tested head 與 source hashes。
+- [workspace-core.log](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/lane-12/review-fixes-20261013/workspace-core.log)、[tooling-21.log](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/lane-12/review-fixes-20261013/tooling-21.log)、[checkpoint.json](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/lane-12/review-fixes-20261013/checkpoint.json)、[verification.json](https://github.com/w3d-su/plainsong/blob/e20162e5c2402800e84cf1f68ae4787535228c50/docs/ios/evidence/lane-12/review-fixes-20261013/verification.json) 保留實際 counts、tested head 與 source hashes。
 
 ```sh
 # 在 exact code ref 3d4f671 的獨立 checkout 執行；每個 public runner 自己持 canonical lock。

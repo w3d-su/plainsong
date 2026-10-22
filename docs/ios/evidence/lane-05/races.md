@@ -1,5 +1,7 @@
 # Lane 05 races and negative probes
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 All commands used the WorkspaceKitIOS package scheme, iPhone 17 Pro simulator `59CB04BD-26CC-4841-8D06-E75A2EDEBC66`, and `/private/tmp/plainsong-xcodebuild-test.lock`. The green run is `/tmp/plainsong-doc-io-test3.log` (31 tests, 0 failures).
 
 ## Races that passed on the restored tree

@@ -1,5 +1,7 @@
 # iOS build run evidence index — 2026-10-08
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 （`docs/ios/evidence/build/` 被 repo `.gitignore` 的裸 `build/` pattern 攔截，且
 `.gitignore` 不在本 lane 可改清單——實跑索引依 lane-owned evidence 慣例落於此檔。
 若 13/maintainer 要啟用 `docs/ios/evidence/build/`，在 `.gitignore` 加

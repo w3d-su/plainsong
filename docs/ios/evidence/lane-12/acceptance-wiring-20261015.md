@@ -1,5 +1,7 @@
 # Lane 12 — acceptance scheme wiring, 2026-10-15
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 Base is PR #164 head `fdbcd44444f958589cb1e662d67ce3015e5e9f30` on `codex/ios-review-fixes-20261013`. The prompt's earlier pin `59f374ff` is the parent of that head; the harness from PR #171 is already in `fdbcd444`. This lane did not reset either branch.
 
 Worktree: `/private/tmp/plainsong-ios-12-validation-wiring`. Branch: `codex/ios-12-validation-wiring-20261015`.

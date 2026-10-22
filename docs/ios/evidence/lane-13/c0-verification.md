@@ -1,5 +1,7 @@
 # C0 verification — lane 13
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 Date: 2026-10-08 (Asia/Taipei). IOS-C0-v1. Worktree: `/private/tmp/plainsong-ios-integration`; owner checkout was never edited, switched, stashed, formatted or generated. Initial source: packet `2144c46c888360c84a42fef79e676e60b518048b`, live main `b13aa620c7444f2ccd3a8fe3a5b8b0afe0e997b2`.
 
 ## Reproduction

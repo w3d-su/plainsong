@@ -1,5 +1,7 @@
 # Lane 04 device acceptance
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 These boxes are open. Simulator tests do not check them. Lane 01 has not accepted M0.
 
 Record the device model, OS, app build, source SHA, and fixture hashes before any box can be checked.

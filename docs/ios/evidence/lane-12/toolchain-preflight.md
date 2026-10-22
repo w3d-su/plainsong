@@ -1,5 +1,7 @@
 # Lane 12 — toolchain preflight（本機實測）
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 日期：2026-10-08。探測機器：owner Mac（darwin 27.0.0）。所有值為本次實測，
 不是文件假設；preflight script 以相同檢查在每次 run 重新驗證。
 

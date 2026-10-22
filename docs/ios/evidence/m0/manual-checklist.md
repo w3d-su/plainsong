@@ -1,5 +1,7 @@
 # M0 owner device checklist — OPEN
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 Use only `Prototypes/iOSM0/Fixtures/m0.md` and disposable copies, one in Files
 “On My iPhone/iPad”, one in iCloud Drive. Record the fixture SHA-256, exact app
 source commit, IPA SHA, Xcode/SDK, model, OS, input method, UTC start/end, expected

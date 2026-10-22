@@ -1,5 +1,7 @@
 # Lane 12 build-wiring proposal — iOS acceptance harness
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 Status: proposal only. This lane did not edit `project.yml`, the Makefile, `Scripts/ios/**`, or the iOS workflow. `PlainsongIOS` production composition stays unavailable.
 
 ## Diagnosis

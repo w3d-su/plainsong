@@ -1,5 +1,7 @@
 # Lane 05 device gates
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 These gates stay **open**. Simulator doubles and one local UIDocument round trip do not close them.
 
 | Gate | What the owner checks | Status |

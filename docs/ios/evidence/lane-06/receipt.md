@@ -1,5 +1,7 @@
 # Lane 06 receipt — Workspace access
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 Status: **module-ready**. Lane 13 can inject the production factory. App composition stays unavailable. M0 Files, iCloud, device, exact-head CI, and performance gates stay open.
 
 | Field | Value |

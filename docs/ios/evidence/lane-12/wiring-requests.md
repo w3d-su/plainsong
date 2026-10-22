@@ -1,5 +1,7 @@
 # Lane 12 → 13：C0 交接時需要凍結／確認的項目
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 依 handoff：全域 manifest／build 檔由 13 在 bootstrap 建最小 scaffold，C0 freeze
 時明確交接給 12。以下缺一項，lane-12 只能發明平行命名（被禁止）或停工。
 

@@ -1,5 +1,7 @@
 # Lane 08 來源調查
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 調查基準：`2144c46c888360c84a42fef79e676e60b518048b`。只讀 `Packages/MarkdownCore`、Mac Format menu 與既有 single-replace executor。沒有改這些檔。
 
 ## 凍結後必須消費的唯一寫入面

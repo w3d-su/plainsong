@@ -1,5 +1,7 @@
 # Lane 13 inventory patch for SyntaxKit
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 Lane 02 changed `Packages/SyntaxKit/Package.swift` and `Packages/EditorKit/Package.swift`. It did not edit `EditorReplaceLayeringTests.swift`, `docs/decision-log.md`, or `agent.md`. Those stay with lane 13.
 
 ## Decision Log row to append
