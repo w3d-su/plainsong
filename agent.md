@@ -253,6 +253,14 @@ replacement local to EditorKit.
   SwiftUI update. Edits, document/appearance changes and WYSIWYG selection changes
   still restart the revision-fenced scheduler; fence/frontmatter context is expanded
   once per source highlight, off the main actor.
+- Fenced-code state has one definition, `MarkdownFenceScanner` (MarkdownCore), shared by
+  the visible-range expansion, the Enter fence helper (§6.3) and MDX component
+  completion (§6.5). CommonMark §4.5 per line (`\n`, `\r`, `\r\n`): a run of ≥ 3
+  `` ` `` or `~` after ≤ 3 spaces (the Enter helper accepts any spaces/tabs, for
+  list-item fences); a backtick opener's info string has no backtick; only the same
+  character, at least as long, followed by nothing but spaces/tabs, closes; a leading
+  `---`/`+++` frontmatter block closed by the same marker is skipped. It walks native
+  UTF-8 storage with `memchr` (bridged strings as UTF-16) and returns UTF-16 offsets.
 - Applying a highlight skips runs whose stored attributes already equal the new ones:
   re-setting equal attributes still marks the run edited, and TextKit then re-typesets
   every visible paragraph. The stored result is identical either way.
@@ -283,7 +291,9 @@ replacement local to EditorKit.
   caret so bullets and manually typed italics stay natural. Wrapping: with a selection,
   typing a pair character wraps the selection. Skip-over on closing char except for `*`.
 - **Code fence helper:** typing ``` ``` ``` then Enter auto-inserts closing fence and places
-  cursor inside; language autocomplete fires after the opening fence.
+  cursor inside; language autocomplete fires after the opening fence. Inside an already
+  open fence of either marker (`~~~` included, any indentation) nothing is inserted:
+  the typed line is code or the closing fence.
 - **Smart paste:** pasting a URL over selected text creates `[selection](url)`. Pasting an
   image from clipboard saves it to `assets/` (configurable, relative to the file) and
   inserts `![](path)`. Drag-in image files insert relative-path links (copy into
