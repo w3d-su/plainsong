@@ -72,6 +72,15 @@ public struct WorkspaceDirectoryScanner: Sendable {
     /// Captures root authority and enumerates its canonical spelling on the same utility task.
     /// Namespace replacement during enumeration rejects the whole capture.
     public func snapshotCapture(root: URL) async throws -> WorkspaceDirectorySnapshotCapture {
+        try await snapshotCapture(root: root, pruning: .none)
+    }
+
+    /// `snapshotCapture(root:)` that skips the directories `pruning` names without
+    /// enumerating or inspecting anything under them.
+    public func snapshotCapture(
+        root: URL,
+        pruning: WorkspaceScanPruning
+    ) async throws -> WorkspaceDirectorySnapshotCapture {
         try Task.checkCancellation()
 
         return try await withThrowingTaskGroup(of: WorkspaceDirectorySnapshotCapture.self) { group in
@@ -82,7 +91,8 @@ public struct WorkspaceDirectoryScanner: Sendable {
                     root: authority.canonicalRootURL,
                     rootAuthority: authority,
                     entryVisitHook: entryVisitHook,
-                    preservesLiteralEntrySpelling: true
+                    preservesLiteralEntrySpelling: true,
+                    pruning: pruning
                 )
                 try authority.validateCanonicalBinding()
                 return WorkspaceDirectorySnapshotCapture(
@@ -104,7 +114,8 @@ public struct WorkspaceDirectoryScanner: Sendable {
         root: URL,
         rootAuthority: WorkspaceFileSystemRootAuthority,
         entryVisitHook: @escaping @Sendable (URL) -> Void,
-        preservesLiteralEntrySpelling: Bool
+        preservesLiteralEntrySpelling: Bool,
+        pruning: WorkspaceScanPruning = .none
     ) throws -> WorkspaceFileSnapshot {
         try Task.checkCancellation()
         var isDirectory: ObjCBool = false
@@ -148,6 +159,14 @@ public struct WorkspaceDirectoryScanner: Sendable {
                 preservesLiteralEntrySpelling: preservesLiteralEntrySpelling
             )
             guard !relativePath.isEmpty else { continue }
+            // Before the per-entry anchored inspection: an ignored tree such as
+            // `node_modules` is most of a web project's entries.
+            if values.isDirectory == true,
+               pruning.skipsDirectory(named: url.lastPathComponent, relativePath: relativePath)
+            {
+                enumerator.skipDescendants()
+                continue
+            }
             let location = try rootAuthority.location(relativePath: relativePath)
             let mutationExpectation = try WorkspaceNoFollowItemInspector.inspect(at: location)
 

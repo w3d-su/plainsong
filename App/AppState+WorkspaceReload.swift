@@ -102,11 +102,12 @@ extension AppState {
         let selectedRoot = root
         let generation = advanceWorkspaceGeneration()
         let scanner = directoryScanner
+        let pruning = workspaceScanPruning(root: selectedRoot)
         workspaceReloadTask?.cancel()
 
         workspaceReloadTask = Task { @MainActor [weak self, scanner] in
             do {
-                let capture = try await scanner.snapshotCapture(root: selectedRoot)
+                let capture = try await scanner.snapshotCapture(root: selectedRoot, pruning: pruning)
                 guard let self else { return }
                 try await reloadWorkspaceCapture(
                     root: selectedRoot,
@@ -134,7 +135,10 @@ extension AppState {
     func reloadWorkspaceTree(root: URL, selectFirstIfNeeded: Bool) async throws {
         let selectedRoot = root
         let generation = advanceWorkspaceGeneration()
-        let capture = try await directoryScanner.snapshotCapture(root: selectedRoot)
+        let capture = try await directoryScanner.snapshotCapture(
+            root: selectedRoot,
+            pruning: workspaceScanPruning(root: selectedRoot)
+        )
         try await reloadWorkspaceCapture(
             root: selectedRoot,
             scanner: directoryScanner,
@@ -172,9 +176,44 @@ extension AppState {
                 guard isCurrentWorkspaceReload(root: root, generation: generation) else {
                     throw CancellationError()
                 }
-                capture = try await scanner.snapshotCapture(root: root)
+                capture = try await scanner.snapshotCapture(
+                    root: root,
+                    pruning: workspaceScanPruning(root: root)
+                )
             }
         }
+    }
+
+    /// "Show all files" off skips generated and vendored directories (`node_modules`,
+    /// `dist`, …) at scan time, except on the way to a managed session's file: an open
+    /// document there must not look missing after the rescan.
+    func workspaceScanPruning(root: URL) -> WorkspaceScanPruning {
+        guard !showAllFiles else { return .none }
+        let rootAuthority = workspaceSearchRootAuthority
+        let rootPrefixes = Set([root.standardizedFileURL, root.resolvingSymlinksInPath()].map { url in
+            let path = url.path(percentEncoded: false)
+            return path.hasSuffix("/") ? path : path + "/"
+        })
+        var retained: Set<String> = []
+        for session in [currentDocument] + Array(sessionCache.values) {
+            // Every spelling that may name the session inside this root; extra entries only
+            // make the scan enumerate more.
+            if let location = retainedAnchoredSessionLocation(for: session) {
+                retained.insert(location.relativePath)
+            }
+            guard let fileURL = sessionStateURL(for: session) else { continue }
+            if let rootAuthority, let relativePath = try? rootAuthority.relativePath(forFileURL: fileURL) {
+                retained.insert(relativePath)
+            }
+            for filePath in Set([fileURL.standardizedFileURL, fileURL.resolvingSymlinksInPath()]
+                .map { $0.path(percentEncoded: false) })
+            {
+                for rootPrefix in rootPrefixes where filePath.hasPrefix(rootPrefix) {
+                    retained.insert(String(filePath.dropFirst(rootPrefix.count)))
+                }
+            }
+        }
+        return .ignoredDirectories(retaining: retained)
     }
 
     func advanceWorkspaceGeneration() -> UInt64 {
