@@ -1,0 +1,85 @@
+{
+  "mode": "test",
+  "source_sha": "806989d176f61f0825973fbd2eb9bee444a6d16b",
+  "dirty": false,
+  "fixture_sha256": "38b1b6a80749a22baa8cede8adf5af4ee598181ca4690dc4b7d64b6a850c5144",
+  "xcode": "Xcode 27.0\nBuild version 27A5194q",
+  "started_utc": "2026-10-22T15:24:49.495564+00:00",
+  "ended_utc": "2026-10-22T15:25:49.476835+00:00",
+  "exit_code": 0,
+  "attempt": "20261022T152448Z-test-15558F61",
+  "simulator": {
+    "modelName": "iPad Pro 11-inch (M5)",
+    "deviceName": "iPad Pro 11-inch (M5)",
+    "osVersion": "27.0",
+    "platform": "iOS Simulator"
+  },
+  "family": "iPad",
+  "gate": {
+    "passed": 20,
+    "skipped": 0,
+    "failed": 0,
+    "executed": 20,
+    "required": [
+      "DocumentTests/testCleanDocumentSwitchClosesThroughAutosaveFence",
+      "DocumentTests/testDirectorySkipsSymlinkAndNonMarkdown",
+      "DocumentTests/testRealUIDocumentRejectsExternalBytesAtWrite",
+      "DocumentTests/testRealUIDocumentSaveAndReopenExactUnicode",
+      "DocumentTests/testSingleFileGrantCannotEnumerateParentOrSibling",
+      "EditorTests/testCleanReloadKeepsIdentityAndAdvancesRevision",
+      "EditorTests/testMarkedTextRefusesPresentationAttachAndUndo",
+      "EditorTests/testNativeUndoRoundTripAfterPresentation",
+      "EditorTests/testStaleRevisionAndDocumentSwitchRefusePresentation",
+      "EditorTests/testTextKit2PresentationPreservesSourceSelectionAndUndoRedo",
+      "SaveTests/testCanonicallyEquivalentUnicodeStillDirtyWhenBytesDiffer",
+      "SaveTests/testConflictAndUnavailableRefuseOverwrite",
+      "SaveTests/testFailedSavePreservesBaselineAndSource",
+      "SaveTests/testOldSaveAcknowledgementLeavesNewRevisionDirty",
+      "SaveTests/testOnlyOneWriterAndDuplicateAcknowledgementRefused",
+      "SaveTests/testRecoveryFailureDoesNotReturnSuccess",
+      "SaveTests/testRecoveryRoundTripExactUnicodeAndRevision",
+      "WorkflowTests/testDelayHelpSurvivesReportsAndTogglePreservesNativeComposition",
+      "WorkflowTests/testDelayedDocumentSessionSavesCapturedRevisionBeforeLaterNativeEdit",
+      "WorkflowTests/testFixtureButtonOpensEditableBundledBytesInAppPrivateDocument"
+    ],
+    "cases": {
+      "DocumentTests/testCleanDocumentSwitchClosesThroughAutosaveFence": "Passed",
+      "DocumentTests/testDirectorySkipsSymlinkAndNonMarkdown": "Passed",
+      "DocumentTests/testRealUIDocumentRejectsExternalBytesAtWrite": "Passed",
+      "DocumentTests/testRealUIDocumentSaveAndReopenExactUnicode": "Passed",
+      "DocumentTests/testSingleFileGrantCannotEnumerateParentOrSibling": "Passed",
+      "EditorTests/testCleanReloadKeepsIdentityAndAdvancesRevision": "Passed",
+      "EditorTests/testMarkedTextRefusesPresentationAttachAndUndo": "Passed",
+      "EditorTests/testNativeUndoRoundTripAfterPresentation": "Passed",
+      "EditorTests/testStaleRevisionAndDocumentSwitchRefusePresentation": "Passed",
+      "EditorTests/testTextKit2PresentationPreservesSourceSelectionAndUndoRedo": "Passed",
+      "SaveTests/testCanonicallyEquivalentUnicodeStillDirtyWhenBytesDiffer": "Passed",
+      "SaveTests/testConflictAndUnavailableRefuseOverwrite": "Passed",
+      "SaveTests/testFailedSavePreservesBaselineAndSource": "Passed",
+      "SaveTests/testOldSaveAcknowledgementLeavesNewRevisionDirty": "Passed",
+      "SaveTests/testOnlyOneWriterAndDuplicateAcknowledgementRefused": "Passed",
+      "SaveTests/testRecoveryFailureDoesNotReturnSuccess": "Passed",
+      "SaveTests/testRecoveryRoundTripExactUnicodeAndRevision": "Passed",
+      "WorkflowTests/testDelayedDocumentSessionSavesCapturedRevisionBeforeLaterNativeEdit": "Passed",
+      "WorkflowTests/testDelayHelpSurvivesReportsAndTogglePreservesNativeComposition": "Passed",
+      "WorkflowTests/testFixtureButtonOpensEditableBundledBytesInAppPrivateDocument": "Passed"
+    }
+  },
+  "complete_xcresult": true,
+  "admission": [
+    {
+      "bundle": "PlainsongIOSM0.app",
+      "mach_o_filetype": 2,
+      "arch": "arm64",
+      "platform": "IOSSIMULATOR",
+      "sha256": "9f0f6026c05b41f6daa1734427503b4382edb62e4bd95e5b88bc03ee1b06464c"
+    },
+    {
+      "bundle": "PlainsongIOSM0Tests.xctest",
+      "mach_o_filetype": 8,
+      "arch": "arm64",
+      "platform": "IOSSIMULATOR",
+      "sha256": "aefe20be91e442caef06b606400e8fb1a13420d09082571c072a5e6667e80bc3"
+    }
+  ]
+}

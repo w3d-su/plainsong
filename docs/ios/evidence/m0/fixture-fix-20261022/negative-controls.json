@@ -1,0 +1,183 @@
+{
+  "writer": {
+    "status": "EXPECTED_DEFECT_DETECTED",
+    "run": {
+      "attempt": "20261022T151030Z-test-8C6B69BB",
+      "source_sha": "23a4d727d5461a52d105b3adc735520ecbb075e3",
+      "dirty": true,
+      "exit_code": 65,
+      "complete_xcresult": true,
+      "passed": 19,
+      "failed": [
+        "WorkflowTests/testDelayedDocumentSessionSavesCapturedRevisionBeforeLaterNativeEdit"
+      ],
+      "skipped": 0,
+      "cases": {
+        "DocumentTests/testCleanDocumentSwitchClosesThroughAutosaveFence": "Passed",
+        "DocumentTests/testDirectorySkipsSymlinkAndNonMarkdown": "Passed",
+        "DocumentTests/testRealUIDocumentRejectsExternalBytesAtWrite": "Passed",
+        "DocumentTests/testRealUIDocumentSaveAndReopenExactUnicode": "Passed",
+        "DocumentTests/testSingleFileGrantCannotEnumerateParentOrSibling": "Passed",
+        "EditorTests/testCleanReloadKeepsIdentityAndAdvancesRevision": "Passed",
+        "EditorTests/testMarkedTextRefusesPresentationAttachAndUndo": "Passed",
+        "EditorTests/testNativeUndoRoundTripAfterPresentation": "Passed",
+        "EditorTests/testStaleRevisionAndDocumentSwitchRefusePresentation": "Passed",
+        "EditorTests/testTextKit2PresentationPreservesSourceSelectionAndUndoRedo": "Passed",
+        "SaveTests/testCanonicallyEquivalentUnicodeStillDirtyWhenBytesDiffer": "Passed",
+        "SaveTests/testConflictAndUnavailableRefuseOverwrite": "Passed",
+        "SaveTests/testFailedSavePreservesBaselineAndSource": "Passed",
+        "SaveTests/testOldSaveAcknowledgementLeavesNewRevisionDirty": "Passed",
+        "SaveTests/testOnlyOneWriterAndDuplicateAcknowledgementRefused": "Passed",
+        "SaveTests/testRecoveryFailureDoesNotReturnSuccess": "Passed",
+        "SaveTests/testRecoveryRoundTripExactUnicodeAndRevision": "Passed",
+        "WorkflowTests/testDelayedDocumentSessionSavesCapturedRevisionBeforeLaterNativeEdit": "Failed",
+        "WorkflowTests/testDelayHelpSurvivesReportsAndTogglePreservesNativeComposition": "Passed",
+        "WorkflowTests/testFixtureButtonOpensEditableBundledBytesInAppPrivateDocument": "Passed"
+      },
+      "manifest": {
+        "mode": "test",
+        "started_utc": "2026-10-22T15:10:31.074957+00:00",
+        "source_sha": "23a4d727d5461a52d105b3adc735520ecbb075e3",
+        "dirty": true,
+        "prototype_files_sha256": {
+          ".gitignore": "711c29106ff9484cfb0bfdd19d107f24bcbf8b3a7d70917592bc4fddd8679a1e",
+          "Fixtures/m0.md": "38b1b6a80749a22baa8cede8adf5af4ee598181ca4690dc4b7d64b6a850c5144",
+          "README.md": "04f5926ad8c5dc5c977fd1e297abd2c788e3f427995338dd9cfced96b2fb94b6",
+          "Scripts/CoreChecks.swift": "53769b0ed032d95dc5a7eb7e6622882686108a005d7823cf8f9e2df8f0ee4763",
+          "Scripts/package-ipa.py": "3940a9b2480bffbf923ec70c52345beccee1b23c5a62916f75c567cd90f5660b",
+          "Scripts/run.sh": "afb98fdd037a945972eca574129bdf7e3d6544eb6a6eabc4febcec962d092a22",
+          "Sources/AccessGrant.swift": "50276b079dea96b0c6458713b404ffc69e25d57e1f5faa60a746356283bb2470",
+          "Sources/DocumentSession.swift": "cbd248ca6efb52610d7a0226017d37add41efaed1ce565c2baa34a3a2dc06ea3",
+          "Sources/Probe.swift": "15014a16698fd8a0d81718efcddc99ee659c098c2ed1bce1f114cb6fb1f0cc31",
+          "Sources/SaveLedger.swift": "1f71146114721a0b6aee8fd87ad036de521f0810e3e3e42355c2b0ec42fbfa6d",
+          "Sources/SourceEditor.swift": "37b92a8d00b71fb656d8ef2c6066b3670de0a76568d2be8cfb68e9aa89cacddb",
+          "Sources/SpikeApp.swift": "f8076ceda25f99daf0d6eaaf3cd55a11e7aed0cc271a4c64991ce61fd3e733f7",
+          "Sources/SpikeDocument.swift": "dd88d4ee74806df719af3966639061a01cd2906401194e8d123f8f6d6d364366",
+          "Tests/DocumentTests.swift": "2621c7c42e1fb283129096393b9689a932c2d3acd8f46bafd30504c3fa0ea8e4",
+          "Tests/EditorTests.swift": "4d4a2f9af9d72e8a7437795de86babeef8b7ae2133332dfccc1c39b751f5d4f6",
+          "Tests/SaveTests.swift": "472786a3afd81d41ae646d1e03016165e09ee00c5f81c8bdf40a0c8806e63e0f",
+          "Tests/WorkflowTests.swift": "b800e4aebb653a7c4ed9020605dc8ff48a4db420c9fde6bac23c9e08e4bc5832",
+          "project.yml": "6adbed2faf96946b46c17e209386f192086170a284af5a1fd2bdb5f3a2769d3d"
+        },
+        "fixture_sha256": "38b1b6a80749a22baa8cede8adf5af4ee598181ca4690dc4b7d64b6a850c5144",
+        "xcode": "Xcode 27.0\nBuild version 27A5194q",
+        "exit_code": 65,
+        "ended_utc": "2026-10-22T15:12:41.176288+00:00"
+      }
+    },
+    "mutation": "document.persist(capture.source, baseline:) -> document.persist(editor.textView.text, baseline:)",
+    "original_source_sha256": "9e6140808cc63449fce18618c0b55f3a476dda35f769b343999fdd3b3f31fcb9",
+    "mutated_source_sha256": "cbd248ca6efb52610d7a0226017d37add41efaed1ce565c2baa34a3a2dc06ea3",
+    "restored_source_sha256": "9e6140808cc63449fce18618c0b55f3a476dda35f769b343999fdd3b3f31fcb9",
+    "source_overlay_retained": true,
+    "original_log_and_manifest_retained": true,
+    "source_helper": "native-validation.py"
+  },
+  "packaging": {
+    "packager_sha256": "3940a9b2480bffbf923ec70c52345beccee1b23c5a62916f75c567cd90f5660b",
+    "fixture_sha256": "38b1b6a80749a22baa8cede8adf5af4ee598181ca4690dc4b7d64b6a850c5144",
+    "cases": [
+      {
+        "case": "original-delivered-app",
+        "exit_code": 1,
+        "stderr": "M0 bundled fixture is missing or not a regular file: m0.md",
+        "ipa_created": false,
+        "receipt_created": false
+      },
+      {
+        "case": "missing",
+        "exit_code": 1,
+        "stderr": "M0 bundled fixture is missing or not a regular file: m0.md",
+        "ipa_created": false,
+        "receipt_created": false
+      },
+      {
+        "case": "wrong-bytes",
+        "exit_code": 1,
+        "stderr": "M0 bundled fixture byte mismatch: m0.md differs from the source fixture",
+        "ipa_created": false,
+        "receipt_created": false
+      },
+      {
+        "case": "symlink",
+        "exit_code": 1,
+        "stderr": "M0 bundled fixture is missing or not a regular file: m0.md",
+        "ipa_created": false,
+        "receipt_created": false
+      }
+    ]
+  },
+  "final_positive_source_sha": "806989d176f61f0825973fbd2eb9bee444a6d16b",
+  "writer_negative_harness_source_sha": "23a4d727d5461a52d105b3adc735520ecbb075e3",
+  "harness_difference": "Final adds Fixture timeout JSON/Probe attachments and reduces the compact layout fixture from393x500 to393x390 to ensure actual overflow on iPad. Time bounds and assertions unchanged. Mutation was not rerun with that harness.",
+  "restored_product_inputs_equal_to_final_positive": {
+    "Fixtures/m0.md": "38b1b6a80749a22baa8cede8adf5af4ee598181ca4690dc4b7d64b6a850c5144",
+    "Scripts/package-ipa.py": "3940a9b2480bffbf923ec70c52345beccee1b23c5a62916f75c567cd90f5660b",
+    "Sources/AccessGrant.swift": "50276b079dea96b0c6458713b404ffc69e25d57e1f5faa60a746356283bb2470",
+    "Sources/DocumentSession.swift": "9e6140808cc63449fce18618c0b55f3a476dda35f769b343999fdd3b3f31fcb9",
+    "Sources/Probe.swift": "15014a16698fd8a0d81718efcddc99ee659c098c2ed1bce1f114cb6fb1f0cc31",
+    "Sources/SaveLedger.swift": "1f71146114721a0b6aee8fd87ad036de521f0810e3e3e42355c2b0ec42fbfa6d",
+    "Sources/SourceEditor.swift": "37b92a8d00b71fb656d8ef2c6066b3670de0a76568d2be8cfb68e9aa89cacddb",
+    "Sources/SpikeApp.swift": "f8076ceda25f99daf0d6eaaf3cd55a11e7aed0cc271a4c64991ce61fd3e733f7",
+    "Sources/SpikeDocument.swift": "dd88d4ee74806df719af3966639061a01cd2906401194e8d123f8f6d6d364366",
+    "project.yml": "6adbed2faf96946b46c17e209386f192086170a284af5a1fd2bdb5f3a2769d3d"
+  },
+  "prior_attempts": [
+    {
+      "attempt": "20261022T150218Z-test-8B4BBC63",
+      "source_sha": "f911f19d5fbd4edc0c9a4b4a2f98a41b8d1ba0be",
+      "dirty": true,
+      "exit_code": 65,
+      "complete_xcresult": true,
+      "classification": "historical failed/cancelled/incomplete attempt; excluded from final positive counts"
+    },
+    {
+      "attempt": "20261022T150235Z-test-6F9B7484",
+      "source_sha": "f911f19d5fbd4edc0c9a4b4a2f98a41b8d1ba0be",
+      "dirty": false,
+      "exit_code": 65,
+      "complete_xcresult": true,
+      "classification": "historical failed/cancelled/incomplete attempt; excluded from final positive counts"
+    },
+    {
+      "attempt": "20261022T150407Z-test-EFFF5FE4",
+      "source_sha": "23a4d727d5461a52d105b3adc735520ecbb075e3",
+      "dirty": true,
+      "exit_code": null,
+      "complete_xcresult": false,
+      "classification": "historical failed/cancelled/incomplete attempt; excluded from final positive counts"
+    },
+    {
+      "attempt": "20261022T151030Z-test-8C6B69BB",
+      "source_sha": "23a4d727d5461a52d105b3adc735520ecbb075e3",
+      "dirty": true,
+      "exit_code": 65,
+      "complete_xcresult": true,
+      "classification": "executed mutation; see writer report"
+    },
+    {
+      "attempt": "20261022T151241Z-test-95B5ADB3",
+      "source_sha": "23a4d727d5461a52d105b3adc735520ecbb075e3",
+      "dirty": false,
+      "exit_code": 65,
+      "complete_xcresult": true,
+      "classification": "historical failed/cancelled/incomplete attempt; excluded from final positive counts"
+    },
+    {
+      "attempt": "20261022T151841Z-test-D0091E9A",
+      "source_sha": "dd26d23119666d9a1e96b7a9eb9f3763b1ee4df5",
+      "dirty": false,
+      "exit_code": 0,
+      "complete_xcresult": true,
+      "classification": "historical successful earlier-source run; excluded from final positive counts"
+    },
+    {
+      "attempt": "20261022T152007Z-test-9CF086B7",
+      "source_sha": "dd26d23119666d9a1e96b7a9eb9f3763b1ee4df5",
+      "dirty": false,
+      "exit_code": 65,
+      "complete_xcresult": true,
+      "classification": "historical failed/cancelled/incomplete attempt; excluded from final positive counts"
+    }
+  ]
+}

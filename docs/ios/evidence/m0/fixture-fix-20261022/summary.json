@@ -1,0 +1,266 @@
+{
+  "source_sha": "806989d176f61f0825973fbd2eb9bee444a6d16b",
+  "prototype_source_fingerprint": "43cff98de444f6505666cd5480d5369a20c6ba4e602090518925bb753802de7c",
+  "simulator_cases": {
+    "iPhone": 20,
+    "iPad": 20
+  },
+  "failed": 0,
+  "skipped": 0,
+  "xcode": "Xcode 27.0\nBuild version 27A5194q",
+  "sdk": "27.0",
+  "minimum_os": "26.0",
+  "runtime_evidence": "iOS/iPadOS 27.0 simulator only; iOS/iPadOS 26 device execution remains OPEN",
+  "runs": [
+    {
+      "mode": "test",
+      "source_sha": "806989d176f61f0825973fbd2eb9bee444a6d16b",
+      "dirty": false,
+      "fixture_sha256": "38b1b6a80749a22baa8cede8adf5af4ee598181ca4690dc4b7d64b6a850c5144",
+      "xcode": "Xcode 27.0\nBuild version 27A5194q",
+      "started_utc": "2026-10-22T15:23:26.160500+00:00",
+      "ended_utc": "2026-10-22T15:24:48.241662+00:00",
+      "exit_code": 0,
+      "attempt": "20261022T152325Z-test-DA74A092",
+      "simulator": {
+        "modelName": "iPhone 17",
+        "deviceName": "Plainsong iOS review 20261013",
+        "osVersion": "27.0",
+        "platform": "iOS Simulator"
+      },
+      "family": "iPhone",
+      "gate": {
+        "passed": 20,
+        "skipped": 0,
+        "failed": 0,
+        "executed": 20,
+        "required": [
+          "DocumentTests/testCleanDocumentSwitchClosesThroughAutosaveFence",
+          "DocumentTests/testDirectorySkipsSymlinkAndNonMarkdown",
+          "DocumentTests/testRealUIDocumentRejectsExternalBytesAtWrite",
+          "DocumentTests/testRealUIDocumentSaveAndReopenExactUnicode",
+          "DocumentTests/testSingleFileGrantCannotEnumerateParentOrSibling",
+          "EditorTests/testCleanReloadKeepsIdentityAndAdvancesRevision",
+          "EditorTests/testMarkedTextRefusesPresentationAttachAndUndo",
+          "EditorTests/testNativeUndoRoundTripAfterPresentation",
+          "EditorTests/testStaleRevisionAndDocumentSwitchRefusePresentation",
+          "EditorTests/testTextKit2PresentationPreservesSourceSelectionAndUndoRedo",
+          "SaveTests/testCanonicallyEquivalentUnicodeStillDirtyWhenBytesDiffer",
+          "SaveTests/testConflictAndUnavailableRefuseOverwrite",
+          "SaveTests/testFailedSavePreservesBaselineAndSource",
+          "SaveTests/testOldSaveAcknowledgementLeavesNewRevisionDirty",
+          "SaveTests/testOnlyOneWriterAndDuplicateAcknowledgementRefused",
+          "SaveTests/testRecoveryFailureDoesNotReturnSuccess",
+          "SaveTests/testRecoveryRoundTripExactUnicodeAndRevision",
+          "WorkflowTests/testDelayHelpSurvivesReportsAndTogglePreservesNativeComposition",
+          "WorkflowTests/testDelayedDocumentSessionSavesCapturedRevisionBeforeLaterNativeEdit",
+          "WorkflowTests/testFixtureButtonOpensEditableBundledBytesInAppPrivateDocument"
+        ],
+        "cases": {
+          "DocumentTests/testCleanDocumentSwitchClosesThroughAutosaveFence": "Passed",
+          "DocumentTests/testDirectorySkipsSymlinkAndNonMarkdown": "Passed",
+          "DocumentTests/testRealUIDocumentRejectsExternalBytesAtWrite": "Passed",
+          "DocumentTests/testRealUIDocumentSaveAndReopenExactUnicode": "Passed",
+          "DocumentTests/testSingleFileGrantCannotEnumerateParentOrSibling": "Passed",
+          "EditorTests/testCleanReloadKeepsIdentityAndAdvancesRevision": "Passed",
+          "EditorTests/testMarkedTextRefusesPresentationAttachAndUndo": "Passed",
+          "EditorTests/testNativeUndoRoundTripAfterPresentation": "Passed",
+          "EditorTests/testStaleRevisionAndDocumentSwitchRefusePresentation": "Passed",
+          "EditorTests/testTextKit2PresentationPreservesSourceSelectionAndUndoRedo": "Passed",
+          "SaveTests/testCanonicallyEquivalentUnicodeStillDirtyWhenBytesDiffer": "Passed",
+          "SaveTests/testConflictAndUnavailableRefuseOverwrite": "Passed",
+          "SaveTests/testFailedSavePreservesBaselineAndSource": "Passed",
+          "SaveTests/testOldSaveAcknowledgementLeavesNewRevisionDirty": "Passed",
+          "SaveTests/testOnlyOneWriterAndDuplicateAcknowledgementRefused": "Passed",
+          "SaveTests/testRecoveryFailureDoesNotReturnSuccess": "Passed",
+          "SaveTests/testRecoveryRoundTripExactUnicodeAndRevision": "Passed",
+          "WorkflowTests/testDelayedDocumentSessionSavesCapturedRevisionBeforeLaterNativeEdit": "Passed",
+          "WorkflowTests/testDelayHelpSurvivesReportsAndTogglePreservesNativeComposition": "Passed",
+          "WorkflowTests/testFixtureButtonOpensEditableBundledBytesInAppPrivateDocument": "Passed"
+        }
+      },
+      "complete_xcresult": true,
+      "admission": [
+        {
+          "bundle": "PlainsongIOSM0.app",
+          "mach_o_filetype": 2,
+          "arch": "arm64",
+          "platform": "IOSSIMULATOR",
+          "sha256": "9f0f6026c05b41f6daa1734427503b4382edb62e4bd95e5b88bc03ee1b06464c"
+        },
+        {
+          "bundle": "PlainsongIOSM0Tests.xctest",
+          "mach_o_filetype": 8,
+          "arch": "arm64",
+          "platform": "IOSSIMULATOR",
+          "sha256": "fc676f15bd5c98cf6aabb8c8e159370a343abb1eb393ad8972289bedd24a529d"
+        }
+      ]
+    },
+    {
+      "mode": "test",
+      "source_sha": "806989d176f61f0825973fbd2eb9bee444a6d16b",
+      "dirty": false,
+      "fixture_sha256": "38b1b6a80749a22baa8cede8adf5af4ee598181ca4690dc4b7d64b6a850c5144",
+      "xcode": "Xcode 27.0\nBuild version 27A5194q",
+      "started_utc": "2026-10-22T15:24:49.495564+00:00",
+      "ended_utc": "2026-10-22T15:25:49.476835+00:00",
+      "exit_code": 0,
+      "attempt": "20261022T152448Z-test-15558F61",
+      "simulator": {
+        "modelName": "iPad Pro 11-inch (M5)",
+        "deviceName": "iPad Pro 11-inch (M5)",
+        "osVersion": "27.0",
+        "platform": "iOS Simulator"
+      },
+      "family": "iPad",
+      "gate": {
+        "passed": 20,
+        "skipped": 0,
+        "failed": 0,
+        "executed": 20,
+        "required": [
+          "DocumentTests/testCleanDocumentSwitchClosesThroughAutosaveFence",
+          "DocumentTests/testDirectorySkipsSymlinkAndNonMarkdown",
+          "DocumentTests/testRealUIDocumentRejectsExternalBytesAtWrite",
+          "DocumentTests/testRealUIDocumentSaveAndReopenExactUnicode",
+          "DocumentTests/testSingleFileGrantCannotEnumerateParentOrSibling",
+          "EditorTests/testCleanReloadKeepsIdentityAndAdvancesRevision",
+          "EditorTests/testMarkedTextRefusesPresentationAttachAndUndo",
+          "EditorTests/testNativeUndoRoundTripAfterPresentation",
+          "EditorTests/testStaleRevisionAndDocumentSwitchRefusePresentation",
+          "EditorTests/testTextKit2PresentationPreservesSourceSelectionAndUndoRedo",
+          "SaveTests/testCanonicallyEquivalentUnicodeStillDirtyWhenBytesDiffer",
+          "SaveTests/testConflictAndUnavailableRefuseOverwrite",
+          "SaveTests/testFailedSavePreservesBaselineAndSource",
+          "SaveTests/testOldSaveAcknowledgementLeavesNewRevisionDirty",
+          "SaveTests/testOnlyOneWriterAndDuplicateAcknowledgementRefused",
+          "SaveTests/testRecoveryFailureDoesNotReturnSuccess",
+          "SaveTests/testRecoveryRoundTripExactUnicodeAndRevision",
+          "WorkflowTests/testDelayHelpSurvivesReportsAndTogglePreservesNativeComposition",
+          "WorkflowTests/testDelayedDocumentSessionSavesCapturedRevisionBeforeLaterNativeEdit",
+          "WorkflowTests/testFixtureButtonOpensEditableBundledBytesInAppPrivateDocument"
+        ],
+        "cases": {
+          "DocumentTests/testCleanDocumentSwitchClosesThroughAutosaveFence": "Passed",
+          "DocumentTests/testDirectorySkipsSymlinkAndNonMarkdown": "Passed",
+          "DocumentTests/testRealUIDocumentRejectsExternalBytesAtWrite": "Passed",
+          "DocumentTests/testRealUIDocumentSaveAndReopenExactUnicode": "Passed",
+          "DocumentTests/testSingleFileGrantCannotEnumerateParentOrSibling": "Passed",
+          "EditorTests/testCleanReloadKeepsIdentityAndAdvancesRevision": "Passed",
+          "EditorTests/testMarkedTextRefusesPresentationAttachAndUndo": "Passed",
+          "EditorTests/testNativeUndoRoundTripAfterPresentation": "Passed",
+          "EditorTests/testStaleRevisionAndDocumentSwitchRefusePresentation": "Passed",
+          "EditorTests/testTextKit2PresentationPreservesSourceSelectionAndUndoRedo": "Passed",
+          "SaveTests/testCanonicallyEquivalentUnicodeStillDirtyWhenBytesDiffer": "Passed",
+          "SaveTests/testConflictAndUnavailableRefuseOverwrite": "Passed",
+          "SaveTests/testFailedSavePreservesBaselineAndSource": "Passed",
+          "SaveTests/testOldSaveAcknowledgementLeavesNewRevisionDirty": "Passed",
+          "SaveTests/testOnlyOneWriterAndDuplicateAcknowledgementRefused": "Passed",
+          "SaveTests/testRecoveryFailureDoesNotReturnSuccess": "Passed",
+          "SaveTests/testRecoveryRoundTripExactUnicodeAndRevision": "Passed",
+          "WorkflowTests/testDelayedDocumentSessionSavesCapturedRevisionBeforeLaterNativeEdit": "Passed",
+          "WorkflowTests/testDelayHelpSurvivesReportsAndTogglePreservesNativeComposition": "Passed",
+          "WorkflowTests/testFixtureButtonOpensEditableBundledBytesInAppPrivateDocument": "Passed"
+        }
+      },
+      "complete_xcresult": true,
+      "admission": [
+        {
+          "bundle": "PlainsongIOSM0.app",
+          "mach_o_filetype": 2,
+          "arch": "arm64",
+          "platform": "IOSSIMULATOR",
+          "sha256": "9f0f6026c05b41f6daa1734427503b4382edb62e4bd95e5b88bc03ee1b06464c"
+        },
+        {
+          "bundle": "PlainsongIOSM0Tests.xctest",
+          "mach_o_filetype": 8,
+          "arch": "arm64",
+          "platform": "IOSSIMULATOR",
+          "sha256": "aefe20be91e442caef06b606400e8fb1a13420d09082571c072a5e6667e80bc3"
+        }
+      ]
+    },
+    {
+      "mode": "core",
+      "source_sha": "806989d176f61f0825973fbd2eb9bee444a6d16b",
+      "dirty": false,
+      "fixture_sha256": "38b1b6a80749a22baa8cede8adf5af4ee598181ca4690dc4b7d64b6a850c5144",
+      "xcode": "Xcode 27.0\nBuild version 27A5194q",
+      "started_utc": "2026-10-22T15:25:50.228299+00:00",
+      "ended_utc": "2026-10-22T15:25:52.468621+00:00",
+      "exit_code": 0,
+      "attempt": "20261022T152549Z-core-C370F62F",
+      "checks": [
+        "oneWriter",
+        "capturedAcknowledgement",
+        "oldSaveLeavesNewRevisionDirty",
+        "staleAcknowledgementRefused",
+        "failedSavePreservesBaseline",
+        "conflictRefusesSave",
+        "unavailableRefusesSave",
+        "unicodeBytesDefineDirty",
+        "recoveryExactReadback",
+        "recoveryFailureReported"
+      ]
+    },
+    {
+      "mode": "mutation",
+      "source_sha": "806989d176f61f0825973fbd2eb9bee444a6d16b",
+      "dirty": false,
+      "fixture_sha256": "38b1b6a80749a22baa8cede8adf5af4ee598181ca4690dc4b7d64b6a850c5144",
+      "xcode": "Xcode 27.0\nBuild version 27A5194q",
+      "started_utc": "2026-10-22T15:25:52.764699+00:00",
+      "ended_utc": "2026-10-22T15:25:54.704005+00:00",
+      "exit_code": 0,
+      "attempt": "20261022T152552Z-mutation-F58D0721",
+      "expected_defects_detected": [
+        "oldSaveLeavesNewRevisionDirty",
+        "unicodeBytesDefineDirty"
+      ]
+    },
+    {
+      "mode": "ipa",
+      "source_sha": "806989d176f61f0825973fbd2eb9bee444a6d16b",
+      "dirty": false,
+      "fixture_sha256": "38b1b6a80749a22baa8cede8adf5af4ee598181ca4690dc4b7d64b6a850c5144",
+      "xcode": "Xcode 27.0\nBuild version 27A5194q",
+      "started_utc": "2026-10-22T15:25:55.018007+00:00",
+      "ended_utc": "2026-10-22T15:26:04.880690+00:00",
+      "exit_code": 0,
+      "attempt": "20261022T152554Z-ipa-D7EF3DEC",
+      "ipa": {
+        "artifact": "PlainsongIOSM0-unsigned.ipa",
+        "sha256": "95b7882c2ec32c0f7a01f25b46bef8b25209bf6ad5bd98fdd6db52e37347ee96",
+        "architectures": "arm64",
+        "minimum_os": "26.0",
+        "device_family": [
+          1,
+          2
+        ],
+        "unsigned": true,
+        "owner_resign_install_gate": "OPEN",
+        "fixture_member": "Payload/PlainsongIOSM0.app/m0.md",
+        "fixture_sha256": "38b1b6a80749a22baa8cede8adf5af4ee598181ca4690dc4b7d64b6a850c5144",
+        "fixture_bytes": 243,
+        "platform": "IOS",
+        "mach_o_sha256": "59a9eb18d311e860a0ad880cff6e2254e182389f53efdc66660bf8d076933550",
+        "source_sha": "806989d176f61f0825973fbd2eb9bee444a6d16b",
+        "xcode": "Xcode 27.0\nBuild version 27A5194q",
+        "sdk": "iPhoneOS 27.0"
+      }
+    }
+  ],
+  "owner_device_gates": {
+    "M0-IME": "OPEN",
+    "M0-Presentation": "OPEN",
+    "M0-Files": "OPEN",
+    "M0-Save": "OPEN",
+    "M0-Install": "OPEN"
+  },
+  "production_composition_allowed": false,
+  "observations": [
+    "Scene configuration and appearance-transition warnings occurred during hosted tests; all assertions passed. Their causes are not established and they are not used as device acceptance."
+  ]
+}
