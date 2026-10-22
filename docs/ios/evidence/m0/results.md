@@ -1,5 +1,16 @@
 # M0 result — OPEN, production composition prohibited
 
+## 2026-10-22 follow-up
+
+The [dated runtime and owner-kit receipt](runtime-20261022/README.md) executes
+17/17 named cases on each iPhone and iPad simulator, with no failures/skips, from
+clean #188 head `e20162e5`. It also rebuilds and validates a new unsigned IPA.
+This supersedes the historical simulator-not-executed row below only. All five
+physical-device gates remain OPEN and production composition remains prohibited.
+See [owner installation](runtime-20261022/owner-install.md).
+
+## Historical 2026-10-08 receipt
+
 Date: 2026-10-08 (Asia/Taipei). Branch `phase3-ios-m0-device-spike`.
 Dedicated checkout `/private/tmp/plainsong-ios-m0-device-spike`.
 Base ref `phase3-ios-parallel-handoffs`, SHA

@@ -1,5 +1,9 @@
 # M0 owner device checklist — OPEN
 
+The [2026-10-22 installation notes](runtime-20261022/owner-install.md) accompany
+the new source-bound unsigned IPA and OPEN per-device forms. Simulator passes
+remain separate from every physical-device row below.
+
 Use only `Prototypes/iOSM0/Fixtures/m0.md` and disposable copies, one in Files
 “On My iPhone/iPad”, one in iCloud Drive. Record the fixture SHA-256, exact app
 source commit, IPA SHA, Xcode/SDK, model, OS, input method, UTC start/end, expected
