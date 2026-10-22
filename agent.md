@@ -457,8 +457,11 @@ block-level element.
   list is measured lazily and reused while the two anchors bounding a lookup are still
   where it recorded them; otherwise it is re-measured.
 - **Reflow:** the preview remembers the (fractional) source position at its top and
-  re-places it when its width changes (`ResizeObserver`, before paint), because the
-  editor reports nothing new when its own top line survives a window resize.
+  its actual pixel offset from the mapped anchor. A width change (`ResizeObserver`,
+  before paint) adjusts scrolling only when that anchor's layout top changes and
+  the browser has not already placed it at the target. Width notifications without
+  anchor reflow leave scroll position and ownership untouched. The pixel offset
+  survives repeated resizes without accumulating scroll-coordinate rounding.
 - The editor's source-line index is edited in place from `willChangeTextIn`
   (O(log n) per keystroke; a full rebuild walked the 1 MiB storage on every selection
   change), with a length check and a change-notification fallback that rebuild in bulk.

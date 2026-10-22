@@ -53,10 +53,10 @@ let currentAllowRemoteImages = false;
 let scrollOwner: ScrollOwner = "none";
 let scrollOwnerTimer: number | undefined;
 let scrollFrame: number | undefined;
-// Fractional source line kept at the top of the viewport. A width change reflows the
-// content under an unchanged scrollY, and the editor reports nothing new when its own
-// top line survives the resize, so the preview re-places this position itself.
-let anchoredPosition: number | undefined;
+// Keep the actual scroll position as well as its mapped source position. The inverse
+// mapping can lose a fraction of a pixel (or clamp beyond the first/last anchor).
+// Reflow applies only the change in anchor geometry, preserving that residual.
+let scrollAnchor: { position: number; top: number; offset: number } | undefined;
 let layoutWidth: number | undefined;
 const scrollAnchorOffset = 12;
 
@@ -97,7 +97,14 @@ if (typeof ResizeObserver !== "undefined") {
     if (width === layoutWidth) return;
     const isReflow = layoutWidth !== undefined;
     layoutWidth = width;
-    if (isReflow && anchoredPosition !== undefined) placeSourcePosition(anchoredPosition, false);
+    if (!isReflow || scrollAnchor === undefined) return;
+    const top = scrollIndex.topForLine(scrollAnchor.position);
+    // A width notification alone does not prove that the anchored content reflowed.
+    // In particular, never round-trip an unchanged layout through window.scrollTo.
+    if (top === undefined || top === scrollAnchor.top) return;
+    scrollAnchor.top = top;
+    const target = Math.max(0, top + scrollAnchor.offset);
+    if (target !== window.scrollY) placeScrollTop(target, false);
   }).observe(previewRoot);
 }
 
@@ -271,18 +278,20 @@ function clearMdxErrorBanner(): void {
 }
 
 function scrollToLine(line: number, animated: boolean): void {
-  anchoredPosition = line;
-  placeSourcePosition(line, animated);
+  const targetTop = scrollIndex.topForLine(line);
+  if (targetTop === undefined) return;
+  const target = Math.max(0, targetTop - scrollAnchorOffset);
+  // Use the destination even for smooth scrolling, whose current scrollY still
+  // belongs to the beginning of the animation.
+  scrollAnchor = { position: line, top: targetTop, offset: target - targetTop };
+  placeScrollTop(target, animated);
 }
 
-function placeSourcePosition(position: number, animated: boolean): void {
-  const targetTop = scrollIndex.topForLine(position);
-  if (targetTop === undefined) return;
-
+function placeScrollTop(top: number, animated: boolean): void {
   // Programmatic scrolling is never reported back to the editor.
   setScrollOwner("editor");
   window.scrollTo({
-    top: Math.max(0, targetTop - scrollAnchorOffset),
+    top,
     behavior: animated ? "smooth" : "auto",
   });
 }
@@ -290,7 +299,9 @@ function placeSourcePosition(position: number, animated: boolean): void {
 function handlePreviewScroll(): void {
   if (scrollOwner === "editor") return;
 
-  anchoredPosition = scrollIndex.positionAtTop(window.scrollY + scrollAnchorOffset) ?? anchoredPosition;
+  const position = scrollIndex.positionAtTop(window.scrollY + scrollAnchorOffset);
+  const top = position === undefined ? undefined : scrollIndex.topForLine(position);
+  scrollAnchor = position === undefined || top === undefined ? undefined : { position, top, offset: window.scrollY - top };
   const topVisibleLine = scrollIndex.lineAtTop(window.scrollY + 16);
   if (topVisibleLine === undefined) return;
 
