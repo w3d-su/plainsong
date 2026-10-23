@@ -559,6 +559,8 @@ extension AppState {
         defer { isSaving = false }
 
         let text = session.text
+        // One digest for the binding, the indeterminate-write context and the disk-hash record.
+        let textDigest = Self.contentHash(text)
         if hasConflictingPhysicalSessionOwnership(
             writeContext.expectedIdentity,
             excluding: session
@@ -588,7 +590,7 @@ extension AppState {
                 AnchoredWorkspaceSessionFileBinding(
                     location: writeContext.location,
                     identity: result.metadata.identity,
-                    sha256Digest: WorkspaceSearchContentFingerprint(text: text).sha256Digest
+                    sha256Digest: textDigest
                 ),
                 for: session,
                 preparedImageAssetAuthority: preparedImageAssetAuthority
@@ -600,9 +602,7 @@ extension AppState {
             indeterminateSessionWrites[sessionIdentity] = result
             indeterminateSessionWriteContexts[sessionIdentity] = IndeterminateSessionWriteContext(
                 location: writeContext.location,
-                preparedSHA256Digest: WorkspaceSearchContentFingerprint(
-                    text: text
-                ).sha256Digest
+                preparedSHA256Digest: textDigest
             )
             cancelAutosave(for: session)
             refreshIndeterminateFileWriteReconciliation(for: session)
@@ -612,7 +612,7 @@ extension AppState {
         _ = clearWorkspaceMutationTextRecovery(for: session)
         sessionPolicy.updateDirtyState(for: destination, isDirty: false)
         detachedSessionURLs.remove(destination)
-        lastKnownDiskHashes[destination] = Self.contentHash(text)
+        lastKnownDiskHashes[destination] = textDigest
         lastKnownDiskModificationDates[destination] = nil
         if let cleanupResult {
             presentCommittedFileWriteCleanup(cleanupResult, destinationURL: destination)
