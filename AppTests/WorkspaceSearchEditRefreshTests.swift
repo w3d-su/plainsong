@@ -62,6 +62,40 @@ final class WorkspaceSearchEditRefreshTests: XCTestCase {
         XCTAssertFalse(appState.workspaceSearchEditRefresh.isPendingUntilSearchShows)
     }
 
+    func testClearingTheQueryDropsAWaitingEditRefresh() async throws {
+        let provider = ActiveSearchRefreshProvider()
+        let fixture = try makeActiveSearchRefreshFixture(
+            provider: provider,
+            scanner: ActiveSearchRefreshScanner(),
+            files: ["a.md": "saved"],
+            currentPath: "a.md"
+        )
+        defer { cleanUpActiveSearchRefreshFixture(fixture) }
+        let appState = fixture.appState
+        appState.workspaceSearchEditRefresh.delayNanoseconds = 150_000_000
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
+        try await waitForActiveSearchRefresh("initial search") { provider.requests.count == 1 }
+
+        // A refresh waiting for the typing pause.
+        appState.applyAuthorizedEditorText("needle one", to: appState.currentDocument)
+        XCTAssertNotNil(appState.workspaceSearchEditRefresh.task)
+        appState.clearWorkspaceSearch()
+        XCTAssertNil(appState.workspaceSearchEditRefresh.task)
+
+        // A refresh waiting for the Search navigator.
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
+        try await waitForActiveSearchRefresh("second search") { provider.requests.count == 2 }
+        appState.selectWorkspaceSidebarMode(.files)
+        appState.applyAuthorizedEditorText("needle two", to: appState.currentDocument)
+        XCTAssertTrue(appState.workspaceSearchEditRefresh.isPendingUntilSearchShows)
+        appState.clearWorkspaceSearch()
+        XCTAssertFalse(appState.workspaceSearchEditRefresh.isPendingUntilSearchShows)
+
+        appState.selectWorkspaceSidebarMode(.search)
+        try await Task.sleep(nanoseconds: 250_000_000)
+        XCTAssertEqual(provider.requests.count, 2, "a cleared query runs no edit refresh")
+    }
+
     func testFileResultsStaySortedAndReplaceTheSamePath() {
         let appState = AppState(shouldRestoreLastOpenedFile: false)
         let paths = ["b/z.md", "a.md", "c.md", "b/a.md", "Z.md", "é.md", "a.md"]

@@ -598,9 +598,6 @@ extension AppState {
         _ query: TextSearchQuery,
         cancellingPendingEditorNavigation: Bool
     ) {
-        // Any start (a new query, a reload refresh, or the edit refresh itself) supersedes a
-        // waiting edit-driven refresh.
-        workspaceSearchEditRefresh.cancel()
         cancelWorkspaceSearchTask()
         if cancellingPendingEditorNavigation {
             cancelPendingWorkspaceSearchNavigationIfNeeded()
@@ -803,7 +800,10 @@ extension AppState {
         }
     }
 
+    /// Also drops a waiting edit-driven refresh: every caller ends the current search (a new
+    /// query, a clear, a workspace-generation advance), so the refresh has nothing to refresh.
     func cancelWorkspaceSearchTask() {
+        workspaceSearchEditRefresh.cancel()
         workspaceSearchTask?.cancel()
         workspaceSearchTask = nil
         workspaceSearchTaskToken = nil
