@@ -31,12 +31,18 @@ extension IOSWorkspaceAccessService {
 
     func remember(record: IOSWorkspaceScopeRecord, bookmark: Data) {
         var items = ports.recents.load()
+        let restoringID = items.first {
+            recentRestoreRequests[$0.recordID] != nil && $0.bookmark == bookmark && $0.scope == record.scope
+        }?.recordID
         if let identity = record.providerIdentity {
             items.removeAll { $0.providerIdentity == identity }
         }
+        let recentID = restoringID ?? UUID()
+        items.removeAll { $0.recordID == recentID }
+        record.recentRecordID = recentID
         items.insert(
             IOSStoredRecentWorkspace(
-                recordID: UUID(),
+                recordID: recentID,
                 displayName: record.displayName,
                 scope: record.scope,
                 openedAt: ports.clock(),
