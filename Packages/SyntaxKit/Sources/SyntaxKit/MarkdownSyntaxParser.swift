@@ -149,8 +149,9 @@ extension MarkdownSyntaxParser {
     /// Expands viewport ranges to whole lines plus lightweight Markdown context.
     ///
     /// This intentionally keeps tokenization visible-range-first: callers do not parse
-    /// the full document on the edit path. The only document-wide work here is a linear
-    /// fence-state scan so visible code-block lines keep their Markdown context.
+    /// the full document on the edit path. The only document-wide work here is
+    /// `MarkdownFenceScanner`'s linear line scan (frontmatter and fence state), so
+    /// visible code-block lines keep their Markdown context.
     public static func visibleHighlightRange(in source: String, requestedRange: NSRange) -> NSRange {
         let nsSource = source as NSString
         guard nsSource.length > 0 else {
@@ -159,7 +160,7 @@ extension MarkdownSyntaxParser {
 
         let clampedRange = requestedRange.clamped(toLength: nsSource.length)
         let lineRange = lineRangeCovering(clampedRange, in: nsSource)
-        var start = lineRange.location
+        let start = lineRange.location
         var end = NSMaxRange(lineRange)
 
         if end - start < visibleHighlightMinimumLength {
@@ -168,10 +169,11 @@ extension MarkdownSyntaxParser {
             end = max(end, NSMaxRange(nsSource.lineRange(for: NSRange(location: seed, length: 0))))
         }
 
-        (start, end) = expandFrontmatterContext(in: nsSource, start: start, end: end)
-        (start, end) = expandFencedCodeContext(in: nsSource, start: start, end: end)
-
-        return NSRange(location: start, length: max(0, end - start)).clamped(toLength: nsSource.length)
+        let context = MarkdownFenceScanner.contextRange(
+            in: source,
+            expanding: NSRange(location: start, length: max(0, end - start))
+        )
+        return context.clamped(toLength: nsSource.length)
     }
 
     private static func lineRangeCovering(_ range: NSRange, in source: NSString) -> NSRange {
@@ -181,119 +183,6 @@ extension MarkdownSyntaxParser {
         let startLine = source.lineRange(for: NSRange(location: startLocation, length: 0))
         let endLine = source.lineRange(for: NSRange(location: lastLocation, length: 0))
         return NSRange(location: startLine.location, length: NSMaxRange(endLine) - startLine.location)
-    }
-
-    private static func expandFrontmatterContext(in source: NSString, start: Int, end: Int) -> (Int, Int) {
-        let firstLine = source.lineRange(for: NSRange(location: 0, length: 0))
-        let marker = source.substring(with: firstLine).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard marker == "---" || marker == "+++" else {
-            return (start, end)
-        }
-
-        var cursor = NSMaxRange(firstLine)
-        while cursor < source.length {
-            let lineRange = source.lineRange(for: NSRange(location: cursor, length: 0))
-            let line = source.substring(with: lineRange).trimmingCharacters(in: .whitespacesAndNewlines)
-            if line == marker {
-                let frontmatterRange = NSRange(location: 0, length: NSMaxRange(lineRange))
-                let requested = NSRange(location: start, length: max(0, end - start))
-                guard NSIntersectionRange(frontmatterRange, requested).length > 0 else {
-                    return (start, end)
-                }
-                return (0, max(end, NSMaxRange(lineRange)))
-            }
-
-            let next = NSMaxRange(lineRange)
-            guard next > cursor else { break }
-            cursor = next
-        }
-
-        return (start, end)
-    }
-
-    private static func expandFencedCodeContext(in source: NSString, start: Int, end: Int) -> (Int, Int) {
-        let originalStart = start
-        var expandedStart = start
-        var expandedEnd = end
-        var cursor = 0
-        var isInsideFence = false
-        var openFenceRange: NSRange?
-
-        while cursor < originalStart {
-            let lineRange = source.lineRange(for: NSRange(location: cursor, length: 0))
-            if isFenceLine(source.substring(with: lineRange)) {
-                if isInsideFence {
-                    isInsideFence = false
-                    openFenceRange = nil
-                } else {
-                    isInsideFence = true
-                    openFenceRange = lineRange
-                }
-            }
-
-            let next = NSMaxRange(lineRange)
-            guard next > cursor else { break }
-            cursor = next
-        }
-
-        if isInsideFence, let openFenceRange {
-            expandedStart = openFenceRange.location
-        }
-
-        cursor = originalStart
-        var insideAtEnd = isInsideFence
-        while cursor < expandedEnd {
-            let lineRange = source.lineRange(for: NSRange(location: cursor, length: 0))
-            if isFenceLine(source.substring(with: lineRange)) {
-                insideAtEnd.toggle()
-            }
-
-            let next = NSMaxRange(lineRange)
-            guard next > cursor else { break }
-            cursor = next
-        }
-
-        if insideAtEnd {
-            while cursor < source.length {
-                let lineRange = source.lineRange(for: NSRange(location: cursor, length: 0))
-                expandedEnd = NSMaxRange(lineRange)
-                if isFenceLine(source.substring(with: lineRange)) {
-                    break
-                }
-
-                let next = NSMaxRange(lineRange)
-                guard next > cursor else { break }
-                cursor = next
-            }
-        }
-
-        return (expandedStart, expandedEnd)
-    }
-
-    private static func isFenceLine(_ line: String) -> Bool {
-        var cursor = line.startIndex
-        var leadingSpaces = 0
-        while cursor < line.endIndex, line[cursor] == " " {
-            leadingSpaces += 1
-            cursor = line.index(after: cursor)
-        }
-
-        guard leadingSpaces <= 3, cursor < line.endIndex else {
-            return false
-        }
-
-        let marker = line[cursor]
-        guard marker == "`" || marker == "~" else {
-            return false
-        }
-
-        var markerCount = 0
-        while cursor < line.endIndex, line[cursor] == marker {
-            markerCount += 1
-            cursor = line.index(after: cursor)
-        }
-
-        return markerCount >= 3
     }
 }
 

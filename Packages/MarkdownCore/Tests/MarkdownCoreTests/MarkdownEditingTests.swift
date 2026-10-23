@@ -120,6 +120,53 @@ final class MarkdownEditingTests: XCTestCase {
         ))
     }
 
+    func testCodeFenceHelperSkipsBackticksInsideTildeFence() {
+        let input = MarkedText("~~~markdown\n```<caret>")
+
+        XCTAssertNil(MarkdownEditing.apply(
+            .insertNewline(fileKind: .markdown),
+            to: input.text,
+            selection: input.selection
+        ))
+    }
+
+    func testCodeFenceHelperTreatsFenceWithInfoStringAsNonClosing() {
+        // "```js" cannot close the "```swift" block, so the typed "```" closes it.
+        let input = MarkedText("```swift\nlet a = 1\n```js\n```<caret>")
+
+        XCTAssertNil(MarkdownEditing.apply(
+            .insertNewline(fileKind: .markdown),
+            to: input.text,
+            selection: input.selection
+        ))
+    }
+
+    func testCodeFenceHelperRecognizesListItemFences() {
+        let closing = MarkedText("- item\n    ```swift\n    code\n    ```<caret>")
+        XCTAssertNil(MarkdownEditing.apply(
+            .insertNewline(fileKind: .markdown),
+            to: closing.text,
+            selection: closing.selection
+        ))
+
+        assertEdit(
+            .insertNewline(fileKind: .markdown),
+            from: "- item\n    ```swift\n    code\n    ```\n    ```<caret>",
+            to: "- item\n    ```swift\n    code\n    ```\n    ```\n    <caret>\n    ```"
+        )
+    }
+
+    func testCodeFenceHelperReadsBridgedTextStorageStrings() {
+        let input = MarkedText("```swift\n上😀\n```<caret>")
+        let bridged = NSMutableString(string: input.text) as String
+
+        XCTAssertNil(MarkdownEditing.apply(
+            .insertNewline(fileKind: .markdown),
+            to: bridged,
+            selection: input.selection
+        ))
+    }
+
     func testCheckboxToggleBehaviors() {
         assertEdit(
             .toggleCheckbox,
