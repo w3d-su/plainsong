@@ -139,95 +139,106 @@ final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler, @unchecked Send
 
     private func beginRead(_ task: any PreviewAssetSchemeTask, capture: AssetReadCapture, taskID: ObjectIdentifier) {
         guard let requestURL = task.requestURL else { return }
-        let resolved: URL
-        do {
-            resolved = try AssetURLResolver(allowedRoot: capture.allowedRoot).resolve(requestURL)
-            _ = try AssetURLPolicy.mimeType(for: resolved)
-            if let fileSize = try? resolved.resourceValues(forKeys: [.fileSizeKey]).fileSize,
-               Int64(fileSize) > AssetURLPolicy.maxAssetBytes
-            {
-                throw AssetURLPolicyError.fileTooLarge(
-                    actualBytes: Int64(fileSize),
-                    maxBytes: AssetURLPolicy.maxAssetBytes
-                )
-            }
-        } catch {
-            failMapped(task, error: error, capture: capture, taskID: taskID)
-            return
-        }
-
-        let request = PreviewAssetReadRequest(
-            requestID: capture.requestID,
-            resolvedURL: resolved,
-            access: capture.access,
-            maximumByteCount: Int(exactly: AssetURLPolicy.maxAssetBytes) ?? .max
-        )
         let reader = readers.current()
         let box = SchemeTaskBox(task)
         let readTask = Task.detached { [weak self] in
+            let resolved: URL
+            do {
+                resolved = try AssetFilesystemPreparation.resolvedAssetURL(
+                    requestURL,
+                    allowedRoot: capture.allowedRoot
+                )
+            } catch {
+                await self?.failMapped(box.task, error: error, capture: capture, taskID: taskID)
+                return
+            }
             guard let self else { return }
-            await finishRead(box, request: request, reader: reader, capture: capture, taskID: taskID)
+            guard await acceptsDelivery(capture, taskID: taskID) else { return }
+            let request = PreviewAssetReadRequest(
+                requestID: capture.requestID,
+                resolvedURL: resolved,
+                access: capture.access,
+                maximumByteCount: Int(exactly: AssetURLPolicy.maxAssetBytes) ?? .max
+            )
+            do {
+                try Task.checkCancellation()
+                guard let reader else {
+                    await failCurrent(box.task, failure: .unavailable, capture: capture, taskID: taskID)
+                    return
+                }
+                let result = try await reader.read(request)
+                try Task.checkCancellation()
+                guard let root = await deliveryRoot(
+                    box.task,
+                    result: result,
+                    capture: capture,
+                    taskID: taskID
+                ) else { return }
+                let prepared = try AssetFilesystemPreparation.containedAsset(
+                    result.bytes,
+                    fileURL: result.coordinatedURL,
+                    root: root
+                )
+                try Task.checkCancellation()
+                await deliverPrepared(
+                    box.task,
+                    asset: prepared.asset,
+                    displayURL: prepared.fileURL,
+                    capture: capture,
+                    taskID: taskID
+                )
+            } catch is CancellationError {
+                return
+            } catch {
+                await failMapped(box.task, error: error, capture: capture, taskID: taskID)
+            }
         }
         state.store(readTask, id: taskID)
     }
 
-    private func finishRead(
-        _ box: SchemeTaskBox,
-        request: PreviewAssetReadRequest,
-        reader: (any PreviewAssetReading)?,
-        capture: AssetReadCapture,
-        taskID: ObjectIdentifier
-    ) async {
-        do {
-            try Task.checkCancellation()
-            guard let reader else {
-                await failCurrent(box.task, failure: .unavailable, capture: capture, taskID: taskID)
-                return
-            }
-            let result = try await reader.read(request)
-            try Task.checkCancellation()
-            await deliver(box.task, result: result, capture: capture, taskID: taskID)
-        } catch is CancellationError {
-            return
-        } catch let failure as PreviewAssetReadFailure {
-            await failCurrent(box.task, failure: failure, capture: capture, taskID: taskID)
-        } catch {
-            await failCurrent(box.task, failure: .providerFailed, capture: capture, taskID: taskID)
-        }
+    @MainActor
+    private func acceptsDelivery(_ capture: AssetReadCapture, taskID: ObjectIdentifier) -> Bool {
+        state.permission(for: capture, taskID: taskID).acceptsDelivery
     }
 
+    /// Permission and generation are read on the main thread. The caller resolves
+    /// the returned root off the main thread, then delivers only after another check.
     @MainActor
-    private func deliver(
+    private func deliveryRoot(
         _ task: any PreviewAssetSchemeTask,
         result: PreviewAssetReadResult,
         capture: AssetReadCapture,
         taskID: ObjectIdentifier
-    ) {
+    ) -> URL? {
         let permission = state.permission(for: capture, taskID: taskID)
-        guard permission.acceptsDelivery, let root = permission.allowedRoot else { return }
+        guard permission.acceptsDelivery, let root = permission.allowedRoot else { return nil }
         guard result.requestID == capture.requestID, AssetAuthority.matches(result.access, capture.access) else {
             failCurrentSync(task, failure: .accessChanged, capture: capture, taskID: taskID)
-            return
+            return nil
         }
+        return root
+    }
 
-        do {
-            let contained = try AssetContainment.fileURL(result.coordinatedURL, isContainedIn: root)
-            let asset = try AssetURLPolicy.deliveredAsset(data: result.bytes, fileURL: contained)
-            guard state.permission(for: capture, taskID: taskID).acceptsDelivery else { return }
-            let response = URLResponse(
-                url: task.requestURL ?? contained,
-                mimeType: asset.mimeType,
-                expectedContentLength: asset.data.count,
-                textEncodingName: nil
-            )
-            task.receive(response: response)
-            guard state.permission(for: capture, taskID: taskID).acceptsDelivery else { return }
-            task.receive(data: asset.data)
-            guard state.permission(for: capture, taskID: taskID).acceptsDelivery else { return }
-            task.finish()
-        } catch {
-            failMapped(task, error: error, capture: capture, taskID: taskID)
-        }
+    @MainActor
+    private func deliverPrepared(
+        _ task: any PreviewAssetSchemeTask,
+        asset: AssetURLPolicyResult,
+        displayURL: URL,
+        capture: AssetReadCapture,
+        taskID: ObjectIdentifier
+    ) {
+        guard state.permission(for: capture, taskID: taskID).acceptsDelivery else { return }
+        let response = URLResponse(
+            url: task.requestURL ?? displayURL,
+            mimeType: asset.mimeType,
+            expectedContentLength: asset.data.count,
+            textEncodingName: nil
+        )
+        task.receive(response: response)
+        guard state.permission(for: capture, taskID: taskID).acceptsDelivery else { return }
+        task.receive(data: asset.data)
+        guard state.permission(for: capture, taskID: taskID).acceptsDelivery else { return }
+        task.finish()
     }
 
     @MainActor
@@ -305,6 +316,35 @@ private extension PreviewAssetReadFailure {
         default:
             .providerFailed
         }
+    }
+}
+
+/// Filesystem work for a preview asset read. This type is not the URL-scheme
+/// handler, so symlink resolution and file metadata stay off the main actor.
+private enum AssetFilesystemPreparation {
+    struct ContainedAsset: Sendable {
+        let asset: AssetURLPolicyResult
+        let fileURL: URL
+    }
+
+    static func resolvedAssetURL(_ requestURL: URL, allowedRoot: URL) throws -> URL {
+        let resolved = try AssetURLResolver(allowedRoot: allowedRoot).resolve(requestURL)
+        _ = try AssetURLPolicy.mimeType(for: resolved)
+        if let fileSize = try? resolved.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+           Int64(fileSize) > AssetURLPolicy.maxAssetBytes
+        {
+            throw AssetURLPolicyError.fileTooLarge(
+                actualBytes: Int64(fileSize),
+                maxBytes: AssetURLPolicy.maxAssetBytes
+            )
+        }
+        return resolved
+    }
+
+    static func containedAsset(_ bytes: Data, fileURL: URL, root: URL) throws -> ContainedAsset {
+        let contained = try AssetContainment.fileURL(fileURL, isContainedIn: root)
+        let asset = try AssetURLPolicy.deliveredAsset(data: bytes, fileURL: contained)
+        return ContainedAsset(asset: asset, fileURL: contained)
     }
 }
 

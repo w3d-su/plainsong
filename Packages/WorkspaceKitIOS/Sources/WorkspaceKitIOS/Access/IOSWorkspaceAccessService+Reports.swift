@@ -162,4 +162,14 @@ final class IOSRetainedAccessLease: IOSWorkspaceAccessLease {
         isReleased = true
         service?.releaseConsumer(self)
     }
+
+    /// The captured grant is still the service's live, unrevoked generation.
+    func authorizesCapturedGeneration() -> Bool {
+        guard !isReleased, let service else { return false }
+        return service.authorizes(workspaceID: grant.workspaceID, generation: grant.accessGeneration)
+    }
+
+    var accessService: IOSWorkspaceAccessService? {
+        service
+    }
 }

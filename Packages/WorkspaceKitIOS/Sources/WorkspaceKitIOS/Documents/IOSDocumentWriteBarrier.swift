@@ -9,7 +9,9 @@ extension IOSUIDocumentStore {
 
     func refreshWritableState(_ entry: IOSDocumentEntry) {
         guard !entry.closed, !entry.superseded, !entry.fenced else { return }
-        let writable = entry.allowsProviderWrite && !entry.lease.isReleased && !writeBarrier(entry)
+        let writable = entry.allowsProviderWrite
+            && leaseStillAuthorizes(entry, generation: entry.accessGeneration)
+            && !writeBarrier(entry)
         if case let .saving(_, generation, operationID) = entry.state, entry.inFlightText != nil {
             setState(.saving(canWrite: writable, accessGeneration: generation, operationID: operationID), entry: entry)
         } else {

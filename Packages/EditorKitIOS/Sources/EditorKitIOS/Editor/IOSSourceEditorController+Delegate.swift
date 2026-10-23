@@ -51,6 +51,10 @@ public extension IOSSourceEditorController {
         let ended = hadMarkedText && !marked
         hadMarkedText = marked
         guard ended else { return }
+        if needsBaseStyle {
+            applyBaseTextStyle()
+            raisePresentationFloor()
+        }
         scheduleHighlight()
     }
 }

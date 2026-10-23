@@ -1,5 +1,7 @@
 # iOS / iPadOS manual acceptance matrix
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 Head under test must be recorded before any row changes. Every row below is **OPEN** on `59f374ff9341289b91c0a4090b216dcf16510797` plus this harness. Simulator screenshots, the scaffold UI test, and Mac component tests do not check these boxes.
 
 Record for each attempt: device model, OS, thermal state, Low Power Mode, build configuration, source head, fixture SHA-256, and whether Xcode or a simulator was busy. Keep failed attempts. A later pass does not erase an unexplained race.

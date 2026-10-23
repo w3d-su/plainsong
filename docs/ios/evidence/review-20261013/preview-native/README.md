@@ -1,5 +1,7 @@
 # Native Preview review evidence — 2026-10-13
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../../README.md); run historical local-path commands from that restored checkout.
+
 The full native iOS module gate remains **FAILED**. Preserve all failures; do not replace them with a green rerun or a skipped bundle case.
 
 | Attempt | Source | Build | Runtime result |

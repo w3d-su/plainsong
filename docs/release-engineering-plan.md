@@ -5,7 +5,7 @@
 > notarization scripted later; direct distribution first, App Store optional. This document
 > turns that into ordered work packages with gates. Owner decisions are marked **[owner]**.
 
-Created 2026-07-02. Current state (2026-10-15): MIT `LICENSE` committed; packaging
+Created 2026-07-02. Current state (2026-10-21): MIT `LICENSE` committed; packaging
 (`make release`, P3) and unsigned release CI (`release.yml`, P4) landed; v0.1.0-alpha.1 is
 published. The `v0.1.0-alpha.2` tag completed the first end-to-end P4 CI run and created a
 draft prerelease with the build-67 unsigned DMG and filename-only `.sha256`; that GitHub
@@ -15,7 +15,22 @@ as a GitHub prerelease, built by Release workflow run 38696363613 from `main` at
 `5707c4623a4fd4dce2255864d8972af46c0c0477d4fd55e01208647f5e5e47fc`) was verified as
 universal (arm64 + x86_64) with a valid ad-hoc signature and the sandbox +
 `com.apple.security.network.client` entitlements present. Because alpha.2 was never
-published, alpha.3's auto-generated changelog compares against alpha.1. Per-DMG
+published, alpha.3's auto-generated changelog compares against alpha.1.
+**v0.1.0-alpha.4 was published 2026-10-21** as a GitHub prerelease, built by Release
+workflow run 39605975561 from `main` at `60e5ac1` (build 160). It is a fix and
+performance release (single-file open/save under the sandbox, large-document typing and
+scroll, Files sidebar, preview leak on close, Experimental WYSIWYG thumbnails after a
+same-length reload) with no new features. Its asset
+`Plainsong-0.1.0-160-unsigned.dmg` (SHA-256
+`f0d8ef32cfbfbd9df70df2bc50c50ffb6a7604abdeb1f4140e4abb2b89c1e716`) passed the alpha.3
+checks (universal arm64 + x86_64, valid ad-hoc signature, sandbox entitlements present;
+`CFBundleVersion` 160). Its entitlements also carry `com.apple.security.get-task-allow`,
+which Xcode adds for the ad-hoc "Sign to Run Locally" identity and is not in
+`App/Plainsong.entitlements`; it is harmless for an unsigned alpha but must be absent from a
+Developer ID build (P1). `PLAINSONG_UNSIGNED=1 make release` was also run locally before the
+tag, from `main` at `15913f8` (build 159, one commit before the tag, without #154). `MARKETING_VERSION` stays `0.1.0` and the build number stays the commit count
+(P0.5): the prerelease label lives only in the tag name. Alpha.3 was already published, so
+alpha.4's auto-generated changelog compares against alpha.3. Per-DMG
 clean-machine spot-checking remains good practice and is not a release blocker after R14/P5
 closed with alpha.1. Developer ID signing and notarization remain deferred with P1/P2. The
 app builds and runs locally with the sandbox and `com.apple.security.network.client`
@@ -81,6 +96,31 @@ hdiutil still works and stays until compatibility needs force a change.
   documented env (unsigned path verified 2026-07-05, build 56). The signed-path run
   re-verifies this gate when P1/P2 resume.
 
+**Stripped executable + private dSYM (2026-10-22).** `Scripts/release.sh` passes
+`PLAINSONG_STRIP_SHIPPED_BINARY=YES`; `project.yml` turns it into
+`DEPLOYMENT_POSTPROCESSING=YES`, `STRIP_INSTALLED_PRODUCT=YES` and `STRIP_STYLE=all` on the
+app target's Release configuration only, so Xcode writes the dSYM, strips, then signs (the
+signature covers the stripped bytes). Ordinary Release builds and Release test runs stay
+unstripped. The script fails unless the dSYM's per-architecture UUIDs equal the
+executable's, then zips it next to the DMG as `Plainsong-<version>-<build>[-unsigned].dSYM.zip`
+(no `.sha256`, so it never matches the release upload globs). Measured with
+`PLAINSONG_UNSIGNED=1 make release` (build 161 before, 162 after; only docs changed between
+them):
+
+| | Before | After |
+|---|---|---|
+| `Contents/MacOS/Plainsong` (universal) | 32.2 MiB | 18.3 MiB |
+| `Plainsong.app` | 37.4 MiB | 23.5 MiB |
+| DMG | 12.1 MiB | 9.4 MiB |
+| dSYM (zip) | 62.3 MiB (not packaged) | 17.1 MiB |
+
+A copy re-signed under a separate bundle ID launched and kept running. In a live `sample`
+of it the app frame reads `??? (in Plainsong)`; `atos` against the dSYM from the zip resolves
+the same address to `main (in Plainsong) (PlainsongApp.swift:0)`. To symbolicate a crash
+report: unzip the build's dSYM, check `dwarfdump --uuid` against the report's binary image
+UUID, then run `atos -arch <arch> -o Plainsong.app.dSYM/Contents/Resources/DWARF/Plainsong
+-l <load address> <addresses…>`.
+
 ## P4 — Release CI (unsigned path implemented 2026-07-05)
 
 `.github/workflows/release.yml` runs on `v*` tags and `workflow_dispatch` only (never
@@ -88,7 +128,10 @@ per-push, per the 2026-07-02 CI-cost decision): macos-15 runner, full-history ch
 (build number = commit count), `PLAINSONG_UNSIGNED=1 make release`. Tag runs upload the
 DMG + SHA-256 to the tag's GitHub Release — created as a **draft prerelease** when absent,
 so the owner still authors the notes and presses publish. Dispatch runs attach the DMG as
-a workflow artifact for pipeline verification without touching Releases. No secrets are
+a workflow artifact for pipeline verification without touching Releases. Every run (tag or
+dispatch) also uploads the zipped dSYM as the `plainsong-dsym` workflow artifact, kept 90
+days and never attached to a Release; download it for any build that gets published, since
+crash reports from that DMG can only be symbolicated with it. No secrets are
 required on the unsigned path, and public-repo macOS minutes are free.
 
 - Secrets (Developer ID cert keychain import + notary API key) become repo secrets only

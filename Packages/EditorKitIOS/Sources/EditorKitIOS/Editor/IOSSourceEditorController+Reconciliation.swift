@@ -60,7 +60,8 @@ extension IOSSourceEditorController {
         raisePresentationFloor()
         IOSHighlightPresenter.clearOwnedAttributes(
             in: NSRange(location: 0, length: textView.textStorage.length),
-            of: textView
+            of: textView,
+            theme: theme
         )
         scheduleHighlight()
         emitSnapshot()

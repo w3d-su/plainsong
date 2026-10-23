@@ -1,5 +1,7 @@
 # App-hosted PreviewKit validation
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 Lane 12 owns `IOSPreviewTestHost`, `IOSPreviewTests`, the serial `IOSPreview`
 scheme and the public `make ios-preview` entry. The host links system frameworks
 only; the test bundle links PreviewKit and MarkdownCore. All 94 original case

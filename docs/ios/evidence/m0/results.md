@@ -1,5 +1,7 @@
 # M0 result — OPEN, production composition prohibited
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 ## 2026-10-22 Fixture / delay repair
 
 The owner reports iPhone 14 Pro / iOS 27, with Fixture doing nothing and Delay

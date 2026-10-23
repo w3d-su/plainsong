@@ -1,5 +1,7 @@
 # M0 owner device checklist — OPEN
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 The [2026-10-22 installation notes](runtime-20261022/owner-install.md) accompany
 the new source-bound unsigned IPA and OPEN per-device forms. Simulator passes
 remain separate from every physical-device row below.

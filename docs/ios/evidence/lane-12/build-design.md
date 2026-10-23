@@ -1,5 +1,7 @@
 # Lane 12 — 建置／測試／archive／IPA 入口設計
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 狀態：**設計完成，未落地**。`project.yml`／`Makefile`／`Scripts/ios/**`／`.github/workflows/ios.yml`
 目前屬 13 bootstrap 所有權；C0 freeze 且 13 明確交接 commit 後，本設計經 review 平移到全域檔案。
 Draft 全文在 [`drafts/`](drafts/)（已通過 `bash -n`／`py_compile`，見 test-plan.md）。

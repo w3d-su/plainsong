@@ -1,5 +1,7 @@
 # Lane 02 — SyntaxKit extraction evidence
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 Date: 2026-10-08. Contract: IOS-C0-v1. This lane does not change frozen contracts, `agent.md`, the Decision Log, `project.yml`, the Makefile, or CI.
 
 ## Baseline

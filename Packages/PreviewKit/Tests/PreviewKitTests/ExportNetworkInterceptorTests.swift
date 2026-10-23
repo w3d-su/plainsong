@@ -99,6 +99,43 @@ final class ExportNetworkInterceptorTests: XCTestCase {
         )
     }
 
+    /// With Allow Remote Images off, the live preview must not request remote images even
+    /// transiently: the rendered HTML has to be parsed where nothing loads, before
+    /// `rewriteImageSources` strips the remote `src` values.
+    func testLivePreviewWithRemoteImagesOffIssuesNoHTTPRequests() async throws {
+        let proxy = try LoopbackProxyRecorder()
+        let port = try await proxy.start()
+        let dataStore = WKWebsiteDataStore.nonPersistent()
+        let previousProxies = dataStore.proxyConfigurations
+        dataStore.proxyConfigurations = [
+            ProxyConfiguration(httpCONNECTProxy: .hostPort(host: "127.0.0.1", port: port)),
+        ]
+        addTeardownBlock { @MainActor in
+            dataStore.proxyConfigurations = previousProxies
+            proxy.stop()
+        }
+        let directory = try makeDirectory()
+        let live = try makeController(dataStore: dataStore)
+        live.setAllowsRemoteImages(false)
+
+        for (fileKind, source) in [(FileKind.markdown, Self.markdown), (FileKind.mdx, Self.mdx)] {
+            let renderID = live.renderForTesting(DocumentTextChange(
+                text: source,
+                version: 1,
+                fileKind: fileKind,
+                fileURL: directory.appendingPathComponent(fileKind == .mdx ? "post.mdx" : "post.md")
+            ))
+            let deadline = Date().addingTimeInterval(20)
+            while live.scrollDeliveryState.completedRenderID != renderID, Date() < deadline {
+                try await Task.sleep(nanoseconds: 50_000_000)
+            }
+            XCTAssertEqual(live.scrollDeliveryState.completedRenderID, renderID, "render \(fileKind) never completed")
+            // Give a request started by the parse a moment to reach the proxy.
+            try await Task.sleep(nanoseconds: 500_000_000)
+            XCTAssertEqual(proxy.connections, [], "the live preview requested remote images (\(fileKind))")
+        }
+    }
+
     private static let markdown = """
     # Interceptor
 

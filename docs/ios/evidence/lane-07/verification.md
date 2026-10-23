@@ -1,5 +1,7 @@
 # Lane 07 — PreviewKit iOS verification
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 Date: 2026-10-09. Contract: **IOS-C0-v1**. No frozen declaration changed.
 
 ```text

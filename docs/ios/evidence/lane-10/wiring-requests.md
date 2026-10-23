@@ -1,5 +1,7 @@
 # Lane 10 → 13：C0 最小 wiring request
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 依 handoff：「C0 的 scaffolding 不完整時向 13 提供最小 wiring request；不能自己新增
 第二個 AppState 或模擬保存成功。」以下每項若不進 C0，lane-10 只能發明平行 API
 （被禁止）或停工。

@@ -199,9 +199,10 @@ final class IOSShellSceneState: ObservableObject {
     // MARK: Sheets
 
     /// The current sheet's context (for hosted content factories).
-    /// Image-pick presentation captures the document's directory and the
+    /// Image-pick presentation captures the open Markdown document and the
     /// current grant up front — the flow must not retarget after the user
     /// moves the caret or changes selection mid-pick (09's contract).
+    /// The writer derives the asset directory from this document's parent.
     func present(_ sheet: IOSShellPresentation) {
         guard presentation != sheet else { return }
         dismissPresentation()
@@ -209,9 +210,7 @@ final class IOSShellSceneState: ObservableObject {
             facade: facade,
             editor: currentEditor,
             presentation: sheet,
-            destination: sheet == .imagePicker
-                ? sceneSnapshot.document?.location.parentDirectoryLocation
-                : nil,
+            destination: sheet == .imagePicker ? sceneSnapshot.document?.location : nil,
             grant: sheet == .imagePicker ? surfaces.currentGrant?() : nil
         )
         sheetContext = context

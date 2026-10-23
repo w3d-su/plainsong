@@ -1,5 +1,7 @@
 # Lane 07 ready-load evidence — 2026-10-15
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../../README.md); run historical local-path commands from that restored checkout.
+
 The hosted preview ready gate remains **FAILED**. Commit `9ae2b78` adds this note only. It does not change product or test code. Head `59f374ff9341289b91c0a4090b216dcf16510797` is the review tree these notes started from. Branch `codex/ios-07-ready-repair-20261015`. The owner checkout was not modified.
 
 ## Open gate

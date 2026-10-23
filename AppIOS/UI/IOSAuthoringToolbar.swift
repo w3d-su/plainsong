@@ -3,10 +3,18 @@ import SwiftUI
 extension EventModifiers {
     init(_ modifiers: IOSKeyboardModifiers) {
         var result: EventModifiers = []
-        if modifiers.contains(.command) { result.insert(.command) }
-        if modifiers.contains(.shift) { result.insert(.shift) }
-        if modifiers.contains(.option) { result.insert(.option) }
-        if modifiers.contains(.control) { result.insert(.control) }
+        if modifiers.contains(.command) {
+            result.insert(.command)
+        }
+        if modifiers.contains(.shift) {
+            result.insert(.shift)
+        }
+        if modifiers.contains(.option) {
+            result.insert(.option)
+        }
+        if modifiers.contains(.control) {
+            result.insert(.control)
+        }
         self = result
     }
 }
@@ -19,6 +27,20 @@ extension IOSAuthoringAction {
             return nil
         }
         return KeyEquivalent(character)
+    }
+}
+
+/// One installer for every placement. Menu rows and find commands use it too;
+/// a plain `Button` does not install the descriptor's shortcut.
+struct AuthoringShortcutModifier: ViewModifier {
+    let action: IOSAuthoringAction
+
+    func body(content: Content) -> some View {
+        if let key = action.keyEquivalent {
+            content.keyboardShortcut(key, modifiers: EventModifiers(action.keyboardModifiers))
+        } else {
+            content
+        }
     }
 }
 
@@ -60,10 +82,7 @@ struct IOSAuthoringToolbarItems: ToolbarContent {
             if !overflowActions.isEmpty {
                 Menu {
                     ForEach(overflowActions, id: \.id) { action in
-                        Button(action.title) {
-                            _ = router.perform(action.id)
-                        }
-                        .disabled(!router.isEnabled(action.id))
+                        overflowButton(action)
                     }
                 } label: {
                     Label("Format", systemImage: "textformat")
@@ -83,14 +102,11 @@ struct IOSAuthoringToolbarItems: ToolbarContent {
             .keyboardShortcut("s", modifiers: .command)
             .accessibilityIdentifier("plainsong.ios.toolbar.save")
 
-            Button {
-                _ = router.perform(.find)
-            } label: {
-                Label("Find", systemImage: "magnifyingglass")
+            findButton
+
+            ForEach(unplacedShortcutActions, id: \.id) { action in
+                shortcutHost(action)
             }
-            .disabled(!scene.chrome.hasDocument)
-            .keyboardShortcut("f", modifiers: .command)
-            .accessibilityIdentifier("plainsong.ios.toolbar.find")
 
             Button {
                 router.presentFrontmatter()
@@ -114,8 +130,12 @@ struct IOSAuthoringToolbarItems: ToolbarContent {
 
     private var primaryActions: [IOSAuthoringAction] {
         router.actions.filter { action in
-            if case .toolbar = action.placement { return true }
-            if case .toolbarGroup = action.placement { return true }
+            if case .toolbar = action.placement {
+                return true
+            }
+            if case .toolbarGroup = action.placement {
+                return true
+            }
             return false
         }
     }
@@ -124,16 +144,68 @@ struct IOSAuthoringToolbarItems: ToolbarContent {
         router.actions.filter { $0.placement == .formatMenu }
     }
 
+    /// Format commands live in a menu, and Find Next / Find Previous / Use
+    /// Selection have no always-visible control. Mount the same installer so
+    /// those shortcuts exist while the toolbar is on screen. Cmd-F stays on
+    /// the visible Find button. Primary buttons install their own shortcuts.
+    private var unplacedShortcutActions: [IOSAuthoringAction] {
+        router.actions.filter { action in
+            guard action.keyEquivalent != nil else { return false }
+            switch action.placement {
+            case .formatMenu:
+                return true
+            case .find:
+                return action.id != .find
+            case .toolbar, .toolbarGroup:
+                return false
+            }
+        }
+    }
+
+    private var findButton: some View {
+        let button = Button {
+            _ = router.perform(.find)
+        } label: {
+            Label("Find", systemImage: "magnifyingglass")
+        }
+        .disabled(!scene.chrome.hasDocument)
+        .accessibilityIdentifier("plainsong.ios.toolbar.find")
+        if let find = router.actions.first(where: { $0.id == .find }), find.keyEquivalent != nil {
+            return AnyView(button.modifier(AuthoringShortcutModifier(action: find)))
+        }
+        return AnyView(button.keyboardShortcut("f", modifiers: .command))
+    }
+
     private func authoringButton(_ action: IOSAuthoringAction) -> some View {
-        let button = Button(action.title) {
+        Button(action.title) {
             _ = router.perform(action.id)
         }
         .disabled(!router.isEnabled(action.id))
         .accessibilityLabel(action.accessibilityLabel)
-        if let key = action.keyEquivalent {
-            return AnyView(button.keyboardShortcut(key, modifiers: EventModifiers(action.keyboardModifiers)))
+        .modifier(AuthoringShortcutModifier(action: action))
+    }
+
+    private func overflowButton(_ action: IOSAuthoringAction) -> some View {
+        Button(action.title) {
+            _ = router.perform(action.id)
         }
-        return AnyView(button)
+        .disabled(!router.isEnabled(action.id))
+        .accessibilityLabel(action.accessibilityLabel)
+    }
+
+    /// Menu rows are not a reliable key-command source, so format and find
+    /// commands are also mounted here with the same installer. The host is
+    /// hidden; the menu row remains the visible control. Primary shortcuts
+    /// stay on their buttons and are not repeated here.
+    private func shortcutHost(_ action: IOSAuthoringAction) -> some View {
+        Button(action.title) {
+            _ = router.perform(action.id)
+        }
+        .disabled(!router.isEnabled(action.id))
+        .accessibilityLabel(action.accessibilityLabel)
+        .modifier(AuthoringShortcutModifier(action: action))
+        .accessibilityHidden(true)
+        .frame(width: 1, height: 1)
     }
 }
 

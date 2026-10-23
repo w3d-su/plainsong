@@ -1,5 +1,7 @@
 # Lane 06 device gates
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 These gates stay **open**. The simulator scripted provider and one local temp-file bookmark round trip do not close them. No signed install or owner recording is claimed.
 
 | Gate | What the owner checks | Status |

@@ -1,1 +1,0 @@
-/private/tmp/plainsong-shell-build-review-20261013/release/ipa-staging-3d4f671545eb.vNWJlN/Payload/PlainsongIOS.app	unsigned

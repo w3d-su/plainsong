@@ -1,5 +1,7 @@
 # Lane 08 — 格式、Frontmatter、Find／單次 Replace：交付摘要
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 > 2026-10-13 additive review 與最新證據見 [`exact-source-delivery-review.md`](exact-source-delivery-review.md)；portable Mac 邏輯、generic iOS 編譯及尚未完成的 native／真機關卡分列，以下歷史紀錄保留。
 
 > 2026-10-09 acceptance review 修正與實際 simulator 證據見 [`acceptance-review-fixes.md`](acceptance-review-fixes.md)。Find 已接受結果的來源保護、Frontmatter 即時投影與 production scheduler 反例已補；以下 2026-10-08 原始交付紀錄保留為歷史，不代表最新關卡。

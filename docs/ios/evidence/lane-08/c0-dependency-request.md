@@ -1,5 +1,7 @@
 # Lane 08 → lane 13 dependency request
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 日期：2026-10-08。請求者：lane 08。
 
 ## 現況

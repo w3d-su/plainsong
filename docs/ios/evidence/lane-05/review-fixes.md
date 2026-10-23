@@ -1,5 +1,7 @@
 # Lane 05 document lifecycle review fixes
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 Review branch: `codex/ios-storage-review-fixes`; implementation base: `b82d0c27e69ebe9260a1c71a0a4deb8a2cceec6b`. Frozen interface: IOS-C0-v1. This batch owns document internals, document tests, and this lane's evidence. Lane 06 providers and lane 13 production composition remain outside this batch.
 
 ## Resulting behavior

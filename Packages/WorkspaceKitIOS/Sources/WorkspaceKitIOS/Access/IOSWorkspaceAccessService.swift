@@ -98,6 +98,14 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
         return record.grant
     }
 
+    /// Live grant check. A retained lease keeps a generation snapshot and its
+    /// security scope so an in-flight provider call can drain; that snapshot
+    /// does not authorize a new document operation after invalidate.
+    func authorizes(workspaceID: IOSWorkspaceIdentity, generation: UInt64) -> Bool {
+        guard let record = records[workspaceID] else { return false }
+        return record.generation == generation && !record.revoked && !record.stopped
+    }
+
     public func snapshot(for identity: IOSWorkspaceIdentity) -> IOSWorkspaceSnapshot? {
         records[identity]?.latestSnapshot
     }

@@ -68,6 +68,17 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "-"
         ENABLE_HARDENED_RUNTIME: NO
+        # Scripts/release.sh passes PLAINSONG_STRIP_SHIPPED_BINARY=YES, so only the
+        # shipped app is stripped: Release test runs (the perf harness) still link
+        # their bundles against an unstripped app, and SwiftPM's object-file
+        # targets are never stripped (a command-line STRIP_* override strips them
+        # too and fails the build).
+        PLAINSONG_STRIP_SHIPPED_BINARY: NO
+      configs:
+        Release:
+          DEPLOYMENT_POSTPROCESSING: $(PLAINSONG_STRIP_SHIPPED_BINARY)
+          STRIP_INSTALLED_PRODUCT: $(PLAINSONG_STRIP_SHIPPED_BINARY)
+          STRIP_STYLE: all
     info:
       path: App/Info.plist
       properties:

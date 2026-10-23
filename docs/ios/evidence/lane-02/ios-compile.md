@@ -1,5 +1,7 @@
 # Lane 02 iOS compile
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 Recorded 2026-10-08. This is a simulator compile. It is not a real-device run.
 
 ## Package

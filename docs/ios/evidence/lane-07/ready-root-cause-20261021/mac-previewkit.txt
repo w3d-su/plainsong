@@ -1,3 +1,0 @@
-swift test --package-path Packages/PreviewKit (macOS host, tree bd3dadcf5e0d)
-exit 0; Executed 94 tests, with 0 failures (0 unexpected) in 83.274 s; 0 skipped
-full log sha256: c22aac2f458a7cd5b3ae1952d67e0e71a79c118a55b56bd9da4660ea1316b667

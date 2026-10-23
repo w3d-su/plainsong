@@ -1,5 +1,7 @@
 # Lane 10 Shell 設計 — 視圖結構、routing、不變條件
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 契約版本 IOS-C0-v1（specification）。以下 Swift 型別名稱是 lane-10 內部設計提案；
 斜體 *名稱* 表示需由 C0 凍結的 consumer-facing 名稱（見 `wiring-requests.md`），
 lane-10 不自行定義它們。

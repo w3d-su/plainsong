@@ -1,5 +1,7 @@
 # lane-12 drafts — 交接前設計稿
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../../README.md); run historical local-path commands from that restored checkout.
+
 這裡的 `Scripts/ios/**`、`github/workflows/ios.yml`、`Makefile.snippet`、
 `project-yml.snippet.yml` 是 **C0／13→12 交接前的設計 draft**，不是生效檔案：
 全域 manifest／Scripts/ios／ios.yml 在 bootstrap 期間屬 13，交接 commit 後才由

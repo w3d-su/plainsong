@@ -1,5 +1,7 @@
 # iOS acceptance harness — phase B receipt
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 Parent: PR #164 head `59f374ff9341289b91c0a4090b216dcf16510797` on `codex/ios-review-fixes-20261013`.
 
 This receipt covers the Mac component package only. It does not close product acceptance, M0, or phase C.

@@ -1,5 +1,7 @@
 # Lane 10 — iPhone／iPad 自適應 App shell：交付摘要
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 日期：2026-10-08。契約版本：**IOS-C0-v1**（`refs/tags/ios-c0-v1`，`642cb21`）。
 
 ## 交付格式

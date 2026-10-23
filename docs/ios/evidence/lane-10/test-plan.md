@@ -1,5 +1,7 @@
 # Lane 10 測試計畫 — named acceptance tests、doubles、negative probes
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 目標 target：`AppIOSTests`（C0 建立 hosted test target；lane-10 tests 歸
 `AppIOSTests/Shell/**`）。測試型別名為提案；frozen protocol 簽名以 C0 為準。
 

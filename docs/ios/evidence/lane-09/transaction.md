@@ -1,5 +1,7 @@
 # Lane 09 transaction
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 Contract: IOS-C0-v1. Writer and editor are injected. This lane does not persist with `FileManager` and does not append `DocumentSession.text`.
 
 ## Timeline

@@ -1,5 +1,7 @@
 # BoundedWait handle race
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../../README.md); run historical local-path commands from that restored checkout.
+
 The racy bytes are `racy-BoundedWait.swift`, SHA-256 `2c14e6e2f1fa15e8634eb1e94e022c00766dc85978019a20015d71ae1f2f8d64`. Line 112 reads `predicateTask` inside the timer closure. Line 116 writes it while holding the lock. This file is the pre-fix source. It is not the code under test after the fix.
 
 `probe.swift` is the isolated driver, SHA-256 `d70defce2e2fbb6a8562b2354d0513bacc929cfd64198e996df8a27434dcdf39`. It is not an XCTest and not the 26-case suite. Both binaries were `swiftc -sanitize=thread -g -Onone -parse-as-library` for `arm64-apple-macos14.0`. Compile exit was 0 for both (`tsan-racy-compile.log`, `tsan-fixed-compile.log`, each SHA-256 `bac34729956f6130ef30ae54f86a84989d070be717ce516f5e91719a9085dd8f`).

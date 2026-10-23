@@ -1,5 +1,7 @@
 # Lane 07 real-bundle readiness: retained observations — 2026-10-21
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../../README.md); run historical local-path commands from that restored checkout.
+
 **The app-hosted readiness gate passes; the platform cause remains unproven.**
 The public `make ios-preview` run executed **94 Passed, 0 Failed, 0 Skipped**
 on `bd3dadcf5e0dd39e83896d6c463e285e8a0d6cb3`. Independent review re-extracted

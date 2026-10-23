@@ -5,7 +5,6 @@ const diagram = vi.hoisted(() => ({
   render: vi.fn(async () => ({ svg: "<svg></svg>" })),
   initialize: vi.fn(),
 }));
-vi.mock("mermaid", () => ({ default: diagram }));
 
 let messages: BridgeMessage[];
 
@@ -13,6 +12,8 @@ beforeEach(async () => {
   vi.resetModules();
   diagram.render.mockReset();
   diagram.render.mockResolvedValue({ svg: "<svg></svg>" });
+  // Stands in for the lazily loaded mermaid.js (src/mermaid-loader.ts).
+  window.PlainsongMermaid = { default: diagram };
   messages = [];
   document.body.innerHTML = '<main id="preview-root"></main>';
   window.webkit = { messageHandlers: { bridge: {

@@ -1,5 +1,0 @@
-{
-  "exit_code": 0,
-  "stdout": "{\n  \"workspace\" : {\n    \"name\" : \"PreviewKit\",\n    \"schemes\" : [\n      \"PreviewKit\",\n      \"PreviewKit-Package\",\n      \"PreviewKitContracts\"\n    ]\n  }\n}\n",
-  "stderr": "2026-10-13 16:18:04.672 xcodebuild[12827:10346485] [MT] IDELogStore: Failed to move log store. Error: (null). User info: (null).\n2026-10-13 16:18:04.673 xcodebuild[12827:10346485] [MT] IDELogStore: Failed to move log store. Error: (null). User info: (null).\n2026-10-13 16:18:04.673 xcodebuild[12827:10346485] [MT] IDELogStore: Failed to move log store. Error: (null). User info: (null).\n2026-10-13 16:18:04.673 xcodebuild[12827:10346485] [MT] IDELogStore: Failed to move log store. Error: (null). User info: (null).\n2026-10-13 16:18:04.673 xcodebuild[12827:10346485] [MT] IDELogStore: Failed to move log store. Error: (null). User info: (null).\n2026-10-13 16:18:04.687 xcodebuild[12827:10346485] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.\n"
-}

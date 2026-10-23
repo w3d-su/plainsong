@@ -35,6 +35,17 @@ jobs:
       - name: Checksum summary
         run: cat build/release/*.sha256
 
+      # Every run keeps the dSYM, so crash reports from this exact (stripped)
+      # build can be symbolicated. It is deliberately never a Release asset.
+      # Artifacts expire: download it for any build that gets published.
+      - name: Upload dSYM (workflow artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: plainsong-dsym
+          path: build/release/*.dSYM.zip
+          if-no-files-found: error
+          retention-days: 90
+
       # Tag runs: attach the DMG + checksum to the tag's GitHub Release.
       # Created as a DRAFT prerelease when absent so the owner still writes
       # the notes and presses publish.
@@ -45,11 +56,11 @@ jobs:
         run: |
           if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber \
-              build/release/Plainsong-*-unsigned.dmg build/release/*.sha256
+              build/release/Plainsong-*-unsigned.dmg build/release/Plainsong-*-unsigned.dmg.sha256
           else
             gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
               --draft --prerelease --generate-notes \
-              build/release/Plainsong-*-unsigned.dmg build/release/*.sha256
+              build/release/Plainsong-*-unsigned.dmg build/release/Plainsong-*-unsigned.dmg.sha256
           fi
 
       # Dispatch runs (pipeline verification without a tag): keep the DMG as a

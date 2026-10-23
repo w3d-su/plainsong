@@ -1,5 +1,7 @@
 # Lane 09 — 圖片插入交易：交付摘要
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 > 2026-10-13 additive review 與最新證據見 [`acceptance-review-fixes.md`](acceptance-review-fixes.md)；portable Mac 邏輯、generic iOS 編譯及尚未完成的 native／真機關卡分列，以下歷史紀錄保留。
 
 日期：2026-10-08。契約版本：IOS-C0-v1。推理等級：L4。

@@ -91,6 +91,31 @@ final class IOSWorkspaceSnapshotRaceTests: XCTestCase {
         XCTAssertTrue(paths.contains(nfd))
     }
 
+    func testNestedUnicodeDirectorySpellingsDoNotShareChildren() async throws {
+        let harness = AccessHarness()
+        let grant = try await harness.openDirectory()
+        let nfc = "caf\u{00E9}"
+        let nfd = "cafe\u{0301}"
+        XCTAssertEqual(nfc, nfd)
+        XCTAssertNotEqual(Data(nfc.utf8), Data(nfd.utf8))
+        harness.files.listResult = .success([
+            directory(root: grant.rootURL, relativePath: nfc),
+            directory(root: grant.rootURL, relativePath: nfd),
+            item(root: grant.rootURL, relativePath: nfc + "/a.md"),
+            item(root: grant.rootURL, relativePath: nfd + "/b.md"),
+        ])
+        let snapshot = try await harness.service.refresh(grant)
+        let nfcEntry = try XCTUnwrap(snapshot.entries.first {
+            Data($0.location.relativePath.utf8) == Data(nfc.utf8)
+        })
+        let nfdEntry = try XCTUnwrap(snapshot.entries.first {
+            Data($0.location.relativePath.utf8) == Data(nfd.utf8)
+        })
+        XCTAssertEqual(nfcEntry.children.map { Data($0.location.relativePath.utf8) }, [Data((nfc + "/a.md").utf8)])
+        XCTAssertEqual(nfdEntry.children.map { Data($0.location.relativePath.utf8) }, [Data((nfd + "/b.md").utf8)])
+        XCTAssertEqual(snapshot.entries.count, 2)
+    }
+
     func testExternalReportDoesNotCoordinate() async throws {
         let harness = AccessHarness()
         let grant = try await harness.openDirectory()
@@ -153,6 +178,21 @@ final class IOSWorkspaceSnapshotRaceTests: XCTestCase {
         } catch let failure as IOSWorkspaceFailure {
             XCTAssertEqual(failure, .permissionDenied)
         }
+    }
+
+    private func directory(root: URL, relativePath: String) -> IOSWorkspaceFileItem {
+        IOSWorkspaceFileItem(
+            relativePath: relativePath,
+            url: IOSWorkspacePathAuthority.fileURL(
+                path: IOSWorkspacePathAuthority.joined(root: root, relativePath: relativePath)
+            ),
+            isDirectory: true,
+            isSymlink: false,
+            fileSize: nil,
+            availability: .available(canWrite: true),
+            providerIdentity: nil,
+            bytes: nil
+        )
     }
 
     private func item(

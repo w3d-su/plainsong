@@ -94,15 +94,19 @@ enum EditorReplaceBatchSpikeSupport {
 
     struct Fixture {
         let window: NSWindow
+        let scrollView: NSScrollView
         let textView: MarkdownSTTextView
         let coordinator: MarkdownTextViewCoordinator
         let model: Model
+        let representable: MarkdownTextView
     }
 
     static func makeFixture(
         source: String,
         selection: NSRange = NSRange(location: 0, length: 0),
         enableWYSIWYG: Bool = false,
+        findMatchHighlight: EditorFindMatchHighlightRequest? = nil,
+        imageThumbnailConfiguration: EditorImageThumbnailConfiguration? = nil,
         makeWindow: ((NSRect) -> NSWindow)? = nil,
         selectionBinding: Binding<NSRange?>? = nil
     ) throws -> Fixture {
@@ -120,10 +124,7 @@ enum EditorReplaceBatchSpikeSupport {
             XCTAssertTrue(textView.setWYSIWYGZeroWidthFoldingEnabled(true))
         }
 
-        let textBinding = Binding(
-            get: { model.source },
-            set: { model.source = $0 }
-        )
+        let textBinding = Binding(get: { model.source }, set: { model.source = $0 })
         let representable = MarkdownTextView(
             text: textBinding,
             styledText: nil,
@@ -132,7 +133,9 @@ enum EditorReplaceBatchSpikeSupport {
             documentIdentity: EditorDocumentIdentity(rawValue: "replace-r0"),
             documentBindingID: model.bindingID,
             documentSourceContract: contract,
-            isWYSIWYGZeroWidthFoldingEnabled: enableWYSIWYG
+            findMatchHighlight: findMatchHighlight,
+            isWYSIWYGZeroWidthFoldingEnabled: enableWYSIWYG,
+            imageThumbnailPresentationConfiguration: imageThumbnailConfiguration
         )
         let coordinator = representable.makeCoordinator()
         textView.textDelegate = coordinator
@@ -151,9 +154,11 @@ enum EditorReplaceBatchSpikeSupport {
         textView.undoManager?.removeAllActions()
         return Fixture(
             window: window,
+            scrollView: scrollView,
             textView: textView,
             coordinator: coordinator,
-            model: model
+            model: model,
+            representable: representable
         )
     }
 

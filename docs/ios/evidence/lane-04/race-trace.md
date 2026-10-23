@@ -1,5 +1,7 @@
 # Lane 04 race trace
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 The tests block on continuations. They do not sleep for a fixed interval.
 
 ## Latest edit wins

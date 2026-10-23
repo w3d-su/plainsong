@@ -99,7 +99,7 @@ blogeditor/
 ```
 
 Build artifacts: `preview-src` builds to `App/Resources/preview/` (`index.html`, `bundle.js`,
-`bundle.css`). The dist output **is committed** so Swift-only agents can build the app without
+`mermaid.js`, `bundle.css`, woff2 KaTeX `fonts/`). The dist output **is committed** so Swift-only agents can build the app without
 Node installed; regenerate with `make preview-bundle` whenever `preview-src/` changes.
 
 Manual Swift linker harnesses must include the approved portable package dependencies:
@@ -160,8 +160,12 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 - UI mutation on `@MainActor` only.
 - tree-sitter parsing and highlight query execution off main thread (`MarkdownHighlightService`
   handles this; do not block it).
-- Preview render requests are coalesced: only the latest version may be in flight; stale
-  `renderComplete` responses are ignored.
+- Preview render requests are single-flight: one render is in JavaScript at a time and the
+  newest request replaces the pending one, sent when the in-flight render posts
+  `renderComplete` or after a 2 s watchdog (a throwing md pipeline or a stale-dropped render
+  posts nothing). Stale `renderComplete` responses still free the slot but are otherwise
+  ignored. A session render whose (session, version, file, presented document, asset root,
+  theme, remote-image policy) equals the last submission is dropped as a duplicate.
 - Editor highlight requests restart through `EditorHighlightScheduler`: each request cancels
   the executing request and replaces the pending revision in the caller's turn. One runner
   waits for cancelled work to return before starting the latest request, so at most one
@@ -395,7 +399,8 @@ descriptor and `.mermaid-pending` state while retaining its previous SVG childre
 as a stale visual until rendering settles; pending wrappers are never authoritative,
 and success or `.mermaid-error` replaces those children. Remaining placeholders use a
 64-entry success-only LRU keyed by the exact JavaScript source string + ordinal tuple,
-and misses call `mermaid.render`. Exact-string comparison, not the removed 32-bit djb2
+and misses call `mermaid.render` (the first miss loads `mermaid.js`, §7.4; a failed load is
+an ordinary `.mermaid-error` and the next render retries). Exact-string comparison, not the removed 32-bit djb2
 hash, authorizes reuse. The ordinal is part of the key because Mermaid output embeds its
 render ID in SVG IDs and references; reusing one SVG string for identical fences at two
 positions would duplicate IDs. Inserting or removing a fence therefore deliberately
@@ -415,8 +420,12 @@ the Frontmatter panel, §10). Optional toggle to show it as a styled block.
 
 ### 7.3 Swift ↔ JS bridge protocol
 
-`window.webkit.messageHandlers.bridge.postMessage(...)` (JS→Swift) and
-`webView.evaluateJavaScript("render(payloadJSON)")` (Swift→JS). Keep the protocol in
+`window.webkit.messageHandlers.bridge.postMessage(...)` (JS→Swift, read field by field from
+the Foundation body, never through `JSONSerialization`) and
+`window.PlainsongBridge.receive(message)` (Swift→JS). `render` goes through
+`callAsyncJavaScript` with the message as a Foundation argument, so the document text is
+never JSON-encoded, interpolated into a script, or parsed as source; the other messages are
+JSON-encoded into an `evaluateJavaScript` script. Both carry the same message shape. Keep the protocol in
 `BridgeMessage.swift` + `ExportBridgeMessages.swift` (Codable) and `bridge.ts` —
 **these must be kept in sync; both sides list message names in the same order with a
 `PROTOCOL_VERSION` constant checked at `ready`.**
@@ -436,8 +445,12 @@ the Frontmatter panel, §10). Optional toggle to show it as a styled block.
 
 ### 7.4 Build
 
-`make preview-bundle`: `npm ci && esbuild src/index.ts --bundle --minify` →
-`App/Resources/preview/`. KaTeX fonts/CSS and Mermaid are bundled; syntax highlighting uses the preview
+`make preview-bundle`: `npm ci && node build.mjs` → `App/Resources/preview/`. esbuild emits two
+classic IIFE scripts: `bundle.js` (everything parsed at start-up, kept under 1 MB by
+`test/bundle-budget.test.ts`) and `mermaid.js`, which `src/mermaid-loader.ts` injects on the
+first diagram so documents without diagrams never parse Mermaid. Do not switch to ES module
+splitting: the page is a file: URL, where module scripts hit CORS. Only the woff2 KaTeX fonts
+ship, and the build strips the woff/ttf fallbacks from KaTeX's CSS. Syntax highlighting uses the preview
 stylesheet’s Apple system palette and Xcode-inspired light/dark token colors, with dark
 function/link/comment colors raised to meet 4.5:1 on code background `#2a2a2c`.
 The highlight.js `github.css` theme is no longer bundled. All assets are bundled
@@ -472,7 +485,11 @@ block-level element.
   (O(log n) per keystroke; a full rebuild walked the 1 MiB storage on every selection
   change), with a length check and a change-notification fallback that rebuild in bulk.
 - **Loop prevention:** a `scrollOwner` token (`editor` | `preview` | `none`) with 100 ms
-  decay; messages from the non-owner are dropped.
+  decay (a deadline timestamp, not a timer per event); messages from the non-owner are
+  dropped.
+- Editor viewport traffic carries no completion: one `scrollToLine` is in flight and only
+  the newest line waits. Document navigation keeps its render barrier and receipt, and
+  discards waiting viewport lines so they cannot scroll back over it.
 - Cursor-follow option: "typewriter sync" — on text edit, preview scrolls to the edited
   line (on by default, like Typora).
 

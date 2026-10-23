@@ -1,5 +1,7 @@
 # Lane 04 receipt — EditorKitIOS
 
+> Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
+
 Status: **module-ready**. Not product-integration-ready. M0 device gates are open.
 
 | Field | Value |

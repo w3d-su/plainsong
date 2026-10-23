@@ -43,7 +43,7 @@ final class IOSShellSheetTests: XCTestCase {
         XCTAssertEqual(editor.session.version, 0)
     }
 
-    /// The image flow's context carries the document's directory and the
+    /// The image flow's context carries the open document location and the
     /// captured grant — captured at presentation time so a later caret or
     /// selection move cannot retarget the pending insert.
     func testImagePickerContextCapturesDestinationAndGrant() {
@@ -58,7 +58,7 @@ final class IOSShellSheetTests: XCTestCase {
 
         XCTAssertEqual(
             scene.sheetContext?.destination?.relativePath,
-            "posts"
+            "posts/entry.md"
         )
         XCTAssertEqual(scene.sheetContext?.grant?.workspaceID, grant.workspaceID)
         XCTAssertEqual(scene.sheetContext?.grant?.accessGeneration, grant.accessGeneration)
