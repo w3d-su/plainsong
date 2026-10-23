@@ -20,12 +20,6 @@ protocol RecentItemPersisting: AnyObject {
 
 extension RecentItemStore: RecentItemPersisting {}
 
-protocol WorkspaceDirectoryScanning: Sendable {
-    func snapshotCapture(root: URL) async throws -> WorkspaceDirectorySnapshotCapture
-}
-
-extension WorkspaceDirectoryScanner: WorkspaceDirectoryScanning {}
-
 protocol ExternalReloadApplicationPreparing: Sendable {
     func prepare(
         snapshot: WorkspaceCoherentFileSnapshot,

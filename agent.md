@@ -207,7 +207,10 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   the 521 pt Split floor). The inspector auto-collapses when the document column cannot fit it.
 - Open folder: sidebar shows the tree; filter to show only markdown-related files by
   default (`.md`, `.markdown`, `.mdx`), toggle "Show all files". Images shown so they can
-  be drag-inserted.
+  be drag-inserted. In the default mode the scan skips `WorkspaceIgnoredDirectories`
+  (`node_modules`, `dist`, `build`, `.next`, `.astro`, `.build`, `deriveddata`, `.git`;
+  the list Search ignores) without enumerating them; only the chain down to an open
+  session's file in that root is scanned inside them. "Show all files" rescans everything.
 - File tree operations: create/rename/delete/move file & folder (Finder-style, with
   trash not hard delete). Watch root recursively via `FSEventStream`; debounce 300 ms;
   reconcile tree diff instead of full reload to preserve expansion state.
