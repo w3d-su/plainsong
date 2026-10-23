@@ -385,6 +385,9 @@ production UI work. This is **not** a late verification detail of a performance 
 - Evidence: **closed 2026-07-27.** §2 outcome (b); menu route spike in PR B; owner
   physical `⌘F` under **ABC** and **Zhuyin** confirmed via Console `F0 spike` logs
   (`delivered=true` + `fired`). Mechanism = ordinary menu item + `sendAction` (no Carbon).
+  (2026-10-22: the spike's Console logging and `EditorFindSpike.performShowFind` were
+  removed; the app routes ⌘F through `EditorFindCommandDelivery`, and only the fire counter
+  that `EditorFindSpikeTests` reads remains.)
 
 ### F1 — Pure find-session model
 
