@@ -8,7 +8,7 @@ import XCTest
 @MainActor
 final class PreviewRenderDispatchTests: XCTestCase {
     func testOneRenderIsInFlightAndTheNewestReplacesThePending() {
-        let harness = RenderDispatchHarness()
+        let harness = RenderDispatchHarness(testCase: self)
         harness.markReady()
 
         let first = harness.controller.renderForTesting(change("one", version: 1))
@@ -28,7 +28,7 @@ final class PreviewRenderDispatchTests: XCTestCase {
     }
 
     func testRendersBeforeReadySendOnlyTheNewestOnReady() {
-        let harness = RenderDispatchHarness()
+        let harness = RenderDispatchHarness(testCase: self)
         _ = harness.controller.renderForTesting(change("early", version: 1))
         let newest = harness.controller.renderForTesting(change("newest", version: 2))
         XCTAssertTrue(harness.sentRenderIDs.isEmpty)
@@ -40,7 +40,7 @@ final class PreviewRenderDispatchTests: XCTestCase {
     }
 
     func testPendingRenderReadsTheThemeWhenItIsSent() {
-        let harness = RenderDispatchHarness()
+        let harness = RenderDispatchHarness(testCase: self)
         harness.markReady()
         let first = harness.controller.renderForTesting(change("one", version: 1))
         _ = harness.controller.renderForTesting(change("two", version: 2))
@@ -53,7 +53,7 @@ final class PreviewRenderDispatchTests: XCTestCase {
     }
 
     func testUnchangedPreviewSettingsSendNothing() {
-        let harness = RenderDispatchHarness()
+        let harness = RenderDispatchHarness(testCase: self)
         harness.markReady()
         let settingsAfterReady = harness.settingsMessageCount
         harness.controller.setTheme("system")
@@ -64,7 +64,7 @@ final class PreviewRenderDispatchTests: XCTestCase {
     }
 
     func testWatchdogReleasesARenderJavaScriptNeverAnswers() async throws {
-        let harness = RenderDispatchHarness()
+        let harness = RenderDispatchHarness(testCase: self)
         harness.markReady()
         harness.controller.renderWatchdogNanoseconds = 50_000_000
         let stalled = harness.controller.renderForTesting(change("throws", version: 1))
@@ -83,7 +83,7 @@ final class PreviewRenderDispatchTests: XCTestCase {
     }
 
     func testFailedDeliveryFreesTheSlotAndDoesNotSuppressTheSameRender() {
-        let harness = RenderDispatchHarness()
+        let harness = RenderDispatchHarness(testCase: self)
         harness.markReady()
         let session = DocumentSession(text: "kept")
         harness.deliverySucceeds = false
@@ -97,7 +97,7 @@ final class PreviewRenderDispatchTests: XCTestCase {
     }
 
     func testIdenticalSessionPresentationIsSubmittedOnce() {
-        let harness = RenderDispatchHarness()
+        let harness = RenderDispatchHarness(testCase: self)
         harness.markReady()
         let session = DocumentSession(text: "# Post")
         harness.controller.setPresentedDocumentIdentifier("post")
@@ -134,7 +134,7 @@ final class PreviewRenderDispatchTests: XCTestCase {
     }
 
     func testWebContentTerminationKeepsTheNewestPendingRenderAndClearsDuplicates() {
-        let harness = RenderDispatchHarness()
+        let harness = RenderDispatchHarness(testCase: self)
         harness.markReady()
         let session = DocumentSession(text: "kept")
         harness.controller.render(session.currentTextChange, for: session)
@@ -150,7 +150,7 @@ final class PreviewRenderDispatchTests: XCTestCase {
     }
 
     func testInvalidationDropsPendingRenderWork() {
-        let harness = RenderDispatchHarness()
+        let harness = RenderDispatchHarness(testCase: self)
         harness.markReady()
         let first = harness.controller.renderForTesting(change("one", version: 1))
         _ = harness.controller.renderForTesting(change("two", version: 2))
@@ -161,7 +161,7 @@ final class PreviewRenderDispatchTests: XCTestCase {
     }
 
     func testCheckboxProvenanceNamesTheNewestSubmittedRender() {
-        let harness = RenderDispatchHarness()
+        let harness = RenderDispatchHarness(testCase: self)
         harness.markReady()
         let session = DocumentSession(text: "- [ ] task")
         var toggles: [Int] = []
@@ -257,7 +257,7 @@ final class RenderDispatchHarness {
         sentRenders.map(\.text)
     }
 
-    init(recoversFromWebContentTermination: Bool = false) {
+    init(testCase: XCTestCase, recoversFromWebContentTermination: Bool = false) {
         controller = PreviewController(
             previewIndexURL: nil,
             recoversFromWebContentTermination: recoversFromWebContentTermination
@@ -278,6 +278,12 @@ final class RenderDispatchHarness {
             default:
                 completion?(true)
             }
+        }
+        // Even a nil-index controller owns a real WKWebView. Register cleanup before any await.
+        testCase.addTeardownBlock { @MainActor [harness = self] in
+            harness.controller.invalidate()
+            harness.controller.bridgeTransportOverrideForTesting = nil
+            harness.heldScrollCompletions.removeAll()
         }
     }
 

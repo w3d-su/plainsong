@@ -20,15 +20,16 @@ final class ResourceAndLeaseTests: XCTestCase {
             encoding: .utf8
         )
         let records = try ResourcePreflight.validate(root: root, manifest: manifest)
-        XCTAssertEqual(records.count, 75)
+        XCTAssertEqual(records.count, 36)
         XCTAssertTrue(records.allSatisfy { $0.byteCount > 0 && $0.sha256.count == 64 })
         let preview = try ResourcePreflight.validateExactDirectory(
             root: root,
             directory: "App/Resources/preview",
             manifest: manifest
         )
-        XCTAssertEqual(preview.count, 64)
+        XCTAssertEqual(preview.count, 25)
         XCTAssertTrue(preview.contains { $0.relativePath == "App/Resources/preview/bundle.js" })
+        XCTAssertTrue(preview.contains { $0.relativePath == "App/Resources/preview/mermaid.js" })
     }
 
     func testHostileEmptyAndTamperedResourcesFailClosed() throws {

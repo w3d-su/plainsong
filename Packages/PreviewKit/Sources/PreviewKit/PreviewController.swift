@@ -17,6 +17,11 @@ public final class PreviewController: NSObject, ObservableObject {
     let eventHub = PreviewEventHub()
     private let scriptMessageProxy: ScriptMessageProxy
     let previewIndexURL: URL?
+    let initialReadinessScheduler: PreviewInitialReadiness.Scheduler
+    let pageLoadOverrideForTesting: (@MainActor (WKWebView, URL?) -> WKNavigation?)?
+    var initialReadiness = PreviewInitialReadiness()
+    var pageLoadGeneration = UUID()
+    var currentPageNavigation: WKNavigation?
     private let jsonEncoder = JSONEncoder()
     /// Single-flight render state: at most one render in JavaScript, the newest pending.
     var renderDispatch = PreviewRenderDispatch()
@@ -71,7 +76,9 @@ public final class PreviewController: NSObject, ObservableObject {
         contentRuleList: WKContentRuleList? = nil,
         websiteDataStore: WKWebsiteDataStore? = nil,
         assetReader: (any PreviewAssetReading)? = nil,
-        recoversFromWebContentTermination: Bool = false
+        recoversFromWebContentTermination: Bool = false,
+        initialReadinessScheduler: @escaping PreviewInitialReadiness.Scheduler = PreviewInitialReadiness.schedule,
+        pageLoadOverrideForTesting: (@MainActor (WKWebView, URL?) -> WKNavigation?)? = nil
     ) {
         let configuration = WKWebViewConfiguration()
         let userContentController = WKUserContentController()
@@ -102,6 +109,8 @@ public final class PreviewController: NSObject, ObservableObject {
         self.scriptMessageProxy = scriptMessageProxy
         self.previewIndexURL = previewIndexURL
         self.recoversFromWebContentTermination = recoversFromWebContentTermination
+        self.initialReadinessScheduler = initialReadinessScheduler
+        self.pageLoadOverrideForTesting = pageLoadOverrideForTesting
 
         super.init()
 
@@ -111,7 +120,8 @@ public final class PreviewController: NSObject, ObservableObject {
         assetSchemeHandler.onCurrentFailure = { [weak self] failure in
             self?.emitPreviewEvent(.failed(failure))
         }
-        webView.loadPreviewIndex(indexURL: previewIndexURL)
+        loadPreviewPage()
+        startInitialReadinessWatchdog()
     }
 
     /// Injects 06's leased reader. Production iOS composition stays with the integrator.
@@ -144,7 +154,9 @@ public final class PreviewController: NSObject, ObservableObject {
     /// `observe(_:)` yields the same text again ~150 ms later; that repeat would run the
     /// whole pipeline again under a new render ID and hold back pending navigation.
     public func render(_ change: DocumentTextChange, for session: DocumentSession? = nil) {
-        if let session, isAlreadySubmitted(change, session: session) { return }
+        if let session, isAlreadySubmitted(change, session: session) {
+            return
+        }
         _ = submitRender(change, session: session)
     }
 
@@ -250,6 +262,8 @@ public final class PreviewController: NSObject, ObservableObject {
     public func invalidate() {
         guard !isInvalidated else { return }
         isInvalidated = true
+        finishInitialReadinessWatchdog()
+        invalidatePageReadiness()
         isReady = false
         resetRenderDispatch(keepingPending: false)
         viewportScrollQueue.reset()
@@ -310,7 +324,9 @@ public final class PreviewController: NSObject, ObservableObject {
     func receive(_ message: BridgeMessage) {
         switch message {
         case let .ready(payload):
-            guard payload.protocolVersion == PreviewBridge.protocolVersion else {
+            guard payload.protocolVersion == PreviewBridge.protocolVersion,
+                  !initialReadiness.requiresRetryProbe
+            else {
                 return
             }
             markReadyAndFlushPendingRender()
@@ -364,6 +380,7 @@ public final class PreviewController: NSObject, ObservableObject {
 
     private func markReadyAndFlushPendingRender() {
         guard !isInvalidated else { return }
+        finishInitialReadinessWatchdog()
         let becameReady = !isReady
         isReady = true
         if becameReady {
@@ -401,6 +418,9 @@ public final class PreviewController: NSObject, ObservableObject {
 
 extension PreviewController: WKNavigationDelegate {
     public func webViewWebContentProcessDidTerminate(_: WKWebView) {
+        finishInitialReadinessWatchdog()
+        initialReadiness.requiresRetryProbe = false
+        invalidatePageReadiness()
         isReady = false
         webContentProcessTerminated = true
         // The newest render the page showed or was about to show; a recovering controller
@@ -424,17 +444,22 @@ extension PreviewController: WKNavigationDelegate {
         decisionHandler(policy)
     }
 
-    public func webView(_ webView: WKWebView, didFinish _: WKNavigation!) {
+    public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        guard navigation === currentPageNavigation else { return }
+        let generation = pageLoadGeneration
         let protocolVersionScript = "window.PlainsongPreview && window.PlainsongPreview.PROTOCOL_VERSION"
         webView.evaluateJavaScript(protocolVersionScript) { @MainActor [weak self] result, _ in
-            guard let version = PreviewController.protocolVersion(from: result),
-                  version == PreviewBridge.protocolVersion
-            else {
-                return
-            }
-
-            self?.markReadyAndFlushPendingRender()
+            self?.receiveReadinessProbe(result, generation: generation)
         }
+    }
+
+    /// The asynchronous probe belongs to the page that issued it, not a later reload.
+    func receiveReadinessProbe(_ result: Any?, generation: UUID) {
+        guard generation == pageLoadGeneration,
+              let version = Self.protocolVersion(from: result),
+              version == PreviewBridge.protocolVersion else { return }
+        initialReadiness.requiresRetryProbe = false
+        markReadyAndFlushPendingRender()
     }
 }
 
@@ -479,7 +504,7 @@ private final class ScriptMessageProxy: NSObject, WKScriptMessageHandler {
 }
 
 private extension WKWebView {
-    func loadPreviewIndex(indexURL: URL?) {
+    func loadPreviewIndex(indexURL: URL?) -> WKNavigation? {
         if let indexURL {
             loadFileURL(indexURL, allowingReadAccessTo: indexURL.deletingLastPathComponent())
         } else {
@@ -520,8 +545,26 @@ extension PreviewController {
         ))
     }
 
+    func loadPreviewPage(stoppingCurrentLoad: Bool = false) {
+        pageLoadGeneration = UUID()
+        currentPageNavigation = nil
+        if stoppingCurrentLoad {
+            webView.stopLoading()
+        }
+        if let pageLoadOverrideForTesting {
+            currentPageNavigation = pageLoadOverrideForTesting(webView, previewIndexURL)
+        } else {
+            currentPageNavigation = webView.loadPreviewIndex(indexURL: previewIndexURL)
+        }
+    }
+
+    func invalidatePageReadiness() {
+        pageLoadGeneration = UUID()
+        currentPageNavigation = nil
+    }
+
     func reloadPreviewPageAfterTermination() {
         webContentProcessTerminated = false
-        webView.loadPreviewIndex(indexURL: previewIndexURL)
+        loadPreviewPage()
     }
 }

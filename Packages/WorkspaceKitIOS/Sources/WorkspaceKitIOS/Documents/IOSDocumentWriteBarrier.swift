@@ -4,6 +4,7 @@ extension IOSUIDocumentStore {
     /// Transient observation/lifecycle barriers never imply a clean document.
     func writeBarrier(_ entry: IOSDocumentEntry, allowsClosing: Bool = false) -> Bool {
         entry.fenced || entry.externalToken != nil || entry.pendingProposal != nil
+            || entry.hasDeferredExternalChange
             || entry.isRetiring || entry.portClosed || (entry.isClosing && !allowsClosing)
     }
 

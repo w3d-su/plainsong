@@ -336,7 +336,7 @@ final class GateLedgerTests: XCTestCase {
         defer { try? lease.cleanup() }
         let required = try lease.write(
             relativePath: "required.txt",
-            data: Data("IOSAcceptanceLaunchSmokeTests/testLaunchShowsUnavailableScaffold\n".utf8)
+            data: Data("IOSAcceptanceLaunchSmokeTests/testLaunchShowsFilesAndOpenControl\n".utf8)
         )
         let report = lease.root.appendingPathComponent("report.json")
         let names = lease.root.appendingPathComponent("names.txt")
@@ -345,7 +345,7 @@ final class GateLedgerTests: XCTestCase {
         XCTAssertEqual(try run(script, results: empty, required: required, report: report, names: names), 65)
 
         let skipped = """
-        {"testNodes":[{"nodeType":"Test Case","nodeIdentifier":"IOSAcceptanceLaunchSmokeTests/testLaunchShowsUnavailableScaffold()","result":"Skipped","children":[]}]}
+        {"testNodes":[{"nodeType":"Test Case","nodeIdentifier":"IOSAcceptanceLaunchSmokeTests/testLaunchShowsFilesAndOpenControl()","result":"Skipped","children":[]}]}
         """
         let skippedURL = try lease.write(relativePath: "skipped.json", data: Data(skipped.utf8))
         XCTAssertEqual(try run(script, results: skippedURL, required: required, report: report, names: names), 65)
