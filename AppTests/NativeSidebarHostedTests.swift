@@ -38,7 +38,13 @@ extension EditorFindHostedGateTests {
             XCTAssertTrue(host.window.firstResponder === list)
         }
         let firstNode = try XCTUnwrap(state.workspaceTree?.root.children.first { $0.name == "a.md" })
-        state.selectWorkspaceNode(id: firstNode.id) // Default mouse/menu behavior remains focused.
+        // A watcher reload for the fixture's own writes can still be in flight here, and a pick
+        // is refused while its capture lags (CI run 39813122776); wait for it to install.
+        try await waitUntil("any watcher reload installed its capture") {
+            state.workspaceInstalledCaptureGeneration == state.workspaceGeneration
+        }
+        // Default mouse/menu behavior remains focused.
+        XCTAssertTrue(state.selectWorkspaceNode(id: firstNode.id), "the pick was refused")
         XCTAssertNotEqual(state.editorFocusRequestID, focusBefore)
     }
 
