@@ -105,6 +105,25 @@ final class IOSProductionDocumentWorkflowTests: XCTestCase {
         runtime.scene.stopObserving()
     }
 
+    func testMissingPreviewLinkPresentsAnAlertAndKeepsTheProductionDocumentWritable() async throws {
+        let (fixture, runtime, controller) = try fixtureRuntime()
+        try await controller.openPickedURL(fixture.root, scope: .directory)
+        try await controller.openSelectedURL(fixture.first, scope: .singleFile)
+        let handle = try XCTUnwrap(controller.handle)
+        let binding = controller.bindingID
+        controller.previewEvent(.relativeLinkRequested(documentID: handle.identity, href: "missing.md"))
+        try await waitUntil("production navigation alert") { runtime.scene.presentedError != nil }
+
+        XCTAssertEqual(runtime.scene.presentedError?.title, "Link Could Not Be Opened")
+        XCTAssertEqual(runtime.scene.presentedError?.message, "The linked document could not be opened.")
+        XCTAssertNil(controller.snapshot.unavailableReason)
+        XCTAssertTrue(controller.handle?.session === handle.session)
+        XCTAssertEqual(controller.bindingID, binding)
+        XCTAssertTrue(controller.snapshot.documentState?.canWrite == true)
+        XCTAssertTrue(runtime.editor.captureSnapshot()?.canWrite == true)
+        XCTAssertEqual(runtime.editor.textView.text, "# Original\n")
+    }
+
     private func fixtureRuntime() throws -> (Fixture, IOSProductionRuntime, IOSDocumentSceneController) {
         let fixture = try Fixture()
         do {

@@ -10,6 +10,15 @@ The formal-App candidate now calls `makeProduction`, composing one Files access 
 
 Clean `c18e41a` completed 430/430 native cases, zero failures/skips and all 63 required names, including five real-provider workflows and four close/observation regressions. Earlier failed attempts and the old-code negative control remain retained. Later test-harness cleanup does not replace the final candidate's full-preview gate, CI or Release IPA receipt; those results are recorded separately with the delivered artifact and PR. No physical-device or performance result is inferred.
 
+The PR #209 review follow-up adds a deferred notification barrier and drains the
+live external-read registry, preserves authority across provider close/reopen,
+completes Preview test cleanup and bounded waits, and presents relative-link
+failures through the shell alert without changing document availability. See the
+[review decision](../decisions/2026-10-23-ios-composition-review-fixes.md). Its
+current-source native results and Release receipt are separate from the retained
+`c18e41a` and `eba271b` evidence above; cleanup is not proof of the origin of the
+historical InvalidTransition diagnostic.
+
 The owner prerequisites in the next section are satisfied at owner-report level. #191 stays the separate C0/M0 PR; this production branch is a new review candidate. Its new artifact's owner installation, complete device matrix, accessibility and performance remain OPEN. Relaunch recovery-list and conflict Save a Copy UI are not yet connected. The [current hosted launch smoke](evidence/validation/production-launch-smoke-20261023.md) checks Files/Open only.
 
 ## M0 follow-up and Phase B admission — 2026-10-23

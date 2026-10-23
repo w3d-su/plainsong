@@ -161,6 +161,7 @@ final class ScriptedCoordinator: IOSCoordinatedFileAccess, @unchecked Sendable {
     private var readGates: [CheckedContinuation<Void, Never>] = []
     private var blockedReadCount = 0
     private var readCount = 0
+    private var readObserver: (@MainActor @Sendable () -> Void)?
 
     func setBytes(_ data: Data) async {
         stateLock.lock()
@@ -171,6 +172,12 @@ final class ScriptedCoordinator: IOSCoordinatedFileAccess, @unchecked Sendable {
     func setBlockReads(_ blocked: Bool) async {
         stateLock.lock()
         blockReads = blocked
+        stateLock.unlock()
+    }
+
+    func setReadObserver(_ observer: (@MainActor @Sendable () -> Void)?) async {
+        stateLock.lock()
+        readObserver = observer
         stateLock.unlock()
     }
 
@@ -228,7 +235,9 @@ final class ScriptedCoordinator: IOSCoordinatedFileAccess, @unchecked Sendable {
     ) async throws -> IOSCoordinatedRead {
         stateLock.lock()
         let shouldBlock = blockReads
+        let observer = readObserver
         stateLock.unlock()
+        await observer?()
         if shouldBlock {
             await withCheckedContinuation { continuation in
                 self.stateLock.lock()

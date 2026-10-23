@@ -16,6 +16,7 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     let preview: any IOSPreviewControlling
     let assetContext: (IOSWorkspaceGrant) -> PreviewAssetAccessContext?
     var openExternalURL: ((URL) -> Void)?
+    var onNavigationFailure: ((String) -> Void)?
 
     private(set) var currentGrant: IOSWorkspaceGrant?
     var handle: IOSDocumentHandle?

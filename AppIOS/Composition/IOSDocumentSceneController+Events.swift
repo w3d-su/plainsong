@@ -106,13 +106,15 @@ extension IOSDocumentSceneController {
         case let .relativeLinkRequested(identity, href) where identity == handle?.identity:
             guard let base = handle?.location.fileURL,
                   let url = URL(string: href, relativeTo: base)?.absoluteURL,
-                  documentLocation(for: url) != nil, let originBinding = bindingID else { return }
+                  let originBinding = bindingID else { return }
             Task { @MainActor [weak self] in
                 guard let self, handle?.identity == identity, bindingID == originBinding else { return }
                 do { try await openSelectedURL(url, scope: .singleFile) }
                 catch {
-                    unavailableReason = "The linked document could not be opened."
-                    publish()
+                    // Navigation failure is a presentation error. It cannot
+                    // revoke the current writer or overwrite a real access error.
+                    guard handle == nil || (handle?.identity == identity && bindingID == originBinding) else { return }
+                    onNavigationFailure?("The linked document could not be opened.")
                 }
             }
         case let .checkboxRequested(revision, _, line, checked):

@@ -40,7 +40,7 @@ struct IOSProductionComposition {
             assets: access, admission: .process, assetContext: { [weak access] in access?.previewContext(for: $0) }
         )
         controller.openExternalURL = { UIApplication.shared.open($0) }
-        return try IOSProductionRuntime(
+        let runtime = try IOSProductionRuntime(
             controller: controller, editor: editor, preview: preview,
             currentGrant: { [weak controller] in
                 guard controller?.grantIsCurrent == true else { return nil }
@@ -56,6 +56,10 @@ struct IOSProductionComposition {
             },
             shutdown: { [controller] in await controller.shutdown() }
         )
+        controller.onNavigationFailure = { [weak scene = runtime.scene] message in
+            scene?.presentedError = IOSShellError(title: "Link Could Not Be Opened", message: message)
+        }
+        return runtime
     }
 
     private init() {}

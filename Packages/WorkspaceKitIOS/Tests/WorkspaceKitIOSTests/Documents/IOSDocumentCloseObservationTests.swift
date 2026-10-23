@@ -77,6 +77,39 @@ final class IOSDocumentCloseObservationTests: XCTestCase {
         XCTAssertTrue(race.port.written.isEmpty)
     }
 
+    func testCloseRetainsACleanNewerRevisionThenObservesAgainAfterClosingEnds() async throws {
+        let race = try await parkedObservation(externalText: "remote bytes")
+        var readClosingPhases: [Bool] = []
+        await race.harness.coordinator.setReadObserver { @MainActor in
+            readClosingPhases.append(race.entry.isClosing)
+        }
+        race.handle.session.replaceText("temporary edit")
+        race.handle.session.replaceText("baseline")
+        let version = race.handle.session.version
+        XCTAssertFalse(race.handle.session.isDirty)
+        let closing = await startCloseAndAssertPending(race)
+        await race.harness.coordinator.unblockReads()
+        await waitUntil { !readClosingPhases.isEmpty }
+        // The retry is allowed only after this close has conservatively retained.
+        // Release it even in the negative implementation so no parked read leaks.
+        XCTAssertEqual(readClosingPhases, [false])
+        XCTAssertEqual(race.port.closeCalls, 0)
+        XCTAssertFalse(race.entry.lease.isReleased)
+        await race.harness.coordinator.setBlockReads(false)
+        await race.harness.coordinator.unblockReads()
+        guard case .retained = try await closing.value else {
+            return XCTFail("An old read cannot prove a newer clean revision safe to close")
+        }
+        await waitUntil { race.entry.externalReadTasks.isEmpty }
+        XCTAssertEqual(race.entry.pendingProposal?.text, "remote bytes")
+        XCTAssertEqual(race.entry.pendingProposal?.capturedRevision.version, version)
+        XCTAssertEqual(race.handle.session.text, "baseline")
+        XCTAssertEqual(race.handle.session.version, version)
+        XCTAssertFalse(race.handle.session.isDirty)
+        XCTAssertFalse(race.entry.closed)
+        XCTAssertTrue(race.port.written.isEmpty)
+    }
+
     private func parkedObservation(externalText: String, draft: String? = nil) async throws -> ParkedObservation {
         let harness = DocumentIOHarness()
         let handle = try await harness.openNote(text: "baseline")
