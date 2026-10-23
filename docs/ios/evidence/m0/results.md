@@ -2,6 +2,14 @@
 
 > Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
 
+## 2026-10-23 owner follow-up
+
+The [additional owner receipts](owner-retest-20261023/README.md) supersede the
+fixed-artifact retest status below for Fixture/A→Save→B and record the owner’s
+explicit PASS for all four named pre-composition categories. These are owner
+reports, not instrumented traces or full iPad/OS26 acceptance. See the dated
+[integration ledger](../../integration-ledger.md) for the Phase B boundary.
+
 ## 2026-10-22 Fixture / delay repair
 
 The owner reports iPhone 14 Pro / iOS 27, with Fixture doing nothing and Delay

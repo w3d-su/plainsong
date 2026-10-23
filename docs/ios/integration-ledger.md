@@ -4,6 +4,37 @@ Created 2026-10-08. Contract: **IOS-C0-v1 declarations implemented**. Live main:
 
 C0 provides declarations and an unavailable app scaffold. **Current phase A source integration is in progress; full v1 acceptance remains OPEN. See the dated current section below. Production composition is blocked by M0 + real providers.**
 
+## M0 follow-up and Phase B admission — 2026-10-23
+
+This dated section supersedes older current-status snapshots below. #188 is
+merged into main; #191 is being aligned additively with main `7d9f1721`, including
+#202’s fixture packaging, control wording and three real workflow tests.
+[Merge/source receipt](evidence/m0/main-sync-20261023/README.md).
+
+The corrected M0 source `806989d` passed 20/20 named tests on each iPhone/iPad
+OS27 simulator, Foundation 10 and two ledger mutations. All 18 prototype inputs
+remain byte-equal after this merge. The retained unexplained Fixture readiness
+failure, cancelled/incomplete attempts and real-writer negative control are not
+erased by later passes. These local source-bound results and historical #202 CI
+are distinct from the current #191 head’s CI.
+
+The [owner feedback packet](evidence/m0/owner-retest-20261023/README.md) first
+records the targeted Fixture and A→Save→B PASS, then the owner’s explicit
+“都測過了，正常” response to the four named pre-composition categories:
+Traditional Chinese candidate confirmation and native Undo/Redo; local Files
+and iCloud file/folder open/save/reopen; background save/recovery; and owner
+re-sign/install of the corrected kit. These are **OWNER_REPORTED_PASS** on the
+inherited iPhone 14 Pro / iOS 27 context. No detailed traces, actual test times,
+signing tool or installed signed-IPA hash were supplied.
+
+The named owner pre-composition conditions are satisfied at owner-report level.
+Phase B still requires current-candidate lane 06 and real-bundle PreviewKit
+readiness/full-suite verification before production activation. The App remains
+`c0` in #191; its next composition is a separate reviewable PR. Final physical
+iPad, minimum OS26, full checklist, VoiceOver/keyboard/performance and the
+composed-head IPA/device acceptance remain OPEN. This report does not check all
+formal M0 per-device rows or declare v1 complete.
+
 ## Main integration candidate — 2026-10-21
 
 This section supersedes the older readiness snapshots below. They remain historical

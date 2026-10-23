@@ -1,0 +1,17 @@
+{
+  "main_sha": "7d9f1721020d0afe3174bc3a0d988cfa682185ea",
+  "prior_pr_head": "74db3caffc5d4cfc7af75330a6f2c28551718108",
+  "merge_commit": "d76494151fc39db4259413729f53117109569c2b",
+  "merge_parents": [
+    "74db3caffc5d4cfc7af75330a6f2c28551718108",
+    "7d9f1721020d0afe3174bc3a0d988cfa682185ea"
+  ],
+  "resolution": "Current main tree outside the 26 M0 delta paths; preserve both main archive notes and PR additions in manual-checklist.md/results.md. No archived evidence restored.",
+  "prototype_source": "806989d176f61f0825973fbd2eb9bee444a6d16b",
+  "prototype_input_hashes_equal": 18,
+  "prototype_input_hashes_mismatched": 0,
+  "production_composition_changed": false,
+  "historical_packets_modified": false,
+  "new_head_ci": "PENDING; read current PR checks after publication",
+  "native_execution": "No new execution claimed by this receipt; 20/20 each remains source-bound to 806989d."
+}
