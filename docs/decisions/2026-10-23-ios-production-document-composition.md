@@ -52,3 +52,12 @@ being duplicated by a later runtime. Transient sheet disappearance only stops UI
 observation. Initial facade observation emits the current snapshot, and active
 binding changes restore document command focus without crossing background or
 replacement bindings. Preview checkboxes use the same native guarded editor path.
+
+Close drains already-issued external observations after its writer queue and
+before the unchanged retention barriers. Four parked-read regressions fail on
+the old lifecycle; the fixed source completes them and five real-provider App
+workflows in a 430-case native pass. See the source-bound evidence packet.
+Preview helpers own cleanup through the executing test case; optional paired
+benchmarks remain outside the iOS functional plan with its zero-skip gate intact.
+The minimum milestone does not yet expose relaunch recovery-list or conflict
+Save a Copy UI; those remain explicit v1 work.

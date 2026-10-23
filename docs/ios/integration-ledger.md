@@ -2,7 +2,15 @@
 
 Created 2026-10-08. Contract: **IOS-C0-v1 declarations implemented**. Live main: `b13aa620c7444f2ccd3a8fe3a5b8b0afe0e997b2`; specification ancestor #153: `2144c46c888360c84a42fef79e676e60b518048b`.
 
-C0 provides declarations and an unavailable app scaffold. **Current phase A source integration is in progress; full v1 acceptance remains OPEN. See the dated current section below. Production composition is blocked by M0 + real providers.**
+The C0 tag preserves declarations and an unavailable scaffold. **The current branch contains the production composition candidate described below; full v1 acceptance remains OPEN. Older dated sections retain their original source and acceptance boundaries.**
+
+## Production composition candidate — 2026-10-23
+
+The formal-App candidate now calls `makeProduction`, composing one Files access service, one UIDocument writer/store, its exact native editor session and one retained PreviewController. C0 sentinel tests remain available. [Architecture](../decisions/2026-10-23-ios-production-document-composition.md) and [source-bound evidence](evidence/production-composition-20261023/README.md).
+
+Clean `c18e41a` completed 430/430 native cases, zero failures/skips and all 63 required names, including five real-provider workflows and four close/observation regressions. Earlier failed attempts and the old-code negative control remain retained. Later test-harness cleanup does not replace the final candidate's full-preview gate, CI or Release IPA receipt; those results are recorded separately with the delivered artifact and PR. No physical-device or performance result is inferred.
+
+The owner prerequisites in the next section are satisfied at owner-report level. #191 stays the separate C0/M0 PR; this production branch is a new review candidate. Its new artifact's owner installation, complete device matrix, accessibility and performance remain OPEN. Relaunch recovery-list and conflict Save a Copy UI are not yet connected. The [current hosted launch smoke](evidence/validation/production-launch-smoke-20261023.md) checks Files/Open only.
 
 ## M0 follow-up and Phase B admission — 2026-10-23
 
