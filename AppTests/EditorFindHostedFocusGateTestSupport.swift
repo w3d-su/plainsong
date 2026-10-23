@@ -78,7 +78,12 @@ extension EditorFindHostedGateTests {
         hostingView.layoutSubtreeIfNeeded()
         #if DEBUG
             let mounted = EditorPreviewScrollCoordinator.latestDebugInstance?.previewControllerForTesting
-            XCTAssertNotNil(mounted, "Hosted workspace did not mount its own preview controller")
+            // The preview controller is created on the first preview show.
+            if appState.isPreviewVisible {
+                XCTAssertNotNil(mounted, "Hosted workspace did not mount its own preview controller")
+            } else {
+                XCTAssertNil(mounted, "A hidden preview pane created a preview controller")
+            }
             previewLifecycle.capture(mounted)
         #endif
         let host = HostedWorkspace(

@@ -378,6 +378,11 @@ republishes only when its value changes literally.
   view's `@StateObject` state owns its `PreviewController`: closures stored on the
   controller or handed to AppKit views capture the objects they use, never the view
   struct, so closing the workspace root releases the controller and its web view.
+  The controller (and so its WebContent process) is created the first time the preview
+  pane is shown (`LazyPreviewController`); a source-only window has none. Hiding the pane
+  keeps it. After a WebContent termination a live controller reloads the page and
+  re-submits its newest render under a new render ID, giving up after three terminations
+  without a completed render (each later render retries once); export controllers fail.
 - **Security:** strict CSP (`default-src 'none'; script-src 'self'; style-src 'self'
   'unsafe-inline'; img-src asset: data: https:`), `isElementFullscreenEnabled` off, and
   no remote loads by default. The preview JS removes remote image `src` values unless

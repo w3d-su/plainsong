@@ -51,17 +51,21 @@ extension EditorFindHostedGateTests {
     }
 
     /// A mounted workspace whose cleanup closes the window and workspace, and shuts the
-    /// controller down only if a failed assertion left it alive.
+    /// controller down only if a failed assertion left it alive. The controller is created on
+    /// the first preview show, so the workspace mounts with the preview visible and then
+    /// switches to `layout`: source-only covers a hidden pane that still owns its controller.
     private func makeLifetimeHost(layout: EditorLayoutMode, shell: WorkspaceShell) async throws -> HostedWorkspace {
         let fixture = try makeWorkspaceFixture(files: ["a.md": "# A", "b.md": "b"])
         let state = fixture.appState
-        state.setLayoutMode(layout)
+        state.setLayoutMode(.sourcePreview)
         state.openExternalFile(fixture.root)
         try await waitUntil("\(layout) workspace opens") {
             state.currentDocument.fileURL?.lastPathComponent == "a.md"
         }
         let host = makeWorkspaceHost(appState: state, shellOverride: shell)
         XCTAssertFalse(host.previewLifecycle.isReleased, "\(layout): no preview controller mounted")
+        state.setLayoutMode(layout)
+        host.hostingView.layoutSubtreeIfNeeded()
         addTeardownBlock { @MainActor in
             let tasks = self.activeTasks(in: state)
             tasks.forEach { $0.cancel() }
