@@ -12,6 +12,13 @@ extension IOSUIDocumentStore {
             _ = try? await saveSnapshot(entry, allowsClosing: true)
         }
         await entry.queue.drain()
+        // A provider's own save notification can already be reading the durable
+        // baseline. Let those issued observations finish before deciding whether
+        // close must retain the writer; cancellation is not proof of clean bytes.
+        let reads = Array(entry.externalReadTasks.values)
+        for read in reads {
+            await read.value
+        }
         if entry.session?.isDirty == true || entry.fenced
             || entry.externalToken != nil || entry.pendingProposal != nil
         {
