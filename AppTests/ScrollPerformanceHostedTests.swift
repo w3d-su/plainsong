@@ -41,7 +41,8 @@ extension EditorFindHostedGateTests {
         try requireScrollProbe()
         let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "large-1mb", withExtension: "md"))
         let source = try String(contentsOf: fixture, encoding: .utf8)
-        let hosted = try await makeHostedEditorWorkspace(source: source)
+        let lineNumbers = scrollProbeShowsLineNumbers
+        let hosted = try await makeHostedEditorWorkspace(source: source, showsLineNumbers: lineNumbers)
         let editor = try hostedEditor(hosted)
         let coordinator = try XCTUnwrap(editor.textDelegate as? MarkdownTextViewCoordinator)
         let scrollView = try XCTUnwrap(editor.enclosingScrollView)
@@ -68,7 +69,11 @@ extension EditorFindHostedGateTests {
         XCTAssertEqual(editor.selectedRange(), selection)
         XCTAssertEqual(MarkdownTextView.textStorage(of: editor)?.string, source)
         XCTAssertFalse(editor.undoManager?.canUndo ?? true)
-        recordScrollReport("Editor scroll", ["milliseconds": samples, "highlightApplications": appliedRevisions.count])
+        recordScrollReport("Editor scroll", [
+            "milliseconds": samples,
+            "highlightApplications": appliedRevisions.count,
+            "lineNumbers": lineNumbers,
+        ])
     }
 
     func requireScrollProbe() throws {

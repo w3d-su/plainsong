@@ -56,7 +56,7 @@ projects such as Astro/Next.js content directories).
 |---|---|---|
 | Language | Swift 5.10+ (enable strict concurrency; migrate to Swift 6 language mode when all deps allow) | |
 | UI shell | SwiftUI (windows, sidebar, settings, toolbars) | |
-| Text editor | [STTextView](https://github.com/krzyzanowskim/STTextView) (TextKit 2, AppKit) wrapped in `NSViewRepresentable` | Actively maintained; provides line numbers, plugins, completion window. Keep it behind our own `MarkdownEditorView` abstraction so it can be swapped for raw `NSTextView`+TextKit 2 if needed. |
+| Text editor | [STTextView](https://github.com/krzyzanowskim/STTextView) (TextKit 2, AppKit) wrapped in `NSViewRepresentable` | Actively maintained; provides plugins and the completion window (line numbers are EditorKit's own, §6.1). Keep it behind our own `MarkdownEditorView` abstraction so it can be swapped for raw `NSTextView`+TextKit 2 if needed. |
 | Syntax highlighting | [SwiftTreeSitter](https://github.com/tree-sitter/swift-tree-sitter) behind the EditorKit `MarkdownSyntaxHighlighter` façade | Async, visible-range highlighting; Neon adoption is deferred until its dependency graph is deterministic (§18). |
 | Grammars | `tree-sitter-markdown` (block) + `tree-sitter-markdown-inline`, with injections: yaml (frontmatter), html, tsx (MDX/JSX regions), plus common fence languages (swift, js, ts, tsx, python, bash, json, css, html, yaml, go, rust) | Grammars vendored as SPM targets (each grammar repo ships an SPM package, or we wrap the C source). |
 | Structure parsing (outline, etc.) | Reuse the tree-sitter syntax tree. Optionally [swift-markdown](https://github.com/swiftlang/swift-markdown) for export tasks. | Avoid two parsers driving the same UI. |
@@ -246,6 +246,15 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 `STTextView` (AppKit, TextKit 2) hosted in `NSViewRepresentable` (`MarkdownEditorView`).
 Configure: line numbers gutter (toggleable), invisible characters off, wraps lines,
 variable-width font allowed (default: SF Mono 13 for source mode).
+
+Line numbers are EditorKit's `EditorLineNumberGutterView`, which `EditorScrollView` tiles
+left of the clip view; STTextView's `showsLineNumbers` gutter stays off (it rebuilt one view
+per visible line and counted the paragraphs above the viewport on every layout pass). The
+gutter only draws: the laid-out viewport fragments it shows, numbered from the shared
+`EditorScrollLineIndex` (only `\n` starts a line), on the painted baseline of each source
+line's first visual line (STTextView raises lines by half their line-height multiple's
+extra height). Its width follows the line count's digits with hysteresis and never
+changes while marked text is composed.
 
 **Abstraction rule:** App/ and MarkdownCore/ must never import STTextView types. Only
 EditorKit knows the concrete editor. This keeps the Phase-2 WYSIWYG swap and any library
@@ -593,9 +602,10 @@ attempt without a Decision Log entry.
 | Memory (app host RSS) | < 400 MB in the Plainsong host process with 8 warm sessions + 2 settled live WKWebViews |
 
 Techniques: tree-sitter incremental edits (`InputEdit`), visible-range-first
-highlighting, morphdom patching, render-version dropping, LRU sessions, and bounded
-success-only Mermaid memoization by exact fence source + Mermaid-fence ordinal within a
-theme generation. The ordinal prevents duplicate Mermaid-generated SVG IDs when equal
+highlighting, a line-number gutter that draws only the visible viewport fragments from an
+incrementally edited line index, morphdom patching, render-version dropping, LRU sessions,
+and bounded success-only Mermaid memoization by exact fence source + Mermaid-fence ordinal
+within a theme generation. The ordinal prevents duplicate Mermaid-generated SVG IDs when equal
 source appears more than once; inserting or removing a fence intentionally invalidates
 shifted following ordinals. While a changed diagram renders, morphdom keeps its prior
 SVG children only as non-authoritative pending content, avoiding a temporary collapse.
@@ -609,6 +619,10 @@ which normalizes a bridged string from its first character. Edit derived indexes
 place. Release TextKit 2's cached text elements below the viewport once scrolling
 settles (`EditorTextElementCacheTrimmer`): each edit rewrites the range of every cached
 element after it, so typing above a once-viewed document end cost ~50 ms per keystroke.
+Admit each chunk against the real live viewport and selected paragraphs immediately
+before its attribute edit; a captured range is only a candidate. Keep their prefetch
+protection while releasing safe ranges around an offscreen selection. Selection-only
+changes reschedule trimming without republishing an unchanged viewport.
 The synchronous typing gates do not see SwiftUI, layout or display work a keystroke
 schedules; typing with the preview visible is measured by the opt-in hosted
 busy-slice probe (`MainThreadStallHostedTests`, `TEST_RUNNER_PLAINSONG_RUN_SCROLL_PROBE=1`).
