@@ -46,13 +46,7 @@ extension IOSDocumentSceneController {
             updateEditorAccess()
             return false
         }
-        let grant = currentGrant
-        currentGrant = nil
-        grantIsCurrent = false
-        workspaceSnapshot = nil
-        if let grant {
-            _ = workspace.invalidate(grant.workspaceID)
-        }
+        releaseCurrentGrant()
         renderTask?.cancel()
         reloadRelay.detach()
         documentObservation?.cancel()

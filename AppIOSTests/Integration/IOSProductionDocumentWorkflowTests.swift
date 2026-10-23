@@ -52,7 +52,7 @@ final class IOSProductionDocumentWorkflowTests: XCTestCase {
     }
 
     func testFolderRowsReuseTheGrantAndReopenTheDocument() async throws {
-        let (fixture, runtime, controller) = try fixtureRuntime()
+        let (fixture, _, controller) = try fixtureRuntime()
         try await controller.openPickedURL(fixture.root, scope: .directory)
         let grant = try XCTUnwrap(controller.currentGrant)
         XCTAssertNil(controller.handle)
@@ -67,7 +67,7 @@ final class IOSProductionDocumentWorkflowTests: XCTestCase {
     }
 
     func testSingleFileSelectionDoesNotAuthorizeItsSibling() async throws {
-        let (fixture, runtime, controller) = try fixtureRuntime()
+        let (fixture, _, controller) = try fixtureRuntime()
         try await controller.openPickedURL(fixture.first, scope: .singleFile)
         let handle = try XCTUnwrap(controller.handle)
         do {
@@ -78,12 +78,6 @@ final class IOSProductionDocumentWorkflowTests: XCTestCase {
         }
         XCTAssertTrue(controller.handle?.session === handle.session)
         XCTAssertEqual(controller.admission.active?.documentID, handle.identity)
-        try await controller.closeCurrent()
-        if let grant = controller.currentGrant {
-            _ = controller.workspace.invalidate(grant.workspaceID)
-        }
-        runtime.preview.invalidate()
-        try fixture.remove()
     }
 
     func testNewFileUsesTheGrantedParentAndDoesNotReplaceAnExistingFile() async throws {

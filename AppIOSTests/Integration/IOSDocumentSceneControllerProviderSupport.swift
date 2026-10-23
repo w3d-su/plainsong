@@ -96,6 +96,7 @@ final class IOSSceneControllerWorkspaceDouble: IOSWorkspaceAccessProviding {
 final class IOSSceneControllerPreviewDouble: IOSPreviewControlling {
     var renders: [(IOSDocumentIdentity, Int, PreviewAssetAccessContext?)] = []
     var invalidateCount = 0
+    var observations: [(IOSReloadRelayObservation, @MainActor (IOSPreviewEvent) -> Void)] = []
     func render(_ snapshot: DocumentSnapshot, identity: IOSDocumentIdentity, assetAccess: PreviewAssetAccessContext?) {
         renders.append((identity, snapshot.version, assetAccess))
     }
@@ -106,8 +107,16 @@ final class IOSSceneControllerPreviewDouble: IOSPreviewControlling {
         invalidateCount += 1
     }
 
-    func observe(_: @escaping @MainActor (IOSPreviewEvent) -> Void) -> any IOSObservation {
-        IOSReloadRelayObservation()
+    func observe(_ handler: @escaping @MainActor (IOSPreviewEvent) -> Void) -> any IOSObservation {
+        let token = IOSReloadRelayObservation()
+        observations.append((token, handler))
+        return token
+    }
+
+    func emit(_ event: IOSPreviewEvent) {
+        for (token, handler) in observations where !token.isCancelled {
+            handler(event)
+        }
     }
 }
 
