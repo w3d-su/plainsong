@@ -4,8 +4,6 @@ import STTextView
 /// Counts `plainsongShowFind:` deliveries to the focused editor, so tests can prove a
 /// SwiftUI `⌘F` menu item reaches the editor through the responder chain (the F0 spike;
 /// the production find bar is `EditorFindActionHooks` + App's `EditorFindCommandDelivery`).
-///
-/// It no longer logs: every production ⌘F used to `print` and write an `os_log` notice.
 @MainActor
 public enum EditorFindSpike {
     /// Monotonic count of successful `plainsongShowFind:` deliveries (tests / diagnostics).
