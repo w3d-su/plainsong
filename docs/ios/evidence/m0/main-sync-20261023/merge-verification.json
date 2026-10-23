@@ -27,5 +27,17 @@
     ],
     "conflicts": 0,
     "reason": "Pre-push verification detected five parallel main commits; additively integrated before publication."
+  },
+  "later_main_advance": {
+    "main_sha": "0b5669d86907683462816a1d82642207d83fa4af",
+    "commits": [
+      "0436e56",
+      "0b5669d"
+    ],
+    "method": "additive merge, no reset or force push",
+    "m0_inputs_changed": false,
+    "preview_resources_changed": false,
+    "prior_ci_sha": "eb4e77bd6ed192c8f0ddefe799ba1508d227ebb2",
+    "final_ci": "See current PR head checks; prior CI is not final-head evidence."
   }
 }
