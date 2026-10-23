@@ -276,6 +276,16 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
         }
     }
 
+    func releaseCurrentGrant() {
+        let grant = currentGrant
+        currentGrant = nil
+        grantIsCurrent = false
+        workspaceSnapshot = nil
+        if let grant {
+            _ = workspace.invalidate(grant.workspaceID)
+        }
+    }
+
     func clearInstallation() {
         reloadRelay.detach()
         renderTask?.cancel()
