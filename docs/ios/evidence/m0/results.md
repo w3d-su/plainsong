@@ -2,6 +2,34 @@
 
 > Historical raw evidence and replay files referenced below are preserved at `e20162e5`. See the [archive index and restoration instructions](../README.md); run historical local-path commands from that restored checkout.
 
+## 2026-10-23 owner follow-up
+
+The [additional owner receipts](owner-retest-20261023/README.md) supersede the
+fixed-artifact retest status below for Fixture/A→Save→B and record the owner’s
+explicit PASS for all four named pre-composition categories. These are owner
+reports, not instrumented traces or full iPad/OS26 acceptance. See the dated
+[integration ledger](../../integration-ledger.md) for the Phase B boundary.
+
+## 2026-10-22 Fixture / delay repair
+
+The owner reports iPhone 14 Pro / iOS 27, with Fixture doing nothing and Delay
+unclear. The original IPA lacked its fixture resource; its earlier 17-test suite
+had no bundled-resource/button coverage. The [repair receipt](fixture-fix-20261022/README.md)
+records the corrected IPA, 20/20 named cases on each simulator family, executed
+writer/packaging negative controls and the limited owner observation. The fixed
+artifact still needs physical retesting; all five owner gates remain OPEN.
+
+## 2026-10-22 follow-up
+
+The [dated runtime and owner-kit receipt](runtime-20261022/README.md) executes
+17/17 named cases on each iPhone and iPad simulator, with no failures/skips, from
+clean #188 head `e20162e5`. It also rebuilds and validates a new unsigned IPA.
+This supersedes the historical simulator-not-executed row below only. All five
+physical-device gates remain OPEN and production composition remains prohibited.
+See [owner installation](runtime-20261022/owner-install.md).
+
+## Historical 2026-10-08 receipt
+
 Date: 2026-10-08 (Asia/Taipei). Branch `phase3-ios-m0-device-spike`.
 Dedicated checkout `/private/tmp/plainsong-ios-m0-device-spike`.
 Base ref `phase3-ios-parallel-handoffs`, SHA

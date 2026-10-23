@@ -1,0 +1,29 @@
+{
+  "mode": "ipa",
+  "source_sha": "e20162e5c2402800e84cf1f68ae4787535228c50",
+  "dirty": false,
+  "fixture_sha256": "38b1b6a80749a22baa8cede8adf5af4ee598181ca4690dc4b7d64b6a850c5144",
+  "xcode": "Xcode 27.0\nBuild version 27A5194q",
+  "started_utc": "2026-10-22T05:26:21.180129+00:00",
+  "ended_utc": "2026-10-22T05:26:30.113762+00:00",
+  "exit_code": 0,
+  "attempt": "20261022T052620Z-ipa-EF90154A",
+  "ipa": {
+    "artifact": "PlainsongIOSM0-unsigned.ipa",
+    "sha256": "3a7ec6b11151a79a4279680d0152fd2bc1765652255605674ec129e0b708adcf",
+    "architectures": "arm64",
+    "minimum_os": "26.0",
+    "device_family": [
+      1,
+      2
+    ],
+    "unsigned": true,
+    "owner_resign_install_gate": "OPEN",
+    "platform": "IOS",
+    "mach_o_sha256": "5a6a857406a3d6fdf635e1ef65990831c6ada94508f1faf287de6c2087ec538d",
+    "source_sha": "e20162e5c2402800e84cf1f68ae4787535228c50",
+    "xcode": "Xcode 27.0\nBuild version 27A5194q",
+    "sdk": "iPhoneOS 27.0",
+    "fixture_sha256": "38b1b6a80749a22baa8cede8adf5af4ee598181ca4690dc4b7d64b6a850c5144"
+  }
+}

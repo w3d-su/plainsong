@@ -1,0 +1,79 @@
+{
+  "mode": "test",
+  "source_sha": "e20162e5c2402800e84cf1f68ae4787535228c50",
+  "dirty": false,
+  "fixture_sha256": "38b1b6a80749a22baa8cede8adf5af4ee598181ca4690dc4b7d64b6a850c5144",
+  "xcode": "Xcode 27.0\nBuild version 27A5194q",
+  "started_utc": "2026-10-22T05:25:16.316596+00:00",
+  "ended_utc": "2026-10-22T05:26:16.091343+00:00",
+  "exit_code": 0,
+  "attempt": "20261022T052516Z-test-D716A25F",
+  "simulator": {
+    "modelName": "iPad Pro 11-inch (M5)",
+    "deviceName": "iPad Pro 11-inch (M5)",
+    "osVersion": "27.0",
+    "platform": "iOS Simulator"
+  },
+  "family": "iPad",
+  "gate": {
+    "passed": 17,
+    "skipped": 0,
+    "failed": 0,
+    "executed": 17,
+    "required": [
+      "DocumentTests/testCleanDocumentSwitchClosesThroughAutosaveFence",
+      "DocumentTests/testDirectorySkipsSymlinkAndNonMarkdown",
+      "DocumentTests/testRealUIDocumentRejectsExternalBytesAtWrite",
+      "DocumentTests/testRealUIDocumentSaveAndReopenExactUnicode",
+      "DocumentTests/testSingleFileGrantCannotEnumerateParentOrSibling",
+      "EditorTests/testCleanReloadKeepsIdentityAndAdvancesRevision",
+      "EditorTests/testMarkedTextRefusesPresentationAttachAndUndo",
+      "EditorTests/testNativeUndoRoundTripAfterPresentation",
+      "EditorTests/testStaleRevisionAndDocumentSwitchRefusePresentation",
+      "EditorTests/testTextKit2PresentationPreservesSourceSelectionAndUndoRedo",
+      "SaveTests/testCanonicallyEquivalentUnicodeStillDirtyWhenBytesDiffer",
+      "SaveTests/testConflictAndUnavailableRefuseOverwrite",
+      "SaveTests/testFailedSavePreservesBaselineAndSource",
+      "SaveTests/testOldSaveAcknowledgementLeavesNewRevisionDirty",
+      "SaveTests/testOnlyOneWriterAndDuplicateAcknowledgementRefused",
+      "SaveTests/testRecoveryFailureDoesNotReturnSuccess",
+      "SaveTests/testRecoveryRoundTripExactUnicodeAndRevision"
+    ],
+    "cases": {
+      "DocumentTests/testCleanDocumentSwitchClosesThroughAutosaveFence": "Passed",
+      "DocumentTests/testDirectorySkipsSymlinkAndNonMarkdown": "Passed",
+      "DocumentTests/testRealUIDocumentRejectsExternalBytesAtWrite": "Passed",
+      "DocumentTests/testRealUIDocumentSaveAndReopenExactUnicode": "Passed",
+      "DocumentTests/testSingleFileGrantCannotEnumerateParentOrSibling": "Passed",
+      "EditorTests/testCleanReloadKeepsIdentityAndAdvancesRevision": "Passed",
+      "EditorTests/testMarkedTextRefusesPresentationAttachAndUndo": "Passed",
+      "EditorTests/testNativeUndoRoundTripAfterPresentation": "Passed",
+      "EditorTests/testStaleRevisionAndDocumentSwitchRefusePresentation": "Passed",
+      "EditorTests/testTextKit2PresentationPreservesSourceSelectionAndUndoRedo": "Passed",
+      "SaveTests/testCanonicallyEquivalentUnicodeStillDirtyWhenBytesDiffer": "Passed",
+      "SaveTests/testConflictAndUnavailableRefuseOverwrite": "Passed",
+      "SaveTests/testFailedSavePreservesBaselineAndSource": "Passed",
+      "SaveTests/testOldSaveAcknowledgementLeavesNewRevisionDirty": "Passed",
+      "SaveTests/testOnlyOneWriterAndDuplicateAcknowledgementRefused": "Passed",
+      "SaveTests/testRecoveryFailureDoesNotReturnSuccess": "Passed",
+      "SaveTests/testRecoveryRoundTripExactUnicodeAndRevision": "Passed"
+    }
+  },
+  "complete_xcresult": true,
+  "admission": [
+    {
+      "bundle": "PlainsongIOSM0.app",
+      "mach_o_filetype": 2,
+      "arch": "arm64",
+      "platform": "IOSSIMULATOR",
+      "sha256": "9f0f6026c05b41f6daa1734427503b4382edb62e4bd95e5b88bc03ee1b06464c"
+    },
+    {
+      "bundle": "PlainsongIOSM0Tests.xctest",
+      "mach_o_filetype": 8,
+      "arch": "arm64",
+      "platform": "IOSSIMULATOR",
+      "sha256": "4a77094dbf780c3bf674a3dda1125f1201bb701333cc9332e6b70f712442c652"
+    }
+  ]
+}
