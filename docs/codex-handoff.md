@@ -372,7 +372,7 @@ Acceptance (checklist §A + §B):
   attribute compatibility, no undo pollution).
 - New layout-geometry test (B13): folded-line fragment height ≈ unfolded-line height; multi-line fold does
   not displace the viewport.
-- Rerun B1–B12 against the new mechanism (IME harness opt-in). Record large-doc perf in docs/perf-log.md.
+- Rerun B1–B12 against the new mechanism (IME harness opt-in). Record large-doc perf in docs/perf/YYYY-MM-DD-<slug>.md.
 - Record the chosen mechanism in the Decision Log (`docs/decision-log.md`); update R18 (close only when A + B13 are green).
 
 Verification:
@@ -614,7 +614,7 @@ Branch and PR discipline:
         hidden-URL span), plus the L3/L4/L6/L7/L9 gates (keyboard, partial-URL raw copy,
         real-NSEvent pointer, accessibility, undo) and the L8 perf probe
         (visible-range fold recompute on Fixtures/large-1mb.md <= 50 ms, recorded in
-        docs/perf-log.md; add a link-dense section to the fixture if needed).
+        docs/perf/YYYY-MM-DD-<slug>.md; add a link-dense section to the fixture if needed).
   PR C: ONLY after the owner has run the opt-in actual-IME harness (L5,
         PLAINSONG_RUN_ACTUAL_IME=1, Zhuyin + Pinyin) on a real Mac: check the remaining
         gates in docs/link-folding-gates.md, add the Decision Log entry recording the

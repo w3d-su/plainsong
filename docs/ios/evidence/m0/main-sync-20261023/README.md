@@ -32,3 +32,7 @@ there were no conflicts. The first merge proof above refers to `7d9f1721`.
 The final diff is still limited to the reviewed M0 changes and additive receipts/
 ledger. The latest PreviewKit changes require candidate-head native verification
 before formal App activation; old preview passes are not relabelled.
+
+## Later main advance before handoff
+
+Main advanced again to `0b5669d86907683462816a1d82642207d83fa4af` via #206 and #194. A further additive merge retains those Mac recovery/Find and performance-recording changes. They change no M0 prototype, iOS production inputs or preview resources. All 18 prototype inputs still match the clean tested `806989d` source. The earlier `eb4e77b` six-job CI remains historical; the PR body/checks identify the final merge head's new CI. No iOS pass is inferred from that Mac CI.

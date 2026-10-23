@@ -15,7 +15,7 @@ The owner prerequisites in the next section are satisfied at owner-report level.
 ## M0 follow-up and Phase B admission — 2026-10-23
 
 This dated section supersedes older current-status snapshots below. #188 is
-merged into main; #191 is being aligned additively with main `9afe9927`, including
+merged into main; #191 was aligned additively with main `9afe9927` and then `0b5669d`, including
 #202’s fixture packaging, control wording and three real workflow tests.
 [Merge/source receipt](evidence/m0/main-sync-20261023/README.md).
 
