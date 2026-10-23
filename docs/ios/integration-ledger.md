@@ -19,6 +19,14 @@ current-source native results and Release receipt are separate from the retained
 `c18e41a` and `eba271b` evidence above; cleanup is not proof of the origin of the
 historical InvalidTransition diagnostic.
 
+The subsequent [initial-readiness follow-up](../decisions/2026-10-23-preview-initial-readiness-watchdog.md)
+adds one bounded initial-page reload and current-navigation probe fencing,
+plus retained-transition availability protection. This addresses the silent
+initial-load symptom; it does not claim the proposed private GPU/XCTest causal
+chain is proven. New complete repeated native results, exact-head CI and the new
+Release artifact must be assessed separately from cc36bdb's 181-pass/177-pass
+attempts, which remain retained.
+
 The owner prerequisites in the next section are satisfied at owner-report level. #191 stays the separate C0/M0 PR; this production branch is a new review candidate. Its new artifact's owner installation, complete device matrix, accessibility and performance remain OPEN. Relaunch recovery-list and conflict Save a Copy UI are not yet connected. The [current hosted launch smoke](evidence/validation/production-launch-smoke-20261023.md) checks Files/Open only.
 
 ## M0 follow-up and Phase B admission — 2026-10-23

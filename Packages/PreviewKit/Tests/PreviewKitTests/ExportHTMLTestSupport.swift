@@ -43,7 +43,7 @@ struct ExportHTMLTestSupport {
 
     func waitUntil(
         _ description: String,
-        timeoutNanoseconds: UInt64 = 5_000_000_000,
+        timeoutNanoseconds: UInt64 = 8_000_000_000,
         condition: @escaping @MainActor () async throws -> Bool
     ) async throws {
         try await PreviewHostedTestWait.until(

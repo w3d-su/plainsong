@@ -102,6 +102,9 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
                 throw IOSWorkspaceFailure.grantChanged
             }
             workspaceSnapshot = fresh
+            // The new grant has passed refresh; retire errors from the old scope.
+            // Clear before install can suspend and receive a new revocation.
+            clearUnavailableReasonForCurrentGrant()
             if scope == .singleFile {
                 guard let location = documentLocation(for: url) else {
                     throw IOSDocumentFailure.access(.unsupportedType)
@@ -192,7 +195,6 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
         guard !transitioning, !isShuttingDown, !isDisposed else { throw IOSDocumentFailure.unavailable }
         guard editor.captureSnapshot()?.hasMarkedText != true else { throw IOSDocumentFailure.sourceChanged }
         transitioning = true
-        unavailableReason = nil
     }
 
     func finishTransition() {
@@ -215,11 +217,18 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
         switch try await documents.close(handle.identity) {
         case .closed:
             clearInstallation()
+            clearUnavailableReasonForCurrentGrant()
         case .retained:
             // Keep the ticket/session/editor. A recovered draft is not permission
             // to retire its live writer or replace it with a second open.
             throw IOSDocumentFailure.closeFailed
         }
+    }
+
+    func clearUnavailableReasonForCurrentGrant() {
+        // A revocation received while close was suspended still describes this scope.
+        guard grantIsCurrent else { return }
+        unavailableReason = nil
     }
 
     func install(_ location: IOSFileLocation, initialText: String?) async throws {

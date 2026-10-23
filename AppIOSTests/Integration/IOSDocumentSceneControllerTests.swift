@@ -146,6 +146,7 @@ final class IOSDocumentSceneControllerTests: XCTestCase {
         await fulfillment(of: [started], timeout: 2)
         let grant = try XCTUnwrap(fixture.controller.currentGrant)
         _ = fixture.workspace.invalidate(grant.workspaceID)
+        let unavailable = try XCTUnwrap(fixture.controller.snapshot.unavailableReason)
         latch.release()
         do {
             try await opening.value
@@ -155,6 +156,7 @@ final class IOSDocumentSceneControllerTests: XCTestCase {
         }
 
         let retained = try XCTUnwrap(fixture.controller.handle)
+        XCTAssertEqual(fixture.controller.snapshot.unavailableReason, unavailable)
         XCTAssertFalse(fixture.editor.snapshot.canWrite)
         XCTAssertTrue(fixture.editor.binding.session === retained.session)
         XCTAssertEqual(fixture.controller.admission.active?.documentID, retained.identity)
