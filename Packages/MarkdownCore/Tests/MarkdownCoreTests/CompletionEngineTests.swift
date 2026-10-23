@@ -158,6 +158,35 @@ final class CompletionEngineTests: XCTestCase {
         XCTAssertEqual(results.first?.label, "Card")
     }
 
+    func testMDXComponentContextIgnoresBackticksInsideTildeFence() {
+        let workspace = CompletionWorkspace(currentFilePath: "posts/page.mdx")
+        let text = """
+        import Card from "./components"
+
+        ~~~md
+        ```
+        <Ca<caret>
+        """
+
+        let results = completions(from: text, workspace: workspace)
+
+        XCTAssertTrue(results.isEmpty)
+    }
+
+    func testMDXComponentContextTreatsBacktickInfoWithBacktickAsProse() {
+        let workspace = CompletionWorkspace(currentFilePath: "posts/page.mdx")
+        let text = """
+        import Card from "./components"
+
+        ```not`a fence
+        <Ca<caret>
+        """
+
+        let results = completions(from: text, workspace: workspace)
+
+        XCTAssertEqual(results.first?.label, "Card")
+    }
+
     func testMDXImportParserHandlesPureNamedImports() {
         let testCases: [(source: String, expectedNames: [String])] = [
             ("import { Button, Card } from './ui'", ["Button", "Card"]),

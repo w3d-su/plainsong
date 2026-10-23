@@ -7,7 +7,7 @@ C0 provides declarations and an unavailable app scaffold. **Current phase A sour
 ## M0 follow-up and Phase B admission — 2026-10-23
 
 This dated section supersedes older current-status snapshots below. #188 is
-merged into main; #191 is being aligned additively with main `7d9f1721`, including
+merged into main; #191 is being aligned additively with main `9afe9927`, including
 #202’s fixture packaging, control wording and three real workflow tests.
 [Merge/source receipt](evidence/m0/main-sync-20261023/README.md).
 

@@ -20,12 +20,6 @@ protocol RecentItemPersisting: AnyObject {
 
 extension RecentItemStore: RecentItemPersisting {}
 
-protocol WorkspaceDirectoryScanning: Sendable {
-    func snapshotCapture(root: URL) async throws -> WorkspaceDirectorySnapshotCapture
-}
-
-extension WorkspaceDirectoryScanner: WorkspaceDirectoryScanning {}
-
 protocol ExternalReloadApplicationPreparing: Sendable {
     func prepare(
         snapshot: WorkspaceCoherentFileSnapshot,
@@ -152,7 +146,7 @@ final class AppState: ObservableObject {
         }
     }
 
-    @Published var isSaving = false
+    var isSaving = false // Synchronous save guard; unpublished, since no view can observe `true`.
     @Published private(set) var layoutMode: EditorLayoutMode
     @Published var workspaceRootURL: URL? {
         didSet {
@@ -292,6 +286,7 @@ final class AppState: ObservableObject {
         EditorDocumentBindingInstallation: EditorDocumentSourceSynchronizer
     ] = [:]
     var completionWorkspaceTask: Task<Void, Never>?
+    var completionWorkspaceBaseCache: CompletionWorkspaceBaseCache?
     var sessionAutosaveTasks: [ObjectIdentifier: SessionBackgroundTask] = [:]
     var sessionStatisticsTasks: [ObjectIdentifier: SessionBackgroundTask] = [:]
     var documentChangeCancellable: AnyCancellable?
@@ -949,11 +944,6 @@ final class RetiredWorkspaceAuthorityOwner: @unchecked Sendable {
             authority.stop()
         }
     }
-}
-
-struct SessionBackgroundTask {
-    let token: UUID
-    let task: Task<Void, Never>
 }
 
 enum AppStateError: LocalizedError {

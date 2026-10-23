@@ -207,7 +207,10 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   the 521 pt Split floor). The inspector auto-collapses when the document column cannot fit it.
 - Open folder: sidebar shows the tree; filter to show only markdown-related files by
   default (`.md`, `.markdown`, `.mdx`), toggle "Show all files". Images shown so they can
-  be drag-inserted.
+  be drag-inserted. In the default mode the scan skips `WorkspaceIgnoredDirectories`
+  (`node_modules`, `dist`, `build`, `.next`, `.astro`, `.build`, `deriveddata`, `.git`;
+  the list Search ignores) without enumerating them; only the chain down to an open
+  session's file in that root is scanned inside them. "Show all files" rescans everything.
 - File tree operations: create/rename/delete/move file & folder (Finder-style, with
   trash not hard delete). Watch root recursively via `FSEventStream`; debounce 300 ms;
   reconcile tree diff instead of full reload to preserve expansion state.
@@ -257,6 +260,14 @@ replacement local to EditorKit.
   SwiftUI update. Edits, document/appearance changes and WYSIWYG selection changes
   still restart the revision-fenced scheduler; fence/frontmatter context is expanded
   once per source highlight, off the main actor.
+- Fenced-code state has one definition, `MarkdownFenceScanner` (MarkdownCore), shared by
+  the visible-range expansion, the Enter fence helper (§6.3) and MDX component
+  completion (§6.5). CommonMark §4.5 per line (`\n`, `\r`, `\r\n`): a run of ≥ 3
+  `` ` `` or `~` after ≤ 3 spaces (the Enter helper accepts any spaces/tabs, for
+  list-item fences); a backtick opener's info string has no backtick; only the same
+  character, at least as long, followed by nothing but spaces/tabs, closes; a leading
+  `---`/`+++` frontmatter block closed by the same marker is skipped. It walks native
+  UTF-8 storage with `memchr` (bridged strings as UTF-16) and returns UTF-16 offsets.
 - Applying a highlight skips runs whose stored attributes already equal the new ones:
   re-setting equal attributes still marks the run edited, and TextKit then re-typesets
   every visible paragraph. The stored result is identical either way.
@@ -287,7 +298,9 @@ replacement local to EditorKit.
   caret so bullets and manually typed italics stay natural. Wrapping: with a selection,
   typing a pair character wraps the selection. Skip-over on closing char except for `*`.
 - **Code fence helper:** typing ``` ``` ``` then Enter auto-inserts closing fence and places
-  cursor inside; language autocomplete fires after the opening fence.
+  cursor inside; language autocomplete fires after the opening fence. Inside an already
+  open fence of either marker (`~~~` included, any indentation) nothing is inserted:
+  the typed line is code or the closing fence.
 - **Smart paste:** pasting a URL over selected text creates `[selection](url)`. Pasting an
   image from clipboard saves it to `assets/` (configurable, relative to the file) and
   inserts `![](path)`. Drag-in image files insert relative-path links (copy into
@@ -349,6 +362,11 @@ the trigger characters below, or ⌃Space manually. Engine is pure Swift in Mark
 Ranking: prefix match > fuzzy; recently used boosted. Max 50 items. Never block typing —
 compute async, cancel stale requests.
 
+Workspace paths and sibling frontmatter keys are read once per installed workspace capture
+and current file (keys from the first 32 KiB of up to 50 siblings, no digest); a typing
+pause recomputes only heading anchors and MDX component names, and `completionWorkspace`
+republishes only when its value changes literally.
+
 ---
 
 ## 7. Preview (PreviewKit + preview-src)
@@ -360,6 +378,11 @@ compute async, cancel stale requests.
   view's `@StateObject` state owns its `PreviewController`: closures stored on the
   controller or handed to AppKit views capture the objects they use, never the view
   struct, so closing the workspace root releases the controller and its web view.
+  The controller (and so its WebContent process) is created the first time the preview
+  pane is shown (`LazyPreviewController`); a source-only window has none. Hiding the pane
+  keeps it. After a WebContent termination a live controller reloads the page and
+  re-submits its newest render under a new render ID, giving up after three terminations
+  without a completed render (each later render retries once); export controllers fail.
 - **Security:** strict CSP (`default-src 'none'; script-src 'self'; style-src 'self'
   'unsafe-inline'; img-src asset: data: https:`), `isElementFullscreenEnabled` off, and
   no remote loads by default. The preview JS removes remote image `src` values unless
@@ -532,7 +555,9 @@ attempt without a Decision Log entry.
   type-aware controls (string, date picker for `date`, tag token field for `tags`, toggle
   for `draft`).
 - Edits write back into the source text (panel ↔ text always derived from the document;
-  the text is the single source of truth).
+  the text is the single source of truth). An inspector edit is computed from the session's
+  text at that moment and shown at once; editor typing reaches the panel after a 150 ms
+  pause, and the Yams parse reruns only when the frontmatter block itself changed.
 - Malformed YAML → panel shows raw text + error, never crashes, never rewrites what it
   cannot parse.
 - String and string-list form writes use explicitly quoted YAML scalars with serializer-owned

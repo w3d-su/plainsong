@@ -202,21 +202,10 @@ enum WorkspaceSearchCandidatePlanner {
         return components.contains { component in
             let lowercased = component.lowercased()
             return component.hasPrefix(".")
-                || excludedDirectoryNames.contains(lowercased)
+                || WorkspaceIgnoredDirectories.names.contains(lowercased)
                 || packageExtensions.contains((component as NSString).pathExtension.lowercased())
         }
     }
-
-    private static let excludedDirectoryNames: Set<String> = [
-        ".git",
-        "node_modules",
-        ".build",
-        ".next",
-        ".astro",
-        "deriveddata",
-        "dist",
-        "build",
-    ]
 
     private static let packageExtensions: Set<String> = [
         "app",

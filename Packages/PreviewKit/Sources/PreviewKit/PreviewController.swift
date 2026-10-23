@@ -42,6 +42,11 @@ public final class PreviewController: NSObject, ObservableObject {
     /// Set when `webViewWebContentProcessDidTerminate` fires; capture steps check it
     /// between awaits so a mid-capture teardown fails typed rather than hanging.
     private(set) var webContentProcessTerminated = false
+    /// A live preview reloads its page after a WebContent termination; an export controller
+    /// fails its operation instead (`PreviewController+Recovery.swift`).
+    let recoversFromWebContentTermination: Bool
+    /// Terminations since the last completed render; recovery stops past a small limit.
+    var consecutiveWebContentTerminations = 0
     /// Test seam for `captureExportPDF`: invoked with the page index before each page
     /// capture so hosted tests can inject errors, cancellation, or record weak refs.
     var exportPDFCaptureWillCaptureHook: (@MainActor (Int) async throws -> Void)?
@@ -58,14 +63,15 @@ public final class PreviewController: NSObject, ObservableObject {
     var exportAssetRootURL: URL?
 
     override public convenience init() {
-        self.init(previewIndexURL: Self.defaultPreviewIndexURL())
+        self.init(previewIndexURL: Self.defaultPreviewIndexURL(), recoversFromWebContentTermination: true)
     }
 
     init(
         previewIndexURL: URL?,
         contentRuleList: WKContentRuleList? = nil,
         websiteDataStore: WKWebsiteDataStore? = nil,
-        assetReader: (any PreviewAssetReading)? = nil
+        assetReader: (any PreviewAssetReading)? = nil,
+        recoversFromWebContentTermination: Bool = false
     ) {
         let configuration = WKWebViewConfiguration()
         let userContentController = WKUserContentController()
@@ -95,6 +101,7 @@ public final class PreviewController: NSObject, ObservableObject {
         self.assetSchemeHandler = assetSchemeHandler
         self.scriptMessageProxy = scriptMessageProxy
         self.previewIndexURL = previewIndexURL
+        self.recoversFromWebContentTermination = recoversFromWebContentTermination
 
         super.init()
 
@@ -320,6 +327,7 @@ public final class PreviewController: NSObject, ObservableObject {
                 }
                 completePendingExportRender(payload.renderID)
                 flushPendingScrollDeliveryIfReady()
+                noteRenderCompletedForRecovery()
             }
             // A superseded render still frees the slot the newer pending render waits on.
             renderDidSettle(payload.renderID)
@@ -395,12 +403,16 @@ extension PreviewController: WKNavigationDelegate {
     public func webViewWebContentProcessDidTerminate(_: WKWebView) {
         isReady = false
         webContentProcessTerminated = true
+        // The newest render the page showed or was about to show; a recovering controller
+        // re-submits it to the reloaded page.
+        let newestRender = renderDispatch.pending ?? renderDispatch.lastSent
         // The in-flight render and any queued viewport scroll died with the process.
-        resetRenderDispatch(keepingPending: true)
+        resetRenderDispatch(keepingPending: !recoversFromWebContentTermination)
         viewportScrollQueue.reset()
         failPendingExportWork(reason: "web-content-process-terminated")
         scrollDeliveryState.failPendingDelivery()
         scrollDeliveryState = PreviewScrollDeliveryState()
+        recoverFromWebContentTermination(resubmitting: newestRender)
     }
 
     public func webView(
@@ -479,5 +491,37 @@ private extension WKWebView {
                 baseURL: nil
             )
         }
+    }
+}
+
+/// Same file as the class: re-submission sets its private provenance fields.
+extension PreviewController {
+    /// Sends `request`'s text again under a new render ID, keeping its session, version and
+    /// iOS identity, so the scroll/export barrier and checkbox provenance name the render
+    /// the reloaded page shows.
+    func resubmitRender(_ request: PreviewRenderRequest) {
+        guard !isInvalidated else { return }
+        let renderID = nextRenderID
+        nextRenderID += 1
+        checkboxRenderID = renderID
+        lastSubmittedRender = checkboxSession.map {
+            renderSubmission(request.change, session: $0, renderID: renderID)
+        }
+        scrollDeliveryState.registerRender(
+            renderID,
+            documentIdentifier: presentedDocumentIdentifier
+                ?? request.change.fileURL?.standardizedFileURL.absoluteString
+        )
+        enqueueRender(PreviewRenderRequest(
+            change: request.change,
+            renderID: renderID,
+            baseDir: request.baseDir,
+            assetRootID: request.assetRootID
+        ))
+    }
+
+    func reloadPreviewPageAfterTermination() {
+        webContentProcessTerminated = false
+        webView.loadPreviewIndex(indexURL: previewIndexURL)
     }
 }

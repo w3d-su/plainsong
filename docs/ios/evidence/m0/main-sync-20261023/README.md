@@ -23,3 +23,12 @@ head checks must be read separately. Claude/maintainer review and merge remain
 external to this receipt.
 
 [Merge verification](merge-verification.json) records parents and byte equality.
+
+## Parallel main update before publication
+
+The pre-push check found five additional main commits through `9afe9927`
+(#198, #201, #204, #207, #208). A second additive merge retains all of them;
+there were no conflicts. The first merge proof above refers to `7d9f1721`.
+The final diff is still limited to the reviewed M0 changes and additive receipts/
+ledger. The latest PreviewKit changes require candidate-head native verification
+before formal App activation; old preview passes are not relabelled.

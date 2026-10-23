@@ -1,5 +1,4 @@
 {
-  "main_sha": "7d9f1721020d0afe3174bc3a0d988cfa682185ea",
   "prior_pr_head": "74db3caffc5d4cfc7af75330a6f2c28551718108",
   "merge_commit": "d76494151fc39db4259413729f53117109569c2b",
   "merge_parents": [
@@ -13,5 +12,20 @@
   "production_composition_changed": false,
   "historical_packets_modified": false,
   "new_head_ci": "PENDING; read current PR checks after publication",
-  "native_execution": "No new execution claimed by this receipt; 20/20 each remains source-bound to 806989d."
+  "native_execution": "No new execution claimed by this receipt; 20/20 each remains source-bound to 806989d.",
+  "initial_main_sha": "7d9f1721020d0afe3174bc3a0d988cfa682185ea",
+  "current_main_sha": "9afe99276e6d8a0462c16c55d1ec02b4a368862b",
+  "parallel_main_update": {
+    "previous_main": "7d9f1721020d0afe3174bc3a0d988cfa682185ea",
+    "new_main": "9afe99276e6d8a0462c16c55d1ec02b4a368862b",
+    "commits": [
+      "9afe99276e6d8a0462c16c55d1ec02b4a368862b",
+      "ae7f0c016b27c66bb97fb3c4532bb240321fa94a",
+      "e6223652ff460284c93be810dd7d278dc8a3348f",
+      "687d549fff05f05beb95c791b66cec2816409a32",
+      "93b5e77241296065dc68533e5ef7889f62c61068"
+    ],
+    "conflicts": 0,
+    "reason": "Pre-push verification detected five parallel main commits; additively integrated before publication."
+  }
 }

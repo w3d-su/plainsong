@@ -242,7 +242,7 @@ final class PreviewRenderDispatchTests: XCTestCase {
 /// A controller whose outgoing bridge messages are recorded instead of evaluated.
 @MainActor
 final class RenderDispatchHarness {
-    let controller = PreviewController(previewIndexURL: nil)
+    let controller: PreviewController
     var deliverySucceeds = true
     private(set) var sentRenders: [RenderPayload] = []
     private(set) var sentScrollLines: [Int] = []
@@ -257,7 +257,11 @@ final class RenderDispatchHarness {
         sentRenders.map(\.text)
     }
 
-    init() {
+    init(recoversFromWebContentTermination: Bool = false) {
+        controller = PreviewController(
+            previewIndexURL: nil,
+            recoversFromWebContentTermination: recoversFromWebContentTermination
+        )
         controller.bridgeTransportOverrideForTesting = { [unowned self] message, completion in
             switch message {
             case let .render(payload):

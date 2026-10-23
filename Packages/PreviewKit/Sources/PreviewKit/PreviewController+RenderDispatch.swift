@@ -20,6 +20,9 @@ struct PreviewRenderDispatch {
     var inFlightRenderID: Int?
     var pending: PreviewRenderRequest?
     var watchdogTask: Task<Void, Never>?
+    /// The newest render handed to JavaScript, kept after it completes: the page shows it,
+    /// so a reloaded page after a WebContent termination needs it again.
+    var lastSent: PreviewRenderRequest?
 }
 
 /// The presentation a session render last submitted. A repeat with the same key is
@@ -73,6 +76,7 @@ extension PreviewController {
     /// bridge is ready and nothing is in flight.
     func enqueueRender(_ request: PreviewRenderRequest) {
         renderDispatch.pending = request
+        retryExhaustedRecoveryForNewRender()
         dispatchPendingRenderIfIdle()
     }
 
@@ -83,6 +87,7 @@ extension PreviewController {
         else { return }
         renderDispatch.pending = nil
         renderDispatch.inFlightRenderID = request.renderID
+        renderDispatch.lastSent = request
         startRenderWatchdog(for: request.renderID)
 
         let payload = RenderPayload(
