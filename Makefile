@@ -115,7 +115,7 @@ ios-c0-test:
 #   make ios-acceptance-components
 #   make ios-archive [IOS_OUTPUT_ROOT=/private/tmp/plainsong-ios-release]
 #   make ios-ipa     [IOS_OUTPUT_ROOT=/private/tmp/plainsong-ios-release]
-# ios-acceptance is the hosted scaffold smoke only. It is not part of
+# ios-acceptance checks the production Files/Open launch UI only. It is not part of
 # `make test` or `make ios-test`. ios-acceptance-components is the Mac
 # package suite and is also outside those loops.
 IOS_OUTPUT_ROOT ?= /private/tmp/plainsong-ios-release

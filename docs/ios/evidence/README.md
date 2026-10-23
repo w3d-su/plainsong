@@ -16,7 +16,7 @@ their original inventories. Summaries are not substitutes for those bytes.
 |---|---|
 | [Latest phase-A integration receipts](main-integration-20261021/README.md) | Complete 755-input native source manifest, named gates, controls and original integrity inventory remain together. Native execution is still bound to `318be8d`, not later review fixes. |
 | [Parser baseline](lane-02/pre-move-baseline.json) | Executable input for both SyntaxKit differential tests and Mac EditorKit tests; unchanged bytes. |
-| [Component names](validation/required-component-tests.txt) / [hosted smoke names](validation/required-hosted-smoke.txt) | Public runner admission inputs; unchanged bytes. |
+| [Component names](validation/required-component-tests.txt) / [hosted smoke names](validation/required-hosted-smoke.txt) | Public runner admission inputs. The [current hosted contract](validation/production-launch-smoke-20261023.md) checks the production Files/Open launch UI only. |
 | Human receipts and [frozen-contract inventory](lane-13/frozen-contracts.json) | Historical results, failures, source boundaries and architecture decisions stay reviewable. |
 | [M0 checklist](m0/manual-checklist.md), results and owner template | Physical device, IME/Undo, Files/iCloud, background save and owner-install gates remain open. |
 

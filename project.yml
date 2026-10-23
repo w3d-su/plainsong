@@ -319,6 +319,9 @@ targets:
     deploymentTarget: "26.0"
     sources:
       - path: Packages/PreviewKit/Tests/PreviewKitTests
+        excludes:
+          # Opt-in paired benchmarks remain available through SwiftPM.
+          - PreviewRenderDispatchProbeTests.swift
     dependencies:
       - target: IOSPreviewTestHost
       - package: PreviewKit

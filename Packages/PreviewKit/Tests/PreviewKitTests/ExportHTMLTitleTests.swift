@@ -8,7 +8,7 @@ import XCTest
 @MainActor
 final class ExportHTMLTitleTests: XCTestCase {
     func testDocumentTitleUsesFrontmatterThenFirstHeadingThenUntitled() async throws {
-        let support = ExportHTMLHostedTests()
+        let support = ExportHTMLTestSupport(owner: self)
         struct TitleCase {
             let text: String
             let kind: FileKind
@@ -30,6 +30,7 @@ final class ExportHTMLTitleTests: XCTestCase {
         ]
         for item in cases {
             let controller = try support.makeController()
+            defer { controller.invalidate() }
             let renderID = try await support.render(controller, text: item.text, fileKind: item.kind, version: 0)
             let result = await controller.exportHTML(matchingRenderID: renderID)
             controller.invalidate()
