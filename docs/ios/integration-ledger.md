@@ -4,6 +4,29 @@ Created 2026-10-08. Contract: **IOS-C0-v1 declarations implemented**. Live main:
 
 The C0 tag preserves declarations and an unavailable scaffold. **The current branch contains the production composition candidate described below; full v1 acceptance remains OPEN. Older dated sections retain their original source and acceptance boundaries.**
 
+## Main-based production integration — 2026-10-23
+
+This section supersedes earlier current-status snapshots while retaining their
+historical evidence. Live main `cdb528d4a565cd15e31ddc1b6312b5a45b27236a`
+contains merged #191 but its App entry is still C0. #209 is merged into the old
+`codex/ios-m0-validation-20261022` branch, not main. Main-facing [#210](https://github.com/w3d-su/plainsong/pull/210)
+ports only its single squash patch on `codex/ios-main-production-20261023`.
+The unmodified transplant `af1d895` executed 448/448 module/workflow cases,
+zero failures/skips. That receipt predates the acceptance-manifest adaptation
+and is not relabelled as the later combined head's validation.
+
+Main's #195 preview source/bundle and Mac fixes are retained. The inherited
+acceptance manifest's bundle digest is adapted to main's committed resource;
+no assertion is relaxed. Current-candidate complete/repeated native execution,
+actual UI launch, Mac/exact-head CI, and the new unsigned IPA are recorded in
+[evidence/main-production-20261023](evidence/main-production-20261023/README.md).
+Until those receipts are present they remain pending, not inherited passes.
+
+Pre-composition M0 owner-reported prerequisites remain accepted at their recorded
+scope. The new artifact's owner installation/Files/iCloud/IME/Undo/background
+acceptance, physical iPad/minimum OS26, VoiceOver, hardware keyboard and performance
+remain OPEN. Recovery-list and conflict Save a Copy UI follow in separate PRs.
+
 ## Production composition candidate — 2026-10-23
 
 The formal-App candidate now calls `makeProduction`, composing one Files access service, one UIDocument writer/store, its exact native editor session and one retained PreviewController. C0 sentinel tests remain available. [Architecture](../decisions/2026-10-23-ios-production-document-composition.md) and [source-bound evidence](evidence/production-composition-20261023/README.md).
