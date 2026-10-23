@@ -7,7 +7,7 @@ import XCTest
 @MainActor
 final class PreviewWebContentRecoveryTests: XCTestCase {
     func testLiveControllerResubmitsTheNewestRenderUnderANewID() {
-        let harness = RenderDispatchHarness(recoversFromWebContentTermination: true)
+        let harness = RenderDispatchHarness(testCase: self, recoversFromWebContentTermination: true)
         harness.markReady()
         let session = DocumentSession(text: "- [ ] kept")
         harness.controller.render(session.currentTextChange, for: session)
@@ -38,7 +38,7 @@ final class PreviewWebContentRecoveryTests: XCTestCase {
     }
 
     func testRecoveryStopsAfterConsecutiveTerminationsWithoutACompletedRender() {
-        let harness = RenderDispatchHarness(recoversFromWebContentTermination: true)
+        let harness = RenderDispatchHarness(testCase: self, recoversFromWebContentTermination: true)
         harness.markReady()
         _ = harness.controller.renderForTesting(DocumentTextChange(
             text: "crashes", version: 1, fileKind: .markdown, fileURL: nil
@@ -66,7 +66,7 @@ final class PreviewWebContentRecoveryTests: XCTestCase {
     }
 
     func testExportControllersDoNotRecover() {
-        let harness = RenderDispatchHarness()
+        let harness = RenderDispatchHarness(testCase: self)
         harness.markReady()
         let renderID = harness.controller.renderForTesting(DocumentTextChange(
             text: "export", version: 1, fileKind: .markdown, fileURL: nil

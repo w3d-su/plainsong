@@ -2,7 +2,61 @@
 
 Created 2026-10-08. Contract: **IOS-C0-v1 declarations implemented**. Live main: `b13aa620c7444f2ccd3a8fe3a5b8b0afe0e997b2`; specification ancestor #153: `2144c46c888360c84a42fef79e676e60b518048b`.
 
-C0 provides declarations and an unavailable app scaffold. **Current phase A source integration is in progress; full v1 acceptance remains OPEN. See the dated current section below. Production composition is blocked by M0 + real providers.**
+The C0 tag preserves declarations and an unavailable scaffold. **The current branch contains the production composition candidate described below; full v1 acceptance remains OPEN. Older dated sections retain their original source and acceptance boundaries.**
+
+## Main-based production integration — 2026-10-23
+
+This section supersedes earlier current-status snapshots while retaining their
+historical evidence. Live main `cdb528d4a565cd15e31ddc1b6312b5a45b27236a`
+contains merged #191 but its App entry is still C0. #209 is merged into the old
+`codex/ios-m0-validation-20261022` branch, not main. Main-facing [#210](https://github.com/w3d-su/plainsong/pull/210)
+ports only its single squash patch on `codex/ios-main-production-20261023`.
+The unmodified transplant `af1d895` executed 448/448 module/workflow cases,
+zero failures/skips. That receipt predates the acceptance-manifest adaptation
+and is not relabelled as the later combined head's validation.
+
+Main's #195 preview source/bundle and Mac fixes are retained. The inherited
+acceptance manifest's bundle digest is adapted to main's committed resource;
+no assertion is relaxed. Current-candidate complete/repeated native execution,
+actual UI launch, Mac/exact-head CI, and the new unsigned IPA are recorded in
+[evidence/main-production-20261023](evidence/main-production-20261023/README.md).
+Clean implementation `1c1685a` completed modules448/448, complete Preview191/191
+and unchanged repeat191/191, iPhone+iPad UI launch1/1 each, components29/29,
+tooling44/44 and all six exact-head CI checks. Local Mac PreviewKit195 cases
+had192 passed/3 existing skips/0 failures; architecture6/6 andMac build pass.
+The new unsigned IPA and independent actual-ZIP audit pass. These receipts
+remain source-bound to that implementation, separate from documentation-only
+publication commits and their own current-head CI.
+
+Pre-composition M0 owner-reported prerequisites remain accepted at their recorded
+scope. The new artifact's owner installation/Files/iCloud/IME/Undo/background
+acceptance, physical iPad/minimum OS26, VoiceOver, hardware keyboard and performance
+remain OPEN. Recovery-list and conflict Save a Copy UI follow in separate PRs.
+
+## Production composition candidate — 2026-10-23
+
+The formal-App candidate now calls `makeProduction`, composing one Files access service, one UIDocument writer/store, its exact native editor session and one retained PreviewController. C0 sentinel tests remain available. [Architecture](../decisions/2026-10-23-ios-production-document-composition.md) and [source-bound evidence](evidence/production-composition-20261023/README.md).
+
+Clean `c18e41a` completed 430/430 native cases, zero failures/skips and all 63 required names, including five real-provider workflows and four close/observation regressions. Earlier failed attempts and the old-code negative control remain retained. Later test-harness cleanup does not replace the final candidate's full-preview gate, CI or Release IPA receipt; those results are recorded separately with the delivered artifact and PR. No physical-device or performance result is inferred.
+
+The PR #209 review follow-up adds a deferred notification barrier and drains the
+live external-read registry, preserves authority across provider close/reopen,
+completes Preview test cleanup and bounded waits, and presents relative-link
+failures through the shell alert without changing document availability. See the
+[review decision](../decisions/2026-10-23-ios-composition-review-fixes.md). Its
+current-source native results and Release receipt are separate from the retained
+`c18e41a` and `eba271b` evidence above; cleanup is not proof of the origin of the
+historical InvalidTransition diagnostic.
+
+The subsequent [initial-readiness follow-up](../decisions/2026-10-23-preview-initial-readiness-watchdog.md)
+adds one bounded initial-page reload and current-navigation probe fencing,
+plus retained-transition availability protection. This addresses the silent
+initial-load symptom; it does not claim the proposed private GPU/XCTest causal
+chain is proven. New complete repeated native results, exact-head CI and the new
+Release artifact must be assessed separately from cc36bdb's 181-pass/177-pass
+attempts, which remain retained.
+
+The owner prerequisites in the next section are satisfied at owner-report level. #191 stays the separate C0/M0 PR; this production branch is a new review candidate. Its new artifact's owner installation, complete device matrix, accessibility and performance remain OPEN. Relaunch recovery-list and conflict Save a Copy UI are not yet connected. The [current hosted launch smoke](evidence/validation/production-launch-smoke-20261023.md) checks Files/Open only.
 
 ## M0 follow-up and Phase B admission — 2026-10-23
 

@@ -1,17 +1,19 @@
 import XCTest
 
-/// Hosted smoke for lane 12. A pass means the unavailable scaffold is visible.
-/// It is not a writing, preview, save, or device acceptance result.
+/// Hosted production launch smoke. A pass means Files and its Open control are visible.
+/// It is not a file-access, editing, preview, save/reopen, or device acceptance result.
 final class IOSAcceptanceLaunchSmokeTests: XCTestCase {
-    func testLaunchShowsUnavailableScaffold() {
+    func testLaunchShowsFilesAndOpenControl() {
         let app = XCUIApplication()
         app.launch()
-        let scaffold = app.staticTexts[
-            "Development scaffold. Editing and file access await device validation and providers."
-        ]
-        let appeared = expectation(for: NSPredicate(format: "exists == true"), evaluatedWith: scaffold)
-        let result = XCTWaiter.wait(for: [appeared], timeout: 10)
+        let files = app.navigationBars["Files"]
+        let open = app.buttons["plainsong.ios.browser.open"]
+        let filesAppeared = expectation(for: NSPredicate(format: "exists == true"), evaluatedWith: files)
+        let openAppeared = expectation(for: NSPredicate(format: "exists == true"), evaluatedWith: open)
+        let result = XCTWaiter.wait(for: [filesAppeared, openAppeared], timeout: 10)
         XCTAssertEqual(result, .completed)
-        XCTAssertTrue(scaffold.exists)
+        XCTAssertTrue(files.exists)
+        XCTAssertTrue(open.exists)
+        XCTAssertTrue(open.isEnabled)
     }
 }

@@ -8,6 +8,7 @@ final class PreviewScrollDeliveryTests: XCTestCase {
         var controller: PreviewController? = try PreviewController(
             previewIndexURL: previewIndexFixtureURL()
         )
+        defer { controller?.invalidate() }
         let weakController = WeakBox(controller)
         let weakWebView = WeakBox(controller?.webView)
         try await waitUntil("preview bridge ready") {
@@ -33,6 +34,7 @@ final class PreviewScrollDeliveryTests: XCTestCase {
     @MainActor
     func testDocumentNavigationWaitsForMatchingRenderBeforeScrolling() async throws {
         let controller = try PreviewController(previewIndexURL: previewIndexFixtureURL())
+        defer { controller.invalidate() }
         controller.webView.frame = CGRect(x: 0, y: 0, width: 640, height: 300)
         let documentIdentifier = "document-a"
         let document = makeLongDocument(target: "MATCHING_RENDER_TARGET")
@@ -79,6 +81,7 @@ final class PreviewScrollDeliveryTests: XCTestCase {
     @MainActor
     func testPendingDocumentNavigationFailsInsteadOfReplayingIntoAnotherDocument() async throws {
         let controller = try PreviewController(previewIndexURL: previewIndexFixtureURL())
+        defer { controller.invalidate() }
         let firstDocumentIdentifier = "document-a"
         let secondDocumentIdentifier = "document-b"
         var deliveryResult: Bool?
@@ -161,7 +164,9 @@ final class PreviewScrollDeliveryTests: XCTestCase {
     ) async throws {
         let deadline = Date().addingTimeInterval(5)
         while Date() < deadline {
-            if try await condition() { return }
+            if try await condition() {
+                return
+            }
             try await Task.sleep(nanoseconds: 20_000_000)
         }
         XCTFail("Timed out waiting for \(description)")

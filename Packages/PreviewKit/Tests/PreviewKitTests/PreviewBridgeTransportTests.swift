@@ -8,7 +8,7 @@ final class PreviewBridgeTransportTests: XCTestCase {
     // MARK: Viewport scroll traffic
 
     func testViewportScrollsKeepOneInFlightAndTheNewestWaiting() {
-        let harness = RenderDispatchHarness()
+        let harness = RenderDispatchHarness(testCase: self)
         harness.markReady()
 
         for line in 1 ... 5 {
@@ -24,7 +24,7 @@ final class PreviewBridgeTransportTests: XCTestCase {
     }
 
     func testDocumentNavigationDiscardsWaitingViewportTraffic() {
-        let harness = RenderDispatchHarness()
+        let harness = RenderDispatchHarness(testCase: self)
         harness.markReady()
         harness.controller.setPresentedDocumentIdentifier("post")
         let renderID = harness.controller.renderForTesting(DocumentTextChange(
@@ -50,7 +50,7 @@ final class PreviewBridgeTransportTests: XCTestCase {
     }
 
     func testTerminationFencesLateViewportCompletions() {
-        let harness = RenderDispatchHarness()
+        let harness = RenderDispatchHarness(testCase: self)
         harness.markReady()
         harness.controller.scrollToLine(1, animated: false)
         harness.controller.webViewWebContentProcessDidTerminate(harness.controller.webView)
@@ -65,7 +65,7 @@ final class PreviewBridgeTransportTests: XCTestCase {
     }
 
     func testExplicitCompletionBypassesTheViewportQueue() {
-        let harness = RenderDispatchHarness()
+        let harness = RenderDispatchHarness(testCase: self)
         harness.markReady()
         harness.controller.scrollToLine(1, animated: false)
         var delivered: Bool?
@@ -123,7 +123,7 @@ final class PreviewBridgeTransportTests: XCTestCase {
     }
 
     func testRenderCompleteBodyDrivesTheDispatch() {
-        let harness = RenderDispatchHarness()
+        let harness = RenderDispatchHarness(testCase: self)
         harness.markReady()
         let first = harness.controller.renderForTesting(DocumentTextChange(
             text: "one", version: 1, fileKind: .markdown, fileURL: nil

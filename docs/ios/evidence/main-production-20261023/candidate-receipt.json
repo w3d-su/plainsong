@@ -1,0 +1,315 @@
+{
+  "exact_head_CI": {
+    "failed_checks": [],
+    "observed_checks": {
+      "build-and-test": "SUCCESS",
+      "changes": "SUCCESS",
+      "hosted (app)": "SUCCESS",
+      "hosted (ui-performance)": "SUCCESS",
+      "packages": "SUCCESS",
+      "preview": "SUCCESS"
+    },
+    "raw_receipt": "/private/tmp/plainsong-ios-main-production-20261023/audit/ci.json",
+    "raw_receipt_sha256": "0a106da4a13665c304a3896277afbfc10f25d0e831ae82c6c53089e0e2afc3e7",
+    "reason": null,
+    "source_sha": "1c1685adb7a594f3ecaf81a16d61f5d41e032363",
+    "status": "PASS"
+  },
+  "generated_at_utc": "2026-10-23T12:46:19.697981+00:00",
+  "historical_M0": {
+    "Fixture": "OWNER_REPORTED_PASS",
+    "boundary": "Preserve the original M0 feedback and kits. Do not ask the owner to repeat those old M0 workflows or count those reports as acceptance of this new production artifact.",
+    "context": {
+      "basis": "Inherited in the retained owner receipt, not independently reconfirmed.",
+      "model": "iPhone 14 Pro",
+      "os": "iOS 27"
+    },
+    "full_per_device_matrix_and_signed_identity": "OPEN_AS_RECORDED",
+    "is_new_production_artifact_acceptance": false,
+    "kit_receipt_copies": [
+      "evidence/historical-M0/README.md",
+      "evidence/historical-M0/owner-retest-20261023-iphone14pro.json",
+      "evidence/historical-M0/owner-retest-20261023-iphone14pro.md",
+      "evidence/historical-M0/owner-followup-20261023-iphone14pro.json",
+      "evidence/historical-M0/owner-followup-20261023-iphone14pro.md"
+    ],
+    "named_precomposition_conditions": {
+      "IME_Undo_Redo": "OWNER_REPORTED_PASS",
+      "background_save_recovery": "OWNER_REPORTED_PASS",
+      "local_Files_iCloud_open_save_reopen": "OWNER_REPORTED_PASS",
+      "owner_resign_install": "OWNER_REPORTED_PASS"
+    },
+    "precomposition_conditions_satisfied_at_owner_report_level": true,
+    "receipt_paths": [
+      "docs/ios/evidence/m0/owner-retest-20261023/owner-retest-20261023-iphone14pro.json",
+      "docs/ios/evidence/m0/owner-retest-20261023/owner-followup-20261023-iphone14pro.json"
+    ],
+    "three_second_A_Save_B": "OWNER_REPORTED_PASS"
+  },
+  "historical_evidence_boundary": "Previous PR209/native/owner kits are retained and not rewritten. Green repeats do not prove the historical private GPU/XCTest causal chain.",
+  "identical_input_fingerprint_for_all_runs_and_release": true,
+  "ipa": {
+    "archive": "/private/tmp/plainsong-ios-main-production-20261023/combined/release/archive-attempt-1c1685adb7a5.J3Ubug/PlainsongIOS.xcarchive",
+    "archive_sha256": "665ea543d7d56ac030f004637db72be8909c17b06c99133a3058c80abd86a846",
+    "command": "make ios-ipa",
+    "contract_version": "IOS-C0-v1",
+    "delivered_filename": "PlainsongIOS-1c1685adb7a5.ipa",
+    "exit_code": 0,
+    "independent_actual_zip_audit": "PASS",
+    "installation": "OPEN",
+    "ipa": "/private/tmp/plainsong-ios-main-production-20261023/combined/release/PlainsongIOS-1c1685adb7a5.ipa",
+    "ipa_bytes": 3096043,
+    "ipa_sha256": "0584f658209be0e669556745067002d01e6a0df9787feca1d973a8c7f320ed87",
+    "owner_installation": "OPEN",
+    "payload_sha256": "66d371f2da0ce2ad20f2b884cc2b7f207110ad8f253ba1d5484ee5232e69fbb4",
+    "schema": "IOS-IPA-v1",
+    "source_dirty": false,
+    "source_fingerprint": "7199986ef78e15c5596dd30457998e2fb9546d38d01254b7eedced68437fb8c1",
+    "source_sha": "1c1685adb7a594f3ecaf81a16d61f5d41e032363"
+  },
+  "local_runs": {
+    "components": {
+      "executed": 29,
+      "failed": 0,
+      "passed": 29,
+      "post_case_diagnostic_termination_recorded": false,
+      "raw_evidence": "/private/tmp/plainsong-ios-main-production-20261023/combined/components/evidence/1c1685adb7a5-components-20261023-203915-51695",
+      "required_names": 29,
+      "runner_exit_code": 0,
+      "scheme": "IOSAcceptanceHarness",
+      "skipped": 0,
+      "source_dirty": false,
+      "source_fingerprint": "7199986ef78e15c5596dd30457998e2fb9546d38d01254b7eedced68437fb8c1",
+      "source_sha": "1c1685adb7a594f3ecaf81a16d61f5d41e032363"
+    },
+    "launch": {
+      "boundary": "Files/Open launch only; no picker, document I/O, edit, preview, save/reopen or physical-device acceptance.",
+      "compiled_images": [
+        {
+          "app_hosted": false,
+          "bundle": "IOSAcceptanceUITests.xctest",
+          "bytes": 66296,
+          "executable": "IOSAcceptanceUITests",
+          "host_app": "IOSAcceptanceUITests-Runner.app",
+          "target": "IOSAcceptanceUITests"
+        }
+      ],
+      "compiled_test_images": 1,
+      "complete_xcresult": "/private/tmp/plainsong-ios-main-production-20261023/combined/launch/evidence/1c1685adb7a5-acceptance-20261023-203742-50350/Results.xcresult",
+      "destination": "platform=iOS Simulator,id=59CB04BD-26CC-4841-8D06-E75A2EDEBC66",
+      "enabled_xctestrun": "/private/tmp/plainsong-ios-main-production-20261023/combined/launch/dd/1c1685adb7a5-acceptance-20261023-203742-50350/Build/Products/IOSAcceptance_iphonesimulator27.0-arm64.xctestrun",
+      "executed": 1,
+      "failed": 0,
+      "host_and_target_macho_receipt": "evidence/launch/ui-host-and-target-macho.json",
+      "passed": 1,
+      "post_case_diagnostic_termination_recorded": false,
+      "raw_evidence": "/private/tmp/plainsong-ios-main-production-20261023/combined/launch/evidence/1c1685adb7a5-acceptance-20261023-203742-50350",
+      "required_names": 1,
+      "runner_exit_code": 0,
+      "scheme": "IOSAcceptance",
+      "skipped": 0,
+      "source_dirty": false,
+      "source_fingerprint": "7199986ef78e15c5596dd30457998e2fb9546d38d01254b7eedced68437fb8c1",
+      "source_sha": "1c1685adb7a594f3ecaf81a16d61f5d41e032363",
+      "ui_runner_host": "/private/tmp/plainsong-ios-main-production-20261023/combined/launch/dd/1c1685adb7a5-acceptance-20261023-203742-50350/Build/Products/Debug-iphonesimulator/IOSAcceptanceUITests-Runner.app",
+      "ui_target_app": "/private/tmp/plainsong-ios-main-production-20261023/combined/launch/dd/1c1685adb7a5-acceptance-20261023-203742-50350/Build/Products/Debug-iphonesimulator/PlainsongIOS.app"
+    },
+    "modules": {
+      "compiled_images": [
+        {
+          "app_hosted": false,
+          "bundle": "EditorKitIOSTests.xctest",
+          "bytes": 7389600,
+          "executable": "EditorKitIOSTests",
+          "host_app": null,
+          "target": "EditorKitIOSTests"
+        },
+        {
+          "app_hosted": false,
+          "bundle": "MarkdownCoreTests.xctest",
+          "bytes": 4751424,
+          "executable": "MarkdownCoreTests",
+          "host_app": null,
+          "target": "MarkdownCoreTests"
+        },
+        {
+          "app_hosted": true,
+          "bundle": "PlainsongIOSTests.xctest",
+          "bytes": 4173328,
+          "executable": "PlainsongIOSTests",
+          "host_app": "PlainsongIOS.app",
+          "target": "PlainsongIOSTests"
+        },
+        {
+          "app_hosted": false,
+          "bundle": "SyntaxKitTests.xctest",
+          "bytes": 6757424,
+          "executable": "SyntaxKitTests",
+          "host_app": null,
+          "target": "SyntaxKitTests"
+        },
+        {
+          "app_hosted": false,
+          "bundle": "WorkspaceCoreTests.xctest",
+          "bytes": 3443024,
+          "executable": "WorkspaceCoreTests",
+          "host_app": null,
+          "target": "WorkspaceCoreTests"
+        },
+        {
+          "app_hosted": false,
+          "bundle": "WorkspaceKitIOSTests.xctest",
+          "bytes": 8543944,
+          "executable": "WorkspaceKitIOSTests",
+          "host_app": null,
+          "target": "WorkspaceKitIOSTests"
+        }
+      ],
+      "compiled_test_images": 6,
+      "complete_xcresult": "/private/tmp/plainsong-ios-main-production-20261023/combined/modules/evidence/1c1685adb7a5-test-20261023-202607-42952/Results.xcresult",
+      "destination": "platform=iOS Simulator,id=59CB04BD-26CC-4841-8D06-E75A2EDEBC66",
+      "enabled_xctestrun": "/private/tmp/plainsong-ios-main-production-20261023/combined/modules/dd/1c1685adb7a5-test-20261023-202607-42952/Build/Products/PlainsongIOS_iphonesimulator27.0-arm64.xctestrun",
+      "executed": 448,
+      "failed": 0,
+      "passed": 448,
+      "post_case_diagnostic_note": "All functional cases completed; only this run owned post-case simctl diagnose child was terminated. See original receipt; the entire run must not be described as uninterrupted.",
+      "post_case_diagnostic_termination_recorded": true,
+      "raw_evidence": "/private/tmp/plainsong-ios-main-production-20261023/combined/modules/evidence/1c1685adb7a5-test-20261023-202607-42952",
+      "required_names": 81,
+      "runner_exit_code": 0,
+      "scheme": "PlainsongIOS",
+      "skipped": 0,
+      "source_dirty": false,
+      "source_fingerprint": "7199986ef78e15c5596dd30457998e2fb9546d38d01254b7eedced68437fb8c1",
+      "source_sha": "1c1685adb7a594f3ecaf81a16d61f5d41e032363",
+      "whole_run_uninterrupted": false
+    },
+    "preview": {
+      "compiled_images": [
+        {
+          "app_hosted": true,
+          "bundle": "IOSPreviewTests.xctest",
+          "bytes": 6989584,
+          "executable": "IOSPreviewTests",
+          "host_app": "IOSPreviewTestHost.app",
+          "target": "IOSPreviewTests"
+        }
+      ],
+      "compiled_test_images": 1,
+      "complete_xcresult": "/private/tmp/plainsong-ios-main-production-20261023/combined/preview/evidence/1c1685adb7a5-preview-20261023-203100-46712/Results.xcresult",
+      "destination": "platform=iOS Simulator,id=59CB04BD-26CC-4841-8D06-E75A2EDEBC66",
+      "enabled_xctestrun": "/private/tmp/plainsong-ios-main-production-20261023/combined/preview/dd/1c1685adb7a5-preview-20261023-203100-46712/Build/Products/IOSPreview_iphonesimulator27.0-arm64.xctestrun",
+      "executed": 191,
+      "failed": 0,
+      "passed": 191,
+      "post_case_diagnostic_termination_recorded": false,
+      "raw_evidence": "/private/tmp/plainsong-ios-main-production-20261023/combined/preview/evidence/1c1685adb7a5-preview-20261023-203100-46712",
+      "required_names": 104,
+      "runner_exit_code": 0,
+      "scheme": "IOSPreview",
+      "skipped": 0,
+      "source_dirty": false,
+      "source_fingerprint": "7199986ef78e15c5596dd30457998e2fb9546d38d01254b7eedced68437fb8c1",
+      "source_sha": "1c1685adb7a594f3ecaf81a16d61f5d41e032363"
+    },
+    "preview-repeat": {
+      "compiled_images": [
+        {
+          "app_hosted": true,
+          "bundle": "IOSPreviewTests.xctest",
+          "bytes": 6990768,
+          "executable": "IOSPreviewTests",
+          "host_app": "IOSPreviewTestHost.app",
+          "target": "IOSPreviewTests"
+        }
+      ],
+      "compiled_test_images": 1,
+      "complete_xcresult": "/private/tmp/plainsong-ios-main-production-20261023/combined/preview-repeat/evidence/1c1685adb7a5-preview-20261023-203423-48551/Results.xcresult",
+      "destination": "platform=iOS Simulator,id=59CB04BD-26CC-4841-8D06-E75A2EDEBC66",
+      "enabled_xctestrun": "/private/tmp/plainsong-ios-main-production-20261023/combined/preview-repeat/dd/1c1685adb7a5-preview-20261023-203423-48551/Build/Products/IOSPreview_iphonesimulator27.0-arm64.xctestrun",
+      "executed": 191,
+      "failed": 0,
+      "passed": 191,
+      "post_case_diagnostic_termination_recorded": false,
+      "raw_evidence": "/private/tmp/plainsong-ios-main-production-20261023/combined/preview-repeat/evidence/1c1685adb7a5-preview-20261023-203423-48551",
+      "required_names": 104,
+      "runner_exit_code": 0,
+      "scheme": "IOSPreview",
+      "skipped": 0,
+      "source_dirty": false,
+      "source_fingerprint": "7199986ef78e15c5596dd30457998e2fb9546d38d01254b7eedced68437fb8c1",
+      "source_sha": "1c1685adb7a594f3ecaf81a16d61f5d41e032363"
+    }
+  },
+  "mac_regression_boundary": "Use separate exact-head CI and explicit local Mac receipts. No Mac PASS is inferred from these iOS runs.",
+  "main_base_sha": "cdb528d4a565cd15e31ddc1b6312b5a45b27236a",
+  "open_acceptance": [
+    "This exact artifact owner re-sign/install and composed-App Files/iCloud writing acceptance",
+    "Physical iPad; minimum iOS/iPadOS26; full per-device/provider/lifecycle matrix",
+    "VoiceOver; external keyboard; measured typing/highlight/render performance",
+    "Relaunch recovery-list/readback/restore and conflict Save a Copy UI follow-up PRs"
+  ],
+  "pull_request": "https://github.com/w3d-su/plainsong/pull/210",
+  "raw_complete_xcresults_copied": false,
+  "raw_evidence_preserved_in_place": true,
+  "raw_ipa_receipt": "/private/tmp/plainsong-ios-main-production-20261023/combined/release/evidence/ipa-1c1685adb7a5.3oQHWl/ipa.json",
+  "raw_release_archive": "/private/tmp/plainsong-ios-main-production-20261023/combined/release/archive-attempt-1c1685adb7a5.J3Ubug/PlainsongIOS.xcarchive",
+  "reproduction": {
+    "builder_path": "/private/tmp/plainsong-ios-main-production-20261023/build-review-kit.py",
+    "builder_sha256": "07ab3b1f9dadd22afa68fca87fa5b97b6bed89e3263c36edad34b1a8b52b1314",
+    "ipa_audit_script": "/private/tmp/plainsong-ios-main-production-20261023/audit/audit_ipa.py",
+    "ipa_audit_script_sha256": "b33741c97a5270a0282355ae0d62ad925a829cbd29c0b4a94f2033881f8d3dff",
+    "selected_raw_runs": {
+      "components": "/private/tmp/plainsong-ios-main-production-20261023/combined/components/evidence/1c1685adb7a5-components-20261023-203915-51695",
+      "launch": "/private/tmp/plainsong-ios-main-production-20261023/combined/launch/evidence/1c1685adb7a5-acceptance-20261023-203742-50350",
+      "modules": "/private/tmp/plainsong-ios-main-production-20261023/combined/modules/evidence/1c1685adb7a5-test-20261023-202607-42952",
+      "preview": "/private/tmp/plainsong-ios-main-production-20261023/combined/preview/evidence/1c1685adb7a5-preview-20261023-203100-46712",
+      "preview-repeat": "/private/tmp/plainsong-ios-main-production-20261023/combined/preview-repeat/evidence/1c1685adb7a5-preview-20261023-203423-48551"
+    }
+  },
+  "schema": "IOS-MAIN-PRODUCTION-REVIEW-KIT-v1",
+  "source_dirty": false,
+  "source_fingerprint": "7199986ef78e15c5596dd30457998e2fb9546d38d01254b7eedced68437fb8c1",
+  "source_sha": "1c1685adb7a594f3ecaf81a16d61f5d41e032363",
+  "status": "READY_FOR_REVIEW_NATIVE_IPA_AND_CI_PASS",
+  "additional_ipad_launch": {
+    "source_sha": "1c1685adb7a594f3ecaf81a16d61f5d41e032363",
+    "counts": {
+      "cases": {
+        "IOSAcceptanceLaunchSmokeTests/testLaunchShowsFilesAndOpenControl": "Passed"
+      },
+      "executed": 1,
+      "failed": 0,
+      "passed": 1,
+      "required": [
+        "IOSAcceptanceLaunchSmokeTests/testLaunchShowsFilesAndOpenControl"
+      ],
+      "skipped": 0
+    },
+    "raw_evidence": "/private/tmp/plainsong-ios-main-production-20261023/combined/launch-ipad/evidence/1c1685adb7a5-acceptance-20261023-204136-53580",
+    "complete_xcresult": "/private/tmp/plainsong-ios-main-production-20261023/combined/launch-ipad/evidence/1c1685adb7a5-acceptance-20261023-204136-53580/Results.xcresult",
+    "scope": "Files/Open launch only, physical-device acceptance remains OPEN"
+  },
+  "local_mac_regression": {
+    "preview_total": 195,
+    "preview_passed": 192,
+    "preview_existing_skips": 3,
+    "architecture_passed": 6,
+    "build": "PASS",
+    "receipt": "evidence/mac/receipt.json",
+    "local_Mac_UI_run": false
+  },
+  "tooling": {
+    "executed": 44,
+    "passed": 44,
+    "failed": 0,
+    "log": "evidence/audit/tooling.log"
+  },
+  "lint": {
+    "SwiftFormat": "0.62.1",
+    "status": "PASS",
+    "SwiftLint_warnings": 410,
+    "SwiftLint_serious": 0,
+    "log": "evidence/audit/lint.log"
+  }
+}
