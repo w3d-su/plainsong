@@ -271,8 +271,10 @@ extension MarkdownFenceScannerTests {
         }
     }
 
-    /// Runs one query against a native string, a bridged `NSMutableString`, and explicit
-    /// UTF-16 units, so both storage paths must agree.
+    /// Runs one query against a native string, an `NSMutableString` bridged to `String`, and
+    /// explicit UTF-16 units, so the UTF-8 and UTF-16 scans must agree. Swift bridges that
+    /// `NSMutableString` to native UTF-8 storage; the CoreFoundation in-place and copy paths
+    /// are covered with `NSTextStorage` in `EditorKitTests.MarkdownFenceScannerStorageTests`.
     static func allEncodings<Result>(
         of text: String,
         _ units: (MarkdownFenceScanUnits) -> Result,
