@@ -7,7 +7,15 @@ extension IOSUIDocumentStore {
         guard !entry.superseded, !entry.closed else { return }
         switch event {
         case .externalChange:
-            startExternalRead(entry)
+            if entry.isClosing || entry.portClosed {
+                // A notice does not authorize a read concurrent with provider close.
+                // Keep an independent barrier until close or its retained entry reads it.
+                entry.hasDeferredExternalChange = true
+                entry.autosaveTask?.cancel()
+                refreshWritableState(entry)
+            } else {
+                startExternalRead(entry)
+            }
         case .deleted:
             fenceUnavailable(entry, .access(.notFound))
         case .becameReadOnly:
@@ -31,12 +39,14 @@ extension IOSUIDocumentStore {
         setState(.unavailable(accessGeneration: entry.accessGeneration, reason: reason), entry: entry)
     }
 
-    func startExternalRead(_ entry: IOSDocumentEntry) {
-        guard !entry.isRetiring, entry.session != nil,
+    func startExternalRead(_ entry: IOSDocumentEntry, allowsClosingObservation: Bool = false) {
+        guard !entry.isRetiring, !entry.portClosed, entry.session != nil,
+              !entry.isClosing || allowsClosingObservation,
               guardCurrentAuthority(entry, generation: entry.accessGeneration)
         else { return }
         let token = UUID()
         entry.externalToken = token
+        entry.hasDeferredExternalChange = false
         entry.pendingProposal = nil
         entry.autosaveTask?.cancel()
         refreshWritableState(entry)
@@ -103,6 +113,12 @@ extension IOSUIDocumentStore {
                 entry.externalToken = nil
                 await beginConflict(entry, reason: .externalConflict, allowRetry: true)
             } else {
+                // Close cannot prove this newer clean revision from the old read.
+                // Retain its opaque token instead of issuing a retry during close.
+                if entry.isClosing {
+                    entry.hasDeferredExternalChange = true
+                    return
+                }
                 // An edit followed by Undo can be clean at a newer revision. Observe afresh.
                 startExternalRead(entry)
             }
