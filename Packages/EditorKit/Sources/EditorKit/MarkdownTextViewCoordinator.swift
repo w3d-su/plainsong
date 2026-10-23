@@ -317,6 +317,7 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     var visibleRangeObserver: CoordinatorNotificationObserver?
     var visibleRangeChangeHandler: ((NSRange) -> Void)?
     var lastVisibleTextRange: NSRange?
+    var lastCacheTrimSelection: NSRange?
     let textElementCacheTrimmer = EditorTextElementCacheTrimmer()
     var representableUpdateDepth = 0
     var selectionPublicationGeneration: UInt64 = 0
