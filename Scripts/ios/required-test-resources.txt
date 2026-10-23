@@ -1,0 +1,7 @@
+# Required resources for `make ios-test` — resolved inside the built host app
+# and test bundles (PlainsongIOS.app, *.xctest under Debug-iphonesimulator).
+# Lane 11 acceptance fixtures are merged into this manifest when delivered.
+preview/index.html
+preview/bundle.js
+preview/bundle.css
+preview/font-manifest.json

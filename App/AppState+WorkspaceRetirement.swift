@@ -217,6 +217,7 @@ private extension AppState {
         workspaceInstalledCaptureGeneration = nil
         workspaceSearchRefreshIntent = nil
         completionWorkspace = .empty
+        completionWorkspaceBaseCache = nil
         // Close/switch clears query chrome and mode; Files/Search mode flip does not.
         resetWorkspaceSearchUIState()
         notifyEditorFindWorkspaceDidClose()

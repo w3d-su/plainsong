@@ -1,0 +1,231 @@
+import SwiftUI
+
+extension EventModifiers {
+    init(_ modifiers: IOSKeyboardModifiers) {
+        var result: EventModifiers = []
+        if modifiers.contains(.command) {
+            result.insert(.command)
+        }
+        if modifiers.contains(.shift) {
+            result.insert(.shift)
+        }
+        if modifiers.contains(.option) {
+            result.insert(.option)
+        }
+        if modifiers.contains(.control) {
+            result.insert(.control)
+        }
+        self = result
+    }
+}
+
+extension IOSAuthoringAction {
+    /// `keyboardInput` is a single character ("b", "0", "g"); anything else is
+    /// not a `KeyEquivalent` and is installed without a shortcut.
+    var keyEquivalent: KeyEquivalent? {
+        guard let input = keyboardInput, let character = input.first, input.count == 1 else {
+            return nil
+        }
+        return KeyEquivalent(character)
+    }
+}
+
+/// One installer for every placement. Menu rows and find commands use it too;
+/// a plain `Button` does not install the descriptor's shortcut.
+struct AuthoringShortcutModifier: ViewModifier {
+    let action: IOSAuthoringAction
+
+    func body(content: Content) -> some View {
+        if let key = action.keyEquivalent {
+            content.keyboardShortcut(key, modifiers: EventModifiers(action.keyboardModifiers))
+        } else {
+            content
+        }
+    }
+}
+
+/// Toolbar content driven by 08's `IOSAuthoringAction` descriptors. The shell
+/// installs buttons and their declared shortcuts; every tap routes through the
+/// scene-scoped `IOSShellActionRouter`. Items that don't fit in the primary
+/// row collapse into an accessible "Format" overflow menu rather than
+/// shrinking below 44 pt targets.
+struct IOSAuthoringToolbarItems: ToolbarContent {
+    let scene: IOSShellSceneState
+    let router: IOSShellActionRouter
+
+    var body: some ToolbarContent {
+        // iPhone/iPad keyboard accessory: undo/redo, frequent actions, Format
+        // overflow, find. Presented above the hardware or software keyboard.
+        ToolbarItemGroup(placement: .keyboard) {
+            Button {
+                _ = router.undo()
+            } label: {
+                Label("Undo", systemImage: "arrow.uturn backward")
+            }
+            .disabled(!scene.chrome.editorFocused || !scene.chrome.editorCanWrite)
+            .keyboardShortcut("z", modifiers: .command)
+            .accessibilityIdentifier("plainsong.ios.toolbar.undo")
+
+            Button {
+                _ = router.redo()
+            } label: {
+                Label("Redo", systemImage: "arrow.uturn.forward")
+            }
+            .disabled(!scene.chrome.editorFocused || !scene.chrome.editorCanWrite)
+            .keyboardShortcut("z", modifiers: [.command, .shift])
+            .accessibilityIdentifier("plainsong.ios.toolbar.redo")
+
+            ForEach(primaryActions, id: \.id) { action in
+                authoringButton(action)
+            }
+
+            if !overflowActions.isEmpty {
+                Menu {
+                    ForEach(overflowActions, id: \.id) { action in
+                        overflowButton(action)
+                    }
+                } label: {
+                    Label("Format", systemImage: "textformat")
+                }
+                .accessibilityIdentifier("plainsong.ios.toolbar.formatMenu")
+            }
+        }
+
+        // Top-right: save, find, frontmatter inspector, image insertion.
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            Button {
+                scene.saveCurrentDocument()
+            } label: {
+                Label("Save", systemImage: "square.and.arrow.down")
+            }
+            .disabled(!scene.chrome.canSave)
+            .keyboardShortcut("s", modifiers: .command)
+            .accessibilityIdentifier("plainsong.ios.toolbar.save")
+
+            findButton
+
+            ForEach(unplacedShortcutActions, id: \.id) { action in
+                shortcutHost(action)
+            }
+
+            Button {
+                router.presentFrontmatter()
+            } label: {
+                Label("Frontmatter", systemImage: "doc.badge.gearshape")
+            }
+            .disabled(!scene.chrome.hasDocument)
+            .accessibilityIdentifier("plainsong.ios.toolbar.frontmatter")
+
+            if scene.surfaces.imageInsertion != nil {
+                Button {
+                    router.presentImagePicker()
+                } label: {
+                    Label("Insert Image", systemImage: "photo")
+                }
+                .disabled(!scene.chrome.hasDocument || !scene.chrome.editorCanWrite)
+                .accessibilityIdentifier("plainsong.ios.toolbar.insertImage")
+            }
+        }
+    }
+
+    private var primaryActions: [IOSAuthoringAction] {
+        router.actions.filter { action in
+            if case .toolbar = action.placement {
+                return true
+            }
+            if case .toolbarGroup = action.placement {
+                return true
+            }
+            return false
+        }
+    }
+
+    private var overflowActions: [IOSAuthoringAction] {
+        router.actions.filter { $0.placement == .formatMenu }
+    }
+
+    /// Format commands live in a menu, and Find Next / Find Previous / Use
+    /// Selection have no always-visible control. Mount the same installer so
+    /// those shortcuts exist while the toolbar is on screen. Cmd-F stays on
+    /// the visible Find button. Primary buttons install their own shortcuts.
+    private var unplacedShortcutActions: [IOSAuthoringAction] {
+        router.actions.filter { action in
+            guard action.keyEquivalent != nil else { return false }
+            switch action.placement {
+            case .formatMenu:
+                return true
+            case .find:
+                return action.id != .find
+            case .toolbar, .toolbarGroup:
+                return false
+            }
+        }
+    }
+
+    private var findButton: some View {
+        let button = Button {
+            _ = router.perform(.find)
+        } label: {
+            Label("Find", systemImage: "magnifyingglass")
+        }
+        .disabled(!scene.chrome.hasDocument)
+        .accessibilityIdentifier("plainsong.ios.toolbar.find")
+        if let find = router.actions.first(where: { $0.id == .find }), find.keyEquivalent != nil {
+            return AnyView(button.modifier(AuthoringShortcutModifier(action: find)))
+        }
+        return AnyView(button.keyboardShortcut("f", modifiers: .command))
+    }
+
+    private func authoringButton(_ action: IOSAuthoringAction) -> some View {
+        Button(action.title) {
+            _ = router.perform(action.id)
+        }
+        .disabled(!router.isEnabled(action.id))
+        .accessibilityLabel(action.accessibilityLabel)
+        .modifier(AuthoringShortcutModifier(action: action))
+    }
+
+    private func overflowButton(_ action: IOSAuthoringAction) -> some View {
+        Button(action.title) {
+            _ = router.perform(action.id)
+        }
+        .disabled(!router.isEnabled(action.id))
+        .accessibilityLabel(action.accessibilityLabel)
+    }
+
+    /// Menu rows are not a reliable key-command source, so format and find
+    /// commands are also mounted here with the same installer. The host is
+    /// hidden; the menu row remains the visible control. Primary shortcuts
+    /// stay on their buttons and are not repeated here.
+    private func shortcutHost(_ action: IOSAuthoringAction) -> some View {
+        Button(action.title) {
+            _ = router.perform(action.id)
+        }
+        .disabled(!router.isEnabled(action.id))
+        .accessibilityLabel(action.accessibilityLabel)
+        .modifier(AuthoringShortcutModifier(action: action))
+        .accessibilityHidden(true)
+        .frame(width: 1, height: 1)
+    }
+}
+
+/// Source/preview toggle for single-pane (compact or narrow) layouts.
+/// Switching panes only changes container visibility — both stay mounted.
+struct IOSPaneToggle: View {
+    @ObservedObject var scene: IOSShellSceneState
+
+    var body: some View {
+        if case let .single(pane) = scene.layout {
+            Picker("View", selection: Binding(
+                get: { pane },
+                set: { scene.showPane($0) }
+            )) {
+                Text("Source").tag(IOSEditorPane.source)
+                Text("Preview").tag(IOSEditorPane.preview)
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 220)
+            .accessibilityIdentifier("plainsong.ios.paneToggle")
+        }
+    }
+}

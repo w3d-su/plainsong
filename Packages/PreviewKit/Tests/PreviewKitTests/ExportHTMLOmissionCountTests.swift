@@ -37,16 +37,7 @@ final class ExportHTMLOmissionCountTests: XCTestCase {
             .appendingPathComponent("plainsong-omission-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
-        let testFile = URL(fileURLWithPath: #filePath)
-        let repositoryRoot = testFile
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let controller = PreviewController(
-            previewIndexURL: repositoryRoot.appendingPathComponent("App/Resources/preview/index.html")
-        )
+        let controller = try PreviewController(previewIndexURL: PreviewBundleFixture.indexURL())
         controller.exportTimeoutNanoseconds = 30_000_000_000
         addTeardownBlock { @MainActor [weak controller] in controller?.invalidate() }
         controller.setAllowsRemoteImages(false)

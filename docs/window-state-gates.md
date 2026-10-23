@@ -49,7 +49,7 @@ in two editors (§4.1 b), or bridge changes (`PROTOCOL_VERSION` stays unchanged)
 | `PlainsongAppServices.appState` is a weak static. | `App/PlainsongAppServices.swift:7-10` | A process-wide singleton. |
 | The Carbon ⇧⌘F hot key registers while the app is active. Its action reads `PlainsongAppServices.appState`. | `App/PlainsongApplication.swift:57-75`, `:103-108`, `:142-150` | It toggles search in "the" state, not the key window's. |
 | The delegate republishes `appState` and runs the Debug fixture entry points from its `didSet`. Termination asks that one state. | `App/PlainsongApplicationDelegate.swift:13-20`, `:42-54`, `:56-95` | Termination checks cover one state only. |
-| The Find hooks are static closures that call `PlainsongAppServices`. The editor selectors call them with no window argument. | `App/EditorFindCommandDelivery.swift:17-33`, `Packages/EditorKit/Sources/EditorKit/EditorFindActionHooks.swift:6-14`, `Packages/EditorKit/Sources/EditorKit/EditorFindSpike.swift:68-83` | A responder-chain Find command cannot name its window. |
+| The Find hooks are static closures that call `PlainsongAppServices`. The editor selectors call them with no window argument. | `App/EditorFindCommandDelivery.swift:17-33`, `Packages/EditorKit/Sources/EditorKit/EditorFindActionHooks.swift:6-14`, `Packages/EditorKit/Sources/EditorKit/EditorFindSpike.swift:31-46` | A responder-chain Find command cannot name its window. |
 | The Find menu falls back to `PlainsongAppServices`. | `App/EditorFindCommandDelivery.swift:36-48` | Same. |
 | Format and Find dispatch with `sendAction(_:to: nil, from: nil)`. | `Packages/EditorKit/Sources/EditorKit/EditingBehaviorsSupport.swift:60-62`, `Packages/EditorKit/Sources/EditorKit/EditorFindCommandDispatcher.swift:27-38` | AppKit falls back from the key window to the main window. This is safe only while menu enablement excludes non-workspace key windows (§5.1). |
 | `MenuBarState` observes one `AppState` and republishes a deduplicated five-fact snapshot. | `App/MenuBarState.swift:9-24`, `:26-34`, `:41-53` | §5.1 keeps this contract and retargets it. |
@@ -131,7 +131,7 @@ Additional consumers of `currentDocument` / `sessionCache` that I2 must migrate:
 | UI tests pick "the" window as the first hittable one and query identifiers app-wide. | `PlainsongUITests/EditorFindAcceptanceTests.swift:119-129`, `PlainsongUITests/WorkspaceSearchAcceptanceTests.swift:29-37` |
 | Accessibility identifiers are not unique across windows. | `App/Views/DocumentJumpBar.swift` (`plainsong.editor.fileName`) |
 | Real dual-window key activation has never been verified. | `docs/editor-find-gates.md:776-781`, `docs/decision-log.md:180` |
-| The memory gate is 8 warm sessions + 2 live webviews under 400 MB host RSS. Recorded runs: 141.6–149.8 MB host, with about 500 MB across two WebKit helpers (diagnostic, R16). | `PerformanceTests/PerformanceBudgetTests.swift:309`, `:431`, `docs/perf-log.md:51`, `:69`, `docs/risk-register.md:26` |
+| The memory gate is 8 warm sessions + 2 live webviews under 400 MB host RSS. Recorded runs: 141.6–149.8 MB host, with about 500 MB across two WebKit helpers (diagnostic, R16). | `PerformanceTests/PerformanceBudgetTests.swift:309`, `:431`, `docs/perf-log.md:76`, `:94`, `docs/risk-register.md:26` |
 | The typing-latency gate. | `PerformanceTests/PerformanceBudgetTests.swift:12` |
 
 ## 3. State partition
@@ -199,7 +199,7 @@ same notice routing, preserving their session identity even when it is warm and 
 | `WorkspaceSearchKeyboardSmokeProbe` | `App/WorkspaceSearchSelection.swift:27-38` | Key observations by window; hosted multi-window tests cannot read a last-writer-wins static. |
 | `EditorPreviewScrollCoordinator.latestDebugInstance` | `App/Views/EditorScrollBridge.swift:24` | Resolve a designated window's coordinator in hosted tests. |
 | `EditorNavigationDebugProbe.shared` | `Packages/EditorKit/Sources/EditorKit/MarkdownTextViewCoordinator+Navigation.swift:301` | Key observations by window/installation in hosted tests. |
-| `EditorFindSpike.fireCount`, `lastFireDate` | `Packages/EditorKit/Sources/EditorKit/EditorFindSpike.swift:29-32` | Keep aggregate diagnostics; add originating-window evidence for routing tests. |
+| `EditorFindSpike.fireCount`, `lastFireDate` | `Packages/EditorKit/Sources/EditorKit/EditorFindSpike.swift:10-13` | Keep aggregate diagnostics; add originating-window evidence for routing tests. |
 | Delegate Debug fixture state | `App/PlainsongApplicationDelegate.swift:5-11`, `:56-95` | App-global creation/cleanup once; explicitly bind fixture actions to the first test window. |
 
 Unchanged: `EditorSelectionProbe.keyWindowOverrideForTesting`
@@ -303,7 +303,7 @@ single-file session records membership in at most one installed root
   Because enablement excludes non-workspace key windows, AppKit's main-window fallback
   cannot fire. The Find hooks and the App fallbacks
   (`App/EditorFindCommandDelivery.swift:17-48`) resolve the key window's state. The EditorKit
-  selectors (`Packages/EditorKit/Sources/EditorKit/EditorFindSpike.swift:68-83`), including
+  selectors (`Packages/EditorKit/Sources/EditorKit/EditorFindSpike.swift:31-46`), including
   Escape `cancelFind` (`Packages/EditorKit/Sources/EditorKit/MarkdownSTTextView.swift:75`),
   pass their own window, so a command reaches the window that owns the text view.
 - **Carbon ⇧⌘F** stays registered app-wide while active
@@ -478,7 +478,8 @@ sessions, and a session warm in two windows would still need one cross-window ow
 ### 7.3 Restated §12 memory budget (proposal)
 
 < 400 MB host RSS: 8 warm sessions, 4 windows, 2 visible settled previews, 2 hidden windows
-past teardown. Record host delta per preview and helper RSS diagnostics in `docs/perf-log.md`;
+past teardown. Record host delta per preview and helper RSS diagnostics in
+`docs/perf/YYYY-MM-DD-<slug>.md`;
 keep the two-webview test (`PerformanceTests/PerformanceBudgetTests.swift:309`).
 
 ### 7.4 Typing latency
@@ -606,7 +607,7 @@ final layout instead of a layout that is about to move. It changes chrome and it
 ## 11. Gates
 
 Boxes start unchecked. Each bullet names the evidence it needs: a named hosted test, a
-named XCUITest, a perf measurement recorded in `docs/perf-log.md`, or an owner smoke
+named XCUITest, a perf measurement recorded in `docs/perf/YYYY-MM-DD-<slug>.md`, or an owner smoke
 recorded in the closing commit.
 
 ### W0 — Baseline inventory and mechanism probe
@@ -722,7 +723,7 @@ scheduling root cause remains unknown. This is an additional gate, not closure b
 
 ### W11 — Memory
 
-- [ ] The §7.3 configuration stays under 400 MB host RSS. Helper RSS and the per-preview host delta are recorded. *Perf measurement in `docs/perf-log.md`.*
+- [ ] The §7.3 configuration stays under 400 MB host RSS. Helper RSS and the per-preview host delta are recorded. *Perf measurement in `docs/perf/YYYY-MM-DD-<slug>.md`.*
 - [ ] Hidden previews beyond two are torn down after the grace period (controller released), and visible previews are never torn down. *Named hosted test.*
 - [ ] Separate installedURLs allows 8 warm sessions plus installed ones; other protectedURLs still count and failed/fenced evictions retain the over-limit cache. `testZZZMemoryWithEightWarmSessionsAndTwoLiveWebViewsStaysUnderBudget` still passes. *Named policy/hosted/perf tests.*
 - Evidence: _open_

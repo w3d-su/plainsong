@@ -26,7 +26,13 @@ projects such as Astro/Next.js content directories).
 
 ### Non-Goals (for now)
 
-- iOS/iPadOS version (keep core packages platform-portable, but do not build UI for it).
+- iOS/iPadOS UI is outside the macOS roadmap. The separately authorized iOS/iPadOS 26+
+  source-editor and preview work follows [`docs/ios/README.md`](docs/ios/README.md):
+  12 parallel implementation lanes and one integration owner, frozen C0 interfaces,
+  isolated worktrees, and M0 real-device gates before production composition.
+  C0 supplies compile-time contracts and an unavailable app scaffold. Production
+  providers, device validation, persistence, performance and IPA installation remain
+  separate gates in `docs/ios/integration-ledger.md`.
 - Cloud sync, accounts, collaboration.
 - Full MDX component *execution* with user project bundling (placeholder rendering instead; see §9).
 - Plugin system for third parties.
@@ -96,6 +102,14 @@ Build artifacts: `preview-src` builds to `App/Resources/preview/` (`index.html`,
 `mermaid.js`, `bundle.css`, woff2 KaTeX `fonts/`). The dist output **is committed** so Swift-only agents can build the app without
 Node installed; regenerate with `make preview-bundle` whenever `preview-src/` changes.
 
+Manual Swift linker harnesses must include the approved portable package dependencies:
+`WorkspaceKit` requires `WorkspaceCore`, while the parser extraction belongs to
+`SyntaxKit`. Keep missing-object refusals and existing sandbox assertions. For iOS
+package test admission, verify an enabled test plan, built test bundle and actual
+named results; a library-only `build-for-testing` does not verify test compilation.
+Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-ledger.md`.
+
+
 ---
 
 ## 4. Architecture
@@ -146,8 +160,12 @@ Node installed; regenerate with `make preview-bundle` whenever `preview-src/` ch
 - UI mutation on `@MainActor` only.
 - tree-sitter parsing and highlight query execution off main thread (`MarkdownHighlightService`
   handles this; do not block it).
-- Preview render requests are coalesced: only the latest version may be in flight; stale
-  `renderComplete` responses are ignored.
+- Preview render requests are single-flight: one render is in JavaScript at a time and the
+  newest request replaces the pending one, sent when the in-flight render posts
+  `renderComplete` or after a 2 s watchdog (a throwing md pipeline or a stale-dropped render
+  posts nothing). Stale `renderComplete` responses still free the slot but are otherwise
+  ignored. A session render whose (session, version, file, presented document, asset root,
+  theme, remote-image policy) equals the last submission is dropped as a duplicate.
 - Editor highlight requests restart through `EditorHighlightScheduler`: each request cancels
   the executing request and replaces the pending revision in the caller's turn. One runner
   waits for cancelled work to return before starting the latest request, so at most one
@@ -189,7 +207,10 @@ Node installed; regenerate with `make preview-bundle` whenever `preview-src/` ch
   the 521 pt Split floor). The inspector auto-collapses when the document column cannot fit it.
 - Open folder: sidebar shows the tree; filter to show only markdown-related files by
   default (`.md`, `.markdown`, `.mdx`), toggle "Show all files". Images shown so they can
-  be drag-inserted.
+  be drag-inserted. In the default mode the scan skips `WorkspaceIgnoredDirectories`
+  (`node_modules`, `dist`, `build`, `.next`, `.astro`, `.build`, `deriveddata`, `.git`;
+  the list Search ignores) without enumerating them; only the chain down to an open
+  session's file in that root is scanned inside them. "Show all files" rescans everything.
 - File tree operations: create/rename/delete/move file & folder (Finder-style, with
   trash not hard delete). Watch root recursively via `FSEventStream`; debounce 300 ms;
   reconcile tree diff instead of full reload to preserve expansion state.
@@ -239,6 +260,14 @@ replacement local to EditorKit.
   SwiftUI update. Edits, document/appearance changes and WYSIWYG selection changes
   still restart the revision-fenced scheduler; fence/frontmatter context is expanded
   once per source highlight, off the main actor.
+- Fenced-code state has one definition, `MarkdownFenceScanner` (MarkdownCore), shared by
+  the visible-range expansion, the Enter fence helper (§6.3) and MDX component
+  completion (§6.5). CommonMark §4.5 per line (`\n`, `\r`, `\r\n`): a run of ≥ 3
+  `` ` `` or `~` after ≤ 3 spaces (the Enter helper accepts any spaces/tabs, for
+  list-item fences); a backtick opener's info string has no backtick; only the same
+  character, at least as long, followed by nothing but spaces/tabs, closes; a leading
+  `---`/`+++` frontmatter block closed by the same marker is skipped. It walks native
+  UTF-8 storage with `memchr` (bridged strings as UTF-16) and returns UTF-16 offsets.
 - Applying a highlight skips runs whose stored attributes already equal the new ones:
   re-setting equal attributes still marks the run edited, and TextKit then re-typesets
   every visible paragraph. The stored result is identical either way.
@@ -269,7 +298,9 @@ replacement local to EditorKit.
   caret so bullets and manually typed italics stay natural. Wrapping: with a selection,
   typing a pair character wraps the selection. Skip-over on closing char except for `*`.
 - **Code fence helper:** typing ``` ``` ``` then Enter auto-inserts closing fence and places
-  cursor inside; language autocomplete fires after the opening fence.
+  cursor inside; language autocomplete fires after the opening fence. Inside an already
+  open fence of either marker (`~~~` included, any indentation) nothing is inserted:
+  the typed line is code or the closing fence.
 - **Smart paste:** pasting a URL over selected text creates `[selection](url)`. Pasting an
   image from clipboard saves it to `assets/` (configurable, relative to the file) and
   inserts `![](path)`. Drag-in image files insert relative-path links (copy into
@@ -331,6 +362,11 @@ the trigger characters below, or ⌃Space manually. Engine is pure Swift in Mark
 Ranking: prefix match > fuzzy; recently used boosted. Max 50 items. Never block typing —
 compute async, cancel stale requests.
 
+Workspace paths and sibling frontmatter keys are read once per installed workspace capture
+and current file (keys from the first 32 KiB of up to 50 siblings, no digest); a typing
+pause recomputes only heading anchors and MDX component names, and `completionWorkspace`
+republishes only when its value changes literally.
+
 ---
 
 ## 7. Preview (PreviewKit + preview-src)
@@ -342,6 +378,11 @@ compute async, cancel stale requests.
   view's `@StateObject` state owns its `PreviewController`: closures stored on the
   controller or handed to AppKit views capture the objects they use, never the view
   struct, so closing the workspace root releases the controller and its web view.
+  The controller (and so its WebContent process) is created the first time the preview
+  pane is shown (`LazyPreviewController`); a source-only window has none. Hiding the pane
+  keeps it. After a WebContent termination a live controller reloads the page and
+  re-submits its newest render under a new render ID, giving up after three terminations
+  without a completed render (each later render retries once); export controllers fail.
 - **Security:** strict CSP (`default-src 'none'; script-src 'self'; style-src 'self'
   'unsafe-inline'; img-src asset: data: https:`), `isElementFullscreenEnabled` off, and
   no remote loads by default. The preview JS removes remote image `src` values unless
@@ -402,8 +443,12 @@ the Frontmatter panel, §10). Optional toggle to show it as a styled block.
 
 ### 7.3 Swift ↔ JS bridge protocol
 
-`window.webkit.messageHandlers.bridge.postMessage(...)` (JS→Swift) and
-`webView.evaluateJavaScript("render(payloadJSON)")` (Swift→JS). Keep the protocol in
+`window.webkit.messageHandlers.bridge.postMessage(...)` (JS→Swift, read field by field from
+the Foundation body, never through `JSONSerialization`) and
+`window.PlainsongBridge.receive(message)` (Swift→JS). `render` goes through
+`callAsyncJavaScript` with the message as a Foundation argument, so the document text is
+never JSON-encoded, interpolated into a script, or parsed as source; the other messages are
+JSON-encoded into an `evaluateJavaScript` script. Both carry the same message shape. Keep the protocol in
 `BridgeMessage.swift` + `ExportBridgeMessages.swift` (Codable) and `bridge.ts` —
 **these must be kept in sync; both sides list message names in the same order with a
 `PROTOCOL_VERSION` constant checked at `ready`.**
@@ -466,7 +511,11 @@ block-level element.
   (O(log n) per keystroke; a full rebuild walked the 1 MiB storage on every selection
   change), with a length check and a change-notification fallback that rebuild in bulk.
 - **Loop prevention:** a `scrollOwner` token (`editor` | `preview` | `none`) with 100 ms
-  decay; messages from the non-owner are dropped.
+  decay (a deadline timestamp, not a timer per event); messages from the non-owner are
+  dropped.
+- Editor viewport traffic carries no completion: one `scrollToLine` is in flight and only
+  the newest line waits. Document navigation keeps its render barrier and receipt, and
+  discards waiting viewport lines so they cannot scroll back over it.
 - Cursor-follow option: "typewriter sync" — on text edit, preview scrolls to the edited
   line (on by default, like Typora).
 
@@ -509,7 +558,9 @@ attempt without a Decision Log entry.
   type-aware controls (string, date picker for `date`, tag token field for `tags`, toggle
   for `draft`).
 - Edits write back into the source text (panel ↔ text always derived from the document;
-  the text is the single source of truth).
+  the text is the single source of truth). An inspector edit is computed from the session's
+  text at that moment and shown at once; editor typing reaches the panel after a 150 ms
+  pause, and the Yams parse reruns only when the frontmatter block itself changed.
 - Malformed YAML → panel shows raw text + error, never crashes, never rewrites what it
   cannot parse.
 - String and string-list form writes use explicitly quoted YAML scalars with serializer-owned
@@ -567,6 +618,11 @@ highlighting instrumentation, not from the historical 250 KB full-document inlin
 parsing cutoff. The memory budget is scoped to deterministic app host-process RSS.
 OS-managed WebKit helper processes should be recorded as diagnostic/informational
 data because helper reuse and process-pool ownership vary across runs and CI hosts.
+
+Record a new measurement as `docs/perf/YYYY-MM-DD-<slug>.md`, one file per entry.
+`docs/perf-log.md` is the archive and takes no new sections; its header has the file
+format. The 2026-10-18 profile above, and every earlier budget, stay in that archive.
+`Scripts/editor_find_f2_evidence_tests` still reads the F2 trust-root rows there.
 
 ---
 
@@ -675,7 +731,33 @@ Phase 1 milestones were delivered in order and are all accepted; each lists the 
 
 **Phase 2 = WYSIWYG (§13). Phase 3 candidates:** export (HTML/PDF via preview print),
 window tabs, search across workspace (ripgrep-style), publish integrations, real MDX
-component rendering.
+component rendering. The independent iOS lane follows `docs/ios/contracts.md`: iOS 26+,
+source plus preview, Files/iCloud in-place access, native UIKit editor and UIDocument
+persistence. The first C0 PR owns declarations/scaffolds only; 02/03 perform shared
+core extraction, 13 retains contracts/composition, and 12 receives global build
+manifests after the recorded C0 transfer. iOS-only packages stay out of Mac `make test`.
+
+The iOS acceptance review uses a separate aggregate of the published lane heads;
+fix commits preserve the frozen declarations and unavailable C0 composition. Shared
+package dependency inventory tests pin SyntaxKit's two existing parser dependencies
+and WorkspaceKit's WorkspaceCore path after extraction. A successful test action must
+report executed named cases; skip, empty results, lock admission timeout, and simulator
+installation failure remain distinct. Real PreviewKit tests load byte-verified resources
+inside the test container with the original CSP, bounded JavaScript replies, and cleanup
+registered before the first await. M0 device and re-signed IPA installation gates stay
+open until owner evidence is recorded. The current review receipt and next-agent
+handoff live in `docs/ios/evidence/review-20261013/README.md`; an aggregate compilation
+and a portable Mac logic run do not close native or owner acceptance.
+
+Lane 12 owns the separate `IOSPreview` / `make ios-preview` entry. Its dedicated
+SwiftUI app host links system frameworks only; PreviewKit and MarkdownCore are
+linked in the unit-test bundle, avoiding duplicate package classes in the host.
+Admission must prove a built app-hosted Mach-O unit-test bundle. The full suite
+retains all original 94 cases and rejects skips; a separate first-controller run
+loads the production-default app-bundled index after byte parity checks. Keep the
+8-second ready and 2-second JavaScript limits. `PreviewKit-Package` remains the
+hostless package diagnostic, not the iOS app-host acceptance entry. This test
+scaffold does not install providers or authorize production composition before M0.
 
 ---
 
@@ -742,7 +824,10 @@ make format           # swiftformat . && swiftlint --fix
 7. **No new dependencies** (Swift or npm) without a Decision Log entry with rationale and
    alternatives considered.
 8. **Performance budgets (§12) are gates**, not suggestions. When touching the edit path,
-   state how you verified typing latency.
+   state how you verified typing latency. Record the measurement as a new file,
+   `docs/perf/YYYY-MM-DD-<slug>.md` (format in the `docs/perf-log.md` header). Do not
+   append a section to `docs/perf-log.md`: that shared end made open performance PRs
+   conflict, and resolving the conflict forced a full CI run.
 9. **Main-thread discipline:** parsing/rendering off main; UI on `@MainActor`. No new
    `DispatchQueue.global` calls.
 10. **Naming/style:** Swift API Design Guidelines; SwiftFormat config is authoritative;

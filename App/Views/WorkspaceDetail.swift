@@ -7,7 +7,7 @@ import SwiftUI
 /// Document column: jump bar, notices, Find bar, editor (+ preview), status bar.
 struct EditorWorkspace: View {
     @EnvironmentObject private var appState: AppState
-    @StateObject private var previewController = PreviewController()
+    @StateObject private var preview = LazyPreviewController()
     @StateObject private var scrollCoordinator = EditorPreviewScrollCoordinator()
 
     var body: some View {
@@ -59,7 +59,9 @@ struct EditorWorkspace: View {
 
                     PreviewPane(
                         session: appState.currentDocument,
-                        controller: previewController
+                        controller: preview.controller { [appState, scrollCoordinator] controller in
+                            Self.configure(controller, appState: appState, scrollCoordinator: scrollCoordinator)
+                        }
                     )
                     .frame(minWidth: WorkspaceLayout.previewMinimum, maxWidth: .infinity, maxHeight: .infinity)
                     .workspaceFrameProbe("preview")
@@ -72,26 +74,29 @@ struct EditorWorkspace: View {
             WorkspaceStatusBar(statistics: appState.currentDocument.statistics)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear(perform: configurePreviewCallbacks)
     }
 
+    /// Wires a controller created on the first preview show (`LazyPreviewController`).
     /// Closures that outlive this body (the controller's callbacks, the jump bar's AppKit
     /// menu targets) capture `appState` and the coordinator, never `self`: a copy of this
     /// view holds the `@StateObject` storage, so capturing it retains the controller and its
     /// web view from the controller itself, and from any removed view still autoreleased.
-    private func configurePreviewCallbacks() {
-        let appState = appState
-        let scrollCoordinator = scrollCoordinator
-        scrollCoordinator.connect(previewController: previewController)
+    /// Static, so it cannot capture `self` by accident.
+    private static func configure(
+        _ controller: PreviewController,
+        appState: AppState,
+        scrollCoordinator: EditorPreviewScrollCoordinator
+    ) {
+        scrollCoordinator.connect(previewController: controller)
 
-        previewController.onPreviewScrolled = { line in
+        controller.onPreviewScrolled = { line in
             guard appState.preferences.typewriterSyncEnabled else { return }
             scrollCoordinator.previewScrolled(to: line)
         }
-        previewController.onCheckboxToggled = { line, checked, version, session in
+        controller.onCheckboxToggled = { line, checked, version, session in
             appState.setTaskCheckbox(line: line, checked: checked, version: version, in: session)
         }
-        previewController.onLinkClicked = { href in
+        controller.onLinkClicked = { href in
             appState.openPreviewLink(href)
         }
     }

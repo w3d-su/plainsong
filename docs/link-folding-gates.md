@@ -103,7 +103,7 @@ Each gate needs a named test (or recorded manual evidence) before it is checked.
 
 ### L8 — Performance
 - [x] Visible-range fold recompute on `Fixtures/large-1mb.md` (which must gain a link-dense
-  section if it lacks one) stays within the §12 50 ms budget; record in `docs/perf-log.md`.
+  section if it lacks one) stays within the §12 50 ms budget; record a new run in `docs/perf/YYYY-MM-DD-<slug>.md`.
   Evidence: `WYSIWYGLinkPerformanceGateTests.testL8LinkFoldingVisibleRangeRecomputeStaysUnderFiftyMilliseconds`
   and `docs/perf-log.md` (16.968 ms max on 2026-07-06; the existing fixture already contains
   repeated inline links and was not modified).

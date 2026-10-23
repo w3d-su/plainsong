@@ -6,10 +6,15 @@ import MarkdownCore
 @MainActor
 extension AppState {
     /// Publishes find chrome so SwiftUI sees `@Published`-style updates for the host box.
-    func setEditorFindUI(_ ui: EditorFindUIState) {
+    /// An identical value publishes nothing: the find counter is refreshed after every edit
+    /// while a query is active, and each publish re-renders every AppState observer.
+    @discardableResult
+    func setEditorFindUI(_ ui: EditorFindUIState) -> Bool {
+        guard !ui.isLiterallyIdentical(to: editorFindHost.ui) else { return false }
         noteEditorReplaceFindChromeTransition(from: editorFindHost.ui, to: ui)
         editorFindHost.ui = ui
         objectWillChange.send()
+        return true
     }
 
     /// Wire controller → App presentation/navigation once. Match completion is async and
@@ -342,6 +347,7 @@ extension AppState {
     }
 
     private func publishEditorFindSessionPresentation() {
+        let previousRequest = editorFindHost.matchHighlightRequest
         if let session = editorFindHost.controller.session,
            !session.query.pattern.isEmpty,
            !session.matches.isEmpty
@@ -357,7 +363,10 @@ extension AppState {
         }
         var ui = editorFindHost.ui
         ui.applySessionPresentation(editorFindHost.controller.session)
-        setEditorFindUI(ui)
+        // The highlight request is outside `ui`: publish it even when the chrome is unchanged.
+        if !setEditorFindUI(ui), editorFindHost.matchHighlightRequest != previousRequest {
+            objectWillChange.send()
+        }
     }
 
     /// Publish the controller's pending navigation on the shared App channel.

@@ -1,0 +1,50 @@
+name: PlainsongIOSM0
+options:
+  deploymentTarget:
+    iOS: '26.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.10'
+    SWIFT_STRICT_CONCURRENCY: complete
+    TARGETED_DEVICE_FAMILY: '1,2'
+    CODE_SIGNING_ALLOWED: NO
+targets:
+  PlainsongIOSM0:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    resources: [Fixtures]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.plainsong.ios-m0
+        GENERATE_INFOPLIST_FILE: YES
+    info:
+      path: Generated/Info.plist
+      properties:
+        CFBundleDisplayName: Plainsong M0
+        UILaunchScreen: {}
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Markdown
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.plain-text, public.text]
+  PlainsongIOSM0Tests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Tests]
+    dependencies:
+      - target: PlainsongIOSM0
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  PlainsongIOSM0:
+    build:
+      targets:
+        PlainsongIOSM0: all
+    test:
+      targets: [PlainsongIOSM0Tests]

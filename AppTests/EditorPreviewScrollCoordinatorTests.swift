@@ -9,11 +9,8 @@ final class EditorPreviewScrollCoordinatorTests: XCTestCase {
         let document = EditorDocumentIdentity(rawValue: "file:///post.md")
         var deliveredLines: [Int] = []
         var deliveredDocumentIdentifiers: [String?] = []
-        var scheduledDecays: [@MainActor () -> Void] = []
-        coordinator.installOwnerDecaySchedulerForTesting { completion in
-            scheduledDecays.append(completion)
-            return Task {}
-        }
+        var now: UInt64 = 1_000_000_000
+        coordinator.installClockForTesting { now }
         coordinator.installPreviewScrollDeliveryOverrideForTesting { line, _, documentIdentifier, completion in
             deliveredLines.append(line)
             deliveredDocumentIdentifiers.append(documentIdentifier)
@@ -22,13 +19,14 @@ final class EditorPreviewScrollCoordinatorTests: XCTestCase {
 
         coordinator.previewScrolled(to: 1)
         XCTAssertEqual(coordinator.scrollOwner, .preview)
+        now += 90_000_000
         coordinator.editorProxy.onScrollIntent?(
             .navigation(line: 42, documentIdentity: document)
         )
 
-        XCTAssertEqual(scheduledDecays.count, 2, "Navigation must re-arm preview ownership")
-        scheduledDecays[0]()
-        XCTAssertEqual(coordinator.scrollOwner, .preview)
+        // Past the first claim's 100 ms window: only the navigation's re-arm keeps it.
+        now += 20_000_000
+        XCTAssertEqual(coordinator.scrollOwner, .preview, "Navigation must re-arm preview ownership")
         XCTAssertEqual(deliveredLines, [42])
         XCTAssertEqual(deliveredDocumentIdentifiers, [document.rawValue])
         XCTAssertEqual(
@@ -44,8 +42,36 @@ final class EditorPreviewScrollCoordinatorTests: XCTestCase {
 
         coordinator.editorProxy.onScrollIntent?(.viewportChanged(line: 1))
         XCTAssertEqual(deliveredLines, [42], "Preview-driven editor echo must stay suppressed")
-        scheduledDecays[1]()
+        now += 80_000_000
         XCTAssertEqual(coordinator.scrollOwner, .none)
+    }
+
+    func testViewportTrafficClaimsEditorOwnershipWithoutReceiptsAndDecays() {
+        let coordinator = EditorPreviewScrollCoordinator()
+        var now: UInt64 = 5_000_000_000
+        var deliveries: [(line: Int, documentIdentifier: String?)] = []
+        coordinator.installClockForTesting { now }
+        coordinator.installPreviewScrollDeliveryOverrideForTesting { line, _, documentIdentifier, _ in
+            deliveries.append((line, documentIdentifier))
+        }
+        coordinator.setEditorScrollForwardingEnabled(true)
+
+        coordinator.editorProxy.onScrollIntent?(.viewportChanged(line: 10))
+        coordinator.editorProxy.onScrollIntent?(.viewportChanged(line: 11))
+        XCTAssertEqual(deliveries.map(\.line), [10, 11])
+        XCTAssertEqual(deliveries.map(\.documentIdentifier), [nil, nil])
+        XCTAssertNil(coordinator.previewScrollDeliveryReceipt, "Viewport traffic leaves no receipt")
+        XCTAssertEqual(coordinator.scrollOwner, .editor)
+
+        coordinator.previewScrolled(to: 3)
+        XCTAssertEqual(coordinator.scrollOwner, .editor, "The editor owns scrolling for 100 ms")
+
+        now += EditorPreviewScrollCoordinator.ownerDecayNanoseconds - 1
+        XCTAssertEqual(coordinator.scrollOwner, .editor)
+        now += 1
+        XCTAssertEqual(coordinator.scrollOwner, .none)
+        coordinator.previewScrolled(to: 3)
+        XCTAssertEqual(coordinator.scrollOwner, .preview)
     }
 
     func testFailedPreviewDeliveryProducesObservableReceipt() {

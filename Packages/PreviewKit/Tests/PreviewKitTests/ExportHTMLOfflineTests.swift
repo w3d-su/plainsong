@@ -1,4 +1,6 @@
-import AppKit
+#if os(macOS)
+    import AppKit
+#endif
 import MarkdownCore
 @testable import PreviewKit
 import WebKit
@@ -29,6 +31,7 @@ final class ExportHTMLOfflineTests: XCTestCase {
         ```
         """
         let controller = try makeController()
+        defer { controller.shutdownForTesting() }
         controller.exportTimeoutNanoseconds = 30_000_000_000
         let renderID = try await render(
             controller,
@@ -55,12 +58,13 @@ final class ExportHTMLOfflineTests: XCTestCase {
     /// (the reopened WebView's CSSOM and computed styles) must see no remote URL.
     func testEscapedLessThanURLSinksStayNeutralInTheReopenedDocument() async throws {
         let controller = try makeController()
+        defer { controller.shutdownForTesting() }
         controller.exportTimeoutNanoseconds = 30_000_000_000
         let renderID = try await render(
             controller,
             DocumentTextChange(text: "# CSS sinks\n\nText", version: 1, fileKind: .markdown, fileURL: nil)
         )
-        _ = try await controller.webView.evaluateJavaScript(Self.injectEscapedLessThanSinks)
+        _ = try await PreviewHostedTestWait.javascript(Self.injectEscapedLessThanSinks, in: controller.webView)
 
         let result = await controller.exportHTML(matchingRenderID: renderID)
         guard case let .ready(html, _, _) = result else {
@@ -69,17 +73,18 @@ final class ExportHTMLOfflineTests: XCTestCase {
         XCTAssertFalse(html.contains("evil.example"))
 
         let (webView, handler) = try await load(html)
-        let found = try await webView.evaluateJavaScript(Self.remoteCSSURLScan) as? [String]
+        defer { webView.stopLoading(); webView.navigationDelegate = nil }
+        let found = try await PreviewHostedTestWait.javascript(Self.remoteCSSURLScan, in: webView) as? [String]
         XCTAssertEqual(found, [])
-        _ = try await webView.evaluateJavaScript("""
+        _ = try await PreviewHostedTestWait.javascript("""
         (() => {
           const control = document.createElement("style");
           control.textContent = "li { list-style-image: url(https://control.invalid/x.png); }";
           document.head.append(control);
           return null;
         })()
-        """)
-        let control = try await webView.evaluateJavaScript(Self.remoteCSSURLScan) as? [String]
+        """, in: webView)
+        let control = try await PreviewHostedTestWait.javascript(Self.remoteCSSURLScan, in: webView) as? [String]
         XCTAssertTrue(control?.contains { $0.contains("control.invalid") } == true, "The scan must see real url()")
         XCTAssertEqual(handler.requests, ["plainsong-offline://document"])
     }
@@ -156,6 +161,7 @@ final class ExportHTMLOfflineTests: XCTestCase {
 
     private func reopen(_ html: String) async throws {
         let (webView, handler) = try await load(html)
+        defer { webView.stopLoading(); webView.navigationDelegate = nil }
         var rendered: [String: Any]?
         let script = """
         (() => {
@@ -170,7 +176,7 @@ final class ExportHTMLOfflineTests: XCTestCase {
         """
         let decodeStart = DispatchTime.now().uptimeNanoseconds
         while DispatchTime.now().uptimeNanoseconds - decodeStart < 5_000_000_000 {
-            rendered = try await webView.evaluateJavaScript(script) as? [String: Any]
+            rendered = try await PreviewHostedTestWait.javascript(script, in: webView) as? [String: Any]
             if (rendered?["width"] as? Int ?? 0) > 0 {
                 break
             }
@@ -190,47 +196,46 @@ final class ExportHTMLOfflineTests: XCTestCase {
         configuration.setURLSchemeHandler(handler, forURLScheme: "plainsong-offline")
         configuration.websiteDataStore = .nonPersistent()
         let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
+        var loaded = false
+        defer {
+            if !loaded {
+                webView.stopLoading()
+                webView.navigationDelegate = nil
+            }
+        }
         let navigation = NavigationWaiter()
         webView.navigationDelegate = navigation
-        navigation.onFinish = { navigation.didFinish = true }
         try webView.load(URLRequest(url: XCTUnwrap(URL(string: "plainsong-offline://document"))))
-        let navigationStart = DispatchTime.now().uptimeNanoseconds
-        while !navigation.didFinish,
-              DispatchTime.now().uptimeNanoseconds - navigationStart < 10_000_000_000
-        {
-            try await Task.sleep(nanoseconds: 50_000_000)
+        try await PreviewHostedTestWait.until("offline document navigation", timeoutNanoseconds: 10_000_000_000) {
+            navigation.didFinish || navigation.failure != nil
         }
+        if let failure = navigation.failure {
+            throw NSError(domain: "PlainsongOfflineNavigation", code: 1, userInfo: [NSLocalizedDescriptionKey: failure])
+        }
+        // Keep the original assertions; a timeout/failure throws before any JS is evaluated.
         XCTAssertTrue(navigation.didFinish)
         XCTAssertNil(navigation.failure)
+        loaded = true
         return (webView, handler)
     }
 
     private func makeController() throws -> PreviewController {
-        let testFile = URL(fileURLWithPath: #filePath)
-        let repositoryRoot = testFile
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let indexURL = repositoryRoot.appendingPathComponent("App/Resources/preview/index.html")
-        let controller = PreviewController(previewIndexURL: indexURL)
+        let controller = try PreviewController(previewIndexURL: PreviewBundleFixture.indexURL())
         addTeardownBlock { @MainActor [weak controller] in controller?.invalidate() }
         return controller
     }
 
     private func render(_ controller: PreviewController, _ change: DocumentTextChange) async throws -> Int {
-        let start = DispatchTime.now().uptimeNanoseconds
-        while !controller.isReady, DispatchTime.now().uptimeNanoseconds - start < 5_000_000_000 {
-            try await Task.sleep(nanoseconds: 50_000_000)
+        try await PreviewHostedTestWait.until("offline preview bridge ready", timeoutNanoseconds: 5_000_000_000) {
+            controller.isReady
         }
         XCTAssertTrue(controller.isReady)
         let renderID = controller.renderForTesting(change)
-        let renderStart = DispatchTime.now().uptimeNanoseconds
-        while controller.scrollDeliveryState.completedRenderID != renderID,
-              DispatchTime.now().uptimeNanoseconds - renderStart < 30_000_000_000
-        {
-            try await Task.sleep(nanoseconds: 50_000_000)
+        try await PreviewHostedTestWait.until(
+            "offline render \(renderID) completed",
+            timeoutNanoseconds: 30_000_000_000
+        ) {
+            controller.scrollDeliveryState.completedRenderID == renderID
         }
         XCTAssertEqual(controller.scrollDeliveryState.completedRenderID, renderID)
         return renderID
@@ -287,24 +292,18 @@ private final class OfflineDocumentSchemeHandler: NSObject, WKURLSchemeHandler {
 }
 
 private final class NavigationWaiter: NSObject, WKNavigationDelegate {
-    var onFinish: (() -> Void)?
     var didFinish = false
     var failure: String?
 
     func webView(_: WKWebView, didFinish _: WKNavigation!) {
-        onFinish?()
-        onFinish = nil
+        didFinish = true
     }
 
     func webView(_: WKWebView, didFail _: WKNavigation!, withError error: Error) {
         failure = error.localizedDescription
-        onFinish?()
-        onFinish = nil
     }
 
     func webView(_: WKWebView, didFailProvisionalNavigation _: WKNavigation!, withError error: Error) {
         failure = error.localizedDescription
-        onFinish?()
-        onFinish = nil
     }
 }

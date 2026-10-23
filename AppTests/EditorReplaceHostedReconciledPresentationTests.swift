@@ -52,6 +52,9 @@ extension EditorFindHostedGateTests {
         let coordinator = try XCTUnwrap(editor.textDelegate as? MarkdownTextViewCoordinator)
         try await waitForHostedReplaceObservationQuiescence(hosted)
         try await settleReconciledHighlight(coordinator)
+        // Highlight settlement yields: a new disk inspection can begin after the first
+        // readiness check. Recheck after the final suspension before the synchronous probe.
+        try await waitForHostedReplaceObservationQuiescence(hosted)
         let presentationBefore = reconciledPresentation(editor)
         let revisionBefore = try XCTUnwrap(coordinator.lastAppliedHighlightRevision)
         let bindingBefore = coordinator.currentDocumentBindingInstallation

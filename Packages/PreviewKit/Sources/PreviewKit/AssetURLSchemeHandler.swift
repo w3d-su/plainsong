@@ -26,6 +26,14 @@ enum AssetURLPolicy {
         return AssetURLPolicyResult(mimeType: mimeType, data: data)
     }
 
+    /// Policy for bytes a reader already returned. The reader cannot skip the
+    /// extension allowlist or the post-read byte cap.
+    static func deliveredAsset(data: Data, fileURL: URL) throws -> AssetURLPolicyResult {
+        let mimeType = try mimeType(for: fileURL)
+        try validateSize(Int64(data.count))
+        return AssetURLPolicyResult(mimeType: mimeType, data: data)
+    }
+
     static func mimeType(for fileURL: URL) throws -> String {
         let pathExtension = fileURL.pathExtension.lowercased()
         guard let mimeType = MarkdownImageAssetPolicy.mimeType(forPathExtension: pathExtension) else {
@@ -54,139 +62,338 @@ enum AssetURLPolicy {
     }
 }
 
-final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler {
+protocol PreviewAssetSchemeTask: AnyObject {
+    var requestURL: URL? { get }
+    func receive(response: URLResponse)
+    func receive(data: Data)
+    func finish()
+    func fail(_ error: Error)
+}
+
+struct AssetAuthorityInstallation: Equatable {
+    let token: String
+    let reportsMissingDirectoryGrant: Bool
+}
+
+final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler, @unchecked Sendable {
     private let state = AssetURLSchemeHandlerState()
-    private let readQueue: OperationQueue = {
-        let queue = OperationQueue()
-        queue.name = "Plainsong.asset-url-read"
-        queue.qualityOfService = .userInitiated
-        return queue
-    }()
+    private let readers = AssetReaderBox()
+    var onCurrentFailure: (@MainActor (PreviewAssetReadFailure) -> Void)?
+
+    func installReader(_ reader: (any PreviewAssetReading)?) {
+        readers.set(reader)
+    }
 
     @discardableResult
     func updateAllowedRoot(_ root: URL?) -> String {
         state.updateAllowedRoot(root)
     }
 
-    func webView(_: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
-        guard let url = urlSchemeTask.request.url else {
-            fail(urlSchemeTask, error: URLError(.badURL))
+    func updateAuthority(_ context: PreviewAssetAccessContext?) -> AssetAuthorityInstallation {
+        state.updateAuthority(context)
+    }
+
+    func currentPlainsongRootToken() -> String {
+        state.currentToken()
+    }
+
+    func isCurrent(_ context: PreviewAssetAccessContext) -> Bool {
+        state.matches(context)
+    }
+
+    func invalidateReads() {
+        state.invalidate()
+    }
+
+    func webView(_: WKWebView, start urlSchemeTask: any WKURLSchemeTask) {
+        start(WKAssetSchemeTask(urlSchemeTask), taskID: ObjectIdentifier(urlSchemeTask as AnyObject))
+    }
+
+    func webView(_: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) {
+        state.stop(ObjectIdentifier(urlSchemeTask as AnyObject))
+    }
+
+    func stop(_ task: any PreviewAssetSchemeTask) {
+        state.stop(ObjectIdentifier(task))
+    }
+
+    func start(_ task: any PreviewAssetSchemeTask) {
+        start(task, taskID: ObjectIdentifier(task))
+    }
+
+    private func start(_ task: any PreviewAssetSchemeTask, taskID: ObjectIdentifier) {
+        switch state.begin(url: task.requestURL, taskID: taskID) {
+        case .invalidated:
             return
+        case .missingURL:
+            task.fail(URLError(.badURL))
+        case .staleToken:
+            task.fail(CocoaError(.fileReadNoPermission))
+        case .missingAuthority:
+            task.fail(CocoaError(.fileReadNoPermission))
+            report(.unavailable, capture: nil, taskID: taskID)
+        case let .ready(capture):
+            beginRead(task, capture: capture, taskID: taskID)
         }
+    }
 
-        guard let root = state.currentAllowedRoot(for: url) else {
-            fail(urlSchemeTask, error: CocoaError(.fileReadNoPermission))
-            return
-        }
-
-        let taskID = ObjectIdentifier(urlSchemeTask as AnyObject)
-        let task = AssetURLSchemeTaskBox(urlSchemeTask)
-        state.clearStoppedTask(taskID)
-        let callbackQueue = OperationQueue.current ?? .main
-        let state = state
-
-        readQueue.addOperation {
-            let result = Result {
-                let fileURL = try AssetURLResolver(allowedRoot: root).resolve(url)
-                let asset = try AssetURLPolicy.loadAsset(at: fileURL)
-                let response = URLResponse(
-                    url: url,
-                    mimeType: asset.mimeType,
-                    expectedContentLength: asset.data.count,
-                    textEncodingName: nil
+    private func beginRead(_ task: any PreviewAssetSchemeTask, capture: AssetReadCapture, taskID: ObjectIdentifier) {
+        guard let requestURL = task.requestURL else { return }
+        let reader = readers.current()
+        let box = SchemeTaskBox(task)
+        let readTask = Task.detached { [weak self] in
+            let resolved: URL
+            do {
+                resolved = try AssetFilesystemPreparation.resolvedAssetURL(
+                    requestURL,
+                    allowedRoot: capture.allowedRoot
                 )
-                return (response, asset.data)
+            } catch {
+                await self?.failMapped(box.task, error: error, capture: capture, taskID: taskID)
+                return
             }
-
-            callbackQueue.addOperation { [state] in
-                guard !state.consumeStoppedTask(taskID) else { return }
-                switch result {
-                case let .success((response, data)):
-                    task.didReceive(response)
-                    task.didReceive(data)
-                    task.didFinish()
-                case let .failure(error):
-                    task.didFailWithError(error)
+            guard let self else { return }
+            guard await acceptsDelivery(capture, taskID: taskID) else { return }
+            let request = PreviewAssetReadRequest(
+                requestID: capture.requestID,
+                resolvedURL: resolved,
+                access: capture.access,
+                maximumByteCount: Int(exactly: AssetURLPolicy.maxAssetBytes) ?? .max
+            )
+            do {
+                try Task.checkCancellation()
+                guard let reader else {
+                    await failCurrent(box.task, failure: .unavailable, capture: capture, taskID: taskID)
+                    return
                 }
+                let result = try await reader.read(request)
+                try Task.checkCancellation()
+                guard let root = await deliveryRoot(
+                    box.task,
+                    result: result,
+                    capture: capture,
+                    taskID: taskID
+                ) else { return }
+                let prepared = try AssetFilesystemPreparation.containedAsset(
+                    result.bytes,
+                    fileURL: result.coordinatedURL,
+                    root: root
+                )
+                try Task.checkCancellation()
+                await deliverPrepared(
+                    box.task,
+                    asset: prepared.asset,
+                    displayURL: prepared.fileURL,
+                    capture: capture,
+                    taskID: taskID
+                )
+            } catch is CancellationError {
+                return
+            } catch {
+                await failMapped(box.task, error: error, capture: capture, taskID: taskID)
             }
         }
+        state.store(readTask, id: taskID)
     }
 
-    func webView(_: WKWebView, stop urlSchemeTask: WKURLSchemeTask) {
-        state.markStoppedTask(ObjectIdentifier(urlSchemeTask as AnyObject))
+    @MainActor
+    private func acceptsDelivery(_ capture: AssetReadCapture, taskID: ObjectIdentifier) -> Bool {
+        state.permission(for: capture, taskID: taskID).acceptsDelivery
     }
 
-    private func fail(_ task: WKURLSchemeTask, error: Error) {
-        task.didFailWithError(error)
-    }
-}
-
-private final class AssetURLSchemeHandlerState: @unchecked Sendable {
-    private let lock = NSLock()
-    private var allowedRoot: URL?
-    private var rootID = UUID().uuidString
-    private var stoppedTaskIDs: Set<ObjectIdentifier> = []
-
-    func updateAllowedRoot(_ root: URL?) -> String {
-        lock.lock()
-        defer { lock.unlock() }
-        let previousSpelling = allowedRoot?.absoluteString ?? ""
-        let nextSpelling = root?.absoluteString ?? ""
-        if !previousSpelling.utf8.elementsEqual(nextSpelling.utf8) {
-            rootID = UUID().uuidString
+    /// Permission and generation are read on the main thread. The caller resolves
+    /// the returned root off the main thread, then delivers only after another check.
+    @MainActor
+    private func deliveryRoot(
+        _ task: any PreviewAssetSchemeTask,
+        result: PreviewAssetReadResult,
+        capture: AssetReadCapture,
+        taskID: ObjectIdentifier
+    ) -> URL? {
+        let permission = state.permission(for: capture, taskID: taskID)
+        guard permission.acceptsDelivery, let root = permission.allowedRoot else { return nil }
+        guard result.requestID == capture.requestID, AssetAuthority.matches(result.access, capture.access) else {
+            failCurrentSync(task, failure: .accessChanged, capture: capture, taskID: taskID)
+            return nil
         }
-        allowedRoot = root
-        return rootID
+        return root
     }
 
-    func currentAllowedRoot(for url: URL) -> URL? {
-        lock.lock()
-        defer { lock.unlock() }
-        let requestedID = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-            .queryItems?.first { $0.name == "plainsong-root" }?.value
-        if let requestedID, requestedID != rootID { return nil }
-        return allowedRoot
+    @MainActor
+    private func deliverPrepared(
+        _ task: any PreviewAssetSchemeTask,
+        asset: AssetURLPolicyResult,
+        displayURL: URL,
+        capture: AssetReadCapture,
+        taskID: ObjectIdentifier
+    ) {
+        guard state.permission(for: capture, taskID: taskID).acceptsDelivery else { return }
+        let response = URLResponse(
+            url: task.requestURL ?? displayURL,
+            mimeType: asset.mimeType,
+            expectedContentLength: asset.data.count,
+            textEncodingName: nil
+        )
+        task.receive(response: response)
+        guard state.permission(for: capture, taskID: taskID).acceptsDelivery else { return }
+        task.receive(data: asset.data)
+        guard state.permission(for: capture, taskID: taskID).acceptsDelivery else { return }
+        task.finish()
     }
 
-    func clearStoppedTask(_ taskID: ObjectIdentifier) {
-        lock.lock()
-        stoppedTaskIDs.remove(taskID)
-        lock.unlock()
+    @MainActor
+    private func failCurrent(
+        _ task: any PreviewAssetSchemeTask,
+        failure: PreviewAssetReadFailure,
+        capture: AssetReadCapture,
+        taskID: ObjectIdentifier
+    ) {
+        failCurrentSync(task, failure: failure, capture: capture, taskID: taskID)
     }
 
-    func markStoppedTask(_ taskID: ObjectIdentifier) {
-        lock.lock()
-        stoppedTaskIDs.insert(taskID)
-        lock.unlock()
+    @MainActor
+    private func failCurrentSync(
+        _ task: any PreviewAssetSchemeTask,
+        failure: PreviewAssetReadFailure,
+        capture: AssetReadCapture,
+        taskID: ObjectIdentifier
+    ) {
+        guard state.permission(for: capture, taskID: taskID).acceptsDelivery else { return }
+        task.fail(failure.schemeError)
+        onCurrentFailure?(failure)
     }
 
-    func consumeStoppedTask(_ taskID: ObjectIdentifier) -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return stoppedTaskIDs.remove(taskID) != nil
+    private func failMapped(
+        _ task: any PreviewAssetSchemeTask,
+        error: Error,
+        capture: AssetReadCapture,
+        taskID: ObjectIdentifier
+    ) {
+        let failure = PreviewAssetReadFailure.mapped(from: error)
+        Task { @MainActor in
+            self.failCurrentSync(task, failure: failure, capture: capture, taskID: taskID)
+        }
+    }
+
+    private func report(_ failure: PreviewAssetReadFailure, capture: AssetReadCapture?, taskID: ObjectIdentifier) {
+        Task { @MainActor in
+            if let capture {
+                guard self.state.permission(for: capture, taskID: taskID).acceptsDelivery else { return }
+            }
+            self.onCurrentFailure?(failure)
+        }
     }
 }
 
-private struct AssetURLSchemeTaskBox: @unchecked Sendable {
+private extension PreviewAssetReadFailure {
+    var schemeError: Error {
+        switch self {
+        case .unavailable, .accessChanged:
+            CocoaError(.fileReadNoPermission)
+        case .outsideRoot:
+            CocoaError(.fileReadNoPermission)
+        case .unsupportedType:
+            CocoaError(.fileReadCorruptFile)
+        case .tooLarge:
+            CocoaError(.fileReadTooLarge)
+        case .providerFailed:
+            CocoaError(.fileReadUnknown)
+        }
+    }
+
+    static func mapped(from error: Error) -> PreviewAssetReadFailure {
+        switch error {
+        case let failure as PreviewAssetReadFailure:
+            failure
+        case let policy as AssetURLPolicyError:
+            switch policy {
+            case .unsupportedType: .unsupportedType
+            case .fileTooLarge: .tooLarge
+            case .missingFileSize: .providerFailed
+            }
+        case is AssetURLResolverError:
+            .outsideRoot
+        default:
+            .providerFailed
+        }
+    }
+}
+
+/// Filesystem work for a preview asset read. This type is not the URL-scheme
+/// handler, so symlink resolution and file metadata stay off the main actor.
+private enum AssetFilesystemPreparation {
+    struct ContainedAsset: Sendable {
+        let asset: AssetURLPolicyResult
+        let fileURL: URL
+    }
+
+    static func resolvedAssetURL(_ requestURL: URL, allowedRoot: URL) throws -> URL {
+        let resolved = try AssetURLResolver(allowedRoot: allowedRoot).resolve(requestURL)
+        _ = try AssetURLPolicy.mimeType(for: resolved)
+        if let fileSize = try? resolved.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+           Int64(fileSize) > AssetURLPolicy.maxAssetBytes
+        {
+            throw AssetURLPolicyError.fileTooLarge(
+                actualBytes: Int64(fileSize),
+                maxBytes: AssetURLPolicy.maxAssetBytes
+            )
+        }
+        return resolved
+    }
+
+    static func containedAsset(_ bytes: Data, fileURL: URL, root: URL) throws -> ContainedAsset {
+        let contained = try AssetContainment.fileURL(fileURL, isContainedIn: root)
+        let asset = try AssetURLPolicy.deliveredAsset(data: bytes, fileURL: contained)
+        return ContainedAsset(asset: asset, fileURL: contained)
+    }
+}
+
+private final class SchemeTaskBox: @unchecked Sendable {
+    let task: any PreviewAssetSchemeTask
+    init(_ task: any PreviewAssetSchemeTask) {
+        self.task = task
+    }
+}
+
+private final class WKAssetSchemeTask: PreviewAssetSchemeTask {
     private let task: any WKURLSchemeTask
+    var requestURL: URL? {
+        task.request.url
+    }
 
     init(_ task: any WKURLSchemeTask) {
         self.task = task
     }
 
-    func didReceive(_ response: URLResponse) {
+    func receive(response: URLResponse) {
         task.didReceive(response)
     }
 
-    func didReceive(_ data: Data) {
+    func receive(data: Data) {
         task.didReceive(data)
     }
 
-    func didFinish() {
+    func finish() {
         task.didFinish()
     }
 
-    func didFailWithError(_ error: Error) {
+    func fail(_ error: Error) {
         task.didFailWithError(error)
+    }
+}
+
+private final class AssetReaderBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var reader: (any PreviewAssetReading)?
+    func set(_ reader: (any PreviewAssetReading)?) {
+        lock.lock()
+        self.reader = reader
+        lock.unlock()
+    }
+
+    func current() -> (any PreviewAssetReading)? {
+        lock.lock()
+        defer { lock.unlock() }
+        return reader
     }
 }
