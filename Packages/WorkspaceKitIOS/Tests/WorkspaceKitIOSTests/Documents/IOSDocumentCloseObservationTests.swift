@@ -95,6 +95,9 @@ final class IOSDocumentCloseObservationTests: XCTestCase {
         XCTAssertEqual(readClosingPhases, [false])
         XCTAssertEqual(race.port.closeCalls, 0)
         XCTAssertFalse(race.entry.lease.isReleased)
+        // The observer runs before the coordinator registers its continuation.
+        // Do not release the gate until the retry has actually parked.
+        await waitUntil { await race.harness.coordinator.blockedReads() == 2 }
         await race.harness.coordinator.setBlockReads(false)
         await race.harness.coordinator.unblockReads()
         guard case .retained = try await closing.value else {
