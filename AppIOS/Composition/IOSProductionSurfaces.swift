@@ -7,6 +7,11 @@ import UIKit
 import UniformTypeIdentifiers
 import WorkspaceKitIOS
 
+private struct IOSProductionFocus: Equatable {
+    let identity: IOSDocumentIdentity
+    let bindingID: UUID
+}
+
 /// A picker issuance carries its explicit authority; a stale completion cannot
 /// turn a file selection into a directory grant or reopen a later picker.
 struct IOSProductionPickerRequest: Identifiable {
@@ -45,7 +50,13 @@ final class IOSProductionRuntime: ObservableObject {
     private var editorObservation: (any IOSObservation)?
     private var observedBindingID: UUID?
     private var isSceneActive = true
-    private var inactiveFocus: (identity: IOSDocumentIdentity, bindingID: UUID)?
+    private var inactiveFocus: IOSProductionFocus?
+    private var pendingFocus: IOSProductionFocus?
+    private var focusTask: Task<Void, Never>?
+    private let shutdownProvider: @MainActor () async -> Bool
+    private var shutdownTask: Task<Bool, Never>?
+    private var isShutDown = false
+    private var disconnectObserver: IOSWindowSceneDisconnectObserver?
 
     init(
         controller: any IOSAppSceneControlling,
@@ -53,7 +64,8 @@ final class IOSProductionRuntime: ObservableObject {
         preview: PreviewController,
         currentGrant: @escaping () -> IOSWorkspaceGrant?,
         refreshWorkspace: @escaping @MainActor () async throws -> Void,
-        openPickedURL: @escaping @MainActor (URL, IOSWorkspaceScope) async throws -> Void
+        openPickedURL: @escaping @MainActor (URL, IOSWorkspaceScope) async throws -> Void,
+        shutdown: @escaping @MainActor () async -> Bool
     ) throws {
         guard let assets = controller.capabilities.assets else {
             throw IOSDocumentFailure.unavailable
@@ -64,18 +76,22 @@ final class IOSProductionRuntime: ObservableObject {
         self.currentGrant = currentGrant
         self.refreshWorkspace = refreshWorkspace
         self.openPickedURL = openPickedURL
+        shutdownProvider = shutdown
         images = IOSImageInsertionController(writer: assets)
         scene = IOSShellSceneState(facade: controller)
         installSurfaces()
     }
 
     func startObserving() {
-        guard editorObservation == nil else { return }
+        guard !isShutDown, editorObservation == nil else { return }
         let currentBinding = editor.captureSnapshot()?.bindingID
         if observedBindingID != currentBinding {
             retireAuthoringCapture()
         }
         observedBindingID = currentBinding
+        if let snapshot = editor.captureSnapshot() {
+            noteNewBinding(snapshot)
+        }
         editorObservation = editor.observe { [weak self] event in
             guard let self else { return }
             switch event {
@@ -83,9 +99,13 @@ final class IOSProductionRuntime: ObservableObject {
                 if observedBindingID != snapshot.bindingID {
                     retireAuthoringCapture()
                     observedBindingID = snapshot.bindingID
+                    noteNewBinding(snapshot)
                 }
+                queueCommandFocus(snapshot)
             case .detached:
                 observedBindingID = nil
+                pendingFocus = nil
+                focusTask?.cancel()
                 retireAuthoringCapture()
             }
         }
@@ -94,10 +114,42 @@ final class IOSProductionRuntime: ObservableObject {
     func stopObserving() {
         editorObservation?.cancel()
         editorObservation = nil
+        focusTask?.cancel()
+        focusTask = nil
+        pendingFocus = nil
+    }
+
+    func observeSceneDisconnection(_ scene: UIWindowScene) {
+        guard !isShutDown else { return }
+        if disconnectObserver == nil {
+            disconnectObserver = IOSWindowSceneDisconnectObserver { [self] in _ = await shutdown() }
+        }
+        disconnectObserver?.bind(to: scene)
+    }
+
+    func shutdown() async -> Bool {
+        if isShutDown {
+            return true
+        }
+        if let shutdownTask {
+            return await shutdownTask.value
+        }
+        let task = Task { @MainActor [self] in await shutdownProvider() }
+        shutdownTask = task
+        let closed = await task.value
+        shutdownTask = nil
+        if closed {
+            isShutDown = true
+            stopObserving()
+            disconnectObserver?.stop()
+            disconnectObserver = nil
+            preview.invalidate()
+        }
+        return closed
     }
 
     func requestPicker(scope: IOSWorkspaceScope) {
-        guard !isOpening, pickerRequest == nil else { return }
+        guard !isShutDown, !isOpening, pickerRequest == nil else { return }
         scene.dismissPresentation()
         authoring.linkDraft = nil
         pickerRequest = IOSProductionPickerRequest(scope: scope)
@@ -115,7 +167,12 @@ final class IOSProductionRuntime: ObservableObject {
     }
 
     func openURL(_ url: URL) async {
-        guard !isOpening else { return }
+        // An OS delivery supersedes a still-presented picker. Retire its
+        // issuance before any await so its delayed delegate cannot replace it.
+        pickerRequest = nil
+        showOpenChoices = false
+        retireAuthoringCapture()
+        guard !isShutDown, !isOpening else { return }
         isOpening = true
         await performOpen(url, scope: .singleFile)
     }
@@ -133,9 +190,42 @@ final class IOSProductionRuntime: ObservableObject {
             _ = controller.setCommandFocus(true, expected: focus.identity, bindingID: focus.bindingID)
         } else {
             if let current = editor.captureSnapshot(), current.isFocused {
-                inactiveFocus = (current.revision.documentID, current.bindingID)
+                inactiveFocus = IOSProductionFocus(identity: current.revision.documentID, bindingID: current.bindingID)
             }
+            pendingFocus = nil
+            focusTask?.cancel()
+            focusTask = nil
             scene.releaseCommandFocus()
+        }
+    }
+
+    private func noteNewBinding(_ snapshot: IOSSourceEditorSnapshot) {
+        guard isSceneActive else { return }
+        pendingFocus = IOSProductionFocus(identity: snapshot.revision.documentID, bindingID: snapshot.bindingID)
+        queueCommandFocus(snapshot)
+    }
+
+    private func queueCommandFocus(_ snapshot: IOSSourceEditorSnapshot) {
+        guard isSceneActive, let expected = pendingFocus,
+              snapshot.revision.documentID == expected.identity,
+              snapshot.bindingID == expected.bindingID else { return }
+        focusTask?.cancel()
+        focusTask = Task { @MainActor [weak self] in
+            // attach emits inside the controller's transition. A later access
+            // snapshot retries if that transition still refuses this first turn.
+            await Task.yield()
+            guard !Task.isCancelled, let self, isSceneActive,
+                  pendingFocus == expected,
+                  let current = editor.captureSnapshot(),
+                  current.revision.documentID == expected.identity,
+                  current.bindingID == expected.bindingID else { return }
+            pendingFocus = nil
+            let accepted = controller.setCommandFocus(true, expected: expected.identity, bindingID: expected.bindingID)
+            if !accepted, pendingFocus == nil, isSceneActive,
+               editor.captureSnapshot()?.bindingID == expected.bindingID
+            {
+                pendingFocus = expected
+            }
         }
     }
 
@@ -176,9 +266,9 @@ final class IOSProductionRuntime: ObservableObject {
             refreshWorkspace: { [weak self] in
                 guard let self else { return }
                 Task {
-                    do { try await refreshWorkspace() }
+                    do { try await self.refreshWorkspace() }
                     catch is CancellationError { return }
-                    catch { show(error, title: "Couldn't Refresh") }
+                    catch { self.show(error, title: "Couldn't Refresh") }
                 }
             },
             openWorkspace: { [weak self] in self?.showOpenChoices = true }

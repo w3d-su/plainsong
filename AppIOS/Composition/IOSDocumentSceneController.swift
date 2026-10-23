@@ -20,7 +20,10 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     private(set) var currentGrant: IOSWorkspaceGrant?
     var handle: IOSDocumentHandle?
     var bindingID: UUID?
-    var admission = IOSOpenDocumentAdmission()
+    let admission: IOSSceneWriterAdmission
+    var ownedTicket: IOSOpenDocumentAdmission.Ticket?
+    var isShuttingDown = false
+    var isDisposed = false
     var transitioning = false
     var grantIsCurrent = false
     var workspaceSnapshot: IOSWorkspaceSnapshot?
@@ -40,6 +43,7 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
         editor: any IOSSourceEditorBinding,
         preview: any IOSPreviewControlling,
         assets: any IOSWorkspaceAssetWriting,
+        admission: IOSSceneWriterAdmission? = nil,
         assetContext: @escaping (IOSWorkspaceGrant) -> PreviewAssetAccessContext?
     ) {
         self.documents = documents
@@ -47,6 +51,7 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
         self.editor = editor
         self.preview = preview
         self.assetContext = assetContext
+        self.admission = admission ?? IOSSceneWriterAdmission()
         capabilities = IOSSceneCapabilities(
             editor: editor, documents: documents, workspace: workspace, preview: preview, assets: assets
         )
@@ -126,19 +131,15 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
         try await install(location, initialText: nil)
     }
 
-    func createDocument(at location: IOSFileLocation) async throws {
-        guard grantIsCurrent, let grant = currentGrant, grant.scope == .directory,
-              location.workspaceID == grant.workspaceID,
-              location.accessGeneration == grant.accessGeneration,
-              WorkspaceRelativePath(spelling: location.relativePath) != nil
-        else {
-            throw IOSDocumentFailure.access(.outsideGrant)
-        }
+    func createDocument(at parent: IOSFileLocation) async throws {
+        let location = try newDocumentLocation(in: parent)
         try beginTransition()
         defer { finishTransition() }
         try await closeCurrent()
         try await install(location, initialText: "")
-        workspaceSnapshot = try await workspace.refresh(grant)
+        if let grant = currentGrant {
+            workspaceSnapshot = try await workspace.refresh(grant)
+        }
     }
 
     func saveCurrentDocument() async throws -> IOSSaveAcknowledgement {
@@ -172,7 +173,8 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     }
 
     func setCommandFocus(_ focused: Bool, expected: IOSDocumentIdentity, bindingID: UUID) -> Bool {
-        guard !transitioning, handle?.identity == expected, self.bindingID == bindingID else { return false }
+        guard !transitioning, !isShuttingDown, handle?.identity == expected,
+              self.bindingID == bindingID else { return false }
         editor.updateCommandFocus(for: expected, bindingID: bindingID, isFocused: focused)
         return editor.captureSnapshot()?.isFocused == focused
     }
@@ -181,11 +183,12 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
         let token = UUID()
         let observation = IOSSceneObservation(handler: handler) { [weak self] in self?.observers[token] = nil }
         observers[token] = observation
+        handler(snapshot)
         return observation
     }
 
     func beginTransition() throws {
-        guard !transitioning else { throw IOSDocumentFailure.unavailable }
+        guard !transitioning, !isShuttingDown, !isDisposed else { throw IOSDocumentFailure.unavailable }
         guard editor.captureSnapshot()?.hasMarkedText != true else { throw IOSDocumentFailure.sourceChanged }
         transitioning = true
         unavailableReason = nil
@@ -246,9 +249,10 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
         // No suspension between replacing the opening reservation and attaching
         // the store-issued identity. The store is the sole session constructor.
         admission.end(reservation)
-        guard case .success = admission.begin(documentID: opened.identity) else {
+        guard case let .success(ticket) = admission.begin(documentID: opened.identity) else {
             preconditionFailure("Writer admission changed inside synchronous installation")
         }
+        ownedTicket = ticket
         adopted = true
         handle = opened
         let binding = UUID()
@@ -279,9 +283,10 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
         if let handle, let bindingID {
             editor.detach(expected: handle.identity, bindingID: bindingID)
         }
-        if let ticket = admission.active {
+        if let ticket = ownedTicket {
             admission.end(ticket)
         }
+        ownedTicket = nil
         handle = nil
         bindingID = nil
         renderedRevision = nil

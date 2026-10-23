@@ -17,7 +17,7 @@ extension IOSDocumentSceneController {
         guard let handle, let bindingID, let state = documents.state(for: handle.identity) else { return }
         editor.updateAccess(
             for: handle.identity, bindingID: bindingID, generation: state.accessGeneration,
-            canWrite: state.canWrite && !transitioning && grantIsCurrent &&
+            canWrite: state.canWrite && !transitioning && !isShuttingDown && grantIsCurrent &&
                 currentGrant?.workspaceID == handle.location.workspaceID &&
                 currentGrant?.accessGeneration == state.accessGeneration
         )
@@ -114,6 +114,8 @@ extension IOSDocumentSceneController {
                     self?.publish()
                 }
             }
+        case let .checkboxRequested(revision, _, line, checked):
+            applyPreviewCheckbox(revision: revision, line: line, checked: checked)
         case let .externalLinkRequested(url):
             if ["https", "http"].contains(url.scheme?.lowercased() ?? "") {
                 openExternalURL?(url)

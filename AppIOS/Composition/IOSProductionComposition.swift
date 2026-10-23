@@ -37,12 +37,15 @@ struct IOSProductionComposition {
         preview.installAssetReader(access)
         let controller = IOSDocumentSceneController(
             documents: documents, workspace: access, editor: editor, preview: preview,
-            assets: access, assetContext: { [weak access] in access?.previewContext(for: $0) }
+            assets: access, admission: .process, assetContext: { [weak access] in access?.previewContext(for: $0) }
         )
         controller.openExternalURL = { UIApplication.shared.open($0) }
         return try IOSProductionRuntime(
             controller: controller, editor: editor, preview: preview,
-            currentGrant: { [weak controller] in controller?.currentGrant },
+            currentGrant: { [weak controller] in
+                guard controller?.grantIsCurrent == true else { return nil }
+                return controller?.currentGrant
+            },
             refreshWorkspace: { [weak controller] in
                 guard let controller else { throw IOSDocumentFailure.unavailable }
                 try await controller.refreshWorkspace()
@@ -50,7 +53,8 @@ struct IOSProductionComposition {
             openPickedURL: { [weak controller] url, scope in
                 guard let controller else { throw IOSDocumentFailure.unavailable }
                 try await controller.openPickedURL(url, scope: scope)
-            }
+            },
+            shutdown: { [controller] in await controller.shutdown() }
         )
     }
 

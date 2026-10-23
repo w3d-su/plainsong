@@ -23,6 +23,7 @@ final class IOSSceneControllerLatch {
 
 @MainActor
 final class IOSSceneControllerStoreDouble: IOSDocumentStore {
+    var initialText = "original"
     var handles: [IOSDocumentIdentity: IOSDocumentHandle] = [:]
     var states: [IOSDocumentIdentity: IOSDocumentState] = [:]
     var opened: [IOSFileLocation] = []
@@ -44,7 +45,7 @@ final class IOSSceneControllerStoreDouble: IOSDocumentStore {
         await openLatch?.wait()
         let handle = IOSDocumentHandle(
             identity: IOSDocumentIdentity(rawValue: UUID()),
-            session: DocumentSession(text: "original", url: location.fileURL), location: location
+            session: DocumentSession(text: initialText, url: location.fileURL), location: location
         )
         handles[handle.identity] = handle
         states[handle.identity] = .ready(canWrite: true, accessGeneration: location.accessGeneration)

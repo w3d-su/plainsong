@@ -158,7 +158,96 @@ final class IOSProductionSurfaceTests: XCTestCase {
         XCTAssertEqual(harness.runtime.authoring.find.replacement, "")
     }
 
+    func testOSOpenRetiresPresentedPickerBeforeStartingTheNewOpen() async throws {
+        var runtime: IOSProductionRuntime?
+        var opened: [URL] = []
+        let harness = try makeHarness { url, _ in
+            XCTAssertNil(runtime?.pickerRequest)
+            XCTAssertFalse(runtime?.showOpenChoices ?? true)
+            XCTAssertEqual(runtime?.authoring.find.replacement, "")
+            opened.append(url)
+        }
+        runtime = harness.runtime
+        harness.runtime.requestPicker(scope: .singleFile)
+        let old = try XCTUnwrap(harness.runtime.pickerRequest)
+        harness.runtime.showOpenChoices = true
+        harness.runtime.authoring.find.replacement = "Old draft"
+        let delivered = URL(fileURLWithPath: "/tmp/os-delivery.md")
+        await harness.runtime.openURL(delivered)
+        XCTAssertNil(harness.runtime.completePicker(old, urls: [URL(fileURLWithPath: "/tmp/old-picker.md")]))
+        XCTAssertEqual(opened, [delivered])
+    }
+
+    func testActiveMountedDetailClaimsTheNewBinding() async throws {
+        let harness = try makeHarness { _, _ in }
+        harness.runtime.startObserving()
+        let identity = IOSDocumentIdentity(rawValue: UUID())
+        let bindingID = UUID()
+        harness.runtime.editor.attach(IOSSourceEditorDocumentBinding(
+            bindingID: bindingID, identity: identity, session: DocumentSession(text: "New", fileKind: .markdown),
+            accessGeneration: 1, canWrite: true
+        ))
+        try await waitUntil {
+            harness.facade.setCommandFocusCalls.contains {
+                $0.focused && $0.identity == identity && $0.bindingID == bindingID
+            }
+        }
+    }
+
+    func testFocusRejectedDuringAttachRetriesAtTheSettledAccessSnapshot() async throws {
+        let harness = try makeHarness { _, _ in }
+        harness.facade.commandFocusResult = false
+        harness.runtime.startObserving()
+        let identity = IOSDocumentIdentity(rawValue: UUID())
+        let bindingID = UUID()
+        harness.runtime.editor.attach(IOSSourceEditorDocumentBinding(
+            bindingID: bindingID, identity: identity, session: DocumentSession(text: "New", fileKind: .markdown),
+            accessGeneration: 1, canWrite: false
+        ))
+        try await waitUntil { !harness.facade.setCommandFocusCalls.isEmpty }
+        let rejectedCalls = harness.facade.setCommandFocusCalls.count
+        harness.facade.commandFocusResult = true
+        harness.runtime.editor.updateAccess(for: identity, bindingID: bindingID, generation: 1, canWrite: true)
+        try await waitUntil { harness.facade.setCommandFocusCalls.count > rejectedCalls }
+        XCTAssertEqual(harness.facade.setCommandFocusCalls.last?.bindingID, bindingID)
+        XCTAssertEqual(harness.facade.setCommandFocusCalls.last?.identity, identity)
+    }
+
+    func testShutdownPreservesARetainedWriterThenInvalidatesOnlyAfterClose() async throws {
+        var canClose = false
+        var closes = 0
+        let harness = try makeHarness(shutdown: {
+            closes += 1
+            return canClose
+        }) { _, _ in }
+        harness.runtime.stopObserving()
+        XCTAssertEqual(closes, 0, "Ordinary view disappearance is not scene disposal")
+        let retained = await harness.runtime.shutdown()
+        XCTAssertFalse(retained)
+        XCTAssertNotNil(harness.runtime.preview.webView.navigationDelegate)
+        canClose = true
+        let closed = await harness.runtime.shutdown()
+        XCTAssertTrue(closed)
+        XCTAssertNil(harness.runtime.preview.webView.navigationDelegate)
+        let closedAgain = await harness.runtime.shutdown()
+        XCTAssertTrue(closedAgain)
+        XCTAssertEqual(closes, 2)
+    }
+
+    private func waitUntil(_ condition: @escaping @MainActor () -> Bool) async throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while ContinuousClock.now < deadline {
+            if condition() {
+                return
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTFail("Timed out waiting for binding-specific command focus")
+        throw IOSDocumentFailure.unavailable
+    }
+
     private func makeHarness(
+        shutdown: @escaping @MainActor () async -> Bool = { true },
         open: @escaping @MainActor (URL, IOSWorkspaceScope) async throws -> Void
     ) throws -> (runtime: IOSProductionRuntime, facade: FakeSceneFacade) {
         let editor = IOSSourceEditorController()
@@ -169,7 +258,7 @@ final class IOSProductionSurfaceTests: XCTestCase {
         ))
         let runtime = try IOSProductionRuntime(
             controller: facade, editor: editor, preview: preview,
-            currentGrant: { nil }, refreshWorkspace: {}, openPickedURL: open
+            currentGrant: { nil }, refreshWorkspace: {}, openPickedURL: open, shutdown: shutdown
         )
         addTeardownBlock { @MainActor in
             runtime.stopObserving()

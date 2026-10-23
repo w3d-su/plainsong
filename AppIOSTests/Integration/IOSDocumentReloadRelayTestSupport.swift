@@ -21,6 +21,8 @@ final class IOSReloadRelayEditorDouble: IOSSourceEditorBinding {
     var isAttached = true
     var isFocused = false
     var attachCount = 0
+    var appliedEdits: [IOSAuthorizedEdit] = []
+    var selection = NSRange(location: 0, length: 0)
     var installed: [IOSDocumentReloadProposal] = []
     var onInstall: (() -> Void)?
     var onCapture: (() -> Void)?
@@ -43,7 +45,7 @@ final class IOSReloadRelayEditorDouble: IOSSourceEditorBinding {
         IOSSourceEditorSnapshot(
             bindingID: binding.bindingID,
             revision: IOSDocumentRevision(documentID: binding.identity, version: binding.session.version),
-            document: binding.session.snapshot, selection: NSRange(location: 0, length: 0),
+            document: binding.session.snapshot, selection: selection,
             visibleRange: NSRange(location: 0, length: binding.session.text.utf16.count),
             selectionGeneration: 1, accessGeneration: binding.accessGeneration,
             hasMarkedText: hasMarkedText, canWrite: binding.canWrite, isFocused: isFocused
@@ -100,8 +102,9 @@ final class IOSReloadRelayEditorDouble: IOSSourceEditorBinding {
         )
     }
 
-    func apply(_: IOSAuthorizedEdit) -> IOSEditOutcome {
-        .refused(.unavailable)
+    func apply(_ edit: IOSAuthorizedEdit) -> IOSEditOutcome {
+        appliedEdits.append(edit)
+        return .refused(.unavailable)
     }
 
     func reveal(_: NSRange, expected _: IOSDocumentRevision) -> Bool {

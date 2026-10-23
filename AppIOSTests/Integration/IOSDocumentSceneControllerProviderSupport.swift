@@ -1,3 +1,4 @@
+import EditorKitIOS
 import Foundation
 import MarkdownCore
 @testable import PlainsongIOS
@@ -94,13 +95,17 @@ final class IOSSceneControllerWorkspaceDouble: IOSWorkspaceAccessProviding {
 @MainActor
 final class IOSSceneControllerPreviewDouble: IOSPreviewControlling {
     var renders: [(IOSDocumentIdentity, Int, PreviewAssetAccessContext?)] = []
+    var invalidateCount = 0
     func render(_ snapshot: DocumentSnapshot, identity: IOSDocumentIdentity, assetAccess: PreviewAssetAccessContext?) {
         renders.append((identity, snapshot.version, assetAccess))
     }
 
     func setRemoteImagesAllowed(_: Bool) {}
     func scrollToLine(_: Int) {}
-    func invalidate() {}
+    func invalidate() {
+        invalidateCount += 1
+    }
+
     func observe(_: @escaping @MainActor (IOSPreviewEvent) -> Void) -> any IOSObservation {
         IOSReloadRelayObservation()
     }
@@ -140,10 +145,10 @@ struct IOSSceneControllerFixture {
     let controller: IOSDocumentSceneController
     let selectedURL = URL(fileURLWithPath: "/synthetic/public.md")
 
-    init() {
+    init(admission: IOSSceneWriterAdmission? = nil, editorBinding: (any IOSSourceEditorBinding)? = nil) {
         controller = IOSDocumentSceneController(
-            documents: store, workspace: workspace, editor: editor, preview: preview,
-            assets: IOSSceneControllerAssetDouble(), assetContext: { _ in nil }
+            documents: store, workspace: workspace, editor: editorBinding ?? editor, preview: preview,
+            assets: IOSSceneControllerAssetDouble(), admission: admission, assetContext: { _ in nil }
         )
     }
 }

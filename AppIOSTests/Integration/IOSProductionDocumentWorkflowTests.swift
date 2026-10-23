@@ -14,9 +14,7 @@ import XCTest
 @MainActor
 final class IOSProductionDocumentWorkflowTests: XCTestCase {
     func testFilesOpenNativeEditPreviewSaveAndReopen() async throws {
-        let fixture = try Fixture()
-        let runtime = try IOSProductionComposition.makeProduction()
-        let controller = try XCTUnwrap(runtime.controller as? IOSDocumentSceneController)
+        let (fixture, runtime, controller) = try fixtureRuntime()
         try await controller.openPickedURL(fixture.first, scope: .singleFile)
         let handle = try XCTUnwrap(controller.handle)
         XCTAssertEqual(handle.session.text, "# Original\n")
@@ -51,15 +49,10 @@ final class IOSProductionDocumentWorkflowTests: XCTestCase {
         XCTAssertNotEqual(controller.handle?.identity, handle.identity)
         XCTAssertEqual(controller.handle?.session.text, acknowledgement.savedText)
         XCTAssertEqual(runtime.editor.textView.text, acknowledgement.savedText)
-        try await controller.closeCurrent()
-        runtime.preview.invalidate()
-        try fixture.remove()
     }
 
-    func testFolderRowsReuseTheGrantAndReopenSavedNativeText() async throws {
-        let fixture = try Fixture()
-        let runtime = try IOSProductionComposition.makeProduction()
-        let controller = try XCTUnwrap(runtime.controller as? IOSDocumentSceneController)
+    func testFolderRowsReuseTheGrantAndReopenTheDocument() async throws {
+        let (fixture, runtime, controller) = try fixtureRuntime()
         try await controller.openPickedURL(fixture.root, scope: .directory)
         let grant = try XCTUnwrap(controller.currentGrant)
         XCTAssertNil(controller.handle)
@@ -71,16 +64,10 @@ final class IOSProductionDocumentWorkflowTests: XCTestCase {
         try await controller.openSelectedURL(fixture.first, scope: .singleFile)
         XCTAssertEqual(controller.handle?.session.text, "# Original\n")
         XCTAssertEqual(controller.currentGrant?.workspaceID, grant.workspaceID)
-        try await controller.closeCurrent()
-        _ = controller.workspace.invalidate(grant.workspaceID)
-        runtime.preview.invalidate()
-        try fixture.remove()
     }
 
     func testSingleFileSelectionDoesNotAuthorizeItsSibling() async throws {
-        let fixture = try Fixture()
-        let runtime = try IOSProductionComposition.makeProduction()
-        let controller = try XCTUnwrap(runtime.controller as? IOSDocumentSceneController)
+        let (fixture, runtime, controller) = try fixtureRuntime()
         try await controller.openPickedURL(fixture.first, scope: .singleFile)
         let handle = try XCTUnwrap(controller.handle)
         do {
@@ -97,6 +84,54 @@ final class IOSProductionDocumentWorkflowTests: XCTestCase {
         }
         runtime.preview.invalidate()
         try fixture.remove()
+    }
+
+    func testNewFileUsesTheGrantedParentAndDoesNotReplaceAnExistingFile() async throws {
+        let (fixture, _, controller) = try fixtureRuntime()
+        try await controller.openPickedURL(fixture.root, scope: .directory)
+        let grant = try XCTUnwrap(controller.currentGrant)
+        let parent = IOSFileLocation(
+            workspaceID: grant.workspaceID, accessGeneration: grant.accessGeneration,
+            relativePath: "", fileURL: grant.rootURL, resourceID: nil
+        )
+        try await controller.createDocument(at: parent)
+        XCTAssertEqual(controller.handle?.location.relativePath, "Untitled.md")
+        try await controller.createDocument(at: parent)
+        XCTAssertEqual(controller.handle?.location.relativePath, "Untitled 2.md")
+        XCTAssertEqual(try String(contentsOf: fixture.first, encoding: .utf8), "# Original\n")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.root.appendingPathComponent("Untitled.md").path))
+    }
+
+    func testObservationAfterOpeningImmediatelyReceivesTheCurrentDocument() async throws {
+        let (fixture, runtime, controller) = try fixtureRuntime()
+        try await controller.openPickedURL(fixture.first, scope: .singleFile)
+        runtime.scene.startObserving()
+        XCTAssertTrue(runtime.scene.chrome.hasDocument)
+        XCTAssertEqual(runtime.scene.chrome.documentIdentity, controller.handle?.identity)
+        runtime.scene.stopObserving()
+    }
+
+    private func fixtureRuntime() throws -> (Fixture, IOSProductionRuntime, IOSDocumentSceneController) {
+        let fixture = try Fixture()
+        do {
+            let runtime = try IOSProductionComposition.makeProduction()
+            let controller = try XCTUnwrap(runtime.controller as? IOSDocumentSceneController)
+            // Register before any await so an assertion/timeout cannot leak a
+            // UIDocument, presenter, scope or WKWebView into the next case.
+            addTeardownBlock { @MainActor in
+                runtime.stopObserving()
+                runtime.scene.stopObserving()
+                let closed = await controller.shutdown()
+                XCTAssertTrue(closed, "Retained writer must be resolved before releasing test resources")
+                if closed {
+                    try fixture.remove()
+                }
+            }
+            return (fixture, runtime, controller)
+        } catch {
+            try? fixture.remove()
+            throw error
+        }
     }
 
     private func waitUntil(

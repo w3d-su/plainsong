@@ -42,3 +42,13 @@ keyboard, VoiceOver and performance acceptance remain open until measured.
 Alternatives rejected: recreating completed lane modules; a second FileDocument
 writer; copying selected Files resources into app-private storage to pretend
 in-place editing; enabling product acceptance from mocks or historical CI.
+
+Scene-disconnect disposal flushes and safely closes before invalidating its grant.
+A retained close keeps the writer and admission. Only an opaque admission value is
+shared across production runtime recreations for the single-window scope; no
+session, editable text, grant or current-writer singleton is shared. Each scene
+ends only its own ticket. This prevents a discarded scene's pending writer from
+being duplicated by a later runtime. Transient sheet disappearance only stops UI
+observation. Initial facade observation emits the current snapshot, and active
+binding changes restore document command focus without crossing background or
+replacement bindings. Preview checkboxes use the same native guarded editor path.
