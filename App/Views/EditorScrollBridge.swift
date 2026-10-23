@@ -4,37 +4,36 @@ import SwiftUI
 
 @MainActor
 final class EditorPreviewScrollCoordinator: ObservableObject {
-    typealias OwnerDecayScheduler =
-        (@escaping @MainActor () -> Void) -> Task<Void, Never>
+    /// Monotonic nanoseconds.
+    typealias Clock = @MainActor () -> UInt64
+
+    /// The scroll-owner token decays this long after its last claim (agent.md §8).
+    static let ownerDecayNanoseconds: UInt64 = 100_000_000
 
     let editorProxy = EditorScrollProxy()
 
     private weak var previewController: PreviewController?
-    private(set) var scrollOwner: ScrollOwner = .none
     private(set) var previewScrollDeliveryReceipt: PreviewScrollDeliveryReceipt?
-    private var decayTask: Task<Void, Never>?
+    private var claimedScrollOwner: ScrollOwner = .none
+    private var scrollOwnerDeadline: UInt64 = 0
     private var isEditorScrollForwardingEnabled = false
     private var previewScrollRequestID: UInt64 = 0
-    private var ownerDecayGeneration: UInt64 = 0
     private var previewScrollDeliveryOverride:
         ((Int, Bool, String?, @escaping @MainActor (Bool) -> Void) -> Void)?
-    private var ownerDecayScheduler: OwnerDecayScheduler
+    private var now: Clock = { DispatchTime.now().uptimeNanoseconds }
+
+    /// The owner claimed within the last `ownerDecayNanoseconds`, else `.none`. A timestamp
+    /// comparison: scroll events arrive once per frame, and a decay `Task` per event was
+    /// the cost this replaces.
+    var scrollOwner: ScrollOwner {
+        now() < scrollOwnerDeadline ? claimedScrollOwner : .none
+    }
 
     #if DEBUG
         weak static var latestDebugInstance: EditorPreviewScrollCoordinator?
     #endif
 
     init() {
-        ownerDecayScheduler = { completion in
-            Task { @MainActor in
-                do {
-                    try await Task.sleep(nanoseconds: 100_000_000)
-                } catch {
-                    return
-                }
-                completion()
-            }
-        }
         editorProxy.onScrollIntent = { [weak self] intent in
             self?.handleEditorScrollIntent(intent)
         }
@@ -63,24 +62,35 @@ final class EditorPreviewScrollCoordinator: ObservableObject {
         case let .viewportChanged(line):
             guard isEditorScrollForwardingEnabled, scrollOwner != .preview else { return }
             setScrollOwner(.editor)
-            deliverPreviewScroll(to: line, documentIdentifier: nil)
+            deliverViewportScroll(to: line)
         case let .navigation(line, documentIdentity):
             // Explicit navigation is presentation consistency, not typewriter sync. It
             // must reach a mounted preview even while that preference is disabled or a
             // preview-owned scroll token is still inside its 100 ms decay window. Re-arm
-            // that token so a nearly-expired timer cannot release it before the queued
+            // that token so a nearly-expired token cannot release it before the queued
             // editor echo arrives and scrolls the preview back over this intent.
             if scrollOwner == .preview {
                 setScrollOwner(.preview)
             }
-            deliverPreviewScroll(
+            deliverNavigationScroll(
                 to: line,
                 documentIdentifier: documentIdentity.rawValue
             )
         }
     }
 
-    private func deliverPreviewScroll(to line: Int, documentIdentifier: String?) {
+    /// Per-frame editor viewport traffic carries no completion and leaves no receipt:
+    /// nothing waits on it, and the controller keeps one such scroll in flight with only
+    /// the newest line waiting.
+    private func deliverViewportScroll(to line: Int) {
+        if let previewScrollDeliveryOverride {
+            previewScrollDeliveryOverride(line, false, nil) { _ in }
+        } else {
+            previewController?.scrollToLine(line, animated: false)
+        }
+    }
+
+    private func deliverNavigationScroll(to line: Int, documentIdentifier: String) {
         previewScrollRequestID &+= 1
         let requestID = previewScrollRequestID
         let ownerAtDispatch = scrollOwner
@@ -114,20 +124,13 @@ final class EditorPreviewScrollCoordinator: ObservableObject {
         previewScrollDeliveryOverride = delivery
     }
 
-    func installOwnerDecaySchedulerForTesting(_ scheduler: @escaping OwnerDecayScheduler) {
-        decayTask?.cancel()
-        ownerDecayScheduler = scheduler
+    func installClockForTesting(_ clock: @escaping Clock) {
+        now = clock
     }
 
     private func setScrollOwner(_ owner: ScrollOwner) {
-        scrollOwner = owner
-        decayTask?.cancel()
-        ownerDecayGeneration &+= 1
-        let generation = ownerDecayGeneration
-        decayTask = ownerDecayScheduler { [weak self] in
-            guard self?.ownerDecayGeneration == generation else { return }
-            self?.scrollOwner = .none
-        }
+        claimedScrollOwner = owner
+        scrollOwnerDeadline = now() &+ Self.ownerDecayNanoseconds
     }
 
     #if DEBUG

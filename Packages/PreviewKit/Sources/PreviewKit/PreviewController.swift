@@ -18,7 +18,16 @@ public final class PreviewController: NSObject, ObservableObject {
     private let scriptMessageProxy: ScriptMessageProxy
     let previewIndexURL: URL?
     private let jsonEncoder = JSONEncoder()
-    private var queuedRender: RenderPayload?
+    /// Single-flight render state: at most one render in JavaScript, the newest pending.
+    var renderDispatch = PreviewRenderDispatch()
+    /// Releases a render slot JavaScript never answers: the md pipeline rethrows without
+    /// `renderComplete`, and a render JavaScript drops as stale posts nothing.
+    var renderWatchdogNanoseconds: UInt64 = 2_000_000_000
+    var lastSubmittedRender: PreviewRenderSubmission?
+    var assetContextCache: PreviewAssetContextCacheEntry?
+    var viewportScrollQueue = PreviewViewportScrollQueue()
+    /// Test seam: receives every outgoing bridge message instead of WebKit.
+    var bridgeTransportOverrideForTesting: (@MainActor (BridgeMessage, (@MainActor (Bool) -> Void)?) -> Void)?
     var scrollDeliveryState = PreviewScrollDeliveryState()
     var presentedDocumentIdentifier: String?
     private weak var checkboxSession: DocumentSession?
@@ -33,6 +42,11 @@ public final class PreviewController: NSObject, ObservableObject {
     /// Set when `webViewWebContentProcessDidTerminate` fires; capture steps check it
     /// between awaits so a mid-capture teardown fails typed rather than hanging.
     private(set) var webContentProcessTerminated = false
+    /// A live preview reloads its page after a WebContent termination; an export controller
+    /// fails its operation instead (`PreviewController+Recovery.swift`).
+    let recoversFromWebContentTermination: Bool
+    /// Terminations since the last completed render; recovery stops past a small limit.
+    var consecutiveWebContentTerminations = 0
     /// Test seam for `captureExportPDF`: invoked with the page index before each page
     /// capture so hosted tests can inject errors, cancellation, or record weak refs.
     var exportPDFCaptureWillCaptureHook: (@MainActor (Int) async throws -> Void)?
@@ -43,20 +57,21 @@ public final class PreviewController: NSObject, ObservableObject {
     )?
     var pendingHTMLExport: PendingHTMLExport?
     var pendingExportRender: PendingExportRender?
-    private var theme = "system"
-    private var allowRemoteImages = false
-    private var workspaceAssetRootURL: URL?
+    private(set) var theme = "system"
+    private(set) var allowRemoteImages = false
+    private(set) var workspaceAssetRootURL: URL?
     var exportAssetRootURL: URL?
 
     override public convenience init() {
-        self.init(previewIndexURL: Self.defaultPreviewIndexURL())
+        self.init(previewIndexURL: Self.defaultPreviewIndexURL(), recoversFromWebContentTermination: true)
     }
 
     init(
         previewIndexURL: URL?,
         contentRuleList: WKContentRuleList? = nil,
         websiteDataStore: WKWebsiteDataStore? = nil,
-        assetReader: (any PreviewAssetReading)? = nil
+        assetReader: (any PreviewAssetReading)? = nil,
+        recoversFromWebContentTermination: Bool = false
     ) {
         let configuration = WKWebViewConfiguration()
         let userContentController = WKUserContentController()
@@ -86,6 +101,7 @@ public final class PreviewController: NSObject, ObservableObject {
         self.assetSchemeHandler = assetSchemeHandler
         self.scriptMessageProxy = scriptMessageProxy
         self.previewIndexURL = previewIndexURL
+        self.recoversFromWebContentTermination = recoversFromWebContentTermination
 
         super.init()
 
@@ -123,7 +139,12 @@ public final class PreviewController: NSObject, ObservableObject {
         }
     }
 
+    /// Renders a session's text unless this exact presentation was the last one submitted.
+    /// Showing the pane or switching documents renders at once, and the restarted
+    /// `observe(_:)` yields the same text again ~150 ms later; that repeat would run the
+    /// whole pipeline again under a new render ID and hold back pending navigation.
     public func render(_ change: DocumentTextChange, for session: DocumentSession? = nil) {
+        if let session, isAlreadySubmitted(change, session: session) { return }
         _ = submitRender(change, session: session)
     }
 
@@ -134,10 +155,7 @@ public final class PreviewController: NSObject, ObservableObject {
 
     func submitRender(_ change: DocumentTextChange, session: DocumentSession? = nil) -> Int {
         guard !isInvalidated else { return -1 }
-        let assetContext = Self.assetContext(
-            fileURL: change.fileURL,
-            workspaceRootURL: workspaceAssetRootURL
-        )
+        let assetContext = cachedAssetContext(fileURL: change.fileURL)
         let assetRootID = assetSchemeHandler.updateAllowedRoot(assetContext.allowedRoot)
         return prepareRender(
             change,
@@ -188,39 +206,37 @@ public final class PreviewController: NSObject, ObservableObject {
 
         let renderID = nextRenderID
         nextRenderID += 1
+        // Provenance names the newest submitted render, as before single-flight: a pending
+        // render that a newer one replaces is never sent, so no DOM can carry its ID.
         checkboxSession = session
         checkboxRenderID = renderID
         checkboxVersion = change.version
         iosDocumentIdentity = identity
-        let payload = RenderPayload(
-            change: change,
-            renderID: renderID,
-            theme: theme,
-            allowRemoteImages: allowRemoteImages,
-            baseDir: assetContext.baseDir,
-            assetRootID: assetRootID
-        )
+        lastSubmittedRender = session.map { renderSubmission(change, session: $0, renderID: renderID) }
         scrollDeliveryState.registerRender(
             renderID,
             documentIdentifier: presentedDocumentIdentifier
                 ?? change.fileURL?.standardizedFileURL.absoluteString
         )
-
-        guard isReady else {
-            queuedRender = payload
-            return renderID
-        }
-
-        send(.render(payload))
+        enqueueRender(PreviewRenderRequest(
+            change: change,
+            renderID: renderID,
+            baseDir: assetContext.baseDir,
+            assetRootID: assetRootID
+        ))
         return renderID
     }
 
+    /// An unchanged value sends nothing: JavaScript already applied it (every render and
+    /// `ready` carry the current pair), and each `setTheme` rewrites every image source.
     public func setTheme(_ theme: String) {
+        guard theme != self.theme else { return }
         self.theme = theme
         sendPreviewSettings()
     }
 
     public func setAllowsRemoteImages(_ allowRemoteImages: Bool) {
+        guard allowRemoteImages != self.allowRemoteImages else { return }
         self.allowRemoteImages = allowRemoteImages
         sendPreviewSettings()
     }
@@ -235,7 +251,8 @@ public final class PreviewController: NSObject, ObservableObject {
         guard !isInvalidated else { return }
         isInvalidated = true
         isReady = false
-        queuedRender = nil
+        resetRenderDispatch(keepingPending: false)
+        viewportScrollQueue.reset()
         exportSourceText = ""
         exportAssetRootURL = nil
         scrollDeliveryState.failPendingDelivery()
@@ -264,6 +281,10 @@ public final class PreviewController: NSObject, ObservableObject {
         _ message: BridgeMessage,
         completion: (@MainActor (Bool) -> Void)? = nil
     ) {
+        if let bridgeTransportOverrideForTesting {
+            bridgeTransportOverrideForTesting(message, completion)
+            return
+        }
         guard let source = try? jsonEncoder.encode(message),
               let json = String(data: source, encoding: .utf8)
         else {
@@ -292,22 +313,24 @@ public final class PreviewController: NSObject, ObservableObject {
             guard payload.protocolVersion == PreviewBridge.protocolVersion else {
                 return
             }
-            markReadyAndFlushQueuedRender()
+            markReadyAndFlushPendingRender()
 
         case let .renderComplete(payload):
-            guard scrollDeliveryState.recordRenderCompletion(payload.renderID) else {
-                return
+            if scrollDeliveryState.recordRenderCompletion(payload.renderID) {
+                renderCompletionObserver?(payload)
+                if let iosDocumentIdentity {
+                    emitPreviewEvent(.renderCompleted(
+                        documentID: iosDocumentIdentity,
+                        renderID: payload.renderID,
+                        version: payload.version
+                    ))
+                }
+                completePendingExportRender(payload.renderID)
+                flushPendingScrollDeliveryIfReady()
+                noteRenderCompletedForRecovery()
             }
-            renderCompletionObserver?(payload)
-            if let iosDocumentIdentity {
-                emitPreviewEvent(.renderCompleted(
-                    documentID: iosDocumentIdentity,
-                    renderID: payload.renderID,
-                    version: payload.version
-                ))
-            }
-            completePendingExportRender(payload.renderID)
-            flushPendingScrollDeliveryIfReady()
+            // A superseded render still frees the slot the newer pending render waits on.
+            renderDidSettle(payload.renderID)
 
         case let .previewScrolled(payload):
             onPreviewScrolled?(payload.topVisibleLine)
@@ -339,16 +362,15 @@ public final class PreviewController: NSObject, ObservableObject {
         }
     }
 
-    private func markReadyAndFlushQueuedRender() {
+    private func markReadyAndFlushPendingRender() {
         guard !isInvalidated else { return }
         let becameReady = !isReady
         isReady = true
         if becameReady {
             emitPreviewEvent(.ready)
         }
-        if let queuedRender {
-            self.queuedRender = nil
-            send(.render(queuedRender))
+        if renderDispatch.pending != nil {
+            dispatchPendingRenderIfIdle()
         } else {
             sendPreviewSettings()
         }
@@ -381,9 +403,16 @@ extension PreviewController: WKNavigationDelegate {
     public func webViewWebContentProcessDidTerminate(_: WKWebView) {
         isReady = false
         webContentProcessTerminated = true
+        // The newest render the page showed or was about to show; a recovering controller
+        // re-submits it to the reloaded page.
+        let newestRender = renderDispatch.pending ?? renderDispatch.lastSent
+        // The in-flight render and any queued viewport scroll died with the process.
+        resetRenderDispatch(keepingPending: !recoversFromWebContentTermination)
+        viewportScrollQueue.reset()
         failPendingExportWork(reason: "web-content-process-terminated")
         scrollDeliveryState.failPendingDelivery()
         scrollDeliveryState = PreviewScrollDeliveryState()
+        recoverFromWebContentTermination(resubmitting: newestRender)
     }
 
     public func webView(
@@ -404,7 +433,7 @@ extension PreviewController: WKNavigationDelegate {
                 return
             }
 
-            self?.markReadyAndFlushQueuedRender()
+            self?.markReadyAndFlushPendingRender()
         }
     }
 }
@@ -462,5 +491,37 @@ private extension WKWebView {
                 baseURL: nil
             )
         }
+    }
+}
+
+/// Same file as the class: re-submission sets its private provenance fields.
+extension PreviewController {
+    /// Sends `request`'s text again under a new render ID, keeping its session, version and
+    /// iOS identity, so the scroll/export barrier and checkbox provenance name the render
+    /// the reloaded page shows.
+    func resubmitRender(_ request: PreviewRenderRequest) {
+        guard !isInvalidated else { return }
+        let renderID = nextRenderID
+        nextRenderID += 1
+        checkboxRenderID = renderID
+        lastSubmittedRender = checkboxSession.map {
+            renderSubmission(request.change, session: $0, renderID: renderID)
+        }
+        scrollDeliveryState.registerRender(
+            renderID,
+            documentIdentifier: presentedDocumentIdentifier
+                ?? request.change.fileURL?.standardizedFileURL.absoluteString
+        )
+        enqueueRender(PreviewRenderRequest(
+            change: request.change,
+            renderID: renderID,
+            baseDir: request.baseDir,
+            assetRootID: request.assetRootID
+        ))
+    }
+
+    func reloadPreviewPageAfterTermination() {
+        webContentProcessTerminated = false
+        webView.loadPreviewIndex(indexURL: previewIndexURL)
     }
 }

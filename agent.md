@@ -160,8 +160,12 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 - UI mutation on `@MainActor` only.
 - tree-sitter parsing and highlight query execution off main thread (`MarkdownHighlightService`
   handles this; do not block it).
-- Preview render requests are coalesced: only the latest version may be in flight; stale
-  `renderComplete` responses are ignored.
+- Preview render requests are single-flight: one render is in JavaScript at a time and the
+  newest request replaces the pending one, sent when the in-flight render posts
+  `renderComplete` or after a 2 s watchdog (a throwing md pipeline or a stale-dropped render
+  posts nothing). Stale `renderComplete` responses still free the slot but are otherwise
+  ignored. A session render whose (session, version, file, presented document, asset root,
+  theme, remote-image policy) equals the last submission is dropped as a duplicate.
 - Editor highlight requests restart through `EditorHighlightScheduler`: each request cancels
   the executing request and replaces the pending revision in the caller's turn. One runner
   waits for cancelled work to return before starting the latest request, so at most one
@@ -203,7 +207,10 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   the 521 pt Split floor). The inspector auto-collapses when the document column cannot fit it.
 - Open folder: sidebar shows the tree; filter to show only markdown-related files by
   default (`.md`, `.markdown`, `.mdx`), toggle "Show all files". Images shown so they can
-  be drag-inserted.
+  be drag-inserted. In the default mode the scan skips `WorkspaceIgnoredDirectories`
+  (`node_modules`, `dist`, `build`, `.next`, `.astro`, `.build`, `deriveddata`, `.git`;
+  the list Search ignores) without enumerating them; only the chain down to an open
+  session's file in that root is scanned inside them. "Show all files" rescans everything.
 - File tree operations: create/rename/delete/move file & folder (Finder-style, with
   trash not hard delete). Watch root recursively via `FSEventStream`; debounce 300 ms;
   reconcile tree diff instead of full reload to preserve expansion state.
@@ -256,6 +263,14 @@ replacement local to EditorKit.
   SwiftUI update. Edits, document/appearance changes and WYSIWYG selection changes
   still restart the revision-fenced scheduler; fence/frontmatter context is expanded
   once per source highlight, off the main actor.
+- Fenced-code state has one definition, `MarkdownFenceScanner` (MarkdownCore), shared by
+  the visible-range expansion, the Enter fence helper (§6.3) and MDX component
+  completion (§6.5). CommonMark §4.5 per line (`\n`, `\r`, `\r\n`): a run of ≥ 3
+  `` ` `` or `~` after ≤ 3 spaces (the Enter helper accepts any spaces/tabs, for
+  list-item fences); a backtick opener's info string has no backtick; only the same
+  character, at least as long, followed by nothing but spaces/tabs, closes; a leading
+  `---`/`+++` frontmatter block closed by the same marker is skipped. It walks native
+  UTF-8 storage with `memchr` (bridged strings as UTF-16) and returns UTF-16 offsets.
 - Applying a highlight skips runs whose stored attributes already equal the new ones:
   re-setting equal attributes still marks the run edited, and TextKit then re-typesets
   every visible paragraph. The stored result is identical either way.
@@ -286,7 +301,9 @@ replacement local to EditorKit.
   caret so bullets and manually typed italics stay natural. Wrapping: with a selection,
   typing a pair character wraps the selection. Skip-over on closing char except for `*`.
 - **Code fence helper:** typing ``` ``` ``` then Enter auto-inserts closing fence and places
-  cursor inside; language autocomplete fires after the opening fence.
+  cursor inside; language autocomplete fires after the opening fence. Inside an already
+  open fence of either marker (`~~~` included, any indentation) nothing is inserted:
+  the typed line is code or the closing fence.
 - **Smart paste:** pasting a URL over selected text creates `[selection](url)`. Pasting an
   image from clipboard saves it to `assets/` (configurable, relative to the file) and
   inserts `![](path)`. Drag-in image files insert relative-path links (copy into
@@ -364,6 +381,11 @@ republishes only when its value changes literally.
   view's `@StateObject` state owns its `PreviewController`: closures stored on the
   controller or handed to AppKit views capture the objects they use, never the view
   struct, so closing the workspace root releases the controller and its web view.
+  The controller (and so its WebContent process) is created the first time the preview
+  pane is shown (`LazyPreviewController`); a source-only window has none. Hiding the pane
+  keeps it. After a WebContent termination a live controller reloads the page and
+  re-submits its newest render under a new render ID, giving up after three terminations
+  without a completed render (each later render retries once); export controllers fail.
 - **Security:** strict CSP (`default-src 'none'; script-src 'self'; style-src 'self'
   'unsafe-inline'; img-src asset: data: https:`), `isElementFullscreenEnabled` off, and
   no remote loads by default. The preview JS removes remote image `src` values unless
@@ -424,8 +446,12 @@ the Frontmatter panel, §10). Optional toggle to show it as a styled block.
 
 ### 7.3 Swift ↔ JS bridge protocol
 
-`window.webkit.messageHandlers.bridge.postMessage(...)` (JS→Swift) and
-`webView.evaluateJavaScript("render(payloadJSON)")` (Swift→JS). Keep the protocol in
+`window.webkit.messageHandlers.bridge.postMessage(...)` (JS→Swift, read field by field from
+the Foundation body, never through `JSONSerialization`) and
+`window.PlainsongBridge.receive(message)` (Swift→JS). `render` goes through
+`callAsyncJavaScript` with the message as a Foundation argument, so the document text is
+never JSON-encoded, interpolated into a script, or parsed as source; the other messages are
+JSON-encoded into an `evaluateJavaScript` script. Both carry the same message shape. Keep the protocol in
 `BridgeMessage.swift` + `ExportBridgeMessages.swift` (Codable) and `bridge.ts` —
 **these must be kept in sync; both sides list message names in the same order with a
 `PROTOCOL_VERSION` constant checked at `ready`.**
@@ -485,7 +511,11 @@ block-level element.
   (O(log n) per keystroke; a full rebuild walked the 1 MiB storage on every selection
   change), with a length check and a change-notification fallback that rebuild in bulk.
 - **Loop prevention:** a `scrollOwner` token (`editor` | `preview` | `none`) with 100 ms
-  decay; messages from the non-owner are dropped.
+  decay (a deadline timestamp, not a timer per event); messages from the non-owner are
+  dropped.
+- Editor viewport traffic carries no completion: one `scrollToLine` is in flight and only
+  the newest line waits. Document navigation keeps its render barrier and receipt, and
+  discards waiting viewport lines so they cannot scroll back over it.
 - Cursor-follow option: "typewriter sync" — on text edit, preview scrolls to the edited
   line (on by default, like Typora).
 
