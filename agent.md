@@ -205,8 +205,8 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   default (`.md`, `.markdown`, `.mdx`), toggle "Show all files". Images shown so they can
   be drag-inserted. In the default mode the scan skips `WorkspaceIgnoredDirectories`
   (`node_modules`, `dist`, `build`, `.next`, `.astro`, `.build`, `deriveddata`, `.git`;
-  the list Search ignores) without enumerating them, except on the way to an open
-  session's file; "Show all files" rescans everything.
+  the list Search ignores) without enumerating them; only the chain down to an open
+  session's file in that root is scanned inside them. "Show all files" rescans everything.
 - File tree operations: create/rename/delete/move file & folder (Finder-style, with
   trash not hard delete). Watch root recursively via `FSEventStream`; debounce 300 ms;
   reconcile tree diff instead of full reload to preserve expansion state.

@@ -185,35 +185,48 @@ extension AppState {
     }
 
     /// "Show all files" off skips generated and vendored directories (`node_modules`,
-    /// `dist`, …) at scan time, except on the way to a managed session's file: an open
+    /// `dist`, …) at scan time, except the chain down to a managed session's file: an open
     /// document there must not look missing after the rescan.
+    ///
+    /// Only paths inside `root` count. During a workspace switch the outgoing workspace's
+    /// current document and its anchored binding are still installed until the new root's
+    /// first file activates; their root-relative paths name the *old* root and must not
+    /// keep, say, `node_modules/pkg` alive in the new one.
     func workspaceScanPruning(root: URL) -> WorkspaceScanPruning {
         guard !showAllFiles else { return .none }
-        let rootAuthority = workspaceSearchRootAuthority
-        let rootPrefixes = Set([root.standardizedFileURL, root.resolvingSymlinksInPath()].map { url in
-            let path = url.path(percentEncoded: false)
-            return path.hasSuffix("/") ? path : path + "/"
-        })
+        let rootPrefixes = Set(Self.pathSpellings(of: root).map { $0.hasSuffix("/") ? $0 : $0 + "/" })
+        func namesScannedRoot(_ authority: WorkspaceFileSystemRootAuthority) -> Bool {
+            [authority.originalRootURL, authority.canonicalRootURL].contains { url in
+                let path = url.standardizedFileURL.path(percentEncoded: false)
+                return rootPrefixes.contains(path.hasSuffix("/") ? path : path + "/")
+            }
+        }
+        let installedAuthority = workspaceSearchRootAuthority.flatMap { namesScannedRoot($0) ? $0 : nil }
         var retained: Set<String> = []
         for session in [currentDocument] + Array(sessionCache.values) {
             // Every spelling that may name the session inside this root; extra entries only
             // make the scan enumerate more.
-            if let location = retainedAnchoredSessionLocation(for: session) {
+            if let location = retainedAnchoredSessionLocation(for: session),
+               namesScannedRoot(location.rootAuthority)
+            {
                 retained.insert(location.relativePath)
             }
             guard let fileURL = sessionStateURL(for: session) else { continue }
-            if let rootAuthority, let relativePath = try? rootAuthority.relativePath(forFileURL: fileURL) {
+            if let installedAuthority, let relativePath = try? installedAuthority.relativePath(forFileURL: fileURL) {
                 retained.insert(relativePath)
             }
-            for filePath in Set([fileURL.standardizedFileURL, fileURL.resolvingSymlinksInPath()]
-                .map { $0.path(percentEncoded: false) })
-            {
+            for filePath in Self.pathSpellings(of: fileURL) {
                 for rootPrefix in rootPrefixes where filePath.hasPrefix(rootPrefix) {
                     retained.insert(String(filePath.dropFirst(rootPrefix.count)))
                 }
             }
         }
         return .ignoredDirectories(retaining: retained)
+    }
+
+    /// `url`'s standardized and symlink-resolved paths.
+    private static func pathSpellings(of url: URL) -> Set<String> {
+        Set([url.standardizedFileURL, url.resolvingSymlinksInPath()].map { $0.path(percentEncoded: false) })
     }
 
     func advanceWorkspaceGeneration() -> UInt64 {

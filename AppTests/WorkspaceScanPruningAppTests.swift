@@ -38,10 +38,49 @@ final class WorkspaceScanPruningAppTests: XCTestCase {
         XCTAssertEqual(appState.currentDocument.fileURL?.lastPathComponent, "README.md")
         XCTAssertNil(appState.missingFilePrompt, "the open document must not look missing")
         XCTAssertNotNil(node("node_modules/pkg/README.md", in: appState))
+        XCTAssertNil(node("node_modules/other/README.md", in: appState), "only the open file's chain is scanned")
         XCTAssertNil(node("dist/index.md", in: appState), "unrelated ignored trees stay pruned")
     }
 
+    func testSwitchingWorkspacesDoesNotCarryTheOldDocumentsPathIntoTheNewScan() async throws {
+        let (appState, rootA) = try makeWorkspace()
+        let rootB = try makeWorkspaceRoot()
+        appState.workspaceRootURL = nil
+        appState.showAllFiles = true
+        try appState.openWorkspace(url: rootA, rememberAsLastOpened: false)
+        try await waitUntil("workspace A installs with every file") {
+            node("node_modules/pkg/README.md", in: appState) != nil
+                && appState.workspaceInstalledCaptureGeneration == appState.workspaceGeneration
+        }
+        let readme = try XCTUnwrap(node("node_modules/pkg/README.md", in: appState))
+        XCTAssertTrue(appState.selectWorkspaceNode(id: readme.id))
+
+        // Markdown-only again, then open workspace B, which has the same relative path. A's
+        // README is still the current document while B's first scan runs.
+        appState.showAllFiles = false
+        try appState.openWorkspace(url: rootB, rememberAsLastOpened: false)
+        try await waitUntil("workspace B installs") {
+            appState.workspaceRootURL == rootB
+                && node("content/post.md", in: appState) != nil
+                && appState.workspaceInstalledCaptureGeneration == appState.workspaceGeneration
+        }
+
+        XCTAssertNil(node("node_modules/pkg/README.md", in: appState), "A's open document kept B's node_modules")
+        XCTAssertNil(node("node_modules", in: appState))
+        appState.closeWorkspace()
+    }
+
     private func makeWorkspace() throws -> (AppState, URL) {
+        let root = try makeWorkspaceRoot()
+        let suiteName = "WorkspaceScanPruningAppTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        addTeardownBlock { defaults.removePersistentDomain(forName: suiteName) }
+        let appState = AppState(shouldRestoreLastOpenedFile: false, userDefaults: defaults)
+        appState.workspaceRootURL = root
+        return (appState, root)
+    }
+
+    private func makeWorkspaceRoot() throws -> URL {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("WorkspaceScanPruningAppTests")
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -49,6 +88,7 @@ final class WorkspaceScanPruningAppTests: XCTestCase {
         for (path, text) in [
             "content/post.md": "# Post",
             "node_modules/pkg/README.md": "# Package",
+            "node_modules/other/README.md": "# Other package",
             "dist/index.md": "# Built",
         ] {
             let url = root.appendingPathComponent(path)
@@ -58,12 +98,22 @@ final class WorkspaceScanPruningAppTests: XCTestCase {
             )
             try text.write(to: url, atomically: false, encoding: .utf8)
         }
-        let suiteName = "WorkspaceScanPruningAppTests.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        addTeardownBlock { defaults.removePersistentDomain(forName: suiteName) }
-        let appState = AppState(shouldRestoreLastOpenedFile: false, userDefaults: defaults)
-        appState.workspaceRootURL = root
-        return (appState, root)
+        return root
+    }
+
+    private func waitUntil(
+        _ description: String,
+        timeout: TimeInterval = 5,
+        _ condition: @MainActor () -> Bool
+    ) async throws {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition() {
+            guard Date() < deadline else {
+                XCTFail("Timed out waiting for \(description)")
+                return
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
     }
 
     private func node(_ relativePath: String, in appState: AppState) -> WorkspaceFileNode? {

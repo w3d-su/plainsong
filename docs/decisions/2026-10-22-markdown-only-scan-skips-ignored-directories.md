@@ -11,11 +11,14 @@ definition, `WorkspaceIgnoredDirectories` (`.git`, `node_modules`, `.build`, `.n
 `WorkspaceDirectoryScanner.snapshotCapture(root:pruning:)` skips such a directory and
 everything under it before inspecting it. `AppState` passes `.ignoredDirectories` while
 `showAllFiles` is off and `.none` when it is on. Toggling the setting already triggers a
-rescan. A directory on the way to a managed session's file (the current document or a
-cached session, in every spelling that may name it inside the root) is still scanned, so an
-open document opened earlier in "Show all files" mode does not look missing after the
-rescan. On a synthetic Astro project with 21,266 entries (800 packages in `node_modules`) the
-capture took 2,658 ms unpruned and 8.2 ms pruned
+rescan. Inside an ignored directory only the chain of directories down to a managed
+session's file (the current document or a cached session) and that file are scanned, so a
+document opened earlier in "Show all files" mode does not look missing after the rescan, and
+one open `node_modules` README does not bring back the rest of `node_modules`. Only sessions
+inside the scanned root count: during a workspace switch the outgoing workspace's document and
+anchored binding stay installed until the new root's first file activates, and their
+root-relative paths name the old root. On a synthetic Astro project with 21,266 entries
+(800 packages in `node_modules`) the capture took 2,658 ms unpruned and 8.2 ms pruned
 (`docs/perf/2026-10-22-markdown-only-scan-pruning.md`).
 
 Alternatives: show ignored directories as collapsed nodes loaded on expansion (rejected by

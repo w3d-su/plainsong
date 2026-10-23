@@ -161,10 +161,11 @@ public struct WorkspaceDirectoryScanner: Sendable {
             guard !relativePath.isEmpty else { continue }
             // Before the per-entry anchored inspection: an ignored tree such as
             // `node_modules` is most of a web project's entries.
-            if values.isDirectory == true,
-               pruning.skipsDirectory(named: url.lastPathComponent, relativePath: relativePath)
-            {
-                enumerator.skipDescendants()
+            let isDirectory = values.isDirectory == true
+            if pruning.skipsEntry(named: url.lastPathComponent, relativePath: relativePath, isDirectory: isDirectory) {
+                if isDirectory {
+                    enumerator.skipDescendants()
+                }
                 continue
             }
             let location = try rootAuthority.location(relativePath: relativePath)

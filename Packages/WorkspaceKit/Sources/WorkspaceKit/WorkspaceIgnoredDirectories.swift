@@ -25,18 +25,28 @@ public enum WorkspaceIgnoredDirectories {
 public enum WorkspaceScanPruning: Sendable, Equatable {
     /// Enumerate everything ("Show all files").
     case none
-    /// Skip ignored directories and everything under them, except a directory on the way to a
-    /// retained root-relative path (an open document must never vanish from the snapshot).
+    /// Skip ignored directories and everything under them, except the chain of directories
+    /// down to a retained root-relative path and that path itself (an open document must
+    /// never vanish from the snapshot). Nothing else inside an ignored directory is scanned.
     case ignoredDirectories(retaining: Set<String>)
 
-    /// Whether the scan skips the directory at root-relative `relativePath`.
-    func skipsDirectory(named name: String, relativePath: String) -> Bool {
-        guard case let .ignoredDirectories(retained) = self,
-              WorkspaceIgnoredDirectories.contains(name)
-        else {
+    /// Whether the scan skips the entry at root-relative `relativePath` and, for a
+    /// directory, everything under it.
+    func skipsEntry(named name: String, relativePath: String, isDirectory: Bool) -> Bool {
+        guard case let .ignoredDirectories(retained) = self else { return false }
+        let isIgnoredDirectory = isDirectory && WorkspaceIgnoredDirectories.contains(name)
+        // An entry can sit under an ignored directory only when a retained path kept that
+        // directory, so without retained paths the entry's own name decides.
+        guard isIgnoredDirectory || (!retained.isEmpty && Self.hasIgnoredAncestor(relativePath)) else {
             return false
         }
-        let prefix = relativePath + "/"
-        return !retained.contains { $0 == relativePath || $0.hasPrefix(prefix) }
+        let descendantPrefix = relativePath + "/"
+        return !retained.contains { $0 == relativePath || $0.hasPrefix(descendantPrefix) }
+    }
+
+    private static func hasIgnoredAncestor(_ relativePath: String) -> Bool {
+        relativePath.split(separator: "/").dropLast().contains {
+            WorkspaceIgnoredDirectories.contains(String($0))
+        }
     }
 }
