@@ -26,6 +26,7 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     var isShuttingDown = false
     var isDisposed = false
     var transitioning = false
+    var recoveryEpoch: UInt64 = 0
     var grantIsCurrent = false
     var workspaceSnapshot: IOSWorkspaceSnapshot?
     var unavailableReason: String?
@@ -194,6 +195,7 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     func beginTransition() throws {
         guard !transitioning, !isShuttingDown, !isDisposed else { throw IOSDocumentFailure.unavailable }
         guard editor.captureSnapshot()?.hasMarkedText != true else { throw IOSDocumentFailure.sourceChanged }
+        recoveryEpoch &+= 1
         transitioning = true
     }
 
@@ -294,6 +296,22 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
         if let grant {
             _ = workspace.invalidate(grant.workspaceID)
         }
+    }
+
+    /// Composition may replace authority only inside an admitted transition
+    /// after the old writer safely closed. No await between proof and adoption.
+    func adoptCurrentGrant(_ grant: IOSWorkspaceGrant, snapshot: IOSWorkspaceSnapshot) throws {
+        guard transitioning, !isShuttingDown, !isDisposed,
+              handle == nil, bindingID == nil, ownedTicket == nil, admission.active == nil,
+              snapshot.workspaceID == grant.workspaceID, snapshot.accessGeneration == grant.accessGeneration
+        else { throw IOSDocumentFailure.documentChanged }
+        let probe = try workspace.acquireLease(for: grant)
+        probe.release()
+        releaseCurrentGrant()
+        currentGrant = grant
+        grantIsCurrent = true
+        workspaceSnapshot = snapshot
+        clearUnavailableReasonForCurrentGrant()
     }
 
     func clearInstallation() {
