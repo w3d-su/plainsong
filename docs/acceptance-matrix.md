@@ -1,7 +1,7 @@
 # Acceptance Matrix
 
 Status snapshot: 2026-06-27 for M0-M5; release posture refreshed 2026-10-21; Workspace Search
-evidence audited 2026-08-08 and updated 2026-09-18 for the remaining DoD gates.
+evidence audited 2026-08-08, updated 2026-09-18, and accepted 2026-10-24.
 
 This matrix is the short operational view of `agent.md` milestones. It does not replace
 `agent.md`; it records whether the evidence currently on the repository is enough to treat
@@ -27,7 +27,7 @@ a milestone or gate as accepted.
 | M5 final editor-input acceptance | Broken-MDX edit/recovery, MDX completion popup tag-context pass, and fenced-code completion suppression | PR #32 and PR #33 | Accepted |
 | Phase 2 WYSIWYG design gate | M1-M5 accepted and `docs/wysiwyg-design.md` approved | PR #36 and follow-up design notes | Accepted; superseded by the Experimental mode checklist |
 | Phase 2 WYSIWYG Experimental mode | Off-by-default Settings gate, source/source+preview regressions preserved, native gates complete, stable promotion blocked | PR #41-#49 plus 2026-06-27 manual sign-off in `docs/wysiwyg-design.md` §19 and `docs/wysiwyg-release-checklist.md` | Accepted as Experimental/off by default only |
-| Phase 3 Workspace Search | In-process Markdown/MDX search, dirty-overlay refresh, exact navigation, keyboard-accessible sidebar, resource/performance bounds, and regression coverage | PR #89/#91/#92/#93 plus the 2026-09-18 DoD gates `testClickingAResultInAnotherFileSelectsTheExactUTF16MatchAndScrollsItIntoView` and `testProductionDiskReadAndMatchingExecuteOffTheMainActor`; `TextSearch*`, `WorkspaceSearch*`, `EditorNavigation*`, AppState/active-refresh/presentation/selection tests, `WorkspaceSearchAcceptanceTests`, and `WorkspaceSearchPerformanceTests` | In progress — click→cross-file native selection/scroll and production reader/matcher off-main gates now have named tests; overall DoD still needs one `make test` that includes `PlainsongUITests` (runner currently dies on system authentication) and maintainer confirmation that physical ⇧⌘F is residual owner evidence |
+| Phase 3 Workspace Search | In-process Markdown/MDX search, dirty-overlay refresh, exact navigation, keyboard-accessible sidebar, resource/performance bounds, and regression coverage | PR #89/#91/#92/#93, the 2026-09-18 gates `testClickingAResultInAnotherFileSelectsTheExactUTF16MatchAndScrollsItIntoView` and `testProductionDiskReadAndMatchingExecuteOffTheMainActor`, and the 2026-10-24 close-out at `3ae52db`: one serialized `make test` exited 0 with `PlainsongUITests` 31/31 (none skipped), `PlainsongTests` 995/0 failures and WS4B 14/14; `testShortcutRevealsAHiddenSidebarAndFocusesTheQueryField`; dedicated WS4B runs in `docs/perf/2026-10-24-ws4b-recheck.md`; owner physical ⇧⌘F re-run under ABC and Zhuyin, confirmed as residual owner evidence | Accepted — every `docs/workspace-search-plan.md` §7 box is checked; R20 closed. Physical ⇧⌘F stays owner smoke; XCUITest and hosted `NSEvent` input stay synthetic |
 
 ## Current release posture
 
