@@ -84,7 +84,9 @@ final class PlainsongPreferences: ObservableObject {
         previewTheme = userDefaults.string(forKey: Keys.previewTheme)
             .flatMap(PreviewTheme.init(rawValue:)) ?? .system
         allowsRemoteImages = userDefaults.object(forKey: Keys.allowsRemoteImages) as? Bool ?? false
-        experimentalWYSIWYGEnabled = userDefaults.object(forKey: Keys.experimentalWYSIWYGEnabled) as? Bool ?? false
+        // On by default since WYSIWYG left Experimental; a stored `false` (someone who turned
+        // the Experimental mode off) is kept.
+        experimentalWYSIWYGEnabled = userDefaults.object(forKey: Keys.experimentalWYSIWYGEnabled) as? Bool ?? true
         assetFolderRelativePath = Self.normalizedAssetFolder(
             userDefaults.string(forKey: Keys.assetFolderRelativePath)
                 ?? Self.defaultAssetFolderRelativePath
@@ -256,6 +258,7 @@ final class PlainsongPreferences: ObservableObject {
         static let editorTheme = "Plainsong.settings.editorTheme"
         static let previewTheme = "Plainsong.settings.previewTheme"
         static let allowsRemoteImages = "Plainsong.settings.allowsRemoteImages"
+        /// Named before the promotion; renaming it would drop explicit opt-outs.
         static let experimentalWYSIWYGEnabled = "Plainsong.settings.experimentalWYSIWYGEnabled"
         static let assetFolderRelativePath = "Plainsong.settings.assetFolderRelativePath"
         static let defaultFileExtension = "Plainsong.settings.defaultFileExtension"
