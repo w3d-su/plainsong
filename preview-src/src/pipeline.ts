@@ -8,7 +8,11 @@ import remarkMdx from "remark-mdx";
 import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { unified } from "unified";
-import { rehypeHeadingAnchors } from "./heading-anchors";
+import type { PreviewFileKind } from "./bridge";
+import {
+  type HeadingSlugFileData,
+  rehypeHeadingAnchors,
+} from "./heading-anchors";
 import {
   katexRenderOptions,
   rehypeMathBlocks,
@@ -19,6 +23,12 @@ import {
   remarkMdxPlaceholders,
   type TreeNode,
 } from "./mdx-placeholders";
+import {
+  holeMarker,
+  type SegmentHoleOptions,
+  splitHoles,
+  WholeDocumentRequired,
+} from "./segment-holes";
 
 const blockTags = new Set([
   "address",
@@ -80,41 +90,144 @@ export async function renderMdx(markdown: string): Promise<string> {
   return String(await mdxProcessor.process(markdown));
 }
 
-const markdownProcessor = unified()
-  .use(remarkParse)
-  .use(remarkGfm)
-  .use(remarkFrontmatter, ["yaml"])
-  .use(stripFrontmatter)
-  .use(remarkMath)
-  .use(remarkRehype)
-  .use(rehypeHeadingAnchors)
-  // Wrap display math before KaTeX consumes the positioned pre/code nodes;
-  // diagnostics append after KaTeX so VFile messages exist.
-  .use(rehypeMathBlocks)
-  .use(rehypeKatex, katexRenderOptions)
-  .use(rehypeMathDiagnostics)
-  .use(rehypeSourceLines)
-  .use(rehypeStringify);
+/** One segment's HTML with assembly holes (segmented-render.ts). */
+export interface RenderedSegment {
+  /** `splitHoles` output: text, then kind/value/text triples. */
+  pieces: string[];
+  /** Base slugs of the generated heading IDs, in order. */
+  headingSlugs: string[];
+  /** Math wrappers (`data-math-index` values) in the segment. */
+  mathCount: number;
+  /** MDX: the segment has ESM. Each ESM block is parsed after `var <earlier imports>`,
+   * so whether it parses depends on the imports of earlier segments. */
+  hasEsm: boolean;
+  /** MDX: the segment's ESM imports a binding. */
+  importsBindings: boolean;
+}
 
-const mdxProcessor = unified()
-  .use(remarkParse)
-  .use(remarkMdx)
-  .use(remarkGfm)
-  .use(remarkFrontmatter, ["yaml"])
-  .use(stripFrontmatter)
-  .use(remarkMath)
-  .use(remarkMdxPlaceholders)
-  .use(remarkRehype)
-  .use(rehypeDropSourceSvgElements)
-  .use(rehypeDropScriptLikeElements)
-  .use(rehypeSanitize, mdxSanitizeSchema)
-  .use(rehypeHeadingAnchors)
-  // Sanitize user content before trusted KaTeX adds layout styles and generated SVG.
-  .use(rehypeMathBlocks)
-  .use(rehypeKatex, katexRenderOptions)
-  .use(rehypeMathDiagnostics)
-  .use(rehypeSourceLines)
-  .use(rehypeStringify);
+/** Thrown when a construct in the segment is still open where the next one starts. */
+export class SegmentBoundaryOpen extends Error {}
+
+/**
+ * Renders `text` in segment mode. When another segment follows, pass the segment-relative
+ * line it starts on: the text is parsed with a sentinel paragraph on that line, which must
+ * come back as a top-level paragraph of its own, proving that nothing was left open.
+ * Throws `SegmentBoundaryOpen`, `WholeDocumentRequired`, or a parse error.
+ */
+export function renderSegment(
+  fileKind: PreviewFileKind,
+  text: string,
+  nextSegmentLine?: number,
+): RenderedSegment {
+  const data: SegmentFileData = { nextSegmentLine };
+  const processor = fileKind === "md" ? markdownSegmentProcessor : mdxSegmentProcessor;
+  const file = processor.processSync({
+    value: nextSegmentLine === undefined ? text : text + segmentSentinel,
+    data,
+  });
+  const fileData = file.data as SegmentFileData & HeadingSlugFileData & { mathProvenance?: unknown[] };
+  return {
+    pieces: splitHoles(String(file)),
+    headingSlugs: fileData.headingSlugs ?? [],
+    mathCount: fileData.mathProvenance?.length ?? 0,
+    hasEsm: fileData.hasEsm ?? false,
+    importsBindings: fileData.importsBindings ?? false,
+  };
+}
+
+const segmentSentinel = "plainsongsegmentsentinel";
+
+interface EsmNode {
+  data?: { estree?: { body?: Array<{ type: string; specifiers?: unknown[] }> } };
+}
+
+interface SegmentFileData extends Record<string, unknown> {
+  nextSegmentLine?: number;
+  hasEsm?: boolean;
+  importsBindings?: boolean;
+}
+
+const markdownProcessor = createMarkdownProcessor({ holes: false });
+const markdownSegmentProcessor = createMarkdownProcessor({ holes: true });
+const mdxProcessor = createMdxProcessor({ holes: false });
+const mdxSegmentProcessor = createMdxProcessor({ holes: true });
+
+function createMarkdownProcessor(options: SegmentHoleOptions) {
+  return unified()
+    .use(remarkParse)
+    .use(remarkGfm)
+    .use(remarkFrontmatter, ["yaml"])
+    .use(stripFrontmatter)
+    .use(remarkMath)
+    .use(remarkSegmentBoundary, options)
+    .use(remarkRehype)
+    .use(rehypeHeadingAnchors, options)
+    // Wrap display math before KaTeX consumes the positioned pre/code nodes;
+    // diagnostics append after KaTeX so VFile messages exist.
+    .use(rehypeMathBlocks, options)
+    .use(rehypeKatex, katexRenderOptions)
+    .use(rehypeMathDiagnostics, options)
+    .use(rehypeSourceLines, options)
+    .use(rehypeStringify);
+}
+
+function createMdxProcessor(options: SegmentHoleOptions) {
+  return unified()
+    .use(remarkParse)
+    .use(remarkMdx)
+    .use(remarkGfm)
+    .use(remarkFrontmatter, ["yaml"])
+    .use(stripFrontmatter)
+    .use(remarkMath)
+    .use(remarkSegmentBoundary, options)
+    .use(remarkMdxPlaceholders)
+    .use(remarkRehype)
+    .use(rehypeDropSourceSvgElements)
+    .use(rehypeDropScriptLikeElements)
+    .use(rehypeSanitize, mdxSanitizeSchema)
+    .use(rehypeHeadingAnchors, options)
+    // Sanitize user content before trusted KaTeX adds layout styles and generated SVG.
+    .use(rehypeMathBlocks, options)
+    .use(rehypeKatex, katexRenderOptions)
+    .use(rehypeMathDiagnostics, options)
+    .use(rehypeSourceLines, options)
+    .use(rehypeStringify);
+}
+
+/** Segment mode only: checks and removes the sentinel, refuses definitions, which
+ * resolve references in every other segment, and records the segment's ESM. */
+function remarkSegmentBoundary(options: SegmentHoleOptions) {
+  if (!options.holes) return;
+  return (tree: TreeNode, file: { data: SegmentFileData }) => {
+    const line = file.data.nextSegmentLine;
+    if (line !== undefined) {
+      const sentinel = tree.children?.at(-1);
+      const text = sentinel?.children?.length === 1 ? sentinel.children[0] : undefined;
+      if (
+        sentinel?.type !== "paragraph" ||
+        text?.type !== "text" ||
+        text.value !== segmentSentinel ||
+        sentinel.position?.start?.line !== line ||
+        sentinel.position.start.column !== 1
+      ) {
+        throw new SegmentBoundaryOpen();
+      }
+      tree.children?.pop();
+    }
+    visitTree(tree, (node) => {
+      if (node.type === "definition" || node.type === "footnoteDefinition") {
+        throw new WholeDocumentRequired(node.type);
+      }
+      if (node.type === "mdxjsEsm") {
+        file.data.hasEsm = true;
+        const body = (node as EsmNode).data?.estree?.body ?? [];
+        if (body.some((statement) => statement.type === "ImportDeclaration" && (statement.specifiers?.length ?? 0) > 0)) {
+          file.data.importsBindings = true;
+        }
+      }
+    });
+  };
+}
 
 function stripFrontmatter() {
   return (tree: TreeNode) => {
@@ -126,7 +239,7 @@ function stripFrontmatter() {
   };
 }
 
-function rehypeSourceLines() {
+function rehypeSourceLines(options: SegmentHoleOptions) {
   return (tree: TreeNode) => {
     visitTree(tree, (node) => {
       if (node.type !== "element" || !node.tagName) return;
@@ -134,7 +247,13 @@ function rehypeSourceLines() {
       const line = node.position?.start?.line;
       if (line && blockTags.has(node.tagName)) {
         node.properties = node.properties ?? {};
-        node.properties.dataLine = String(line);
+        node.properties.dataLine = options.holes ? holeMarker("L", line) : String(line);
+      }
+
+      // Only rehypeMathBlocks writes this attribute (sanitizing drops a user's).
+      const mathIndex = node.properties?.dataMathIndex;
+      if (options.holes && typeof mathIndex === "string") {
+        node.properties!.dataMathIndex = holeMarker("M", Number(mathIndex));
       }
 
       if (node.tagName === "input" && node.properties?.type === "checkbox") {
