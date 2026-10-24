@@ -61,4 +61,45 @@ final class WorkspaceSearchHostedActivationTests: XCTestCase {
             appState: appState
         )
     }
+
+    /// The macOS 27 split shell lets the user hide the sidebar (View › Hide Sidebar). ⇧⌘F must
+    /// bring it back in Search with the owned query field focused, whichever mode it was hidden
+    /// in, and must still switch a visible Search sidebar to Files.
+    func testShortcutRevealsAHiddenSidebarAndFocusesTheQueryField() async throws {
+        guard #available(macOS 27.0, *) else {
+            throw XCTSkip("Only the macOS 27 split shell can hide the sidebar")
+        }
+        let fixture = try makeSearchWorkspaceFixture(files: ["a.md": "alpha\n"])
+        let appState = fixture.appState
+        appState.setLayoutMode(.sourceOnly)
+        appState.openExternalFile(fixture.root)
+        try await waitUntil("workspace opens and is search-ready") {
+            appState.currentDocument.fileURL?.lastPathComponent == "a.md"
+                && appState.isWorkspaceSearchReady
+        }
+
+        let host = makeWorkspaceHost(appState: appState, width: 1100, height: 520)
+        registerTeardown(host: host, fixture: fixture)
+        appState.workspaceSearchFocusKeyWindowCheck = { $0 === host.window }
+        appState.refreshWorkspaceSearchFocusKeyRouting()
+        try await waitUntil("the sidebar shows") { self.visibleSidebarWidth(in: host.window) > 100 }
+
+        // Hidden in Files mode.
+        try await hideSidebar(in: host.window, appState: appState)
+        XCTAssertEqual(appState.workspaceSearchUI.mode, .files)
+        appState.toggleWorkspaceSearch()
+        XCTAssertEqual(appState.workspaceSearchUI.mode, .search)
+        try await assertSearchRevealedAndFocused(in: host.window, appState: appState)
+
+        // Hidden with Search still selected: the press reopens Search, not an invisible Files.
+        try await hideSidebar(in: host.window, appState: appState)
+        appState.toggleWorkspaceSearch()
+        XCTAssertEqual(appState.workspaceSearchUI.mode, .search)
+        try await assertSearchRevealedAndFocused(in: host.window, appState: appState)
+
+        // Visible Search still toggles to Files (PR #89) and leaves the sidebar shown.
+        appState.toggleWorkspaceSearch()
+        XCTAssertEqual(appState.workspaceSearchUI.mode, .files)
+        XCTAssertGreaterThan(visibleSidebarWidth(in: host.window), 100)
+    }
 }

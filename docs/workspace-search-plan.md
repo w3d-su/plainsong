@@ -400,7 +400,9 @@ of the exact relative-path bytes, so NFC/NFD directories neither share children 
 
 `Command-Shift-F` (physical ⇧⌘F via the app-active Carbon hot key from PR #89) toggles
 Files↔Search: opening Search advances the search-focus request token onto the owned query
-field; a second press returns to Files without clearing query/results. The menu item remains
+field; a second press returns to Files without clearing query/results. On the macOS 27 split
+shell a key window whose sidebar is hidden is not showing Search, so the press opens Search and
+reveals the sidebar there (Decision Log 2026-10-24). The menu item remains
 for discovery and mouse. `Command-F` editor find remains separate, unfinished work; workspace
 search does not claim that shortcut.
 Keyboard selection and Return should open results; every result row needs an accessibility

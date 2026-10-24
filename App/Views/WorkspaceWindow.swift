@@ -40,6 +40,7 @@ private struct WorkspaceWindowContent: View {
     let sidebarIdealWidth: CGFloat
     let sidebarMinimumWidth: CGFloat
     @State private var columnVisibility = NavigationSplitViewVisibility.all
+    @State private var hostWindow = HostWindowReference()
     @StateObject private var inspectorVisibility: InspectorVisibility
     /// Drops superseded geometry updates so a late publish cannot collapse a newer width.
     @State private var inspectorLayoutGeneration = 0
@@ -96,7 +97,11 @@ private struct WorkspaceWindowContent: View {
                     representedURL: appState.currentDocument.fileURL,
                     isDocumentEdited: appState.currentDocument.isDirty,
                     contentMinWidth: windowMinimum,
-                    onWindow: { inspectorVisibility.attach(to: $0) }
+                    onWindow: { [inspectorVisibility, hostWindow, appState, isSidebarHidden] window in
+                        inspectorVisibility.attach(to: window)
+                        hostWindow.window = window
+                        appState.setWorkspaceSidebarHidden(isSidebarHidden, in: window)
+                    }
                 )
             )
             .task {
@@ -124,6 +129,12 @@ private struct WorkspaceWindowContent: View {
                     .workspaceFrameProbe("sidebar")
             } detail: {
                 documentColumn
+            }
+            .onChange(of: appState.workspaceSearchUI.focusRequestID) { _, _ in
+                // ⇧⌘F focuses the Search query field, which a hidden sidebar keeps offscreen.
+                if isSidebarHidden, appState.isWorkspaceSearchFocusKeyWindow(hostWindow.window) {
+                    columnVisibility = .all
+                }
             }
         } else {
             HStack(spacing: 0) {
@@ -214,6 +225,10 @@ private struct WorkspaceWindowContent: View {
         WorkspaceLayout.windowMinimum(splitShell: usesSplitShell)
     }
 
+    private var isSidebarHidden: Bool {
+        columnVisibility == .detailOnly
+    }
+
     private var detail: some View {
         VStack(spacing: 0) {
             ExportHTMLStatusBanner()
@@ -257,6 +272,12 @@ private struct WorkspaceWindowContent: View {
             }
         )
     }
+}
+
+/// The window hosting one workspace window's content, held weakly: the window owns the view.
+@MainActor
+private final class HostWindowReference {
+    weak var window: NSWindow?
 }
 
 #Preview {
