@@ -4,7 +4,8 @@
 > `docs/wysiwyg-release-checklist.md` §C.5 defers link folding behind "a separate, explicitly
 > approved sub-gate". This document is that sub-gate. PR C completed every gate below, recorded
 > the enabling decision, and wired the link-folding presentation only to the off-by-default
-> Experimental WYSIWYG mode.
+> Experimental WYSIWYG mode. L1-L9 were re-verified against `origin/main` on 2026-10-24 for the
+> D.4 promotion (`docs/wysiwyg-promotion-audit.md`); L5 needs the owner's actual-IME rerun.
 
 Created 2026-07-02 as planning follow-up after PR #51 (Experimental WYSIWYG dogfood polish)
 merged. See `agent.md` §13, `docs/wysiwyg-design.md`, and checklist §C.5/§E.

@@ -7,6 +7,8 @@
 > next construct). The App supplies the WorkspaceKit-backed loader only when the Experimental
 > flag, WYSIWYG layout, and mechanism-health gates already permit WYSIWYG; source modes,
 > kill-switch fallback, single-file mode, and stable/default promotion remain unchanged.
+> I0-I10 were re-verified against `origin/main` on 2026-10-24 for the D.4 promotion
+> (`docs/wysiwyg-promotion-audit.md`); I5 needs the owner's actual-IME rerun.
 
 Created 2026-07-06 after the link-folding sub-gate completed (PRs #65/#67/#68).
 See `agent.md` §13, `docs/wysiwyg-release-checklist.md` §A/§E, and the 2026-06-26

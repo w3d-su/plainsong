@@ -532,6 +532,11 @@ macOS. Collect fold/reveal annoyances, caret/IME surprises, and fallback-banner 
 as issues. The D.4 promotion gate in `docs/wysiwyg-release-checklist.md` stays unchecked
 until dogfood evidence plus a Decision Log entry justify promotion.
 
+Status 2026-10-24: every gate was re-verified against `origin/main`
+(`docs/wysiwyg-promotion-audit.md`) and the promotion is prepared in a draft PR (branch
+`phase3-wysiwyg-promotion-prep`). It waits for the click-layout fix and the owner checklist
+`docs/wysiwyg-dogfood-checklist.md`, which includes the actual-IME harness rerun.
+
 ## Goal 11 — Link visual folding sub-gate — completed by phase2-link-folding-enable
 
 Spec: `docs/link-folding-gates.md` (L1-L9). PR A (#65) added the gated inline-link fold model and
