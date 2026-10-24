@@ -22,8 +22,8 @@ import {
 import { LazyMermaid, loadMermaidScript } from "./mermaid-loader";
 import { MermaidRenderCoordinator } from "./mermaid-renderer";
 import { mdxErrorDetails } from "./mdx-error";
-import { renderMarkdown, renderMdx } from "./pipeline";
 import { PreviewScrollIndex } from "./scroll-index";
+import { SegmentedRenderer } from "./segmented-render";
 
 export { PROTOCOL_VERSION } from "./bridge";
 
@@ -60,6 +60,11 @@ let scrollAnchor: { position: number; top: number; offset: number } | undefined;
 let layoutWidth: number | undefined;
 const scrollAnchorOffset = 12;
 
+// Reuse the HTML of unchanged segments between renders (segmented-render.ts).
+const renderers = {
+  md: new SegmentedRenderer("md"),
+  mdx: new SegmentedRenderer("mdx"),
+};
 const mermaid = new LazyMermaid(() => loadMermaidScript(document));
 const mermaidRenderer = new MermaidRenderCoordinator(mermaid.render, mermaid.initialize);
 
@@ -202,10 +207,7 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
 
   let html: string;
   try {
-    html =
-      payload.fileKind === "md"
-        ? await renderMarkdown(payload.text)
-        : await renderMdx(payload.text);
+    html = await renderers[payload.fileKind].render(payload.text);
   } catch (error) {
     if (payload.fileKind !== "mdx") throw error;
     if (payload.renderID < latestRenderID) return;
