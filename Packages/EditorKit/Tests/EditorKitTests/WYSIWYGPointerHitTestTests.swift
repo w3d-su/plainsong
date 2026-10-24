@@ -115,7 +115,7 @@ final class WYSIWYGPointerHitTestTests: XCTestCase {
     }
 
     /// Reads the layout state of the paragraph at `fraction` of the document. Enumerating
-    /// without `.ensuresLayout` does not lay it out (`textLayoutFragment(for:)` does).
+    /// without `.ensuresLayout` reads the state without laying the paragraph out.
     private func hasLayout(atFraction fraction: Double, in textView: STTextView) throws -> Bool {
         let contentManager = textView.textContentManager
         let length = contentManager.offset(

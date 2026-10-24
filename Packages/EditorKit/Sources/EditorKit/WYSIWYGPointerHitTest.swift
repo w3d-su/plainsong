@@ -6,7 +6,7 @@ import STTextView
 ///
 /// Only the laid-out TextKit viewport is visited. STTextView keeps it at the visible area
 /// plus a prefetch band of up to half a screen on either side, so it holds every point a
-/// click can reach. The hit-test used to lay out the whole document on each click: 0.1-2 s
+/// click can reach. The hit-test used to lay out the whole document on each click: 0.1-1.5 s
 /// per click on `Fixtures/large-1mb.md`, bringing back every paragraph element that
 /// `EditorTextElementCacheTrimmer` had released.
 enum WYSIWYGPointerHitTest {
