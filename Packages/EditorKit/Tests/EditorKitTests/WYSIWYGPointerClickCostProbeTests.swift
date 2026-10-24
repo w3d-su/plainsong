@@ -76,6 +76,7 @@ final class WYSIWYGPointerClickCostProbeTests: XCTestCase {
         }
         let data = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys])
         print("WYSIWYG click cost probe: \(String(bytes: data, encoding: .utf8) ?? "")")
+        XCTAssertEqual(samples.values.flatMap(\.offLine), [], "every click lands on the clicked line")
     }
 
     private func measure(_ source: String, fraction: Double) throws -> Samples {

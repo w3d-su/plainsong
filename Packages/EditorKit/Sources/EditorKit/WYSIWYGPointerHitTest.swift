@@ -66,15 +66,15 @@ enum WYSIWYGPointerHitTest {
             from: contentManager.documentRange.location,
             to: nearest.layoutFragment.rangeInElement.location
         )
-        let localIndex = nearest.lineFragment.characterIndex(for: CGPoint(
+        // Like `characterRange`, the index counts from the paragraph's start, not the line's:
+        // adding the line's start again put clicks on a wrapped paragraph's later visual
+        // lines at that line's end.
+        let index = nearest.lineFragment.characterIndex(for: CGPoint(
             x: point.x - nearest.frame.minX,
             y: point.y - nearest.frame.minY
         ))
-        let lineRange = NSRange(
-            location: elementLocation + nearest.lineFragment.characterRange.location,
-            length: nearest.lineFragment.characterRange.length
-        )
-        return min(max(lineRange.location + localIndex, lineRange.location), NSMaxRange(lineRange))
+        let lineRange = nearest.lineFragment.characterRange
+        return elementLocation + min(max(index, lineRange.location), NSMaxRange(lineRange))
     }
 }
 
