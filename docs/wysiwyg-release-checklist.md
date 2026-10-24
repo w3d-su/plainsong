@@ -1,9 +1,10 @@
 # User-Facing WYSIWYG Release Checklist
 
-> **Status: BLOCKING CHECKLIST. WYSIWYG is Experimental and off by default.**
-> This document defines every gate that must be green before Plainsong promotes WYSIWYG beyond
-> the off-by-default Experimental mode. Until every checkbox in this file is checked with linked
-> evidence, WYSIWYG stays behind the Experimental Settings flag and must not become default/stable.
+> **Status: COMPLETE, pending the maintainer's dogfood sign-off in D.4. WYSIWYG left
+> Experimental on YYYY-MM-DD** (`docs/decisions/YYYY-MM-DD-wysiwyg-leaves-experimental.md`):
+> it is a normal layout choice, on by default, and the Settings switch remains its kill switch.
+> This document defines every gate that had to be green before that promotion. Every gate was
+> re-verified against `origin/main` on 2026-10-24 (`docs/wysiwyg-promotion-audit.md`).
 >
 > This checklist started as a specification and now records implementation evidence as gates
 > turn green. The zero-width mechanism and B1-B13 rerun gates are green as of 2026-06-26, the
@@ -11,7 +12,7 @@
 > §D AppState/persistence/recovery/manual UI gates are green as of 2026-06-27, the §C.5
 > inline-link visual-folding sub-gate is green and included in Experimental WYSIWYG as of
 > 2026-07-06, and image-thumbnail gates I0–I10 joined that Experimental mode as of 2026-07-12.
-> Final stable/default promotion remains blocked by the explicit unchecked promotion gate below.
+> The D.4 promotion gate is checked once the owner's dogfood sign-off is recorded.
 
 Created 2026-06-26 as the deliverable for `docs/codex-handoff.md` Goal 5, after the native
 interaction gates (IME §12/§13, keyboard selection/copy/paste/accessibility §12, pointer/
@@ -30,7 +31,7 @@ selection-edge §14 in `docs/wysiwyg-design.md`) passed for the attribute-only d
   *replacement* zero-width mechanism from A, not against `baselineOffset(-1000)`. Re-running
   the matrix against the dev-hook mechanism does **not** satisfy B.
 
-## 1. Why WYSIWYG is still blocked
+## 1. Why WYSIWYG was blocked, and what the promotion keeps
 
 What already passed (attribute-only dev hook, see `docs/wysiwyg-design.md`):
 
@@ -42,15 +43,17 @@ What already passed (attribute-only dev hook, see `docs/wysiwyg-design.md`):
 - True pointer click-to-caret and pointer-extend (drag) selection across folded spans, with
   reveal-on-touch and exact raw-Markdown copy.
 
-What still blocks promotion beyond Experimental:
+What the D.4 promotion keeps:
 
-1. **Stable/default promotion has not been approved.** WYSIWYG remains Experimental until the
-   unchecked D.4 promotion gate is completed with a Decision Log entry.
-2. **WYSIWYG must remain off by default.** The App may pass
-   `_developmentPresentation: .inlineFoldRevealWithLinkFolding` only when the Experimental flag
-   is enabled, the current layout mode is WYSIWYG, and the mechanism has not failed. The App may
-   additionally supply `_developmentImageThumbnails` only under those same gates and only for a
-   contained document in an open folder workspace.
+1. **Promotion needs the owner's sign-off.** D.4 records the 2026-10-24 re-verification
+   (`docs/wysiwyg-promotion-audit.md`), the dogfood sign-off (`docs/wysiwyg-dogfood-checklist.md`)
+   and the Decision Log entry.
+2. **The same App gates.** The WYSIWYG switch (`Plainsong.settings.experimentalWYSIWYGEnabled`)
+   is now on by default. The App still passes
+   `_developmentPresentation: .inlineFoldRevealWithLinkFolding` only when that switch is on, the
+   current layout mode is WYSIWYG, and the mechanism has not failed, and supplies
+   `_developmentImageThumbnails` only under those same gates and only for a contained document in
+   an open folder workspace.
 3. **Remaining deferred constructs stay blocked.** Completing the inline-link and image-thumbnail
    sub-gates does not authorize fenced-code custom fragments, tables, Mermaid/math widgets, or
    real MDX rendering in the editor surface. Reference links, autolinks, remote/SVG/reference
@@ -249,9 +252,9 @@ for the dev hook.
 
 ## D. Mode integration
 
-Today the App exposes a **binary** preview toggle: `AppState.isPreviewVisible` (⌘⇧P), persisted
-under `UserDefaults` key `Plainsong.preview.isVisible` (`App/AppState.swift`). WYSIWYG turns
-this into a **three-state** cycle per `agent.md` §13.
+Before §D the App exposed a **binary** preview toggle: `AppState.isPreviewVisible` (⌘⇧P),
+persisted under `UserDefaults` key `Plainsong.preview.isVisible` (`App/AppState.swift`). WYSIWYG
+turned this into a **three-state** cycle per `agent.md` §13.
 
 ### D.1 `⌘⇧P` cycle
 
@@ -287,9 +290,10 @@ this into a **three-state** cycle per `agent.md` §13.
 
 ### D.3 Failure / disable recovery
 
-- [x] An explicit **kill switch** exists (the off-by-default
-  `Plainsong.settings.experimentalWYSIWYGEnabled` `UserDefaults` flag) that disables WYSIWYG
-  entirely without removing source-only/source+preview. Evidence:
+- [x] An explicit **kill switch** exists (the
+  `Plainsong.settings.experimentalWYSIWYGEnabled` `UserDefaults` flag, off by default until D.4
+  and on by default since) that disables WYSIWYG entirely without removing
+  source-only/source+preview. Evidence:
   `AppStateTests.testLayoutModeCycleSkipsWYSIWYGWhenExperimentalFlagIsDisabled`.
 - [x] If the WYSIWYG mechanism fails to initialize or is disabled at launch, a persisted
   `.wysiwyg` mode **falls back deterministically** to `.sourceOnly` (safest: pure text, no
@@ -309,8 +313,15 @@ this into a **three-state** cycle per `agent.md` §13.
 - [x] The Experimental label is manually verified in Settings UI and user-facing docs/README.
   Evidence: 2026-06-27 Settings UI sign-off verified `WYSIWYG mode (Experimental)` with value `0`
   by default, and README states WYSIWYG is Experimental/off by default.
-- [ ] Promotion from experimental to stable (on by default / no experimental label) requires
+- [x] Promotion from experimental to stable (on by default / no experimental label) requires
   this checklist fully green and a Decision Log entry recording the promotion.
+  Evidence: every gate re-verified against `origin/main` `1428bf1` on 2026-10-24
+  (`docs/wysiwyg-promotion-audit.md`, `docs/perf/2026-10-24-wysiwyg-promotion-gates.md`); the
+  click-layout fix **<PR link>**; owner dogfood and actual-IME sign-off
+  (`docs/wysiwyg-dogfood-checklist.md`) **<maintainer: date and record link>**; Decision Log
+  `docs/decisions/YYYY-MM-DD-wysiwyg-leaves-experimental.md`. The switch defaults on, the
+  first-launch layout is unchanged, and Settings, the View menu, the toolbar and README drop
+  the Experimental label (`WYSIWYGPromotionAppStateTests`).
 
 ---
 
@@ -363,9 +374,10 @@ checked:
   A complete), `docs/codex-handoff.md`, README/Settings copy, and `agent.md` Decision Log all
   synchronized with the shipped behavior.
 
-Until the stable-promotion gate is checked, the only valid WYSIWYG surfaces are the off-by-default
-Experimental mode (using `.inlineFoldRevealWithLinkFolding`, with the folder-scoped thumbnail
-loader supplied only under the same App gates) and non-user-facing development hooks.
+Since the D.4 promotion, the user-facing WYSIWYG surface is the WYSIWYG layout mode, on by
+default behind its Settings kill switch (using `.inlineFoldRevealWithLinkFolding`, with the
+folder-scoped thumbnail loader supplied only under the same App gates). Each deferred construct
+in §E still needs its own gate pass.
 
 ---
 

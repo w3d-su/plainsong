@@ -188,15 +188,15 @@ private struct EditorSettingsPane: View {
                     set: { preferences.setExperimentalWYSIWYGEnabled($0) }
                 )) {
                     Text("WYSIWYG mode")
-                    Text("Experimental")
+                    Text("Offer WYSIWYG as a layout, with Markdown rendered in place.")
                 }
             } footer: {
                 SettingsFooter(
                     """
-                    Off by default and incomplete. Folds inline Markdown (headings, emphasis, \
-                    inline code) as you type. Once enabled, cycle into it from the View menu \
-                    (⌘⇧P); it falls back to source-only if the editor mechanism is unavailable. \
-                    Source-only and source + preview remain the default modes.
+                    Folds inline Markdown (headings, emphasis, inline code, links) and shows \
+                    local images in folder workspaces. Choose it in the toolbar or cycle into it \
+                    from the View menu (⌘⇧P); it falls back to source-only if the editor \
+                    mechanism is unavailable. Turn it off to keep only source and source + preview.
                     """
                 )
             }
