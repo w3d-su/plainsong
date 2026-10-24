@@ -199,7 +199,8 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   the emptied directory is removed. `Scripts/check-single-file-save-sandbox.sh` exercises
   this in a signed sandboxed probe under a LaunchServices file-only grant.
 - Window chrome: a native `NavigationSplitView` with a resizable, collapsible sidebar
-  (Files / Search navigators) on macOS 27+, a fixed-width sidebar in an `HStack` before
+  (Files / Search navigators; ⇧⌘F in a window whose sidebar is hidden reveals it in
+  Search) on macOS 27+, a fixed-width sidebar in an `HStack` before
   (R17), then the document column and a right inspector for frontmatter and file details.
   Inspector intent and width are per-window scene state; visibility is derived
   (`docs/window-state-gates.md` §10.1). The `HStack` shell's window minimum is 780 pt
