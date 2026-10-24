@@ -39,6 +39,9 @@ gaps were closed with new tests and one perf record.
   `MenuBarStateTests` and the same 19 methods: 200 executed, 196 passed, 4 opt-in skips,
   0 failures.
 - Perf reruns: `docs/perf/2026-10-24-wysiwyg-promotion-gates.md`.
+- Final full EditorKit suite on the promotion head `a56f412`: 520 tests, 8 opt-in skips; the
+  three new gate classes pass except the production-viewport perf gate, which failed at
+  80.256 ms at load 84-89 (it passed 3/3 at load 12-14; see the perf record).
 - Not run locally: full `make test` (it includes PlainsongUITests, which kill a running
   Plainsong), PreviewKit and preview-src (no WYSIWYG code path), and the opt-in
   actual-IME harness (owner-run; it switches the system input source). CI runs the first

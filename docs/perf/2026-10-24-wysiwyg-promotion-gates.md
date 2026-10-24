@@ -39,3 +39,8 @@ An earlier full `swift test` of EditorKit on the same tree failed L8 once at 159
 (samples `[159.651, 24.449, 30.270]`) at a 1-minute load average of 85-106 while three
 other sessions built. The isolated reruns above passed at load 12-14, so that failure is
 counted as contention (R15), not a regression.
+
+A final full `swift test` on `a56f412` at load 84-89 shows the same pattern for the new gate:
+production viewport `[80.256, 41.429, 35.760]` (fail), L8 `[43.005, 21.569, 18.257]`, I8
+max 18.729 ms, B10 35.930 ms. Like L8, the new gate is hard locally and informational on CI;
+rerun it alone on a quieter machine before reading a failure as a regression.
