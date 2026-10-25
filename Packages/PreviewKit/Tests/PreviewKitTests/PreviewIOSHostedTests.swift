@@ -48,8 +48,8 @@ final class PreviewIOSHostedTests: XCTestCase {
             }
         }
         let renderID = try XCTUnwrap(controller.previewProvenanceForTesting.renderID)
-        // A script that returns undefined makes this WebKit async API throw
-        // InvalidTransition. Return a value after posting the checkbox.
+        // Return an explicit value after posting so this test observes
+        // completion independently from the checkbox event.
         _ = try await PreviewHostedTestWait.javascript(
             """
             window.webkit.messageHandlers.bridge.postMessage({
