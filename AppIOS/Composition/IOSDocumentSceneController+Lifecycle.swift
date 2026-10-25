@@ -29,15 +29,28 @@ final class IOSSceneWriterAdmission {
 extension IOSDocumentSceneController {
     /// True scene disconnection, never a transient sheet disappearance. Keep a
     /// retained writer and its admission if recovery/close cannot safely finish.
-    func shutdown() async -> Bool {
+    func shutdown(transitionWait: Duration = .seconds(2)) async -> Bool {
         if isDisposed {
             return true
         }
         isShuttingDown = true
         updateEditorAccess()
+        let deadline = ContinuousClock.now.advanced(by: transitionWait)
         while transitioning {
+            guard ContinuousClock.now < deadline else {
+                // A provider may still be draining. Keep its writer admission
+                // and observers; scene disconnect must not wait indefinitely.
+                isShuttingDown = false
+                updateEditorAccess()
+                publish()
+                return false
+            }
             do { try await Task.sleep(nanoseconds: 10_000_000) }
-            catch { isShuttingDown = false; return false }
+            catch {
+                isShuttingDown = false
+                updateEditorAccess()
+                return false
+            }
         }
         _ = await documents.flushForBackground()
         do { try await closeCurrent() }

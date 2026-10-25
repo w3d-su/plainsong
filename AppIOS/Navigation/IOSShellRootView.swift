@@ -11,16 +11,19 @@ import SwiftUI
 struct IOSShellRootView: View {
     @ObservedObject var scene: IOSShellSceneState
     @ObservedObject var router: IOSShellActionRouter
+    let recovery: IOSRecoveryController?
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
 
-    init(scene: IOSShellSceneState) {
+    init(scene: IOSShellSceneState, recovery: IOSRecoveryController? = nil) {
+        self.recovery = recovery
         _scene = ObservedObject(wrappedValue: scene)
         _router = ObservedObject(wrappedValue: IOSShellActionRouter(scene: scene))
     }
 
-    init(scene: IOSShellSceneState, router: IOSShellActionRouter) {
+    init(scene: IOSShellSceneState, router: IOSShellActionRouter, recovery: IOSRecoveryController? = nil) {
+        self.recovery = recovery
         _scene = ObservedObject(wrappedValue: scene)
         _router = ObservedObject(wrappedValue: router)
     }
@@ -29,13 +32,13 @@ struct IOSShellRootView: View {
         Group {
             if horizontalSizeClass == .regular {
                 NavigationSplitView {
-                    IOSWorkspaceBrowserView(scene: scene)
+                    IOSWorkspaceBrowserView(scene: scene, recovery: recovery)
                 } detail: {
                     IOSDocumentScreen(scene: scene, router: router)
                 }
             } else {
                 NavigationStack(path: $scene.navigationPath) {
-                    IOSWorkspaceBrowserView(scene: scene)
+                    IOSWorkspaceBrowserView(scene: scene, recovery: recovery)
                         .navigationDestination(for: IOSShellRoute.self) { route in
                             switch route {
                             case .document:
@@ -64,7 +67,11 @@ struct IOSShellRootView: View {
             scene.presentedError?.title ?? "Error",
             isPresented: Binding(
                 get: { scene.presentedError != nil },
-                set: { isPresented in if !isPresented { scene.dismissError() } }
+                set: {
+                    isPresented in if !isPresented {
+                        scene.dismissError()
+                    }
+                }
             ),
             presenting: scene.presentedError
         ) { _ in

@@ -66,6 +66,11 @@ final class IOSRecoveryProductionWorkflowTests: XCTestCase {
         }
         try await controller.openPickedURL(original, scope: .singleFile)
         let oldIdentity = controller.handle?.identity
+        let access = try XCTUnwrap(controller.workspace as? IOSWorkspaceAccessService)
+        let recentsBeforeRestore = access.recentItems()
+        recovery.present()
+        let presentationID = try XCTUnwrap(recovery.presentationID)
+        XCTAssertTrue(recovery.didAppear(presentationID))
         await recovery.refresh()
         XCTAssertEqual(recovery.records.map(\.recordID), [record.recordID])
         await recovery.select(record.recordID)
@@ -91,6 +96,9 @@ final class IOSRecoveryProductionWorkflowTests: XCTestCase {
         let retained = try await nextRun.load(record.recordID)
         XCTAssertTrue(ExactSourceText.matches(retained.source, record.source))
         XCTAssertEqual(retained.baseline, record.baseline)
+        XCTAssertEqual(access.recentItems(), recentsBeforeRestore, "restore-only folder must not become recent")
+        XCTAssertEqual(runtime.scene.navigationPath, [], "navigation waits for the actual recovery sheet dismissal")
+        recovery.didDismiss(presentationID)
         XCTAssertEqual(runtime.scene.navigationPath, [.document])
     }
 }

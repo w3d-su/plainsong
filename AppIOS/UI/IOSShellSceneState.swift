@@ -331,7 +331,7 @@ final class IOSShellSceneState: ObservableObject {
             } catch {
                 presentedError = IOSShellError(
                     title: "Couldn't Complete",
-                    message: String(describing: error)
+                    message: IOSOperationFeedback.message(for: error)
                 )
             }
         }

@@ -35,6 +35,11 @@ final class InitialReadinessTestClock {
 final class InitialReadinessTestPage {
     var loads: [URL?] = []
     var messages: [BridgeMessage] = []
+    var readinessReplies: [@MainActor (Any?) -> Void] = []
+
+    func probeReadiness(completion: @escaping @MainActor (Any?) -> Void) {
+        readinessReplies.append(completion)
+    }
 
     func load(_: WKWebView, index: URL?) -> WKNavigation? {
         loads.append(index)
@@ -70,10 +75,12 @@ struct InitialReadinessTestFixture {
         controller = PreviewController(
             previewIndexURL: index,
             recoversFromWebContentTermination: recoversFromTermination,
+            retriesSilentInitialLoad: true,
             initialReadinessScheduler: clock.schedule,
             pageLoadOverrideForTesting: page.load
         )
         controller.bridgeTransportOverrideForTesting = page.send
+        controller.readinessProbeOverrideForTesting = page.probeReadiness
     }
 
     static func change(_ text: String, version: Int = 1, file: URL? = nil) -> DocumentTextChange {

@@ -38,6 +38,7 @@ final class IOSRecoveryControllerTests: XCTestCase {
                                                load: { _ in record },
                                                capture: fixture.controller.captureRecoveryRestore,
                                                restore: { _, _, _ in restores += 1 })
+        controller.present()
         await controller.select(record.recordID)
         controller.requestRestore()
         let old = try XCTUnwrap(controller.pickerRequest)

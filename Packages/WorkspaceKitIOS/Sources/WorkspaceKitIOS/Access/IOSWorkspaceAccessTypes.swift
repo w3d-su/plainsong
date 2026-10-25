@@ -142,6 +142,9 @@ struct IOSStoredRecentWorkspace: Codable, Equatable, Sendable {
     var providerIdentity: Data?
     var status: IOSRecentWorkspaceStatus
     var bookmark: Data
+    /// Private list-matching metadata only. It never authorizes access or replaces
+    /// bookmark resolution, scope admission, or a live grant. Nil supports old stores.
+    var metadataPath: Data? = nil
 
     var item: IOSRecentWorkspaceItem {
         IOSRecentWorkspaceItem(

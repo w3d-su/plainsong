@@ -34,11 +34,9 @@ extension IOSWorkspaceAccessService {
         let restoringID = items.first {
             recentRestoreRequests[$0.recordID] != nil && $0.bookmark == bookmark && $0.scope == record.scope
         }?.recordID
-        if let identity = record.providerIdentity {
-            items.removeAll { $0.providerIdentity == identity }
-        }
-        let recentID = restoringID ?? UUID()
-        items.removeAll { $0.recordID == recentID }
+        let matchingIDs = Set(items.filter { matchesRecent($0, record: record) }.map(\.recordID))
+        let recentID = restoringID ?? items.first { matchingIDs.contains($0.recordID) }?.recordID ?? UUID()
+        items.removeAll { $0.recordID == recentID || matchingIDs.contains($0.recordID) }
         record.recentRecordID = recentID
         items.insert(
             IOSStoredRecentWorkspace(
@@ -48,7 +46,8 @@ extension IOSWorkspaceAccessService {
                 openedAt: ports.clock(),
                 providerIdentity: record.providerIdentity,
                 status: .available,
-                bookmark: bookmark
+                bookmark: bookmark,
+                metadataPath: Data(IOSWorkspacePathAuthority.pathBytes(record.rootURL))
             ),
             at: 0
         )
@@ -56,6 +55,25 @@ extension IOSWorkspaceAccessService {
             items.removeLast(items.count - maximumRecentItems)
         }
         ports.recents.save(items)
+    }
+
+    /// List identity is not access authority. In particular, a known path does
+    /// not permit restore without resolving the stored bookmark and a fresh grant.
+    func matchesRecent(_ item: IOSStoredRecentWorkspace, record: IOSWorkspaceScopeRecord) -> Bool {
+        guard item.scope == record.scope else { return false }
+        if let identity = record.providerIdentity, item.providerIdentity == identity {
+            return true
+        }
+        let selectedPath = Data(IOSWorkspacePathAuthority.pathBytes(record.rootURL))
+        if let path = item.metadataPath {
+            return path == selectedPath
+        }
+        // Legacy stores contain only bookmarks. Resolution here supplies metadata
+        // for deduplication; it does not start a scope or create an access record.
+        guard let resolution = try? ports.bookmarks.resolve(item.bookmark),
+              resolution.failure == nil, let url = resolution.url, url.isFileURL
+        else { return false }
+        return Data(IOSWorkspacePathAuthority.pathBytes(url)) == selectedPath
     }
 
     func markBookmark(_ bookmark: Data, status: IOSRecentWorkspaceStatus) {

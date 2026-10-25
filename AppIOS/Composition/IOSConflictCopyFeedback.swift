@@ -28,13 +28,18 @@ enum IOSConflictCopyFeedback {
         return .unavailable
     }
 
-    static func notice(for outcome: IOSConflictCopyOutcome) -> IOSConflictCopyNotice? {
+    static func notice(
+        for outcome: IOSConflictCopyOutcome, sourceUnavailable: Bool = false
+    ) -> IOSConflictCopyNotice? {
         switch outcome {
         case let .saved(filename):
             IOSConflictCopyNotice(
                 title: "Copy Saved",
-                message: "Saved \(filename). The original document still has a conflict. " +
-                    "Your text and any existing recovery draft are retained."
+                message: "Saved \(filename). " + (sourceUnavailable
+                    ? "The original is still unavailable. Your current text is retained. " +
+                    "After restarting the app, open the saved copy from Files to continue."
+                    : "The original document still has a conflict. Your text and any existing recovery draft " +
+                    "are retained. Use Reload only when you want to replace the editor text with the file on disk.")
             )
         case .cancelled: nil
         case let .refused(reason, mayExist):
@@ -42,7 +47,7 @@ enum IOSConflictCopyFeedback {
                 title: "Copy Not Confirmed",
                 message: message(for: reason) +
                     (mayExist ? " A copy may contain the earlier text; inspect the selected folder." : "") +
-                    " Your current text and the original conflict are retained."
+                    " Your current text and the original document state are retained."
             )
         }
     }
