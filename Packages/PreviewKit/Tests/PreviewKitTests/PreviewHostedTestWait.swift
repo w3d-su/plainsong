@@ -103,6 +103,7 @@ enum PreviewHostedTestWait {
         }
     }
 
+    @MainActor
     private final class CompletionGate {
         private var continuation: CheckedContinuation<Any?, Error>?
         private let operation: String
