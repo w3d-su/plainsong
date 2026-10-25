@@ -110,4 +110,12 @@ struct IOSShellFeatureSurfaces {
     /// "Open file/folder" needs a UIDocumentPicker grant that must originate
     /// from user selection; composition owns the picker (W16). Nil hides Open.
     var openWorkspace: (() -> Void)?
+
+    /// Recent rows carry opaque record IDs; the scene's existing access service
+    /// alone restores bookmarks. Composition owns the list and picker handoff.
+    var showRecentWorkspaces: (() -> Void)?
+
+    /// Unavailable access requires explicit file/folder reselection, preserving
+    /// the recorded scope. This callback does not reload or replace source.
+    var reselectUnavailableWorkspace: (() -> Void)?
 }

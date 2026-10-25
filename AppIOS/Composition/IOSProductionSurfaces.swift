@@ -39,6 +39,7 @@ final class IOSProductionRuntime: ObservableObject {
     let images: IOSImageInsertionController
     let recovery: IOSRecoveryController?
     let conflictCopy: IOSConflictCopyCoordinator?
+    let recentPresentation = IOSRecentPresentationController()
 
     @Published var showOpenChoices = false
     @Published var pickerRequest: IOSProductionPickerRequest?
@@ -86,6 +87,7 @@ final class IOSProductionRuntime: ObservableObject {
         images = IOSImageInsertionController(writer: assets)
         scene = IOSShellSceneState(facade: controller)
         installSurfaces()
+        recentPresentation.bind(to: self)
     }
 
     func startObserving() {
@@ -134,6 +136,7 @@ final class IOSProductionRuntime: ObservableObject {
     }
 
     func shutdown() async -> Bool {
+        recentPresentation.cancel()
         if isShutDown {
             return true
         }
@@ -156,6 +159,9 @@ final class IOSProductionRuntime: ObservableObject {
 
     func requestPicker(scope: IOSWorkspaceScope) {
         guard !isShutDown, !isOpening, pickerRequest == nil else { return }
+        if recentPresentation.redirectPickerUntilDismissed(scope: scope) {
+            return
+        }
         scene.dismissPresentation()
         authoring.linkDraft = nil
         pickerRequest = IOSProductionPickerRequest(scope: scope)
@@ -173,7 +179,7 @@ final class IOSProductionRuntime: ObservableObject {
 
     func requestConflictCopy() {
         guard !isShutDown, !isOpening, pickerRequest == nil,
-              recovery?.isPresented != true, let conflictCopy else { return }
+              recovery?.isPresented != true, !recentPresentation.isActive, let conflictCopy else { return }
         prepareForReadOnlyPresentation()
         _ = conflictCopy.requestSaveCopy()
     }
@@ -194,6 +200,7 @@ final class IOSProductionRuntime: ObservableObject {
         // issuance before any await so its delayed delegate cannot replace it.
         pickerRequest = nil
         showOpenChoices = false
+        recentPresentation.cancel()
         retireAuthoringCapture()
         guard !isShutDown, !isOpening else { return }
         isOpening = true
@@ -253,7 +260,10 @@ final class IOSProductionRuntime: ObservableObject {
     }
 
     private func performOpen(_ url: URL, scope: IOSWorkspaceScope) async {
-        defer { isOpening = false }
+        defer {
+            isOpening = false
+            recentPresentation.presenter?.reload()
+        }
         do {
             try await openPickedURL(url, scope)
             if scope == .singleFile, controller.snapshot.document != nil {
@@ -265,6 +275,11 @@ final class IOSProductionRuntime: ObservableObject {
         } catch {
             show(error, title: "Couldn't Open")
         }
+    }
+
+    var canPresentRecentItems: Bool {
+        !isShutDown && !isOpening && pickerRequest == nil && !showOpenChoices &&
+            recovery?.isPresented != true && conflictCopy?.draft?.id == nil && conflictCopy?.isSaving != true
     }
 
     private func installSurfaces() {

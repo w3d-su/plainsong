@@ -89,3 +89,65 @@ acceptance remain pending. Existing M0 owner-reported passes are not changed.
 Current SwiftUI List/ForEach, ObservableObject/StateObject and view-task lifetime
 documentation was fetched with Context7's official Apple SwiftUI source
 `/websites/developer_apple_swiftui`; no dependency or frozen API changed.
+
+## Production wiring added on 2026-10-25
+
+The component now follows the Recovery and Save a Copy integration baseline
+`0b84d2114bd67c36d8d0c2d64bbf8925814a06b0`, including the grant-adoption
+reentrancy repair and current main. The factory installs the presenter with its
+same concrete controller and `IOSWorkspaceAccessService`; Files has a toolbar
+entry and the production root owns the recent-list sheet. A small presentation
+controller retains the sheet issuance ID until actual dismissal. Choose Again
+and successful file/folder navigation hand off there once. Early cancellation
+retires an unpresented request, and stale callbacks cannot retire a newer sheet.
+
+Unavailable-document chrome now offers Choose File or Folder Again through the
+same scoped picker. Revoked current-grant metadata supplies only the file/folder
+scope; it grants no access. Cancelling that picker leaves native source, binding,
+Undo and dirty state alone. No unconditional reload or same-location open is used.
+Explicit picker/OS-open/shutdown routes cancel pending recents, whose provider
+operation must still drain. A directory success shows Files; a single-file
+success navigates only after successful admission and actual list dismissal.
+
+The feature inventory is now **25 module cases** (18 component + six controlled
+modal/source cases + one real production factory workflow), plus one named UI
+open/dismiss smoke. All are included in the combined required manifests. Native
+execution has not been performed by this author; the integration owner must bind
+actual results to the clean implementation head. Historical component-only base
+and static results above retain their recorded scope.
+
+## v1 source wiring audit — 2026-10-25
+
+This table is a source audit of the combined candidate. It does not turn existing
+or pending native receipts into current-head device acceptance.
+
+| Product path | Source wiring / practical boundary |
+|---|---|
+| Open Markdown/MDX file or folder | Existing explicit picker → same access service → scene safe close/admission. Recent rows use opaque stored-record IDs. |
+| Native source editor and syntax | Factory retains `IOSSourceEditorController` with the existing Markdown syntax tokenizer and one UIDocument session. |
+| Live preview | The retained PreviewController renders that native session; no second editable source or preview page per layout update. |
+| iPhone source/preview and iPad wide layout | Existing shell pane toggle and width-based split remain wired. Real device layout and keyboard acceptance stay OPEN. |
+| Frontmatter, formatting and links | Existing retained authoring controller/surfaces; read-only modal entry retires pending focus and captured commands. |
+| Images | Existing staged insertion surface uses the same access service and guarded native edit route. |
+| Find and single Replace | Existing authoring panel and scheduler remain wired; new modal presentation retires their captures. |
+| Recovered drafts | Recovery list/readback/read-only detail and Restore as New File use the existing recovery store and admitted writer path. |
+| Conflict Save a Copy | Destination-only coordinator and picker retain the original source, writer, conflict and recovery record. |
+| Recent files/folders | Files toolbar → retained presenter → same service bookmark restore → fresh tree → safe scene admission. Remove Record deletes metadata only. |
+| Unavailable access | Choose File or Folder Again uses captured scope and existing picker. Unsafe/retained close refuses replacement and keeps the original writer/source. |
+| Preview privacy and MDX | Remote images remain off by default; MDX components remain placeholders. Existing preview bundle/resources are unchanged. |
+
+Bidirectional scroll synchronization is not composed by the frozen C0 facade and
+is not claimed by this integration. Cross-file search, Replace All and export are
+outside this v1 wiring increment. Current-head native test execution/CI and owner
+Files/iCloud providers, IME/Undo/background/relaunch, physical iPad, minimum OS 26,
+VoiceOver, external keyboard and performance remain explicit OPEN gates until
+separately evidenced. Existing M0 owner-reported results keep their original scope.
+
+Scoped integration static checks: pinned SwiftFormat 0.62.1 reports 0/11 files
+requiring formatting. Strict SwiftLint via stdin passes all three newly added
+integration Swift files (presentation controller and two test files), with no
+warnings. The first lint invocation used an unsupported path flag; subsequent
+runs identified a long real-workflow function/tuple, which was split into a typed
+fixture. Raw failed and final clean receipts remain in `/private/tmp/`, including
+`plainsong-ios-recents-integration-lint-clean-v2-20261025.json`. No tests were run
+by the source author; these are formatting/lint receipts only.
