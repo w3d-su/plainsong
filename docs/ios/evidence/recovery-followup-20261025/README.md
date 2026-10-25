@@ -20,5 +20,9 @@ These probes ran under `/private/tmp/plainsong-xcodebuild-test.lock`; they are a
 access-control check, not a substitute for the real PlainsongIOS build.
 
 No redundant access modifier or frozen declaration change was made. A directory
-refresh failure after creation retains the already installed writer and file; it
-cannot roll back the create or revoke the selected destination through this path.
+refresh failure after creation retains the already installed writer and file. Its
+typed feedback says that creation succeeded and directs Refresh in Files (or fresh
+folder selection if authority changed), without suggesting another restore. The
+required failure regression follows that Refresh route, preserving the admitted
+writer, selected grant, original source and recovery record with no additional create.
+This path does not roll back the create or voluntarily invalidate its destination.

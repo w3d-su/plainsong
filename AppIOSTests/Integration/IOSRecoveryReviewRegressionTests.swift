@@ -61,38 +61,6 @@ final class IOSRecoveryReviewRegressionTests: XCTestCase {
         recovery.didDismiss(retryPresentation)
     }
 
-    func testSuccessfulRestoreRefreshesFilesAfterCreateWithoutAWatcherEvent() async throws {
-        let fixture = IOSSceneControllerFixture()
-        try await fixture.controller.openPickedURL(fixture.selectedURL, scope: .singleFile)
-        let record = recoveryRecord()
-        let capture = try fixture.controller.captureRecoveryRestore(record)
-        fixture.workspace.directoryPaths = ["existing.md"]
-        // The create changes provider contents after the initial collision check.
-        // No snapshotChanged event is sent by this test double.
-        fixture.store.onOpen = {
-            fixture.workspace.directoryPaths.append(capture.filename)
-        }
-        var observedPaths: [[String]] = []
-        let observation = fixture.controller.observe { snapshot in
-            if let tree = snapshot.workspace {
-                observedPaths.append(tree.entries.map(\.location.relativePath))
-            }
-        }
-        defer { observation.cancel() }
-        try await fixture.controller.restoreRecovery(capture, in: folder,
-                                                     loadRecord: { _ in record }, isCurrent: { true })
-        let restored = try XCTUnwrap(fixture.controller.handle)
-        let tree = try XCTUnwrap(fixture.controller.snapshot.workspace)
-        XCTAssertEqual(tree.workspaceID, restored.location.workspaceID)
-        XCTAssertEqual(tree.accessGeneration, restored.location.accessGeneration)
-        XCTAssertEqual(tree.entries.map(\.location.relativePath), ["existing.md", capture.filename])
-        XCTAssertEqual(observedPaths.last, ["existing.md", capture.filename], "Files must receive the post-create tree")
-        XCTAssertEqual(restored.location.fileURL.deletingLastPathComponent(), folder)
-        XCTAssertEqual(restored.session.text, record.source)
-        XCTAssertEqual(fixture.controller.admission.active?.documentID, restored.identity)
-        XCTAssertTrue(fixture.editor.snapshot.canWrite)
-    }
-
     func testSuccessfulRestoreNavigatesOnceOnlyAfterMatchingActualDismissal() async throws {
         let fixture = IOSSceneControllerFixture()
         let record = recoveryRecord()
@@ -228,5 +196,87 @@ final class IOSRecoveryReviewRegressionTests: XCTestCase {
                           workspaceID: UUID(), accessGeneration: 1, resourceID: nil,
                           relativePathUTF8: Data(path.utf8), fileURLPath: "/ungranted/\(path)",
                           source: path, baseline: "", reason: .backgroundDeadline)
+    }
+}
+
+extension IOSRecoveryReviewRegressionTests {
+    func testSuccessfulRestoreRefreshesFilesAfterCreateWithoutAWatcherEvent() async throws {
+        let fixture = IOSSceneControllerFixture()
+        try await fixture.controller.openPickedURL(fixture.selectedURL, scope: .singleFile)
+        let record = recoveryRecord()
+        let capture = try fixture.controller.captureRecoveryRestore(record)
+        fixture.workspace.directoryPaths = ["existing.md"]
+        // The create changes provider contents after the initial collision check.
+        // No snapshotChanged event is sent by this test double.
+        fixture.store.onOpen = {
+            fixture.workspace.directoryPaths.append(capture.filename)
+        }
+        var observedPaths: [[String]] = []
+        let observation = fixture.controller.observe { snapshot in
+            if let tree = snapshot.workspace {
+                observedPaths.append(tree.entries.map(\.location.relativePath))
+            }
+        }
+        defer { observation.cancel() }
+        try await fixture.controller.restoreRecovery(capture, in: folder,
+                                                     loadRecord: { _ in record }, isCurrent: { true })
+        let restored = try XCTUnwrap(fixture.controller.handle)
+        let tree = try XCTUnwrap(fixture.controller.snapshot.workspace)
+        XCTAssertEqual(tree.workspaceID, restored.location.workspaceID)
+        XCTAssertEqual(tree.accessGeneration, restored.location.accessGeneration)
+        XCTAssertEqual(tree.entries.map(\.location.relativePath), ["existing.md", capture.filename])
+        XCTAssertEqual(observedPaths.last, ["existing.md", capture.filename], "Files must receive the post-create tree")
+        XCTAssertEqual(restored.location.fileURL.deletingLastPathComponent(), folder)
+        XCTAssertEqual(restored.session.text, record.source)
+        XCTAssertEqual(fixture.controller.admission.active?.documentID, restored.identity)
+        XCTAssertTrue(fixture.editor.snapshot.canWrite)
+    }
+
+    func testPostCreateRefreshFailureKeepsWriterAndExplainsRefreshWithoutAnotherRestore() async throws {
+        let fixture = IOSSceneControllerFixture()
+        try await fixture.controller.openPickedURL(fixture.selectedURL, scope: .singleFile)
+        let original = try XCTUnwrap(fixture.controller.handle)
+        let originalGrant = try XCTUnwrap(fixture.controller.currentGrant)
+        let record = recoveryRecord()
+        let recovery = controller(fixture, record: record)
+        recovery.present()
+        let presentationID = try XCTUnwrap(recovery.presentationID)
+        XCTAssertTrue(recovery.didAppear(presentationID))
+        await recovery.select(record.recordID)
+        recovery.requestRestore()
+        let request = try XCTUnwrap(recovery.pickerRequest)
+        fixture.store.onOpen = {
+            fixture.workspace.directoryPaths.append(request.capture.filename)
+            fixture.workspace.refreshFailure = .offline
+        }
+        let task = try XCTUnwrap(recovery.completePicker(request, urls: [folder]))
+        await task.value
+        let restored = try XCTUnwrap(fixture.controller.handle)
+        let restoredGrant = try XCTUnwrap(fixture.controller.currentGrant)
+        let message = try XCTUnwrap(recovery.errorMessage)
+        XCTAssertTrue(message.contains("restored file was created and is retained"))
+        XCTAssertTrue(message.contains("use Refresh in Files"))
+        XCTAssertTrue(message.contains("No new restore is needed"))
+        XCTAssertFalse(message.contains("restore could not finish"))
+        XCTAssertTrue(recovery.isPresented)
+        XCTAssertEqual(recovery.detail?.source, record.source)
+        XCTAssertEqual(original.session.text, "original")
+        XCTAssertEqual(restored.session.text, record.source)
+        XCTAssertEqual(restored.location.fileURL.deletingLastPathComponent(), folder)
+        XCTAssertEqual(fixture.controller.admission.active?.documentID, restored.identity)
+        XCTAssertEqual(fixture.workspace.invalidated, [originalGrant.workspaceID])
+        XCTAssertTrue(fixture.controller.grantIsCurrent)
+        XCTAssertTrue(fixture.editor.snapshot.canWrite)
+        // Follow the displayed route: refresh the same authority, without create.
+        fixture.workspace.refreshFailure = nil
+        try await fixture.controller.refreshWorkspace()
+        XCTAssertTrue(fixture.controller.snapshot.workspace?.entries.contains {
+            $0.location.relativePath == request.capture.filename
+        } == true)
+        XCTAssertEqual(fixture.controller.currentGrant?.workspaceID, restoredGrant.workspaceID)
+        XCTAssertEqual(fixture.store.opened.count, 2)
+        XCTAssertEqual(fixture.workspace.selected.count, 2)
+        recovery.dismiss()
+        recovery.didDismiss(presentationID)
     }
 }

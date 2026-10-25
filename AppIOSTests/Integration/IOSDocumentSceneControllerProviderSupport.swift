@@ -32,6 +32,7 @@ final class IOSSceneControllerWorkspaceDouble: IOSWorkspaceAccessProviding {
     var leases: [IOSSceneControllerLease] = []
     var observations: [(IOSReloadRelayObservation, @MainActor (IOSWorkspaceEvent) -> Void)] = []
     var directoryPaths = ["first.md", "second.md"]
+    var refreshFailure: IOSWorkspaceFailure?
     var onLeaseRelease: ((IOSWorkspaceGrant) -> Void)?
 
     func open(selectedURL: URL, scope: IOSWorkspaceScope) async throws -> IOSWorkspaceGrant {
@@ -53,6 +54,9 @@ final class IOSSceneControllerWorkspaceDouble: IOSWorkspaceAccessProviding {
     }
 
     func refresh(_ grant: IOSWorkspaceGrant) async throws -> IOSWorkspaceSnapshot {
+        if let refreshFailure {
+            throw refreshFailure
+        }
         let paths = grant.scope == .singleFile ? [grant.rootURL.lastPathComponent] : directoryPaths
         let entries = paths.map { path in
             IOSWorkspaceEntry(
