@@ -13,9 +13,11 @@ extension IOSDocumentSceneController {
         guard item.status == .available else { throw IOSWorkspaceFailure.permissionDenied }
         try Task.checkCancellation()
         try beginTransition()
-        defer { finishTransition() }
+        recentTransitionActive = true
+        recentTransitionSuperseded = false
+        defer { finishRecentTransition() }
         try await closeCurrent()
-        try Task.checkCancellation()
+        try checkRecentTransition()
         guard !isShuttingDown, !isDisposed else { throw IOSDocumentFailure.unavailable }
 
         let grant = try await access.restoreRecent(recordID: recordID)
@@ -31,7 +33,7 @@ extension IOSDocumentSceneController {
         var adopted = false
         do {
             let fresh = try await recentSnapshot(grant, expectedScope: expectedScope)
-            try Task.checkCancellation()
+            try checkRecentTransition()
             guard !isShuttingDown, !isDisposed,
                   access.recentItems().contains(where: { $0.recordID == recordID && $0.status == .available })
             else { throw IOSWorkspaceFailure.grantChanged }
@@ -43,7 +45,11 @@ extension IOSDocumentSceneController {
             if !adopted {
                 _ = workspace.invalidate(grant.workspaceID)
             } else if handle == nil, currentGrant?.workspaceID == grant.workspaceID {
-                releaseCurrentGrant()
+                let selectedScopeRemainsLive = error is CancellationError && grantIsCurrent &&
+                    pendingRecentNavigation?.preserves(grant) == true
+                if !selectedScopeRemainsLive {
+                    releaseCurrentGrant()
+                }
             }
             throw error
         }
@@ -53,7 +59,7 @@ extension IOSDocumentSceneController {
         _ grant: IOSWorkspaceGrant, expectedScope: IOSWorkspaceScope
     ) async throws -> IOSWorkspaceSnapshot {
         guard grant.scope == expectedScope else { throw IOSWorkspaceFailure.outsideGrant }
-        try Task.checkCancellation()
+        try checkRecentTransition()
         guard !isShuttingDown, !isDisposed else { throw IOSDocumentFailure.unavailable }
         return try await workspace.refresh(grant)
     }
@@ -64,10 +70,19 @@ extension IOSDocumentSceneController {
             throw IOSDocumentFailure.access(.unsupportedType)
         }
         try await install(location, initialText: nil)
-        if Task.isCancelled {
-            // A provider-returned writer cannot be dropped. Retain its
-            // admission/session read-only until the next safe close.
-            _ = workspace.invalidate(grant.workspaceID)
+        if Task.isCancelled || recentTransitionSuperseded {
+            // Drain the returned writer through the normal close path before
+            // retiring authority. A retained writer keeps its ticket/session;
+            // cancellation never permits another writer to replace it.
+            do {
+                try await closeCurrent()
+            } catch {
+                _ = workspace.invalidate(grant.workspaceID)
+                throw error
+            }
+            if pendingRecentNavigation?.preserves(grant) != true {
+                releaseCurrentGrant()
+            }
             throw CancellationError()
         }
     }

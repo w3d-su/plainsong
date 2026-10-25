@@ -37,7 +37,7 @@ This responds to `pr-review-210-218.md`, covering #210 → #211 → #217 → #21
 
 ### #218 — Recent cancellation and folders
 
-- **Cancellation after a provider returns a writer:** retain that writer/session and admission, invalidate the abandoned grant, and keep it read only until safe close. Never discard it or reauthorize stale completion. Generic access-change feedback can still be confusing for this race. A dedicated cancelled-open explanation and safe-close/restart path remain an explicit UX follow-up. This batch does not claim cancellation always restores the old screen.
+- **Cancellation and later navigation:** drain a suspended Recent operation before the latest picker/OS URL or Files selection proceeds. Supersession is checked after provider suspension, and cancelled waiters cannot mint a grant. A returned writer first attempts normal safe close; successful cleanup releases its grant unless the latest Files descriptor still needs that matching live scope. Failed close retains the writer/session/admission read only and refuses replacement. The runtime also retains the latest OS URL while an explicit open drains. Never discard an admitted writer, revive a revoked bookmark or reconstruct authority from an old display path. This does not promise restoration of the previous workspace; stale descriptors still require explicit reselection. See `docs/decisions/2026-10-25-ios-recent-navigation-drain.md`.
 - **Recent folder closes the current document:** retain the same workspace-replacement behavior as an explicit folder picker. Safe close must succeed before installation; a refusal retains current source/session. This does not create a concurrent workspace.
 
 ## Governance and evidence

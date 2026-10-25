@@ -136,10 +136,35 @@ final class IOSRecentPresentationTests: XCTestCase {
         XCTAssertTrue(runtime.editor.textView.undoManager === undo)
     }
 
+    func testShutdownInProgressRefusesNewOSAndPickerDeliveriesBeforeProviderReturns() async throws {
+        let access = IOSRecentTestAccess()
+        let latch = IOSSceneControllerLatch()
+        defer { latch.release() }
+        let started = expectation(description: "Runtime shutdown provider is parked")
+        var opened: [URL] = []
+        let runtime = try makeRuntime(access: access, openPicked: { url, _ in opened.append(url) }, shutdown: {
+            started.fulfill()
+            await latch.wait()
+            return true
+        })
+        let shutdown = Task { await runtime.shutdown() }
+        await fulfillment(of: [started], timeout: 2)
+        await runtime.openURL(URL(fileURLWithPath: "/synthetic/shutdown-OS.md"))
+        runtime.requestPicker(scope: .singleFile)
+        XCTAssertTrue(opened.isEmpty)
+        XCTAssertNil(runtime.pickerRequest)
+        XCTAssertFalse(runtime.isOpening)
+        latch.release()
+        let closed = await shutdown.value
+        XCTAssertTrue(closed)
+        XCTAssertTrue(opened.isEmpty)
+    }
+
     private func makeRuntime(
         access: IOSRecentTestAccess,
         openRecent: @escaping @MainActor (UUID) async throws -> Void = { _ in },
-        openPicked: @escaping @MainActor (URL, IOSWorkspaceScope) async throws -> Void = { _, _ in }
+        openPicked: @escaping @MainActor (URL, IOSWorkspaceScope) async throws -> Void = { _, _ in },
+        shutdown: @escaping @MainActor () async -> Bool = { true }
     ) throws -> IOSProductionRuntime {
         let editor = IOSSourceEditorController()
         let preview = PreviewController()
@@ -149,7 +174,7 @@ final class IOSRecentPresentationTests: XCTestCase {
         ))
         let runtime = try IOSProductionRuntime(
             controller: facade, editor: editor, preview: preview,
-            currentGrant: { nil }, refreshWorkspace: {}, openPickedURL: openPicked, shutdown: { true }
+            currentGrant: { nil }, refreshWorkspace: {}, openPickedURL: openPicked, shutdown: shutdown
         )
         runtime.recentPresentation.install(access: access, openRecent: openRecent, reselectionScope: { .directory })
         addTeardownBlock { @MainActor in

@@ -59,6 +59,8 @@ final class IOSProductionRuntime: ObservableObject {
     private let shutdownProvider: @MainActor () async -> Bool
     private var shutdownTask: Task<Bool, Never>?
     private var isShutDown = false
+    private var isShuttingDown = false
+    private var pendingOpen: (url: URL, scope: IOSWorkspaceScope)?
     private var disconnectObserver: IOSWindowSceneDisconnectObserver?
 
     init(
@@ -136,6 +138,8 @@ final class IOSProductionRuntime: ObservableObject {
     }
 
     func shutdown() async -> Bool {
+        pendingOpen = nil
+        pickerRequest = nil
         recentPresentation.cancel()
         recovery?.dismiss()
         if isShutDown {
@@ -144,10 +148,12 @@ final class IOSProductionRuntime: ObservableObject {
         if let shutdownTask {
             return await shutdownTask.value
         }
+        isShuttingDown = true
         let task = Task { @MainActor [self] in await shutdownProvider() }
         shutdownTask = task
         let closed = await task.value
         shutdownTask = nil
+        isShuttingDown = false
         if closed {
             isShutDown = true
             stopObserving()
@@ -159,7 +165,7 @@ final class IOSProductionRuntime: ObservableObject {
     }
 
     func requestPicker(scope: IOSWorkspaceScope) {
-        guard !isShutDown, !isOpening, pickerRequest == nil else { return }
+        guard !isShutDown, !isShuttingDown, !isOpening, pickerRequest == nil else { return }
         if recentPresentation.redirectPickerUntilDismissed(scope: scope) {
             return
         }
@@ -170,7 +176,7 @@ final class IOSProductionRuntime: ObservableObject {
 
     @discardableResult
     func completePicker(_ request: IOSProductionPickerRequest, urls: [URL]) -> Task<Void, Never>? {
-        guard pickerRequest?.id == request.id else { return nil }
+        guard !isShuttingDown, pickerRequest?.id == request.id else { return nil }
         pickerRequest = nil
         guard urls.count == 1, let url = urls.first, !isOpening else { return nil }
         // Reserve synchronously before creating the task. The access provider
@@ -187,7 +193,13 @@ final class IOSProductionRuntime: ObservableObject {
         showOpenChoices = false
         recentPresentation.cancel()
         retireAuthoringCapture()
-        guard !isShutDown, !isOpening else { return }
+        guard !isShutDown, !isShuttingDown else { return }
+        if isOpening {
+            // Preserve the latest OS delivery while a Recent/picker provider
+            // drains. Never run a second grant or writer operation in parallel.
+            pendingOpen = (url, .singleFile)
+            return
+        }
         isOpening = true
         await performOpen(url, scope: .singleFile)
     }
@@ -249,16 +261,42 @@ final class IOSProductionRuntime: ObservableObject {
             isOpening = false
             recentPresentation.presenter?.reload()
         }
-        do {
-            try await openPickedURL(url, scope)
-            if scope == .singleFile, controller.snapshot.document != nil {
-                // Do not navigate for a cancelled/refused/failed open.
-                scene.navigateToDocument()
+        var request = (url: url, scope: scope)
+        var firstRequest = true
+        while !isShutDown, !isShuttingDown {
+            // Pending OS deliveries are separate user operations. A cancelled
+            // picker caller must not cancel every later queued delivery.
+            let operation = Task { @MainActor [request] in
+                try Task.checkCancellation()
+                try await self.openPickedURL(request.url, request.scope)
             }
-        } catch is CancellationError {
-            return
-        } catch {
-            show(error, title: "Couldn't Open")
+            do {
+                if firstRequest {
+                    try await withTaskCancellationHandler {
+                        try await operation.value
+                    } onCancel: {
+                        operation.cancel()
+                    }
+                } else {
+                    try await operation.value
+                }
+                if pendingOpen == nil, !firstRequest || !Task.isCancelled,
+                   !isShuttingDown, !isShutDown, request.scope == .singleFile,
+                   controller.snapshot.document != nil
+                {
+                    scene.navigateToDocument()
+                }
+            } catch is CancellationError {
+                // Cancellation suppresses UI completion, not a newer delivery.
+            } catch {
+                if pendingOpen == nil {
+                    show(error, title: "Couldn't Open")
+                }
+            }
+            guard let next = pendingOpen else { break }
+            pendingOpen = nil
+            request = next
+            firstRequest = false
         }
     }
 
@@ -388,14 +426,14 @@ extension IOSProductionRuntime {
     }
 
     func requestConflictCopy() {
-        guard !isShutDown, !isOpening, pickerRequest == nil,
+        guard !isShutDown, !isShuttingDown, !isOpening, pickerRequest == nil,
               recovery?.isPresented != true, !recentPresentation.isActive, let conflictCopy else { return }
         prepareForReadOnlyPresentation()
         _ = conflictCopy.requestSaveCopy()
     }
 
     var canPresentRecentItems: Bool {
-        !isShutDown && !isOpening && pickerRequest == nil && !showOpenChoices &&
+        !isShutDown && !isShuttingDown && !isOpening && pickerRequest == nil && !showOpenChoices &&
             recovery?.isPresented != true && conflictCopy?.draft?.id == nil && conflictCopy?.isSaving != true
     }
 }

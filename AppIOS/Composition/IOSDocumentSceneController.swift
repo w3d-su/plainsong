@@ -29,6 +29,9 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     var isShuttingDown = false
     var isDisposed = false
     var transitioning = false
+    var recentTransitionActive = false
+    var recentTransitionSuperseded = false
+    var pendingRecentNavigation: IOSPendingRecentNavigation?
     var recoveryEpoch: UInt64 = 0
     var grantIsCurrent = false
     var workspaceSnapshot: IOSWorkspaceSnapshot?
@@ -89,6 +92,7 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     /// Only the explicit picker/OS Open URL path may mint a new grant. Browser
     /// rows and preview links use openSelectedURL and existing descriptors.
     func openPickedURL(_ url: URL, scope: IOSWorkspaceScope) async throws {
+        try await waitForRecentTransition(preserving: nil)
         try beginTransition()
         defer { finishTransition() }
         try await closeCurrent()
@@ -131,6 +135,7 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     }
 
     func openSelectedURL(_ url: URL, scope: IOSWorkspaceScope) async throws {
+        try await waitForRecentTransition(preserving: currentGrant)
         guard scope == .singleFile, let location = documentLocation(for: url) else {
             throw IOSDocumentFailure.access(.outsideGrant)
         }
