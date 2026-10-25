@@ -86,18 +86,19 @@ final class EditorTextElementCacheTrimmerTests: XCTestCase {
     func testScheduledTrimRunsAfterTheViewportSettlesAndRestartsOnChange() async throws {
         let textView = try makeTextView(String(repeating: "line of text\n", count: 20000)).textView
         let trimmer = EditorTextElementCacheTrimmer()
+        let visible = try visibleRange(textView)
         var allowed = false
-        trimmer.visibleRangeDidChange(NSRange(location: 0, length: 1000), in: textView) { allowed }
+        trimmer.visibleRangeDidChange(visible, in: textView) { allowed }
         try await Task.sleep(nanoseconds: EditorTextElementCacheTrimmer.settleNanoseconds + 200_000_000)
         XCTAssertEqual(trimmer.trimmedLength, 0, "a refused trim must stop without releasing anything")
 
         allowed = true
-        trimmer.visibleRangeDidChange(NSRange(location: 0, length: 1000), in: textView) { allowed }
+        trimmer.visibleRangeDidChange(visible, in: textView) { allowed }
         try await Task.sleep(nanoseconds: EditorTextElementCacheTrimmer.settleNanoseconds / 2)
-        trimmer.visibleRangeDidChange(NSRange(location: 0, length: 1000), in: textView) { allowed }
+        trimmer.visibleRangeDidChange(visible, in: textView) { allowed }
         XCTAssertEqual(trimmer.trimmedLength, 0)
         let storageLength = try XCTUnwrap(MarkdownTextView.textStorage(of: textView)?.length)
-        let expected = storageLength - 1000 - 8192
+        let expected = storageLength - NSMaxRange(visible) - max(visible.length, 8192)
         // Chunks yield between run-loop turns, so the release completes over several.
         let deadline = Date().addingTimeInterval(5)
         while trimmer.trimmedLength < expected, Date() < deadline {
@@ -106,8 +107,231 @@ final class EditorTextElementCacheTrimmerTests: XCTestCase {
         XCTAssertEqual(trimmer.trimmedLength, expected)
     }
 
+    func testScheduledTrimProtectsNewViewportAndCaretAfterSixteenthChunk() async throws {
+        let source = String(repeating: "line of text\n", count: 90000)
+        let textView = try makeTextView(source).textView
+        textView.textSelection = NSRange(location: 0, length: 0)
+        let capturedViewport = try visibleRange(textView)
+        let destination = (source as NSString).lineRange(for: NSRange(location: source.utf16.count / 2, length: 0))
+        let trimmer = EditorTextElementCacheTrimmer()
+        defer { trimmer.cancel() }
+        var released: [NSRange] = []
+        var stopped = false
+        var navigatedViewport: NSRange?
+        trimmer.probeHandler = { event, range in
+            if event == "trimmed", let range {
+                released.append(range)
+                if released.count == 16 {
+                    // Keep the task's original top capture while native navigation
+                    // installs a new viewport and caret between production chunks.
+                    textView.textSelection = NSRange(location: destination.location, length: 0)
+                    textView.scrollRangeToVisible(textView.selectedRange())
+                    textView.layoutSubtreeIfNeeded()
+                    navigatedViewport = MarkdownTextView.visibleTextRange(of: textView)
+                }
+            }
+            if event == "complete" || event == "refused" {
+                stopped = true
+            }
+        }
+        trimmer.visibleRangeDidChange(capturedViewport, in: textView) { true }
+        let deadline = Date().addingTimeInterval(5)
+        while !stopped, Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertTrue(stopped)
+        let viewport = try XCTUnwrap(navigatedViewport)
+        XCTAssertGreaterThanOrEqual(released.count, 16, "navigation must occur after sixteen real chunks")
+        let protectedSelection = try selectionProtection(in: textView)
+        let keepEnd = NSMaxRange(viewport) + max(viewport.length, 8192)
+        for range in released.dropFirst(16) {
+            XCTAssertGreaterThanOrEqual(range.location, keepEnd)
+            XCTAssertEqual(NSIntersectionRange(range, protectedSelection).length, 0)
+            XCTAssertLessThanOrEqual(range.length, EditorTextElementCacheTrimmer.chunkLength)
+        }
+        XCTAssertEqual(MarkdownTextView.textStorage(of: textView)?.string, source)
+        XCTAssertEqual(textView.selectedRange().location, destination.location)
+    }
+
+    func testScheduledTrimRechecksCaretProtectionBetweenChunks() async throws {
+        let source = String(repeating: "line of text\n", count: 20000)
+        let textView = try makeTextView(source).textView
+        textView.textSelection = NSRange(location: 0, length: 0)
+        let capturedViewport = try visibleRange(textView)
+        let destination = source.utf16.count - EditorTextElementCacheTrimmer.chunkLength - 16384
+        let trimmer = EditorTextElementCacheTrimmer()
+        defer { trimmer.cancel() }
+        var admissions = 0
+        var released: [NSRange] = []
+        var stopped = false
+        trimmer.probeHandler = { event, range in
+            if event == "trimmed", let range {
+                released.append(range)
+            }
+            if event == "complete" || event == "refused" {
+                stopped = true
+            }
+        }
+        trimmer.visibleRangeDidChange(capturedViewport, in: textView) {
+            admissions += 1
+            if admissions == 2 {
+                // Leave the viewport at the top: the moved caret must independently
+                // protect input whose viewport notification has not arrived yet.
+                textView.textSelection = NSRange(location: destination, length: 0)
+            }
+            return true
+        }
+        let deadline = Date().addingTimeInterval(5)
+        while !stopped, Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertTrue(stopped)
+        XCTAssertGreaterThan(admissions, 2)
+        XCTAssertGreaterThan(released.count, 2, "the pass must continue on both safe sides of the moved caret")
+        let protectedSelection = try selectionProtection(in: textView)
+        for range in released {
+            XCTAssertEqual(NSIntersectionRange(range, protectedSelection).length, 0)
+            XCTAssertLessThanOrEqual(range.length, EditorTextElementCacheTrimmer.chunkLength)
+        }
+        XCTAssertTrue(released.contains { $0.location == NSMaxRange(protectedSelection) },
+                      "retain the safe suffix above the selected-paragraph band")
+        XCTAssertTrue(released.contains { NSMaxRange($0) == protectedSelection.location },
+                      "continue with a preceding chunk after skipping the selected-paragraph band")
+        XCTAssertEqual(textView.selectedRange().location, destination)
+    }
+
+    func testScheduledTrimStillReleasesMiddleTextWithAnOldOffscreenEndCaret() async throws {
+        let source = String(repeating: "line of text\n", count: 20000) + "last caret paragraph"
+        let (scrollView, textView) = try makeTextView(source)
+        let length = source.utf16.count
+        textView.textSelection = NSRange(location: length, length: 0)
+        textView.scrollRangeToVisible(textView.selectedRange())
+        textView.layoutSubtreeIfNeeded()
+        // Manual scrolling leaves the insertion point at the end. Its local protected
+        // band must not prevent the settled top viewport from releasing the middle.
+        scrollView.contentView.scroll(to: .zero)
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+        textView.layoutSubtreeIfNeeded()
+        let visible = try visibleRange(textView)
+        let keepEnd = NSMaxRange(visible) + max(visible.length, 8192)
+        let protectedSelection = try selectionProtection(in: textView)
+        XCTAssertLessThan(keepEnd, length / 2)
+        XCTAssertEqual(textView.selectedRange().location, length)
+        let trimmer = EditorTextElementCacheTrimmer()
+        defer { trimmer.cancel() }
+        var released: [NSRange] = []
+        var stopped = false
+        trimmer.probeHandler = { event, range in
+            if event == "trimmed", let range {
+                released.append(range)
+            }
+            if event == "complete" || event == "refused" {
+                stopped = true
+            }
+        }
+        trimmer.visibleRangeDidChange(visible, in: textView) { true }
+        let deadline = Date().addingTimeInterval(5)
+        while !stopped, Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertTrue(stopped)
+        XCTAssertEqual(trimmer.trimmedLength, protectedSelection.location - keepEnd)
+        XCTAssertTrue(released.contains { NSLocationInRange(length / 2, $0) }, "the cached middle must be released")
+        for range in released {
+            XCTAssertGreaterThanOrEqual(range.location, keepEnd)
+            XCTAssertEqual(NSIntersectionRange(range, protectedSelection).length, 0)
+            XCTAssertLessThanOrEqual(range.length, EditorTextElementCacheTrimmer.chunkLength)
+        }
+        XCTAssertEqual(MarkdownTextView.textStorage(of: textView)?.string, source)
+        XCTAssertEqual(textView.selectedRange().location, length)
+    }
+
+    func testAdmissionProtectsWholeLongParagraphAndKeepsSafeTextOnBothSides() throws {
+        let prefix = String(repeating: "line of text\n", count: 2000)
+        let paragraph = String(repeating: "x", count: 70000) + "\n"
+        let source = prefix + paragraph + String(repeating: "line of text\n", count: 4000)
+        let textView = try makeTextView(source).textView
+        textView.textSelection = NSRange(location: prefix.utf16.count + 1000, length: 0)
+        let protectedSelection = try selectionProtection(in: textView)
+        XCTAssertEqual(protectedSelection.location, prefix.utf16.count - 8192)
+        XCTAssertEqual(protectedSelection.length, paragraph.utf16.count + 16384)
+
+        // This range lies inside the paragraph, far beyond a caret-only 8192 margin.
+        let candidate = NSRange(location: prefix.utf16.count + paragraph.utf16.count - 20000, length: 20000)
+        let preceding = try XCTUnwrap(EditorTextElementCacheTrimmer.protectedChunk(candidate, in: textView))
+        XCTAssertEqual(NSMaxRange(preceding), protectedSelection.location)
+        XCTAssertEqual(NSIntersectionRange(preceding, protectedSelection).length, 0)
+        XCTAssertLessThanOrEqual(preceding.length, EditorTextElementCacheTrimmer.chunkLength)
+
+        let end = NSMaxRange(protectedSelection) + 4000
+        let suffix = try XCTUnwrap(EditorTextElementCacheTrimmer.protectedChunk(
+            NSRange(location: end - EditorTextElementCacheTrimmer.chunkLength,
+                    length: EditorTextElementCacheTrimmer.chunkLength),
+            in: textView
+        ))
+        XCTAssertEqual(suffix, NSRange(location: NSMaxRange(protectedSelection), length: 4000))
+    }
+
+    func testScheduledTrimRefusesAnUnlaidOutViewportCreatedDuringAdmission() async throws {
+        let source = String(repeating: "line of text\n", count: 20000)
+        let textView = try makeTextView(source).textView
+        textView.textSelection = NSRange(location: 0, length: 0)
+        let capturedViewport = try visibleRange(textView)
+        XCTAssertGreaterThan(capturedViewport.length, 0, "the scheduled capture must be laid out")
+        let contentManager = textView.textContentManager
+        let destination = try XCTUnwrap(contentManager.location(
+            contentManager.documentRange.location, offsetBy: source.utf16.count / 2
+        ))
+        let controller = textView.textLayoutManager.textViewportLayoutController
+        let trimmer = EditorTextElementCacheTrimmer()
+        defer { trimmer.cancel() }
+        var admissions = 0
+        var released: [NSRange] = []
+        var refused = false
+        var stopped = false
+        trimmer.probeHandler = { event, range in
+            if event == "trimmed", let range {
+                released.append(range)
+            }
+            if event == "refused" {
+                refused = true
+            }
+            if event == "complete" || event == "refused" {
+                stopped = true
+            }
+        }
+        trimmer.visibleRangeDidChange(capturedViewport, in: textView) {
+            admissions += 1
+            // The input callback is allowed to change native layout state. Re-reading
+            // the real viewport after it returns must reject this unlaid-out anchor;
+            // the visible-range helper's selection fallback is not a substitute.
+            _ = controller.relocateViewport(to: destination)
+            XCTAssertTrue(controller.viewportRange?.isEmpty == true)
+            return true
+        }
+        let deadline = Date().addingTimeInterval(5)
+        while !stopped, Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertTrue(stopped)
+        XCTAssertTrue(refused)
+        XCTAssertEqual(admissions, 1)
+        XCTAssertEqual(released, [])
+        XCTAssertEqual(trimmer.trimmedLength, 0)
+        XCTAssertEqual(MarkdownTextView.textStorage(of: textView)?.string, source)
+        XCTAssertEqual(textView.selectedRange().location, 0)
+    }
+
     private func document() -> String {
         (1 ... 24000).map { "Paragraph \($0) with **bold** text and 中文.\n" }.joined()
+    }
+
+    private func selectionProtection(in textView: STTextView) throws -> NSRange {
+        let storage = try XCTUnwrap(MarkdownTextView.textStorage(of: textView))
+        let paragraphs = storage.mutableString.paragraphRange(for: textView.selectedRange())
+        let start = max(0, paragraphs.location - 8192)
+        let end = min(storage.length, NSMaxRange(paragraphs) + 8192)
+        return NSRange(location: start, length: end - start)
     }
 
     private func makeTextView(_ text: String) throws -> (scrollView: NSScrollView, textView: MarkdownSTTextView) {

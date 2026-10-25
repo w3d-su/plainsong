@@ -13,6 +13,24 @@ final class MarkdownSTTextView: STTextView {
     var wysiwygZeroWidthContentStorageDelegate: WYSIWYGZeroWidthTextContentStorageDelegate?
     var replacePresentationSnapshot: EditorReplacePresentationSnapshot?
     private var previousTextContentStorageDelegate: NSTextContentStorageDelegate?
+    /// Source lines for scroll sync and line numbers, edited in place as the text changes.
+    private(set) lazy var lineIndexCache = EditorLineIndexCache(textView: self)
+    /// EditorKit's line-number gutter, tiled by `EditorScrollView`. STTextView's own gutter
+    /// (`showsLineNumbers`) stays off.
+    var lineNumberGutter: EditorLineNumberGutterView?
+
+    /// STTextView's scroll view setup, on the scroll view that tiles the line-number gutter.
+    override static func scrollableTextView(frame: NSRect = .zero) -> NSScrollView {
+        let scrollView = EditorScrollView(frame: frame)
+        let textView = MarkdownSTTextView()
+        scrollView.clipsToBounds = true
+        scrollView.wantsLayer = true
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = true
+        scrollView.drawsBackground = false
+        scrollView.documentView = textView
+        return scrollView
+    }
 
     /// `nil === nil` would match in source mode, where document installation disables
     /// folding on SwiftUI updates while typing: the whole-document invalidation then

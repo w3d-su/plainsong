@@ -1,7 +1,7 @@
 import Foundation
 
-/// One-based source lines for scroll sync. Only `\n` starts a line, matching the
-/// preview's `data-line` numbering.
+/// One-based source lines for scroll sync and the line-number gutter. Only `\n` starts a
+/// line, matching the preview's `data-line` numbering.
 ///
 /// Typing applies each edit in place instead of rescanning the document: rebuilding
 /// from the bridged text storage on every selection change cost ~17 ms per keystroke
@@ -44,6 +44,11 @@ struct EditorScrollLineIndex: Equatable {
         }
         lineStarts = starts
         textUTF16Count = length
+    }
+
+    /// Source lines, counting the empty line after a final newline.
+    var lineCount: Int {
+        lineStarts.count
     }
 
     func oneBasedLine(containingUTF16Offset offset: Int) -> Int {
