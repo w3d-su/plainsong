@@ -305,9 +305,13 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
               handle == nil, bindingID == nil, ownedTicket == nil, admission.active == nil,
               snapshot.workspaceID == grant.workspaceID, snapshot.accessGeneration == grant.accessGeneration
         else { throw IOSDocumentFailure.documentChanged }
-        let probe = try workspace.acquireLease(for: grant)
-        probe.release()
+        // Retiring the old scope can synchronously notify observers that revoke
+        // this provisional scope. Prove authority after those callbacks, then
+        // hold the proof through adoption so release-time revocation is observed
+        // against the newly installed currentGrant.
         releaseCurrentGrant()
+        let proof = try workspace.acquireLease(for: grant)
+        defer { proof.release() }
         currentGrant = grant
         grantIsCurrent = true
         workspaceSnapshot = snapshot

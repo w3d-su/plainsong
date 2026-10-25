@@ -10,12 +10,17 @@ import WorkspaceKitIOS
 final class IOSSceneControllerLease: IOSWorkspaceAccessLease {
     let grant: IOSWorkspaceGrant
     private(set) var isReleased = false
-    init(grant: IOSWorkspaceGrant) {
+    private let onRelease: (() -> Void)?
+
+    init(grant: IOSWorkspaceGrant, onRelease: (() -> Void)? = nil) {
         self.grant = grant
+        self.onRelease = onRelease
     }
 
     func release() {
+        guard !isReleased else { return }
         isReleased = true
+        onRelease?()
     }
 }
 
@@ -27,6 +32,7 @@ final class IOSSceneControllerWorkspaceDouble: IOSWorkspaceAccessProviding {
     var leases: [IOSSceneControllerLease] = []
     var observations: [(IOSReloadRelayObservation, @MainActor (IOSWorkspaceEvent) -> Void)] = []
     var directoryPaths = ["first.md", "second.md"]
+    var onLeaseRelease: ((IOSWorkspaceGrant) -> Void)?
 
     func open(selectedURL: URL, scope: IOSWorkspaceScope) async throws -> IOSWorkspaceGrant {
         selected.append((selectedURL, scope))
@@ -41,7 +47,7 @@ final class IOSSceneControllerWorkspaceDouble: IOSWorkspaceAccessProviding {
     func acquireLease(for grant: IOSWorkspaceGrant) throws -> any IOSWorkspaceAccessLease {
         guard grants[grant.workspaceID]?.accessGeneration == grant.accessGeneration,
               !invalidated.contains(grant.workspaceID) else { throw IOSWorkspaceFailure.grantChanged }
-        let lease = IOSSceneControllerLease(grant: grant)
+        let lease = IOSSceneControllerLease(grant: grant) { [weak self] in self?.onLeaseRelease?(grant) }
         leases.append(lease)
         return lease
     }
