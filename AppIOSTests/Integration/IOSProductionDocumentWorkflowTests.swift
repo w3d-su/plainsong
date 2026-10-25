@@ -6,7 +6,7 @@ import PreviewKit
 import UIKit
 @preconcurrency import WebKit
 import WorkspaceCore
-import WorkspaceKitIOS
+@testable import WorkspaceKitIOS
 import XCTest
 
 /// App-hosted tests use the actual production factory, UIDocument, native
@@ -40,10 +40,17 @@ final class IOSProductionDocumentWorkflowTests: XCTestCase {
         try await waitUntil("native source rendered") {
             try await self.bodyText(runtime.preview).contains("已修改")
         }
-        let acknowledgement = try await controller.saveCurrentDocument()
+        // The first edit may already be autosaved while a cold WebKit process
+        // becomes ready. Make a new native revision at the warm preview boundary
+        // so this case exercises one enabled manual Save, not an arbitrary call
+        // into a temporarily fenced store.
+        let acknowledgement = try await editAndSaveWhenAdmitted(runtime: runtime, controller: controller)
         XCTAssertEqual(acknowledgement.savedText, handle.session.text)
         XCTAssertFalse(handle.session.isDirty)
         XCTAssertEqual(try String(contentsOf: fixture.first, encoding: .utf8), acknowledgement.savedText)
+        try await waitUntil("manual-save source rendered") {
+            try await self.bodyText(runtime.preview).contains("手動儲存界線")
+        }
         // Re-picking the resource drains/closes its old writer before new grant.
         try await controller.openPickedURL(fixture.first, scope: .singleFile)
         XCTAssertNotEqual(controller.handle?.identity, handle.identity)
@@ -134,16 +141,108 @@ final class IOSProductionDocumentWorkflowTests: XCTestCase {
             addTeardownBlock { @MainActor in
                 runtime.stopObserving()
                 runtime.scene.stopObserving()
-                let closed = await controller.shutdown()
+                var closed = await controller.shutdown()
                 XCTAssertTrue(closed, "Retained writer must be resolved before releasing test resources")
+                if !closed {
+                    self.recordWriterState(runtime: runtime, controller: controller, context: "retained-fixture-close")
+                    // Failure cleanup is not product recovery: preserve the
+                    // failure, then drain/close this fixture's actual provider
+                    // through the existing retirement path. Never force-end a
+                    // process admission or abandon the returned writer.
+                    if let store = controller.documents as? IOSUIDocumentStore,
+                       let handle = controller.handle, let entry = store.byIdentity[handle.identity]
+                    {
+                        try await store.retireForReplacement(entry)
+                        closed = await controller.shutdown()
+                        XCTAssertTrue(closed, "Fixture retirement must safely release its own writer")
+                    }
+                }
                 if closed {
                     try fixture.remove()
                 }
             }
+            runtime.scene.startObserving()
             return (fixture, runtime, controller)
         } catch {
             try? fixture.remove()
             throw error
+        }
+    }
+
+    private func editAndSaveWhenAdmitted(
+        runtime: IOSProductionRuntime,
+        controller: IOSDocumentSceneController
+    ) async throws -> IOSSaveAcknowledgement {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(8))
+        while ContinuousClock.now < deadline {
+            if runtime.scene.chrome.editorCanWrite, let snapshot = runtime.editor.captureSnapshot(),
+               snapshot.canWrite, !snapshot.hasMarkedText
+            {
+                let marker = "手動儲存界線\n"
+                let offset = snapshot.document.text.utf16.count
+                XCTAssertEqual(runtime.editor.apply(IOSAuthorizedEdit(
+                    bindingID: snapshot.bindingID, baseRevision: snapshot.revision,
+                    selectionGeneration: snapshot.selectionGeneration, accessGeneration: snapshot.accessGeneration,
+                    result: MarkdownEditResult(
+                        replacementRange: NSRange(location: offset, length: 0), replacementString: marker,
+                        newSelection: NSRange(location: offset + marker.utf16.count, length: 0)
+                    ), undoActionName: "Manual Workflow Save"
+                )), .applied(IOSDocumentRevision(
+                    documentID: snapshot.revision.documentID, version: snapshot.revision.version + 1
+                )))
+                XCTAssertTrue(runtime.scene.chrome.canSave, "The new native revision must expose an enabled Save")
+                guard runtime.scene.chrome.canSave else {
+                    recordWriterState(runtime: runtime, controller: controller, context: "manual-save-disabled")
+                    throw IOSDocumentFailure.unavailable
+                }
+                // No await between the current UI admission check and this one
+                // Save call. A later real observation must still refuse; do not
+                // retry or relax the store's unknown-content write barrier.
+                do {
+                    return try await controller.saveCurrentDocument()
+                } catch {
+                    recordWriterState(runtime: runtime, controller: controller, context: "manual-save-refused")
+                    throw error
+                }
+            }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        recordWriterState(runtime: runtime, controller: controller, context: "manual-save-admission-timeout")
+        XCTFail("Timed out waiting for the current writer's native edit/Save admission")
+        throw IOSDocumentFailure.unavailable
+    }
+
+    private func recordWriterState(
+        runtime: IOSProductionRuntime,
+        controller: IOSDocumentSceneController,
+        context: String
+    ) {
+        let store = controller.documents as? IOSUIDocumentStore
+        let entry = controller.handle.flatMap { store?.byIdentity[$0.identity] }
+        let state: [String: Any] = [
+            "context": context,
+            "state": String(describing: controller.snapshot.documentState),
+            "source_version": controller.handle?.session.version ?? -1,
+            "dirty": controller.handle?.session.isDirty ?? false,
+            "ui_can_save": runtime.scene.chrome.canSave,
+            "editor_can_write": runtime.editor.captureSnapshot()?.canWrite ?? false,
+            "fenced": entry?.fenced ?? false,
+            "external_token_pending": entry?.externalToken != nil,
+            "external_read_tasks": entry?.externalReadTasks.count ?? 0,
+            "reload_proposal_pending": entry?.pendingProposal != nil,
+            "deferred_external_change": entry?.hasDeferredExternalChange ?? false,
+            "provider_write_in_flight": entry?.inFlightText != nil,
+            "current_grant": controller.grantIsCurrent,
+            "process_admission_owned": controller.ownedTicket != nil &&
+                controller.ownedTicket == controller.admission.active,
+        ]
+        if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]),
+           let text = String(data: data, encoding: .utf8)
+        {
+            let attachment = XCTAttachment(string: text)
+            attachment.name = context
+            attachment.lifetime = .keepAlways
+            add(attachment)
         }
     }
 
