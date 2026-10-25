@@ -245,24 +245,6 @@ public final class PreviewController: NSObject, ObservableObject {
 
     /// An unchanged value sends nothing: JavaScript already applied it (every render and
     /// `ready` carry the current pair), and each `setTheme` rewrites every image source.
-    public func setTheme(_ theme: String) {
-        guard theme != self.theme else { return }
-        self.theme = theme
-        sendPreviewSettings()
-    }
-
-    public func setAllowsRemoteImages(_ allowRemoteImages: Bool) {
-        guard allowRemoteImages != self.allowRemoteImages else { return }
-        self.allowRemoteImages = allowRemoteImages
-        sendPreviewSettings()
-    }
-
-    public func setWorkspaceAssetRoot(_ rootURL: URL?) {
-        workspaceAssetRootURL = rootURL?.standardizedFileURL
-    }
-
-    /// Permanently releases bridge callbacks and pending work. The owner of a dedicated
-    /// offscreen export controller must call this when the operation ends.
     public func invalidate() {
         guard !isInvalidated else { return }
         isInvalidated = true
@@ -422,6 +404,27 @@ public final class PreviewController: NSObject, ObservableObject {
             emitPreviewEvent(.relativeLinkRequested(documentID: iosDocumentIdentity, href: href))
         }
     }
+}
+
+public extension PreviewController {
+    func setTheme(_ theme: String) {
+        guard theme != self.theme else { return }
+        self.theme = theme
+        sendPreviewSettings()
+    }
+
+    func setAllowsRemoteImages(_ allowRemoteImages: Bool) {
+        guard allowRemoteImages != self.allowRemoteImages else { return }
+        self.allowRemoteImages = allowRemoteImages
+        sendPreviewSettings()
+    }
+
+    func setWorkspaceAssetRoot(_ rootURL: URL?) {
+        workspaceAssetRootURL = rootURL?.standardizedFileURL
+    }
+
+    // Permanently releases bridge callbacks and pending work. The owner of a dedicated
+    // offscreen export controller must call this when the operation ends.
 }
 
 extension PreviewController: WKNavigationDelegate {

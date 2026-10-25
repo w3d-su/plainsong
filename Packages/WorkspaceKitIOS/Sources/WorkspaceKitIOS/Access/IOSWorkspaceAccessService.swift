@@ -33,20 +33,6 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
         )
     }
 
-    /// Grants an explicitly picked destination without adding it to the user's
-    /// recent documents/workspaces. The normal lease and invalidation rules apply.
-    public func openDestinationFolder(selectedURL: URL) async throws -> IOSWorkspaceGrant {
-        try Task.checkCancellation()
-        return try await adopt(
-            url: selectedURL,
-            scope: .directory,
-            provenance: .userSelection,
-            bookmark: nil,
-            replacingGeneration: nil,
-            remembersRecent: false
-        )
-    }
-
     public func restore(bookmark: Data, scope: IOSWorkspaceScope) async throws -> IOSWorkspaceGrant {
         try Task.checkCancellation()
         let resolution: IOSBookmarkResolution
@@ -403,5 +389,21 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
         case .rejectedStaleGeneration:
             throw IOSWorkspaceFailure.grantChanged
         }
+    }
+}
+
+public extension IOSWorkspaceAccessService {
+    /// Grants an explicitly picked destination without adding it to the user's
+    /// recent documents/workspaces. The normal lease and invalidation rules apply.
+    func openDestinationFolder(selectedURL: URL) async throws -> IOSWorkspaceGrant {
+        try Task.checkCancellation()
+        return try await adopt(
+            url: selectedURL,
+            scope: .directory,
+            provenance: .userSelection,
+            bookmark: nil,
+            replacingGeneration: nil,
+            remembersRecent: false
+        )
     }
 }
