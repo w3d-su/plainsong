@@ -18,6 +18,8 @@ public final class PreviewController: NSObject, ObservableObject {
     private let scriptMessageProxy: ScriptMessageProxy
     let previewIndexURL: URL?
     let initialReadinessScheduler: PreviewInitialReadiness.Scheduler
+    let retriesSilentInitialLoad: Bool
+    var readinessProbeOverrideForTesting: (@MainActor (@escaping @MainActor (Any?) -> Void) -> Void)?
     let pageLoadOverrideForTesting: (@MainActor (WKWebView, URL?) -> WKNavigation?)?
     var initialReadiness = PreviewInitialReadiness()
     var pageLoadGeneration = UUID()
@@ -77,6 +79,7 @@ public final class PreviewController: NSObject, ObservableObject {
         websiteDataStore: WKWebsiteDataStore? = nil,
         assetReader: (any PreviewAssetReading)? = nil,
         recoversFromWebContentTermination: Bool = false,
+        retriesSilentInitialLoad: Bool = PreviewInitialReadiness.retriesSilentInitialLoadByDefault,
         initialReadinessScheduler: @escaping PreviewInitialReadiness.Scheduler = PreviewInitialReadiness.schedule,
         pageLoadOverrideForTesting: (@MainActor (WKWebView, URL?) -> WKNavigation?)? = nil
     ) {
@@ -110,6 +113,7 @@ public final class PreviewController: NSObject, ObservableObject {
         self.previewIndexURL = previewIndexURL
         self.recoversFromWebContentTermination = recoversFromWebContentTermination
         self.initialReadinessScheduler = initialReadinessScheduler
+        self.retriesSilentInitialLoad = retriesSilentInitialLoad
         self.pageLoadOverrideForTesting = pageLoadOverrideForTesting
 
         super.init()
@@ -324,9 +328,13 @@ public final class PreviewController: NSObject, ObservableObject {
     func receive(_ message: BridgeMessage) {
         switch message {
         case let .ready(payload):
-            guard payload.protocolVersion == PreviewBridge.protocolVersion,
-                  !initialReadiness.requiresRetryProbe
-            else {
+            guard payload.protocolVersion == PreviewBridge.protocolVersion else { return }
+            if initialReadiness.requiresRetryProbe {
+                // A nil navigation has no matching didFinish to await. Probe the
+                // current page instead of trusting a possibly queued old-page ready.
+                if currentPageNavigation == nil {
+                    probePageReadiness()
+                }
                 return
             }
             markReadyAndFlushPendingRender()
@@ -445,11 +453,23 @@ extension PreviewController: WKNavigationDelegate {
     }
 
     public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        guard navigation === currentPageNavigation else { return }
+        guard webView === self.webView else { return }
+        guard !retriesSilentInitialLoad || currentPageNavigation == nil
+            || navigation === currentPageNavigation else { return }
+        probePageReadiness()
+    }
+
+    func probePageReadiness() {
+        guard !isInvalidated, !webContentProcessTerminated else { return }
         let generation = pageLoadGeneration
-        let protocolVersionScript = "window.PlainsongPreview && window.PlainsongPreview.PROTOCOL_VERSION"
-        webView.evaluateJavaScript(protocolVersionScript) { @MainActor [weak self] result, _ in
+        let accept: @MainActor (Any?) -> Void = { [weak self] result in
             self?.receiveReadinessProbe(result, generation: generation)
+        }
+        if let readinessProbeOverrideForTesting {
+            readinessProbeOverrideForTesting(accept)
+        } else {
+            let script = "window.PlainsongPreview && window.PlainsongPreview.PROTOCOL_VERSION"
+            webView.evaluateJavaScript(script) { @MainActor result, _ in accept(result) }
         }
     }
 

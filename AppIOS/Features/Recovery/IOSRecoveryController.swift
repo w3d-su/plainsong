@@ -6,6 +6,7 @@ import WorkspaceKitIOS
 struct IOSRecoveryPickerRequest: Identifiable {
     let id = UUID()
     let capture: IOSRecoveryRestoreCapture
+    let presentationID: UUID
 }
 
 /// UI holds immutable readback only. All document writes remain in composition.
@@ -32,6 +33,9 @@ final class IOSRecoveryController: ObservableObject {
     private let restore: Restore
     private var readID = UUID()
     private var activeRestoreID: UUID?
+    private(set) var presentationID: UUID?
+    private var hasAppeared = false
+    private var restoredPresentationID: UUID?
 
     init(
         list: @escaping @MainActor () async -> IOSRecoveryList,
@@ -46,8 +50,34 @@ final class IOSRecoveryController: ObservableObject {
     }
 
     func present() {
+        guard presentationID == nil, !isRestoring else { return }
         onPresent?()
+        presentationID = UUID()
+        hasAppeared = false
+        restoredPresentationID = nil
         isPresented = true
+    }
+
+    @discardableResult
+    func didAppear(_ id: UUID) -> Bool {
+        guard isPresented, presentationID == id else { return false }
+        hasAppeared = true
+        return true
+    }
+
+    /// Consume navigation only from the matching sheet's actual dismissal.
+    func didDismiss(_ id: UUID?) {
+        guard let id, presentationID == id, hasAppeared else { return }
+        let restored = restoredPresentationID == id
+        presentationID = nil
+        hasAppeared = false
+        restoredPresentationID = nil
+        readID = UUID()
+        isLoading = false
+        cancelPicker()
+        if restored {
+            onRestored?()
+        }
     }
 
     func refresh() async {
@@ -60,7 +90,16 @@ final class IOSRecoveryController: ObservableObject {
         isLoading = true
         let result = await list()
         guard readID == request else { return }
-        records = result.records.sorted { $0.recordID.uuidString < $1.recordID.uuidString }
+        records = result.records.sorted {
+            let first = Self.filename($0), second = Self.filename($1)
+            if !first.utf8.elementsEqual(second.utf8) {
+                return first.utf8.lexicographicallyPrecedes(second.utf8)
+            }
+            if $0.revisionVersion != $1.revisionVersion {
+                return $0.revisionVersion > $1.revisionVersion
+            }
+            return $0.recordID.uuidString < $1.recordID.uuidString
+        }
         corruptCount = result.corruptNames.count
         isLoading = false
     }
@@ -95,9 +134,9 @@ final class IOSRecoveryController: ObservableObject {
     }
 
     func requestRestore() {
-        guard !isRestoring, pickerRequest == nil, let detail else { return }
+        guard isPresented, let presentationID, !isRestoring, pickerRequest == nil, let detail else { return }
         do {
-            let request = try IOSRecoveryPickerRequest(capture: capture(detail))
+            let request = try IOSRecoveryPickerRequest(capture: capture(detail), presentationID: presentationID)
             activeRestoreID = request.id
             pickerRequest = request
             errorMessage = nil
@@ -111,15 +150,23 @@ final class IOSRecoveryController: ObservableObject {
         pickerRequest = nil
     }
 
+    /// External navigation/disposal cancels a pending completion. A visible
+    /// sheet keeps its issuance until UIKit reports actual dismissal.
     func dismiss() {
         readID = UUID()
         isLoading = false
         cancelPicker()
+        restoredPresentationID = nil
+        isPresented = false
+        if !hasAppeared {
+            presentationID = nil
+        }
     }
 
     @discardableResult
     func completePicker(_ request: IOSRecoveryPickerRequest, urls: [URL]) -> Task<Void, Never>? {
-        guard pickerRequest?.id == request.id, activeRestoreID == request.id else { return nil }
+        guard pickerRequest?.id == request.id, activeRestoreID == request.id,
+              presentationID == request.presentationID else { return nil }
         pickerRequest = nil
         guard urls.count == 1, let folder = urls.first else {
             activeRestoreID = nil
@@ -135,16 +182,34 @@ final class IOSRecoveryController: ObservableObject {
                 }
             }
             do {
-                try await restore(request.capture, folder) { [weak self] in self?.activeRestoreID == request.id }
+                try await restore(request.capture, folder) { [weak self] in
+                    self?.activeRestoreID == request.id && self?.presentationID == request.presentationID
+                }
+                guard activeRestoreID == request.id, presentationID == request.presentationID else { return }
+                restoredPresentationID = request.presentationID
                 isPresented = false
-                onRestored?()
             } catch {
+                guard activeRestoreID == request.id, presentationID == request.presentationID else { return }
                 errorMessage = Self.message(for: error)
             }
         }
     }
 
+    private static func filename(_ record: IOSRecoveryRecord) -> String {
+        let path = String(data: record.relativePathUTF8, encoding: .utf8) ?? ""
+        return (path as NSString).lastPathComponent
+    }
+
     private static func message(for error: Error) -> String {
+        if let failure = error as? IOSRecoveryRestoreFailure {
+            let previous = failure.previousDocumentClosed
+                ? "Your previous document was safely closed and its folder is no longer open."
+                : "Your previous folder is no longer open."
+            return "The restore could not finish. \(previous) " +
+                "This restore did not overwrite the previous file or remove the recovery draft. " +
+                "Close Recovered Drafts and use Open to reopen the previous file or folder, " +
+                "or try restoring into another folder."
+        }
         if let failure = error as? IOSDocumentFailure {
             switch failure {
             case .access(.alreadyExists):

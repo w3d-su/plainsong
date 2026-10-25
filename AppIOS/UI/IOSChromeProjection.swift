@@ -100,16 +100,6 @@ struct IOSShellChromeSnapshot: Equatable {
     }
 
     private static func describe(_ failure: IOSDocumentFailure) -> String {
-        switch failure {
-        case .unavailable: "The document is unavailable."
-        case let .access(failure): "Access failed: \(String(describing: failure))."
-        case .documentChanged: "The document changed underneath the editor."
-        case .sourceChanged: "The source changed underneath the editor."
-        case .conflict: "The document has an unresolved conflict."
-        case .saveFailed: "Saving failed."
-        case .closeFailed: "Closing failed."
-        case .recoveryFailed: "Writing a recovery copy failed."
-        case .indeterminate: "The last operation's result is unknown."
-        }
+        IOSOperationFeedback.message(for: failure)
     }
 }

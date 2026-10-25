@@ -8,6 +8,11 @@ struct PreviewInitialReadiness {
     typealias Scheduler = @MainActor (UInt64, @escaping @MainActor () -> Void) -> Cancellation
 
     static let timeoutNanoseconds: UInt64 = 2_500_000_000
+    #if os(iOS)
+        static let retriesSilentInitialLoadByDefault = true
+    #else
+        static let retriesSilentInitialLoadByDefault = false
+    #endif
     var epoch: UUID?
     var cancellation: Cancellation?
     var isFinished = false
@@ -32,7 +37,8 @@ struct PreviewInitialReadiness {
 
 extension PreviewController {
     func startInitialReadinessWatchdog() {
-        guard !initialReadiness.isFinished, initialReadiness.epoch == nil else { return }
+        guard retriesSilentInitialLoad, !initialReadiness.isFinished,
+              initialReadiness.epoch == nil else { return }
         let epoch = UUID()
         initialReadiness.epoch = epoch
         let cancel = initialReadinessScheduler(PreviewInitialReadiness.timeoutNanoseconds) { [weak self] in

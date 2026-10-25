@@ -18,12 +18,37 @@ struct IOSRecoveryRestoreCapture {
     let location: IOSFileLocation?
     let grant: IOSWorkspaceGrant?
     let grantWasCurrent: Bool
+    let destinationID = UUID()
 
     var filename: String {
         let path = String(data: record.relativePathUTF8, encoding: .utf8) ?? ""
-        let suffix = (path as NSString).pathExtension.lowercased() == "mdx" ? "mdx" : "md"
-        return "Recovered-\(record.recordID.uuidString.lowercased()).\(suffix)"
+        let validPath = WorkspaceRelativePath(spelling: path) != nil
+        let leaf = (validPath ? (path as NSString).lastPathComponent : "") as NSString
+        let suffix = leaf.pathExtension.lowercased() == "mdx" ? "mdx" : "md"
+        // Display metadata suggests a new leaf only; it grants no path authority.
+        // Bound UTF-8 bytes, not Character count, leaving space below NAME_MAX
+        // for the recovery marker, issuance suffix and file extension.
+        let forbidden = CharacterSet.controlCharacters.union(CharacterSet(charactersIn: "/\\:"))
+        var stem = ""
+        var byteCount = 0
+        for character in leaf.deletingPathExtension {
+            let part = String(character)
+            guard !part.unicodeScalars.contains(where: { forbidden.contains($0) }) else { continue }
+            guard byteCount + part.utf8.count <= 180 else { break }
+            stem.append(character)
+            byteCount += part.utf8.count
+        }
+        stem = stem.trimmingCharacters(in: .whitespacesAndNewlines)
+        let prefix = stem.isEmpty ? "Recovered" : "\(stem)-Recovered"
+        return "\(prefix)-\(destinationID.uuidString.prefix(8).lowercased()).\(suffix)"
     }
+}
+
+/// The original writer safely closed before destination creation failed. This
+/// is distinct from an early refusal that preserves the installed document.
+struct IOSRecoveryRestoreFailure: Error {
+    let cause: Error
+    let previousDocumentClosed: Bool
 }
 
 extension IOSDocumentSceneController {
@@ -73,7 +98,7 @@ extension IOSDocumentSceneController {
               ExactSourceText.matches(record.baseline, capture.record.baseline)
         else { throw IOSDocumentFailure.sourceChanged }
 
-        let grant = try await workspace.open(selectedURL: folder, scope: .directory)
+        let grant = try await openDestinationFolder(folder)
         destination = grant
         try validateRecoveryOrigin(capture, epoch: epoch, afterClose: false, isCurrent: isCurrent)
         let tree = try await workspace.refresh(grant)
@@ -97,6 +122,9 @@ extension IOSDocumentSceneController {
         } catch {
             if handle == nil {
                 releaseCurrentGrant()
+                if capture.grant != nil || capture.identity != nil {
+                    throw IOSRecoveryRestoreFailure(cause: error, previousDocumentClosed: capture.identity != nil)
+                }
             }
             throw error
         }
