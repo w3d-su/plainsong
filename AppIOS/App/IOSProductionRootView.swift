@@ -46,41 +46,46 @@ private struct IOSProductionSceneView: View {
     }
 
     var body: some View {
-        IOSShellRootView(scene: runtime.scene)
-            .background {
-                IOSWindowSceneDisconnectAnchor { runtime.observeSceneDisconnection($0) }
-                    .frame(width: 0, height: 0)
+        VStack(spacing: 0) {
+            IOSShellRootView(scene: runtime.scene)
+            if let recovery = runtime.recovery {
+                IOSRecoveryEntry(controller: recovery)
             }
-            .confirmationDialog("Open", isPresented: $runtime.showOpenChoices, titleVisibility: .visible) {
-                Button("Open Markdown File") { runtime.requestPicker(scope: .singleFile) }
-                Button("Open Folder") { runtime.requestPicker(scope: .directory) }
-                Button("Cancel", role: .cancel) {}
+        }
+        .background {
+            IOSWindowSceneDisconnectAnchor { runtime.observeSceneDisconnection($0) }
+                .frame(width: 0, height: 0)
+        }
+        .confirmationDialog("Open", isPresented: $runtime.showOpenChoices, titleVisibility: .visible) {
+            Button("Open Markdown File") { runtime.requestPicker(scope: .singleFile) }
+            Button("Open Folder") { runtime.requestPicker(scope: .directory) }
+            Button("Cancel", role: .cancel) {}
+        }
+        .sheet(item: $runtime.pickerRequest) { request in
+            IOSProductionDocumentPicker(request: request) { urls in
+                runtime.completePicker(request, urls: urls)
             }
-            .sheet(item: $runtime.pickerRequest) { request in
-                IOSProductionDocumentPicker(request: request) { urls in
-                    runtime.completePicker(request, urls: urls)
-                }
-            }
-            .sheet(item: $authoring.linkDraft) { draft in
-                NavigationStack {
-                    IOSAuthoringLinkSheet(controller: authoring, editor: runtime.editor, draft: draft)
-                        .padding()
-                        .navigationTitle("Insert Link")
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                Button("Cancel") { authoring.linkDraft = nil }
-                            }
+        }
+        .sheet(item: $authoring.linkDraft) { draft in
+            NavigationStack {
+                IOSAuthoringLinkSheet(controller: authoring, editor: runtime.editor, draft: draft)
+                    .padding()
+                    .navigationTitle("Insert Link")
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Cancel") { authoring.linkDraft = nil }
                         }
-                }
-                .presentationDetents([.medium])
+                    }
             }
-            .onAppear {
-                runtime.setSceneActive(scenePhase == .active)
-                runtime.startObserving()
-            }
-            .onDisappear { runtime.stopObserving() }
-            .onChange(of: scenePhase) { _, phase in runtime.setSceneActive(phase == .active) }
-            .onOpenURL { url in Task { await runtime.openURL(url) } }
+            .presentationDetents([.medium])
+        }
+        .onAppear {
+            runtime.setSceneActive(scenePhase == .active)
+            runtime.startObserving()
+        }
+        .onDisappear { runtime.stopObserving() }
+        .onChange(of: scenePhase) { _, phase in runtime.setSceneActive(phase == .active) }
+        .onOpenURL { url in Task { await runtime.openURL(url) } }
     }
 }
 

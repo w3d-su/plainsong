@@ -117,7 +117,49 @@ final class IOSDocumentRecoveryTests: XCTestCase {
         try? FileManager.default.removeItem(at: directory)
     }
 
-    private func sampleRecord() -> IOSRecoveryRecord {
+    @MainActor
+    func testDocumentStoreRecreationReadsRecoveryAndPreservesCorruptSibling() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("recovery-read-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let writer = IOSDocumentRecoveryStore(directory: directory)
+        let record = sampleRecord(source: "繁中 👩🏽‍💻\r\né e\u{301}\n")
+        _ = try await writer.persist(record)
+        try Data("bad record".utf8).write(to: directory.appendingPathComponent("broken.recovery.json"))
+        let first = DocumentIOHarness(recovery: writer)
+        let initial = try await first.store.loadRecovery(recordID: record.recordID)
+        let recreated = DocumentIOHarness(recovery: IOSDocumentRecoveryStore(directory: directory))
+        let listed = await recreated.store.recoveryList()
+        let read = try await recreated.store.loadRecovery(recordID: record.recordID)
+        XCTAssertEqual(listed.records.map(\.recordID), [record.recordID])
+        XCTAssertEqual(listed.corruptNames, ["broken.recovery.json"])
+        XCTAssertTrue(ExactSourceText.matches(read.source, initial.source))
+        XCTAssertTrue(ExactSourceText.matches(read.source, record.source))
+        XCTAssertEqual(read.documentID, initial.documentID)
+        XCTAssertEqual(read.revisionVersion, initial.revisionVersion)
+        XCTAssertTrue(FileManager.default
+            .fileExists(atPath: directory.appendingPathComponent("broken.recovery.json").path))
+    }
+
+    @MainActor
+    func testDocumentStoreRecoveryReadRejectsMismatchedRecordIdentity() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("recovery-identity-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let requested = UUID()
+        let misplaced = sampleRecord()
+        let url = directory.appendingPathComponent("\(requested.uuidString.lowercased()).recovery.json")
+        try JSONEncoder().encode(misplaced).write(to: url)
+        let harness = DocumentIOHarness(recovery: IOSDocumentRecoveryStore(directory: directory))
+        do {
+            _ = try await harness.store.loadRecovery(recordID: requested)
+            XCTFail("read must not retarget a different record")
+        } catch {
+            XCTAssertEqual(error as? IOSRecoveryDiscardError, .corrupt)
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    private func sampleRecord(source: String = "draft") -> IOSRecoveryRecord {
         IOSRecoveryRecord(
             recordID: UUID(),
             operationID: UUID(),
@@ -128,7 +170,7 @@ final class IOSDocumentRecoveryTests: XCTestCase {
             resourceID: nil,
             relativePathUTF8: Data("Note.md".utf8),
             fileURLPath: "/Notes/Note.md",
-            source: "draft",
+            source: source,
             baseline: "base",
             reason: .saveIndeterminate
         )
