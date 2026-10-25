@@ -90,3 +90,9 @@ Navigation and copy keep their default marked-text refusal. The additional real
 controller/UIDocument/native-editor case preserves marked range, source, version,
 selection and Undo during deferral, then retries the existing proposal after
 unmarking. This synthetic native test does not accept real Zhuyin/Pinyin on a device.
+
+## 2026-10-25 native validation
+
+Source `24d7a633f7277de6d545539229e4cfbc2e67dacd`: full modules **488/488** and production UI smoke **2/2**, zero failed/skipped. These actual results supersede the earlier pending validation note only for this exact source. See [source-bound receipt](native-20261025.json). CI and owner/device/product gates remain separate.
+
+The earlier f91f7aa full run executed 486 cases: 477 passed and 9 failed. It completed normally. [Failure and repair history](failed-native-20261025.json) is retained; later passes do not prove the exact historical autosave/provider-notice ordering. The final change also preserves native marked-text Reload deferral and disables Save while current store/editor authority is read only.
