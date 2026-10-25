@@ -96,7 +96,7 @@ struct IOSShellChromeSnapshot: Equatable {
     }
 
     var canSave: Bool {
-        status == .ready && isDirty
+        status == .ready && isDirty && editorCanWrite
     }
 
     private static func describe(_ failure: IOSDocumentFailure) -> String {

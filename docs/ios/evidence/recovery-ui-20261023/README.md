@@ -72,3 +72,7 @@ UIDocument, and checks unchanged original bytes plus retained record readback.
 
 These owner checks are separate from parent M0 reports, simulator provider
 workflows, the prior composition IPA and exact-head Mac/JS CI.
+
+## 2026-10-25 native validation
+
+Source `f1535d6bb478edd76f2563acaf5ecc00cbf27032`: full modules **467/467** and production UI smoke **2/2**, zero failed/skipped. These actual results supersede the earlier pending validation note only for this exact source. See [source-bound receipt](native-20261025.json). CI and owner/device/product gates remain separate.

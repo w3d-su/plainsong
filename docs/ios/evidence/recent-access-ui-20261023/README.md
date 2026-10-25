@@ -151,3 +151,14 @@ runs identified a long real-workflow function/tuple, which was split into a type
 fixture. Raw failed and final clean receipts remain in `/private/tmp/`, including
 `plainsong-ios-recents-integration-lint-clean-v2-20261025.json`. No tests were run
 by the source author; these are formatting/lint receipts only.
+
+
+## Additive parent repair merge — 2026-10-25
+
+Merged Copy parent `24d7a633f7277de6d545539229e4cfbc2e67dacd`, preserving
+its Recovery native receipts, manual-composing-reload repair, and writable-save
+eligibility repair with all assertions. The global required manifest is the
+explicit union of the parent 121 names and this feature's 25 recents names:
+**146 unique module names**, plus **3 UI smoke names**. No parent or Recents
+case was removed or duplicated. This merge is source preparation, not a native
+PASS; final combined execution remains the integration owner's next gate.

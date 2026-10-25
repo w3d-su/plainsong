@@ -28,8 +28,8 @@ requesting the immutable copy draft; it keeps the same editor/session/store.
 
 ## Tests and evidence boundary
 
-[Required names](required-named-tests.txt) lists 19 new cases: 17 controlled
-coordinator cases and two real-provider save-copy workflows. The cases cover
+[Required names](required-named-tests.txt) lists 20 new cases: 17 controlled
+coordinator cases and three real-provider production workflows. The cases cover
 picker cancellation/duplicate/altered issuance, stale binding/source/generation,
 marked text, resolved conflict, destination open/refresh suspension, occupied and
 concurrently-created leaves, revoked destination, N to N+1 during parked copy,
@@ -82,3 +82,11 @@ violations (same five rule occurrences before wiring), with zero serious
 violations in ordinary lint. Exact source-hashed comparison is retained at
 `/private/tmp/plainsong-ios-conflict-copy-ui-20261023/shared-integration-lint-comparison-20261025.json`.
 No build or native result is inferred.
+
+Manual Reload retains the pre-existing composing deferral semantics while taking
+the asynchronous controller fence. Only `.reload` can admit marked text; the
+native editor/relay still defers installation until an unmarked snapshot.
+Navigation and copy keep their default marked-text refusal. The additional real
+controller/UIDocument/native-editor case preserves marked range, source, version,
+selection and Undo during deferral, then retries the existing proposal after
+unmarking. This synthetic native test does not accept real Zhuyin/Pinyin on a device.

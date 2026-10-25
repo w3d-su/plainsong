@@ -60,6 +60,8 @@ final class IOSConflictCopyProductionWorkflowTests: XCTestCase {
             }
         }
         try await controller.openPickedURL(original, scope: .singleFile)
+        runtime.scene.startObserving()
+        runtime.startObserving()
         let handle = try XCTUnwrap(controller.handle)
         let binding = try XCTUnwrap(controller.bindingID)
         XCTAssertTrue(controller.setCommandFocus(true, expected: handle.identity, bindingID: binding))
@@ -84,6 +86,50 @@ final class IOSConflictCopyProductionWorkflowTests: XCTestCase {
         guard case .conflict = store.state(for: handle.identity) else {
             return XCTFail("The production copy hook must leave the original conflict admitted")
         }
+    }
+
+    func testManualReloadDuringNativeCompositionDefersAndPreservesMarkedTextAndUndo() async throws {
+        let fixture = try IOSConflictCopyRealFixture(autosaveDelayNanoseconds: 60_000_000_000)
+        addTeardownBlock { @MainActor in await fixture.cleanup() }
+        try await fixture.controller.openPickedURL(fixture.original, scope: .singleFile)
+        let handle = try XCTUnwrap(fixture.controller.handle)
+        let binding = try XCTUnwrap(fixture.controller.bindingID)
+        XCTAssertTrue(fixture.editor.textView.becomeFirstResponder())
+        XCTAssertTrue(fixture.controller.setCommandFocus(true, expected: handle.identity, bindingID: binding))
+        fixture.editor.textView.selectedRange = NSRange(location: handle.session.text.utf16.count, length: 0)
+        fixture.editor.textView.insertText("!")
+        fixture.editor.textView.setMarkedText("ㄓ", selectedRange: NSRange(location: 0, length: 1))
+        XCTAssertNotNil(fixture.editor.textView.markedTextRange)
+        let source = handle.session.text
+        let nativeText = fixture.editor.textView.text
+        let version = handle.session.version
+        let selection = fixture.editor.textView.selectedRange
+        let undo = try XCTUnwrap(fixture.editor.textView.undoManager)
+        let undoName = undo.undoActionName
+        XCTAssertTrue(undo.canUndo)
+
+        try await fixture.controller.resolveExternal(.reload)
+
+        XCTAssertNotNil(fixture.editor.textView.markedTextRange)
+        XCTAssertEqual(fixture.editor.textView.text, nativeText)
+        XCTAssertEqual(handle.session.text, source)
+        XCTAssertEqual(handle.session.version, version)
+        XCTAssertEqual(fixture.editor.textView.selectedRange, selection)
+        XCTAssertTrue(fixture.editor.textView.undoManager === undo)
+        XCTAssertTrue(undo.canUndo)
+        XCTAssertEqual(undo.undoActionName, undoName)
+        XCTAssertNotNil(fixture.store.byIdentity[handle.identity]?.pendingProposal)
+        XCTAssertFalse(fixture.controller.transitioning)
+
+        fixture.editor.textView.unmarkText()
+        // A later unmarked snapshot retries the already admitted proposal; no
+        // synthetic user edit, cancellation or second external read is needed.
+        fixture.editor.updateCommandFocus(for: handle.identity, bindingID: binding, isFocused: false)
+        XCTAssertNil(fixture.store.byIdentity[handle.identity]?.pendingProposal)
+        XCTAssertEqual(handle.session.text, "# Original\n")
+        XCTAssertEqual(fixture.editor.textView.text, "# Original\n")
+        XCTAssertFalse(handle.session.isDirty)
+        XCTAssertTrue(fixture.controller.handle?.session === handle.session)
     }
 
     private func assertPreserved(_ fixture: IOSConflictCopyRealFixture, before: IOSConflictCopyRealSnapshot) throws {
@@ -172,7 +218,7 @@ private struct IOSConflictCopyRealFixture {
     let controller: IOSDocumentSceneController
     let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
 
-    init() throws {
+    init(autosaveDelayNanoseconds: UInt64 = 100_000_000) throws {
         root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         original = root.appendingPathComponent("original.md")
         destinationFolder = root.appendingPathComponent("copies", isDirectory: true)
@@ -180,7 +226,9 @@ private struct IOSConflictCopyRealFixture {
         try Data("# Original\n".utf8).write(to: original)
         store = IOSUIDocumentStore(
             coordinatedAccess: access, recoveryDirectory: root.appendingPathComponent("recovery", isDirectory: true),
-            timing: IOSDocumentTiming(autosaveDelayNanoseconds: 100_000_000, backgroundFlushNanoseconds: 500_000_000)
+            timing: IOSDocumentTiming(
+                autosaveDelayNanoseconds: autosaveDelayNanoseconds, backgroundFlushNanoseconds: 500_000_000
+            )
         )
         controller = IOSDocumentSceneController(
             documents: store, workspace: access, editor: editor, preview: IOSSceneControllerPreviewDouble(),
