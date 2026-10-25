@@ -5,6 +5,18 @@ import XCTest
 
 @MainActor
 final class PreviewBridgeTransportTests: XCTestCase {
+    func testStandaloneHTTPLinksOpenOnceWithoutASceneSubscriber() {
+        let controller = PreviewController(previewIndexURL: nil)
+        defer { controller.shutdownForTesting() }
+        var opened: [URL] = []
+        controller.externalURLOpenerOverrideForTesting = { opened.append($0) }
+        let links = ["https://example.invalid/standalone", "http://example.invalid/standalone"]
+        for href in links {
+            controller.receiveBridgeBody(["name": "linkClicked", "payload": ["href": href]])
+        }
+        XCTAssertEqual(opened.map(\.absoluteString), links)
+    }
+
     // MARK: Viewport scroll traffic
 
     func testViewportScrollsKeepOneInFlightAndTheNewestWaiting() {

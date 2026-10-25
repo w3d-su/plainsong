@@ -7,6 +7,110 @@ import XCTest
 
 extension IOSDocumentSceneControllerTests {
     @MainActor
+    func testDownloadingPickedFileRetainsGrantUntilRefreshAndRetry() async throws {
+        try await assertPendingPickedFileCanRetry(availability: .downloading, failure: .downloading)
+    }
+
+    @MainActor
+    func testOfflinePickedFileRetainsGrantUntilRefreshAndRetry() async throws {
+        try await assertPendingPickedFileCanRetry(availability: .offline, failure: .offline)
+    }
+
+    @MainActor
+    func testPendingPickedFileStillRejectsAnUnselectedSibling() async throws {
+        let fixture = try await pendingPickedFile(availability: .downloading, failure: .downloading)
+        let grant = try XCTUnwrap(fixture.controller.currentGrant)
+        do {
+            try await fixture.controller.openSelectedURL(
+                fixture.selectedURL.deletingLastPathComponent().appendingPathComponent("sibling.md"), scope: .singleFile
+            )
+            XCTFail("A pending single-file grant must not authorize siblings")
+        } catch {
+            XCTAssertEqual(error as? IOSDocumentFailure, .access(.outsideGrant))
+        }
+        XCTAssertEqual(fixture.controller.currentGrant?.workspaceID, grant.workspaceID)
+        XCTAssertTrue(fixture.controller.grantIsCurrent)
+        XCTAssertEqual(fixture.workspace.selected.count, 1)
+        XCTAssertTrue(fixture.store.opened.isEmpty)
+    }
+
+    @MainActor
+    func testPendingPickedFileDoesNotSurviveActualGrantRevocation() async throws {
+        let fixture = try await pendingPickedFile(availability: .offline, failure: .offline)
+        let grant = try XCTUnwrap(fixture.controller.currentGrant)
+        _ = fixture.workspace.invalidate(grant.workspaceID)
+        fixture.workspace.singleFileAvailability = .available(canWrite: true)
+        do {
+            try await fixture.controller.refreshWorkspace()
+            XCTFail("A later download cannot revive a revoked grant")
+        } catch {
+            XCTAssertEqual(error as? IOSWorkspaceFailure, .unavailable)
+        }
+        XCTAssertFalse(fixture.controller.grantIsCurrent)
+        XCTAssertNil(fixture.controller.snapshot.workspace)
+        XCTAssertTrue(fixture.store.opened.isEmpty)
+        XCTAssertTrue(fixture.workspace.leases.isEmpty)
+    }
+
+    @MainActor
+    func testUnsupportedPickedFileStillRetiresTheNewGrant() async throws {
+        let fixture = IOSSceneControllerFixture()
+        fixture.workspace.singleFileKind = .image
+        fixture.workspace.singleFileAvailability = .downloading
+        do {
+            try await fixture.controller.openPickedURL(fixture.selectedURL, scope: .singleFile)
+            XCTFail("Cloud availability cannot make an image a document")
+        } catch {
+            XCTAssertEqual(error as? IOSDocumentFailure, .access(.unsupportedType))
+        }
+        XCTAssertNil(fixture.controller.currentGrant)
+        XCTAssertNil(fixture.controller.snapshot.workspace)
+        XCTAssertEqual(fixture.workspace.invalidated.count, 1)
+        XCTAssertTrue(fixture.store.opened.isEmpty)
+    }
+
+    @MainActor
+    private func assertPendingPickedFileCanRetry(
+        availability: IOSFileAvailability, failure: IOSWorkspaceFailure
+    ) async throws {
+        let fixture = try await pendingPickedFile(availability: availability, failure: failure)
+        let grant = try XCTUnwrap(fixture.controller.currentGrant)
+        fixture.workspace.singleFileAvailability = .available(canWrite: true)
+        try await fixture.controller.refreshWorkspace()
+        try await fixture.controller.openSelectedURL(fixture.selectedURL, scope: .singleFile)
+        XCTAssertEqual(fixture.controller.currentGrant?.workspaceID, grant.workspaceID)
+        XCTAssertEqual(fixture.workspace.selected.count, 1, "Refresh/retry reuses the explicit file grant")
+        XCTAssertTrue(fixture.workspace.invalidated.isEmpty)
+        XCTAssertEqual(fixture.store.opened.count, 1)
+        XCTAssertEqual(fixture.controller.handle?.location.fileURL, fixture.selectedURL)
+        XCTAssertTrue(fixture.editor.snapshot.canWrite)
+        XCTAssertFalse(fixture.controller.transitioning)
+    }
+
+    @MainActor
+    private func pendingPickedFile(
+        availability: IOSFileAvailability, failure: IOSWorkspaceFailure
+    ) async throws -> IOSSceneControllerFixture {
+        let fixture = IOSSceneControllerFixture()
+        fixture.workspace.singleFileAvailability = availability
+        do {
+            try await fixture.controller.openPickedURL(fixture.selectedURL, scope: .singleFile)
+            XCTFail("The document must wait for its provider")
+        } catch {
+            XCTAssertEqual(error as? IOSDocumentFailure, .access(failure))
+        }
+        XCTAssertNotNil(fixture.controller.currentGrant)
+        XCTAssertTrue(fixture.controller.grantIsCurrent)
+        XCTAssertEqual(fixture.controller.snapshot.workspace?.entries.first?.availability, availability)
+        XCTAssertTrue(fixture.workspace.invalidated.isEmpty)
+        XCTAssertTrue(fixture.workspace.leases.isEmpty)
+        XCTAssertTrue(fixture.store.opened.isEmpty)
+        XCTAssertNil(fixture.controller.handle)
+        XCTAssertFalse(fixture.controller.transitioning)
+        return fixture
+    }
+
+    @MainActor
     func testPickedURLRetainedClosePreservesTheOfflineReasonAndCurrentWriter() async throws {
         try await assertOfflineReasonSurvivesRetainedClose(for: .pickedFile)
     }

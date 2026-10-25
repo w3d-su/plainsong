@@ -32,7 +32,10 @@ final class IOSSceneControllerWorkspaceDouble: IOSWorkspaceAccessProviding {
     var leases: [IOSSceneControllerLease] = []
     var observations: [(IOSReloadRelayObservation, @MainActor (IOSWorkspaceEvent) -> Void)] = []
     var directoryPaths = ["first.md", "second.md"]
+    var refreshFailure: IOSWorkspaceFailure?
     var onLeaseRelease: ((IOSWorkspaceGrant) -> Void)?
+    var singleFileAvailability: IOSFileAvailability = .available(canWrite: true)
+    var singleFileKind: IOSWorkspaceEntry.Kind = .document(.markdown)
 
     func open(selectedURL: URL, scope: IOSWorkspaceScope) async throws -> IOSWorkspaceGrant {
         selected.append((selectedURL, scope))
@@ -53,6 +56,9 @@ final class IOSSceneControllerWorkspaceDouble: IOSWorkspaceAccessProviding {
     }
 
     func refresh(_ grant: IOSWorkspaceGrant) async throws -> IOSWorkspaceSnapshot {
+        if let refreshFailure {
+            throw refreshFailure
+        }
         let paths = grant.scope == .singleFile ? [grant.rootURL.lastPathComponent] : directoryPaths
         let entries = paths.map { path in
             IOSWorkspaceEntry(
@@ -61,7 +67,9 @@ final class IOSSceneControllerWorkspaceDouble: IOSWorkspaceAccessProviding {
                     relativePath: path,
                     fileURL: grant.scope == .singleFile ? grant.rootURL : grant.rootURL.appendingPathComponent(path),
                     resourceID: nil
-                ), kind: .document(.markdown), availability: .available(canWrite: true), children: []
+                ), kind: grant.scope == .singleFile ? singleFileKind : .document(.markdown),
+                availability: grant.scope == .singleFile ? singleFileAvailability : .available(canWrite: true),
+                children: []
             )
         }
         return IOSWorkspaceSnapshot(
