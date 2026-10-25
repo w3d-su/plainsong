@@ -167,23 +167,6 @@ final class IOSProductionRuntime: ObservableObject {
         pickerRequest = IOSProductionPickerRequest(scope: scope)
     }
 
-    /// A read-only modal owns no source command route. Retire a yielded focus
-    /// claim before releasing the route, without changing native text or Undo.
-    func prepareForReadOnlyPresentation() {
-        pendingFocus = nil
-        focusTask?.cancel()
-        focusTask = nil
-        scene.releaseCommandFocus()
-        retireAuthoringCapture()
-    }
-
-    func requestConflictCopy() {
-        guard !isShutDown, !isOpening, pickerRequest == nil,
-              recovery?.isPresented != true, !recentPresentation.isActive, let conflictCopy else { return }
-        prepareForReadOnlyPresentation()
-        _ = conflictCopy.requestSaveCopy()
-    }
-
     @discardableResult
     func completePicker(_ request: IOSProductionPickerRequest, urls: [URL]) -> Task<Void, Never>? {
         guard pickerRequest?.id == request.id else { return nil }
@@ -275,11 +258,6 @@ final class IOSProductionRuntime: ObservableObject {
         } catch {
             show(error, title: "Couldn't Open")
         }
-    }
-
-    var canPresentRecentItems: Bool {
-        !isShutDown && !isOpening && pickerRequest == nil && !showOpenChoices &&
-            recovery?.isPresented != true && conflictCopy?.draft?.id == nil && conflictCopy?.isSaving != true
     }
 
     private func installSurfaces() {
@@ -420,6 +398,30 @@ final class IOSProductionRuntime: ObservableObject {
 
     private func show(_ error: Error, title: String) {
         scene.presentedError = IOSShellError(title: title, message: Self.message(for: error))
+    }
+}
+
+extension IOSProductionRuntime {
+    /// A read-only modal owns no source command route. Retire a yielded focus
+    /// claim before releasing the route, without changing native text or Undo.
+    func prepareForReadOnlyPresentation() {
+        pendingFocus = nil
+        focusTask?.cancel()
+        focusTask = nil
+        scene.releaseCommandFocus()
+        retireAuthoringCapture()
+    }
+
+    func requestConflictCopy() {
+        guard !isShutDown, !isOpening, pickerRequest == nil,
+              recovery?.isPresented != true, !recentPresentation.isActive, let conflictCopy else { return }
+        prepareForReadOnlyPresentation()
+        _ = conflictCopy.requestSaveCopy()
+    }
+
+    var canPresentRecentItems: Bool {
+        !isShutDown && !isOpening && pickerRequest == nil && !showOpenChoices &&
+            recovery?.isPresented != true && conflictCopy?.draft?.id == nil && conflictCopy?.isSaving != true
     }
 }
 

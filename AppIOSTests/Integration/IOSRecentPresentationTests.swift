@@ -112,13 +112,16 @@ final class IOSRecentPresentationTests: XCTestCase {
         runtime.editor.attach(IOSSourceEditorDocumentBinding(
             bindingID: bindingID, identity: identity, session: session, accessGeneration: 7, canWrite: false
         ))
+        // The facade double publishes only to registered observers. Subscribe
+        // before emitting the unavailable state, as the mounted production shell does.
+        runtime.scene.startObserving()
         facade.emit(IOSAppSceneSnapshot(
             document: IOSStoredDocumentSnapshot(
                 revision: IOSDocumentRevision(documentID: identity, version: session.version),
                 document: session.snapshot, location: ShellFixtures.location("unsaved.md"), state: state
             ), documentState: state, workspace: nil, unavailableReason: "Access revoked"
         ))
-        runtime.scene.startObserving()
+        XCTAssertEqual(runtime.scene.chrome.status, .unavailable)
         let undo = runtime.editor.textView.undoManager
         runtime.scene.reselectUnavailableDocument()
         let request = try XCTUnwrap(runtime.pickerRequest)

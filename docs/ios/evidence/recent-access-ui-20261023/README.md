@@ -162,3 +162,27 @@ explicit union of the parent 121 names and this feature's 25 recents names:
 **146 unique module names**, plus **3 UI smoke names**. No parent or Recents
 case was removed or duplicated. This merge is source preparation, not a native
 PASS; final combined execution remains the integration owner's next gate.
+
+## Preceding native failure and review fixes — 2026-10-25
+
+The full module run at `4f68a9ccb229f35d9631fc536782008731e20dfb` executed
+513 cases: 512 passed, one failed, no skips. The failing reselection fixture
+emitted its unavailable snapshot before registering scene observation. Unlike
+the production controller, `FakeSceneFacade.observe` does not replay an initial
+snapshot, so chrome correctly remained `.noDocument` and refused the unavailable
+action. This change subscribes before emitting and adds an explicit unavailable
+chrome assertion; all existing scope, picker cancellation, native source, dirty,
+binding and Undo assertions remain. The failed raw run is retained separately at
+`/private/tmp/plainsong-ios-features-20261025/combined/modules/`; only its owned
+post-case diagnostic was terminated after the case/image/source guards. It is
+not a passing run and is not relabelled to this source.
+
+Full lint also identified a new serious class-body-length violation. Three
+existing modal helpers now live in a same-file `IOSProductionRuntime` extension;
+their bodies, visibility and behavior are unchanged, and private access stays in
+the same file. No rule suppression or threshold change was introduced. Pinned
+SwiftFormat 0.62.1 full-tree lint reports 0/1016 files require formatting (two
+skipped); SwiftLint reports 417 warnings, zero serious violations across 787
+files. `make lint` exits 0. Raw output is retained at
+`/private/tmp/plainsong-ios-features-20261025/final/audit/review-fixes-make-lint.log`.
+The integration owner must rerun the final native pipeline on the new clean head.
