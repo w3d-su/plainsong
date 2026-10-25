@@ -208,6 +208,7 @@ final class PreviewInitialReadinessTests: XCTestCase {
         let page = InitialReadinessTestPage()
         var controller: PreviewController? = PreviewController(
             previewIndexURL: nil,
+            retriesSilentInitialLoad: true,
             initialReadinessScheduler: clock.schedule,
             pageLoadOverrideForTesting: page.load
         )
@@ -227,6 +228,7 @@ final class PreviewInitialReadinessTests: XCTestCase {
         var cancellations = 0
         let controller = PreviewController(
             previewIndexURL: nil,
+            retriesSilentInitialLoad: true,
             initialReadinessScheduler: { _, fire in
                 captured = fire
                 fire()

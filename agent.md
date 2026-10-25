@@ -395,6 +395,9 @@ republishes only when its value changes literally.
   keeps it. After a WebContent termination a live controller reloads the page and
   re-submits its newest render under a new render ID, giving up after three terminations
   without a completed render (each later render retries once); export controllers fail.
+  Only iOS arms the one-shot 2.5 s silent-initial-page retry; macOS retains its normal
+  initial load. A retry with no navigation token probes the current page when ready
+  arrives, and accepts only a protocol match from the current page generation.
 - **Security:** strict CSP (`default-src 'none'; script-src 'self'; style-src 'self'
   'unsafe-inline'; img-src asset: data: https:`), `isElementFullscreenEnabled` off, and
   no remote loads by default. The preview JS removes remote image `src` values unless
