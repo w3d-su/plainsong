@@ -275,9 +275,8 @@ private struct IOSConflictCopyRealFixture {
         let destinationAccess = access
         controller = IOSDocumentSceneController(
             documents: store, workspace: access, editor: editor, preview: IOSSceneControllerPreviewDouble(),
-            assets: access,
-            openDestinationFolder: { try await destinationAccess.openDestinationFolder(selectedURL: $0) },
-            assetContext: { [weak access] in access?.previewContext(for: $0) }
+            assets: access, assetContext: { [weak access] in access?.previewContext(for: $0) },
+            openDestinationFolder: { try await destinationAccess.openDestinationFolder(selectedURL: $0) }
         )
         let host = UIViewController()
         window.rootViewController = host
