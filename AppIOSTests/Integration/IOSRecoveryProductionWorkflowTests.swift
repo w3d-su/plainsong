@@ -97,6 +97,12 @@ final class IOSRecoveryProductionWorkflowTests: XCTestCase {
         XCTAssertTrue(ExactSourceText.matches(retained.source, record.source))
         XCTAssertEqual(retained.baseline, record.baseline)
         XCTAssertEqual(access.recentItems(), recentsBeforeRestore, "restore-only folder must not become recent")
+        let restoredTree = try XCTUnwrap(controller.snapshot.workspace)
+        XCTAssertEqual(restoredTree.workspaceID, restored.location.workspaceID)
+        XCTAssertEqual(restoredTree.accessGeneration, restored.location.accessGeneration)
+        XCTAssertTrue(restoredTree.entries.contains {
+            $0.location.relativePath.utf8.elementsEqual(request.capture.filename.utf8)
+        }, "Files must show the newly restored file before any manual refresh")
         XCTAssertEqual(runtime.scene.navigationPath, [], "navigation waits for the actual recovery sheet dismissal")
         recovery.didDismiss(presentationID)
         XCTAssertEqual(runtime.scene.navigationPath, [.document])

@@ -201,6 +201,11 @@ final class IOSRecoveryController: ObservableObject {
     }
 
     private static func message(for error: Error) -> String {
+        if error is IOSRecoveryCreatedFileRefreshFailure {
+            return "The restored file was created and is retained. Only the Files list could not refresh. " +
+                "Close Recovered Drafts and use Refresh in Files; select its folder again if access changed. " +
+                "No new restore is needed. Your original file and recovery draft are retained."
+        }
         if let failure = error as? IOSRecoveryRestoreFailure {
             let previous = failure.previousDocumentClosed
                 ? "Your previous document was safely closed and its folder is no longer open."

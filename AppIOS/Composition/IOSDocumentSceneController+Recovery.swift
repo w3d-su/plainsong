@@ -51,6 +51,11 @@ struct IOSRecoveryRestoreFailure: Error {
     let previousDocumentClosed: Bool
 }
 
+/// The file and admitted writer already exist; only the Files readback failed.
+struct IOSRecoveryCreatedFileRefreshFailure: Error {
+    let cause: Error
+}
+
 extension IOSDocumentSceneController {
     func captureRecoveryRestore(_ record: IOSRecoveryRecord) throws -> IOSRecoveryRestoreCapture {
         guard !transitioning, !isShuttingDown, !isDisposed,
@@ -119,6 +124,13 @@ extension IOSDocumentSceneController {
             guard isCurrent(), recoveryEpoch == epoch, !isShuttingDown, !isDisposed else {
                 throw IOSDocumentFailure.documentChanged
             }
+            // The collision check used a pre-create snapshot. Read the destination
+            // again while this transition owns the writer so Files includes the
+            // restored leaf even when the provider emits no watcher notification.
+            try await refreshCreatedRecoveryFile()
+            guard isCurrent(), recoveryEpoch == epoch, !isShuttingDown, !isDisposed else {
+                throw IOSDocumentFailure.documentChanged
+            }
         } catch {
             if handle == nil {
                 releaseCurrentGrant()
@@ -127,6 +139,14 @@ extension IOSDocumentSceneController {
                 }
             }
             throw error
+        }
+    }
+
+    private func refreshCreatedRecoveryFile() async throws {
+        do {
+            try await refreshWorkspace()
+        } catch {
+            throw IOSRecoveryCreatedFileRefreshFailure(cause: error)
         }
     }
 
