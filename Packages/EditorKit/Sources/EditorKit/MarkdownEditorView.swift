@@ -119,6 +119,7 @@ public struct MarkdownEditorView: View {
             styledText: styledText,
             selection: $selection,
             showsLineNumbers: showsLineNumbers,
+            editorTheme: editorTheme,
             focusRequestID: focusRequestID,
             documentIdentity: documentIdentity,
             documentBindingID: documentBindingID,

@@ -25,6 +25,7 @@ extension MarkdownTextViewCoordinator {
             visibleRangeObserver = nil
             visibleRangeTextView = textView
             lastVisibleTextRange = nil
+            lastCacheTrimSelection = nil
 
             if let clipView = textView.enclosingScrollView?.contentView {
                 clipView.postsBoundsChangedNotifications = true
@@ -50,6 +51,7 @@ extension MarkdownTextViewCoordinator {
         visibleRangeTextView = nil
         visibleRangeChangeHandler = nil
         lastVisibleTextRange = nil
+        lastCacheTrimSelection = nil
     }
 
     func attachCommandProxy(_ proxy: EditorCommandProxy?, to textView: STTextView) {
@@ -99,20 +101,26 @@ extension MarkdownTextViewCoordinator {
     }
 
     func reportVisibleRangeIfNeeded(in textView: STTextView) {
-        guard let visibleRange = MarkdownTextView.visibleTextRange(of: textView),
-              visibleRange != lastVisibleTextRange
-        else {
+        guard let visibleRange = MarkdownTextView.visibleTextRange(of: textView) else {
             return
         }
-
-        lastVisibleTextRange = visibleRange
-        // The range includes TextKit's prefetch band above the visible area; scroll sync
-        // needs the line the user sees at the top.
-        scrollProxy?.emitVisibleLine(
-            containingUTF16Offset: EditorVisibleTop.utf16Offset(in: textView) ?? visibleRange.location,
-            in: textView
-        )
-        visibleRangeChangeHandler?(visibleRange)
+        let viewportChanged = visibleRange != lastVisibleTextRange
+        if viewportChanged {
+            lastVisibleTextRange = visibleRange
+            // The range includes TextKit's prefetch band above the visible area; scroll
+            // sync needs the line the user sees at the top.
+            scrollProxy?.emitVisibleLine(
+                containingUTF16Offset: EditorVisibleTop.utf16Offset(in: textView) ?? visibleRange.location,
+                in: textView
+            )
+            visibleRangeChangeHandler?(visibleRange)
+        }
+        // Selection protection can refuse a trim even while the viewport stays fixed.
+        // Retry when that input range changes, without republishing visible text or
+        // restarting the settle timer for duplicate selection/attribute notifications.
+        let selection = textView.selectedRange()
+        guard viewportChanged || selection != lastCacheTrimSelection else { return }
+        lastCacheTrimSelection = selection
         textElementCacheTrimmer.visibleRangeDidChange(visibleRange, in: textView) { [weak self] in
             guard let self else { return false }
             return !isUpdating && !hasPendingWriterLease

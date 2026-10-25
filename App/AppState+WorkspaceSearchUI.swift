@@ -34,6 +34,7 @@ extension AppState {
         var ui = workspaceSearchUI
         ui.mode = mode
         workspaceSearchUI = ui
+        resumeEditDrivenWorkspaceSearchRefreshIfNeeded()
     }
 
     /// Switches to Search and requests field focus. Repeated calls always increment the focus
@@ -45,6 +46,7 @@ extension AppState {
         ui.mode = .search
         ui.focusRequestID &+= 1
         workspaceSearchUI = ui
+        resumeEditDrivenWorkspaceSearchRefreshIfNeeded()
         // Abandon pending Find-field focus so an older ⌘F async closure cannot steal
         // after ⇧⌘F (F7). Does not advance Find focusRequestID (token independence).
         supersedePendingEditorFindFocus()

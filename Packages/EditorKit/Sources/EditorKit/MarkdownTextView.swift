@@ -18,6 +18,7 @@ struct MarkdownTextView: NSViewRepresentable {
 
     private let styledText: HighlightedText?
     private let showsLineNumbers: Bool
+    private let editorTheme: MarkdownEditorTheme
     private let focusRequestID: Int
     let documentIdentity: EditorDocumentIdentity?
     private let documentBindingID: EditorDocumentBindingID?
@@ -43,6 +44,7 @@ struct MarkdownTextView: NSViewRepresentable {
         styledText: HighlightedText?,
         selection: Binding<NSRange?>,
         showsLineNumbers: Bool,
+        editorTheme: MarkdownEditorTheme = .standard,
         focusRequestID: Int = 0,
         documentIdentity: EditorDocumentIdentity? = nil,
         documentBindingID: EditorDocumentBindingID? = nil,
@@ -67,6 +69,7 @@ struct MarkdownTextView: NSViewRepresentable {
         _selection = selection
         self.styledText = styledText
         self.showsLineNumbers = showsLineNumbers
+        self.editorTheme = editorTheme
         self.focusRequestID = focusRequestID
         self.documentIdentity = documentIdentity
         self.documentBindingID = documentBindingID
@@ -101,11 +104,9 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.textDelegate = context.coordinator
         textView.highlightSelectedLine = true
         textView.isHorizontallyResizable = false
-        textView.showsLineNumbers = showsLineNumbers
+        textView.setLineNumberGutterStyle(.init(showing: showsLineNumbers, theme: editorTheme, font: font))
         textView.textSelection = NSRange()
         textView.font = font
-        textView.gutterView?.font = font
-        textView.gutterView?.textColor = .secondaryLabelColor
 
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.setParagraphStyle(.default)
@@ -270,13 +271,10 @@ struct MarkdownTextView: NSViewRepresentable {
         if textView.isSelectable != isEnabled {
             textView.isSelectable = isEnabled
         }
-        if textView.showsLineNumbers != showsLineNumbers {
-            textView.showsLineNumbers = showsLineNumbers
-        }
         if textView.font.fontName != font.fontName || textView.font.pointSize != font.pointSize {
             textView.font = font
-            textView.gutterView?.font = font
         }
+        textView.setLineNumberGutterStyle(.init(showing: showsLineNumbers, theme: editorTheme, font: font))
         coordinator.applyPendingNavigationIfPossible(in: textView)
         coordinator.isUserEditing = false
     }
