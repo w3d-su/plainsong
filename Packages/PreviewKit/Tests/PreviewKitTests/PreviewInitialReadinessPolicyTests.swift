@@ -78,21 +78,27 @@ final class PreviewInitialReadinessPolicyTests: XCTestCase {
         XCTAssertEqual(fixture.page.loads.count, 2)
     }
 
-    func testRetriedNavigationRequiresItsOwnWebViewAndNavigationBeforeProbing() {
+    func testRetriedNavigationRequiresItsOwnWebViewAndNavigationBeforeProbing() throws {
         let fixture = InitialReadinessTestFixture()
-        let other = InitialReadinessTestFixture()
+        let navigationSource = WKWebView(frame: .zero)
+        let otherSource = WKWebView(frame: .zero)
         let controller = fixture.controller
         defer {
             controller.invalidate()
-            other.controller.invalidate()
+            navigationSource.stopLoading()
+            otherSource.stopLoading()
         }
         fixture.clock.fire()
-        let navigation = WKNavigation()
+        // Use handles returned by WebKit. Directly constructed tokens trapped
+        // during deallocation in this fixture.
+        let navigation = try XCTUnwrap(navigationSource.loadHTMLString("<p>current</p>", baseURL: nil))
+        let unrelatedNavigation = try XCTUnwrap(otherSource.loadHTMLString("<p>other</p>", baseURL: nil))
+        XCTAssertFalse(navigation === unrelatedNavigation)
         controller.currentPageNavigation = navigation
 
         controller.receive(InitialReadinessTestFixture.ready)
-        controller.webView(controller.webView, didFinish: WKNavigation())
-        controller.webView(other.controller.webView, didFinish: navigation)
+        controller.webView(controller.webView, didFinish: unrelatedNavigation)
+        controller.webView(otherSource, didFinish: navigation)
         XCTAssertTrue(fixture.page.readinessReplies.isEmpty)
         XCTAssertFalse(controller.isReady)
 
