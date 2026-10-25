@@ -119,6 +119,13 @@ extension IOSDocumentSceneController {
             guard isCurrent(), recoveryEpoch == epoch, !isShuttingDown, !isDisposed else {
                 throw IOSDocumentFailure.documentChanged
             }
+            // The collision check used a pre-create snapshot. Read the destination
+            // again while this transition owns the writer so Files includes the
+            // restored leaf even when the provider emits no watcher notification.
+            try await refreshWorkspace()
+            guard isCurrent(), recoveryEpoch == epoch, !isShuttingDown, !isDisposed else {
+                throw IOSDocumentFailure.documentChanged
+            }
         } catch {
             if handle == nil {
                 releaseCurrentGrant()

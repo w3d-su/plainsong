@@ -61,6 +61,38 @@ final class IOSRecoveryReviewRegressionTests: XCTestCase {
         recovery.didDismiss(retryPresentation)
     }
 
+    func testSuccessfulRestoreRefreshesFilesAfterCreateWithoutAWatcherEvent() async throws {
+        let fixture = IOSSceneControllerFixture()
+        try await fixture.controller.openPickedURL(fixture.selectedURL, scope: .singleFile)
+        let record = recoveryRecord()
+        let capture = try fixture.controller.captureRecoveryRestore(record)
+        fixture.workspace.directoryPaths = ["existing.md"]
+        // The create changes provider contents after the initial collision check.
+        // No snapshotChanged event is sent by this test double.
+        fixture.store.onOpen = {
+            fixture.workspace.directoryPaths.append(capture.filename)
+        }
+        var observedPaths: [[String]] = []
+        let observation = fixture.controller.observe { snapshot in
+            if let tree = snapshot.workspace {
+                observedPaths.append(tree.entries.map(\.location.relativePath))
+            }
+        }
+        defer { observation.cancel() }
+        try await fixture.controller.restoreRecovery(capture, in: folder,
+                                                     loadRecord: { _ in record }, isCurrent: { true })
+        let restored = try XCTUnwrap(fixture.controller.handle)
+        let tree = try XCTUnwrap(fixture.controller.snapshot.workspace)
+        XCTAssertEqual(tree.workspaceID, restored.location.workspaceID)
+        XCTAssertEqual(tree.accessGeneration, restored.location.accessGeneration)
+        XCTAssertEqual(tree.entries.map(\.location.relativePath), ["existing.md", capture.filename])
+        XCTAssertEqual(observedPaths.last, ["existing.md", capture.filename], "Files must receive the post-create tree")
+        XCTAssertEqual(restored.location.fileURL.deletingLastPathComponent(), folder)
+        XCTAssertEqual(restored.session.text, record.source)
+        XCTAssertEqual(fixture.controller.admission.active?.documentID, restored.identity)
+        XCTAssertTrue(fixture.editor.snapshot.canWrite)
+    }
+
     func testSuccessfulRestoreNavigatesOnceOnlyAfterMatchingActualDismissal() async throws {
         let fixture = IOSSceneControllerFixture()
         let record = recoveryRecord()
