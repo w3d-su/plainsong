@@ -141,7 +141,7 @@ final class IOSConflictCopyCoordinator: ObservableObject {
         do {
             try Task.checkCancellation()
             try validateOrigin(capture, ownsTransition: false)
-            let grant = try await controller.workspace.open(selectedURL: folder, scope: .directory)
+            let grant = try await controller.openDestinationFolder(folder)
             // Never retire an origin scope, even if a broken provider returns it.
             guard grant.workspaceID != capture.grant.workspaceID
             else { throw IOSConflictCopyFailure.destinationChanged }
@@ -249,7 +249,8 @@ private extension IOSConflictCopyCoordinator {
     func validateOrigin(_ capture: IOSConflictCopyOrigin, ownsTransition: Bool) throws {
         guard draft?.id == capture.draftID, !isSaving || activePickerID != nil,
               controller.transitioning == ownsTransition, !controller.isShuttingDown, !controller.isDisposed,
-              controller.grantIsCurrent, let current = controller.handle, current.identity == capture.handle.identity,
+              controller.grantIsCurrent == capture.grantWasCurrent,
+              let current = controller.handle, current.identity == capture.handle.identity,
               current.session === capture.handle.session, controller.bindingID == capture.bindingID,
               IOSConflictCopyOrigin.sameLocation(current.location, capture.handle.location),
               let grant = controller.currentGrant, grant.workspaceID == capture.grant.workspaceID,
@@ -262,9 +263,7 @@ private extension IOSConflictCopyCoordinator {
               editor.revision.documentID == capture.handle.identity,
               editor.accessGeneration == capture.editorGeneration,
               !editor.hasMarkedText,
-              case let .conflict(generation, recovery) = controller.documents.state(for: capture.handle.identity),
-              generation == capture.editorGeneration, recovery?.recordID == capture.recovery?.recordID,
-              recovery?.operationID == capture.recovery?.operationID, recovery?.revision == capture.recovery?.revision
+              IOSCopyOriginState(controller.documents.state(for: capture.handle.identity)) == capture.state
         else { throw IOSConflictCopyFailure.originChanged }
         guard editor.revision == capture.revision, current.session.version == capture.revision.version,
               current.session.isDirty == capture.isDirty,
@@ -289,6 +288,8 @@ private extension IOSConflictCopyCoordinator {
 
     func queueTerminal(_ outcome: IOSConflictCopyOutcome) {
         lastOutcome = outcome
-        pendingTerminalNotice = IOSConflictCopyFeedback.notice(for: outcome)
+        pendingTerminalNotice = IOSConflictCopyFeedback.notice(
+            for: outcome, sourceUnavailable: origin?.state.isUnavailable == true
+        )
     }
 }

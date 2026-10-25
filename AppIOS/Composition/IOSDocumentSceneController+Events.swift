@@ -15,8 +15,12 @@ extension IOSDocumentSceneController {
 
     func updateEditorAccess() {
         guard let handle, let bindingID, let state = documents.state(for: handle.identity) else { return }
+        let retainedGeneration = editor.captureSnapshot().flatMap {
+            $0.bindingID == bindingID ? $0.accessGeneration : nil
+        } ?? state.accessGeneration
+        let generation = grantIsCurrent ? state.accessGeneration : max(state.accessGeneration, retainedGeneration)
         editor.updateAccess(
-            for: handle.identity, bindingID: bindingID, generation: state.accessGeneration,
+            for: handle.identity, bindingID: bindingID, generation: generation,
             canWrite: state.canWrite && !transitioning && !isShuttingDown && grantIsCurrent &&
                 currentGrant?.workspaceID == handle.location.workspaceID &&
                 currentGrant?.accessGeneration == state.accessGeneration

@@ -18,6 +18,7 @@ final class IOSConflictCopyProductionWorkflowTests: XCTestCase {
         let before = try IOSConflictCopyRealSnapshot(fixture: fixture, handle: handle)
         let list = await fixture.store.recoveryList()
         XCTAssertTrue(list.records.contains { $0.recordID == before.recovery.recordID && $0.source == before.source })
+        let recentBeforeCopy = fixture.access.recentItems()
         let copy = IOSConflictCopyCoordinator(controller: fixture.controller)
         XCTAssertTrue(copy.requestSaveCopy())
         let draft = try XCTUnwrap(copy.draft)
@@ -25,12 +26,53 @@ final class IOSConflictCopyProductionWorkflowTests: XCTestCase {
         let task = try XCTUnwrap(copy.completePicker(request, urls: [fixture.destinationFolder]))
         let outcome = await task.value
         XCTAssertEqual(outcome, .saved(filename: request.filename))
+        XCTAssertEqual(fixture.access.recentItems(), recentBeforeCopy)
         XCTAssertEqual(
             try String(contentsOf: fixture.destinationFolder.appendingPathComponent(request.filename), encoding: .utf8),
             before.source
         )
         try assertPreserved(fixture, before: before)
         try await assertAutosaveBarrier(fixture, before: before)
+    }
+
+    func testRealUnavailableDirtyWriterExportsItsSourceAfterOriginGrantRevocation() async throws {
+        let fixture = try IOSConflictCopyRealFixture(autosaveDelayNanoseconds: 60_000_000_000)
+        addTeardownBlock { @MainActor in await fixture.cleanup() }
+        let handle = try await fixture.openConflict()
+        let before = try IOSConflictCopyRealSnapshot(fixture: fixture, handle: handle)
+        let entry = try XCTUnwrap(fixture.store.byIdentity[handle.identity])
+        fixture.store.fenceUnavailable(entry, .access(.offline))
+        _ = fixture.access.invalidate(before.grant.workspaceID)
+        XCTAssertFalse(fixture.controller.grantIsCurrent)
+        let generation = try XCTUnwrap(fixture.editor.captureSnapshot()).accessGeneration
+        let recentBeforeCopy = fixture.access.recentItems()
+        let copy = IOSConflictCopyCoordinator(controller: fixture.controller)
+        XCTAssertTrue(copy.requestSaveCopy())
+        let draft = try XCTUnwrap(copy.draft)
+        let request = try XCTUnwrap(copy.requestFolderPicker(draftID: draft.id, filename: "Unavailable Copy.mdx"))
+        let task = try XCTUnwrap(copy.completePicker(request, urls: [fixture.destinationFolder]))
+
+        let outcome = await task.value
+
+        XCTAssertEqual(outcome, .saved(filename: request.filename))
+        XCTAssertEqual(fixture.access.recentItems(), recentBeforeCopy)
+        XCTAssertEqual(
+            try String(contentsOf: fixture.destinationFolder.appendingPathComponent(request.filename), encoding: .utf8),
+            before.source
+        )
+        XCTAssertEqual(try String(contentsOf: fixture.original, encoding: .utf8), "# Original\n")
+        XCTAssertTrue(fixture.controller.handle?.session === handle.session)
+        XCTAssertEqual(handle.session.text, before.source)
+        XCTAssertEqual(handle.session.version, before.version)
+        XCTAssertTrue(handle.session.isDirty)
+        XCTAssertTrue(fixture.editor.textView.undoManager === before.undo)
+        XCTAssertEqual(before.undo.undoActionName, before.undoName)
+        XCTAssertEqual(fixture.editor.captureSnapshot()?.accessGeneration, generation)
+        XCTAssertFalse(fixture.editor.captureSnapshot()?.canWrite ?? true)
+        XCTAssertEqual(try fixture.recoveryFiles(), before.recoveryBytes)
+        guard case .unavailable = fixture.store.state(for: handle.identity) else {
+            return XCTFail("The original must remain unavailable and admitted")
+        }
     }
 
     func testProductionFactorySurfaceUsesTheCurrentWriterAndRetiresAuthoringFocus() async throws {
@@ -230,9 +272,12 @@ private struct IOSConflictCopyRealFixture {
                 autosaveDelayNanoseconds: autosaveDelayNanoseconds, backgroundFlushNanoseconds: 500_000_000
             )
         )
+        let destinationAccess = access
         controller = IOSDocumentSceneController(
             documents: store, workspace: access, editor: editor, preview: IOSSceneControllerPreviewDouble(),
-            assets: access, assetContext: { [weak access] in access?.previewContext(for: $0) }
+            assets: access,
+            openDestinationFolder: { try await destinationAccess.openDestinationFolder(selectedURL: $0) },
+            assetContext: { [weak access] in access?.previewContext(for: $0) }
         )
         let host = UIViewController()
         window.rootViewController = host
