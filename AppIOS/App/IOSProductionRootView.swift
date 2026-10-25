@@ -53,6 +53,11 @@ private struct IOSProductionSceneView: View {
             }
         }
         .background {
+            if let conflictCopy = runtime.conflictCopy {
+                IOSConflictCopyPresenter(coordinator: conflictCopy)
+            }
+        }
+        .background {
             IOSWindowSceneDisconnectAnchor { runtime.observeSceneDisconnection($0) }
                 .frame(width: 0, height: 0)
         }

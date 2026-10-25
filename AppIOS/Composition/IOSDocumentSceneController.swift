@@ -154,7 +154,11 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     }
 
     func resolveExternal(_ choice: IOSExternalResolution) async throws {
-        guard !transitioning, let handle else { throw IOSDocumentFailure.unavailable }
+        guard let handle else { throw IOSDocumentFailure.unavailable }
+        try beginTransition()
+        updateEditorAccess()
+        publish()
+        defer { finishTransition() }
         try await documents.resolveExternal(handle.identity, choice: choice)
     }
 

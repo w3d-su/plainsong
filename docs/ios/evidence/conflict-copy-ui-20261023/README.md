@@ -2,8 +2,9 @@
 
 Base: `1c1685adb7a594f3ecaf81a16d61f5d41e032363`.
 Branch: `codex/ios-conflict-copy-ui-20261023`.
-This is an independent feature addition for a later PR stacked on recovery UI.
-It does not change shared runtime/root/controller files or enable its own hook.
+This feature is stacked on the Recovery UI branch. The production runtime retains
+one optional copy coordinator from its current concrete scene controller, and its
+root installs the presenter once. The conflict banner now exposes the wired hook.
 
 ## Integration API
 
@@ -19,22 +20,23 @@ The coordinator receives the same controller and therefore the same document
 store, workspace access service and native editor. `completePicker` returns a
 task for testing/coordination; its completion occurs after safe-drain cleanup.
 `cancelInFlightCopy` only requests cancellation and does not release scopes early.
-The integration owner must also put asynchronous `resolveExternal` under the
-same controller transition fence so an already-started reload excludes copy
-admission. No changes to that shared file are included here.
+Asynchronous `resolveExternal` now holds the same controller transition fence for
+its entire provider await. An already-started reload excludes copy admission,
+and a copy that already owns the fence refuses a reload before issuing its read.
+The production action retires pending command focus and authoring captures before
+requesting the immutable copy draft; it keeps the same editor/session/store.
 
 ## Tests and evidence boundary
 
-[Required names](required-named-tests.txt) lists 18 new cases: 17 controlled
-coordinator cases and one real-provider save-copy workflow. The cases cover
+[Required names](required-named-tests.txt) lists 19 new cases: 17 controlled
+coordinator cases and two real-provider save-copy workflows. The cases cover
 picker cancellation/duplicate/altered issuance, stale binding/source/generation,
 marked text, resolved conflict, destination open/refresh suspension, occupied and
 concurrently-created leaves, revoked destination, N to N+1 during parked copy,
 cancellation with safe lease drain, navigation/resolve fencing, Unicode names,
 and retained original conflict/dirty/source/native Undo/recovery/autosave barrier.
-The already-started reload exclusion case deliberately requires the integration
-owner's shared `resolveExternal` transition hook; it must pass after integration,
-not be skipped or weakened on this independent source branch.
+The already-started reload exclusion case deliberately requires the shared
+`resolveExternal` transition fence; it must pass and must not be skipped or weakened.
 
 Terminal feedback is queued while the provider drains and is transferred to the
 single outer alert only from the name sheet's actual `onDismiss`. Form validation
@@ -66,5 +68,17 @@ is inferred from static source or lint.
 7. 確認成功存副本後，自動儲存不回寫仍衝突的原始檔。
 8. 在實體 iPad、最低 iOS/iPadOS26、VoiceOver、外接鍵盤完成相同流程並記錄裝置／OS／artifact hash。
 
+The additional production-factory workflow exercises the actual conflict surface,
+command-focus retirement, current writer and real destination copy without
+reconstructing the provider graph. It awaits the integration owner's native run.
+
 Simulator tests do not close these owner gates. This feature does not implement
 recovery, recents, retry UI or a new access/writer service.
+
+Shared wiring static check on 2026-10-25: pinned SwiftFormat reports 0/5 files
+require formatting. The factory, root and new production test each pass strict
+SwiftLint. The existing controller/runtime retain five warning-level length/style
+violations (same five rule occurrences before wiring), with zero serious
+violations in ordinary lint. Exact source-hashed comparison is retained at
+`/private/tmp/plainsong-ios-conflict-copy-ui-20261023/shared-integration-lint-comparison-20261025.json`.
+No build or native result is inferred.

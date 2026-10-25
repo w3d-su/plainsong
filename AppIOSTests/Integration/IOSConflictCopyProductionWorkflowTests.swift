@@ -33,6 +33,59 @@ final class IOSConflictCopyProductionWorkflowTests: XCTestCase {
         try await assertAutosaveBarrier(fixture, before: before)
     }
 
+    func testProductionFactorySurfaceUsesTheCurrentWriterAndRetiresAuthoringFocus() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("FactoryCopy-\(UUID())")
+        let destination = root.appendingPathComponent("Copies", isDirectory: true)
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        let original = root.appendingPathComponent("original.md")
+        let source = "# Factory source\n"
+        try Data(source.utf8).write(to: original)
+        let runtime = try IOSProductionComposition
+            .makeProduction(recoveryDirectory: root.appendingPathComponent("Recovery"))
+        let controller = try XCTUnwrap(runtime.controller as? IOSDocumentSceneController)
+        let store = try XCTUnwrap(controller.documents as? IOSUIDocumentStore)
+        let copy = try XCTUnwrap(runtime.conflictCopy)
+        addTeardownBlock { @MainActor in
+            runtime.stopObserving()
+            runtime.scene.stopObserving()
+            // Fixture-only cleanup drains the conflicted writer without treating
+            // Save a Copy as permission to close or replace the original.
+            if let handle = controller.handle, let entry = store.byIdentity[handle.identity] {
+                try await store.retireForReplacement(entry)
+            }
+            let closed = await runtime.shutdown()
+            XCTAssertTrue(closed)
+            if closed {
+                try FileManager.default.removeItem(at: root)
+            }
+        }
+        try await controller.openPickedURL(original, scope: .singleFile)
+        let handle = try XCTUnwrap(controller.handle)
+        let binding = try XCTUnwrap(controller.bindingID)
+        XCTAssertTrue(controller.setCommandFocus(true, expected: handle.identity, bindingID: binding))
+        runtime.authoring.find.replacement = "Retire this captured authoring draft"
+        let entry = try XCTUnwrap(store.byIdentity[handle.identity])
+        await store.beginConflict(entry, reason: .externalConflict, allowRetry: true)
+        try XCTUnwrap(runtime.scene.surfaces.resolveConflictCopy)()
+        XCTAssertFalse(runtime.editor.captureSnapshot()?.isFocused ?? true)
+        XCTAssertEqual(runtime.authoring.find.replacement, "")
+        let draft = try XCTUnwrap(copy.draft)
+        let request = try XCTUnwrap(copy.requestFolderPicker(draftID: draft.id, filename: "Factory Copy.md"))
+        let task = try XCTUnwrap(copy.completePicker(request, urls: [destination]))
+        let outcome = await task.value
+        XCTAssertEqual(outcome, .saved(filename: request.filename))
+        XCTAssertEqual(
+            try String(contentsOf: destination.appendingPathComponent(request.filename), encoding: .utf8),
+            source
+        )
+        XCTAssertTrue(controller.handle?.session === handle.session)
+        XCTAssertEqual(runtime.editor.textView.text, source)
+        XCTAssertEqual(try String(contentsOf: original, encoding: .utf8), source)
+        guard case .conflict = store.state(for: handle.identity) else {
+            return XCTFail("The production copy hook must leave the original conflict admitted")
+        }
+    }
+
     private func assertPreserved(_ fixture: IOSConflictCopyRealFixture, before: IOSConflictCopyRealSnapshot) throws {
         XCTAssertEqual(try String(contentsOf: fixture.original, encoding: .utf8), "# Original\n")
         XCTAssertTrue(fixture.controller.handle?.session === before.handle.session)

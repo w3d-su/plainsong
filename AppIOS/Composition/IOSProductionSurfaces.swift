@@ -38,6 +38,7 @@ final class IOSProductionRuntime: ObservableObject {
     let authoring = IOSAuthoringController()
     let images: IOSImageInsertionController
     let recovery: IOSRecoveryController?
+    let conflictCopy: IOSConflictCopyCoordinator?
 
     @Published var showOpenChoices = false
     @Published var pickerRequest: IOSProductionPickerRequest?
@@ -67,7 +68,8 @@ final class IOSProductionRuntime: ObservableObject {
         refreshWorkspace: @escaping @MainActor () async throws -> Void,
         openPickedURL: @escaping @MainActor (URL, IOSWorkspaceScope) async throws -> Void,
         shutdown: @escaping @MainActor () async -> Bool,
-        recovery: IOSRecoveryController? = nil
+        recovery: IOSRecoveryController? = nil,
+        conflictCopy: IOSConflictCopyCoordinator? = nil
     ) throws {
         guard let assets = controller.capabilities.assets else {
             throw IOSDocumentFailure.unavailable
@@ -80,6 +82,7 @@ final class IOSProductionRuntime: ObservableObject {
         self.openPickedURL = openPickedURL
         shutdownProvider = shutdown
         self.recovery = recovery
+        self.conflictCopy = conflictCopy
         images = IOSImageInsertionController(writer: assets)
         scene = IOSShellSceneState(facade: controller)
         installSurfaces()
@@ -166,6 +169,13 @@ final class IOSProductionRuntime: ObservableObject {
         focusTask = nil
         scene.releaseCommandFocus()
         retireAuthoringCapture()
+    }
+
+    func requestConflictCopy() {
+        guard !isShutDown, !isOpening, pickerRequest == nil,
+              recovery?.isPresented != true, let conflictCopy else { return }
+        prepareForReadOnlyPresentation()
+        _ = conflictCopy.requestSaveCopy()
     }
 
     @discardableResult
@@ -276,6 +286,7 @@ final class IOSProductionRuntime: ObservableObject {
                 self?.imagePanel(context: context)
             },
             currentGrant: currentGrant,
+            resolveConflictCopy: conflictCopy == nil ? nil : { [weak self] in self?.requestConflictCopy() },
             refreshWorkspace: { [weak self] in
                 guard let self else { return }
                 Task {
