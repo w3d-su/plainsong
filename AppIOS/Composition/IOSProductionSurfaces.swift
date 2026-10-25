@@ -352,35 +352,8 @@ final class IOSProductionRuntime: ObservableObject {
         authoring.find = IOSFindModel()
     }
 
-    private static func message(for error: Error) -> String {
-        let access: IOSWorkspaceFailure? = if let failure = error as? IOSWorkspaceFailure {
-            failure
-        } else if let failure = error as? IOSDocumentFailure, case let .access(reason) = failure {
-            reason
-        } else {
-            nil
-        }
-        switch access {
-        case .permissionDenied, .grantChanged, .outsideGrant:
-            return "Access is no longer available. Choose the file or folder again."
-        case .offline, .downloading:
-            return "The file isn't available yet. Check its download and connection, then try again."
-        case .unsupportedType:
-            return "Choose a Markdown or MDX document."
-        case .notFound:
-            return "The file could not be found. Choose it again in Files."
-        case .readOnly:
-            return "This location is read only. Choose a writable location."
-        default:
-            if let failure = error as? IOSDocumentFailure, failure == .conflict {
-                return "Resolve the current document's changes before opening another document."
-            }
-            return "The operation couldn't finish. Try again or choose another file or folder."
-        }
-    }
-
     private func show(_ error: Error, title: String) {
-        scene.presentedError = IOSShellError(title: title, message: Self.message(for: error))
+        scene.presentedError = IOSShellError(title: title, message: IOSOperationFeedback.message(for: error))
     }
 }
 
