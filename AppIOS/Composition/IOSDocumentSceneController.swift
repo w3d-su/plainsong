@@ -15,6 +15,9 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     let editor: any IOSSourceEditorBinding
     let preview: any IOSPreviewControlling
     let assetContext: (IOSWorkspaceGrant) -> PreviewAssetAccessContext?
+    /// Production injects the non-persisting destination path; protocol doubles
+    /// may use ordinary open without extending the frozen access contract.
+    let openDestinationFolder: @MainActor (URL) async throws -> IOSWorkspaceGrant
     var openExternalURL: ((URL) -> Void)?
     var onNavigationFailure: ((String) -> Void)?
 
@@ -46,13 +49,17 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
         preview: any IOSPreviewControlling,
         assets: any IOSWorkspaceAssetWriting,
         admission: IOSSceneWriterAdmission? = nil,
-        assetContext: @escaping (IOSWorkspaceGrant) -> PreviewAssetAccessContext?
+        assetContext: @escaping (IOSWorkspaceGrant) -> PreviewAssetAccessContext?,
+        openDestinationFolder: (@MainActor (URL) async throws -> IOSWorkspaceGrant)? = nil
     ) {
         self.documents = documents
         self.workspace = workspace
         self.editor = editor
         self.preview = preview
         self.assetContext = assetContext
+        self.openDestinationFolder = openDestinationFolder ?? { url in
+            try await workspace.open(selectedURL: url, scope: .directory)
+        }
         self.admission = admission ?? IOSSceneWriterAdmission()
         capabilities = IOSSceneCapabilities(
             editor: editor, documents: documents, workspace: workspace, preview: preview, assets: assets

@@ -36,6 +36,7 @@ final class IOSSceneControllerStoreDouble: IOSDocumentStore {
     var onClose: (() -> Void)?
     var onSave: (() -> Void)?
     var closeOutcome: IOSDocumentCloseOutcome = .closed
+    var createFailure: IOSDocumentFailure?
     var observations: [(IOSReloadRelayObservation, @MainActor (IOSDocumentEvent) -> Void)] = []
     var flushCount = 0
 
@@ -55,6 +56,9 @@ final class IOSSceneControllerStoreDouble: IOSDocumentStore {
     func create(at location: IOSFileLocation, initialText: String,
                 lease: any IOSWorkspaceAccessLease) async throws -> IOSDocumentHandle
     {
+        if let createFailure {
+            throw createFailure
+        }
         let handle = try await open(location, lease: lease)
         handle.session.replaceTextFromAuthorizedEditor(initialText)
         return handle

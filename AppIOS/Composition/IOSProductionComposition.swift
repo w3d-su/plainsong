@@ -37,7 +37,9 @@ struct IOSProductionComposition {
         preview.installAssetReader(access)
         let controller = IOSDocumentSceneController(
             documents: documents, workspace: access, editor: editor, preview: preview,
-            assets: access, admission: .process, assetContext: { [weak access] in access?.previewContext(for: $0) }
+            assets: access, admission: .process,
+            assetContext: { [weak access] in access?.previewContext(for: $0) },
+            openDestinationFolder: { try await access.openDestinationFolder(selectedURL: $0) }
         )
         controller.openExternalURL = { UIApplication.shared.open($0) }
         let recoveryUI = IOSRecoveryController(

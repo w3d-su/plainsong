@@ -3,18 +3,29 @@ import WorkspaceKitIOS
 
 struct IOSRecoveryEntry: View {
     @ObservedObject var controller: IOSRecoveryController
+    @State private var presentedID: UUID?
 
     var body: some View {
         Button {
             controller.present()
         } label: {
             Label("Recovered Drafts", systemImage: "clock.arrow.circlepath")
-                .frame(maxWidth: .infinity, minHeight: 44)
+                .frame(minWidth: 44, minHeight: 44)
         }
         .accessibilityIdentifier("plainsong.ios.recovery.open")
-        .sheet(isPresented: $controller.isPresented, onDismiss: controller.dismiss) {
-            IOSRecoveryView(controller: controller)
-                .interactiveDismissDisabled(controller.isRestoring)
+        .sheet(isPresented: $controller.isPresented, onDismiss: {
+            controller.didDismiss(presentedID)
+            presentedID = nil
+        }) {
+            if let id = controller.presentationID {
+                IOSRecoveryView(controller: controller)
+                    .interactiveDismissDisabled(controller.isRestoring)
+                    .onAppear {
+                        if controller.didAppear(id) {
+                            presentedID = id
+                        }
+                    }
+            }
         }
     }
 }

@@ -131,6 +131,7 @@ final class IOSProductionRuntime: ObservableObject {
     }
 
     func shutdown() async -> Bool {
+        recovery?.dismiss()
         if isShutDown {
             return true
         }
@@ -180,6 +181,7 @@ final class IOSProductionRuntime: ObservableObject {
     }
 
     func openURL(_ url: URL) async {
+        recovery?.dismiss()
         // An OS delivery supersedes a still-presented picker. Retire its
         // issuance before any await so its delayed delegate cannot replace it.
         pickerRequest = nil
