@@ -2,7 +2,7 @@ import EditorKitIOS
 import Foundation
 import MarkdownCore
 @testable import PlainsongIOS
-import PreviewKit
+@testable import PreviewKit
 import UIKit
 @preconcurrency import WebKit
 import WorkspaceCore
@@ -13,6 +13,28 @@ import XCTest
 /// editor, Files access provider and packaged preview. No successful fake I/O.
 @MainActor
 final class IOSProductionDocumentWorkflowTests: XCTestCase {
+    func testProductionPreviewHTTPLinksUseOnlyItsPlatformOpener() throws {
+        let (_, runtime, controller) = try fixtureRuntime()
+        XCTAssertNil(controller.openExternalURL, "The real PreviewController already owns external URL opening")
+        // Refuse the pre-fix composition before it could open a real browser.
+        guard controller.openExternalURL == nil else { return }
+        var opened: [URL] = []
+        var reported: [URL] = []
+        runtime.preview.externalURLOpenerOverrideForTesting = { opened.append($0) }
+        let observation = runtime.preview.observe { event in
+            if case let .externalLinkRequested(url) = event {
+                reported.append(url)
+            }
+        }
+        defer { observation.cancel() }
+        let links = ["https://example.invalid/path", "http://example.invalid/path"]
+        for href in links {
+            runtime.preview.receiveBridgeBody(["name": "linkClicked", "payload": ["href": href]])
+        }
+        XCTAssertEqual(opened.map(\.absoluteString), links)
+        XCTAssertEqual(reported.map(\.absoluteString), links)
+    }
+
     func testFilesOpenNativeEditPreviewSaveAndReopen() async throws {
         let (fixture, runtime, controller) = try fixtureRuntime()
         try await controller.openPickedURL(fixture.first, scope: .singleFile)

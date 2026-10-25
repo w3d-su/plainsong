@@ -41,7 +41,8 @@ struct IOSProductionComposition {
             assetContext: { [weak access] in access?.previewContext(for: $0) },
             openDestinationFolder: { try await access.openDestinationFolder(selectedURL: $0) }
         )
-        controller.openExternalURL = { UIApplication.shared.open($0) }
+        // PreviewController already opens HTTP(S) through PreviewPlatform.
+        // Its event is informational here; a second scene opener duplicates it.
         let recoveryUI = IOSRecoveryController(
             list: { await documents.recoveryList() },
             load: { try await documents.loadRecovery(recordID: $0) },
