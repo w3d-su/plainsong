@@ -39,7 +39,8 @@ struct IOSProductionComposition {
             documents: documents, workspace: access, editor: editor, preview: preview,
             assets: access, admission: .process, assetContext: { [weak access] in access?.previewContext(for: $0) }
         )
-        controller.openExternalURL = { UIApplication.shared.open($0) }
+        // PreviewController already opens HTTP(S) through PreviewPlatform.
+        // Its event is informational here; a second scene opener duplicates it.
         let runtime = try IOSProductionRuntime(
             controller: controller, editor: editor, preview: preview,
             currentGrant: { [weak controller] in

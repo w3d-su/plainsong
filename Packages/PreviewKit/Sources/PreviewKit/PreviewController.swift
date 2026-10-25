@@ -12,6 +12,7 @@ public final class PreviewController: NSObject, ObservableObject {
     public var onLinkClicked: ((String) -> Void)?
     public var onCheckboxToggled: ((Int, Bool, Int, DocumentSession) -> Void)?
     var renderCompletionObserver: ((RenderCompletePayload) -> Void)?
+    var externalURLOpenerOverrideForTesting: (@MainActor (URL) -> Void)?
 
     let assetSchemeHandler: AssetURLSchemeHandler
     let eventHub = PreviewEventHub()
@@ -392,7 +393,11 @@ public final class PreviewController: NSObject, ObservableObject {
         switch scheme {
         case "http", "https":
             emitPreviewEvent(.externalLinkRequested(url))
-            PreviewPlatform.openExternalURL(url)
+            if let externalURLOpenerOverrideForTesting {
+                externalURLOpenerOverrideForTesting(url)
+            } else {
+                PreviewPlatform.openExternalURL(url)
+            }
         default:
             reportRelativeLink(href)
         }

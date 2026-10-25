@@ -106,13 +106,11 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
             // Clear before install can suspend and receive a new revocation.
             clearUnavailableReasonForCurrentGrant()
             if scope == .singleFile {
-                guard let location = documentLocation(for: url) else {
-                    throw IOSDocumentFailure.access(.unsupportedType)
-                }
+                let location = try pickedDocumentLocation(for: url)
                 try await install(location, initialText: nil)
             }
         } catch {
-            if handle == nil {
+            if handle == nil, !retainsPendingSelection(after: error, grant: grant) {
                 _ = workspace.invalidate(grant.workspaceID)
                 currentGrant = nil
                 grantIsCurrent = false
@@ -313,13 +311,18 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     }
 
     func documentLocation(for url: URL) -> IOSFileLocation? {
+        guard let entry = documentEntry(for: url), case .available = entry.availability else { return nil }
+        return entry.location
+    }
+
+    func documentEntry(for url: URL) -> IOSWorkspaceEntry? {
         guard grantIsCurrent, let grant = currentGrant, let tree = workspaceSnapshot,
               tree.workspaceID == grant.workspaceID, tree.accessGeneration == grant.accessGeneration else { return nil }
         return Self.flatten(tree.entries).first {
-            guard case .document = $0.kind, case .available = $0.availability else { return false }
+            guard case .document = $0.kind else { return false }
             return $0.location.fileURL.isFileURL && url.isFileURL &&
                 $0.location.fileURL.path(percentEncoded: false).utf8.elementsEqual(url.path(percentEncoded: false).utf8)
-        }?.location
+        }
     }
 
     static func flatten(_ entries: [IOSWorkspaceEntry]) -> [IOSWorkspaceEntry] {
@@ -329,6 +332,33 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     static func sameLocation(_ lhs: IOSFileLocation, _ rhs: IOSFileLocation) -> Bool {
         lhs.workspaceID == rhs.workspaceID && lhs.accessGeneration == rhs.accessGeneration &&
             lhs.relativePath.utf8.elementsEqual(rhs.relativePath.utf8)
+    }
+}
+
+extension IOSDocumentSceneController {
+    private func pickedDocumentLocation(for url: URL) throws -> IOSFileLocation {
+        guard let entry = documentEntry(for: url) else { throw IOSDocumentFailure.access(.unsupportedType) }
+        switch entry.availability {
+        case .available: return entry.location
+        case .downloading: throw IOSDocumentFailure.access(.downloading)
+        case .offline: throw IOSDocumentFailure.access(.offline)
+        case .unavailable: throw IOSDocumentFailure.access(.unavailable)
+        case .removed: throw IOSDocumentFailure.access(.notFound)
+        }
+    }
+
+    private func retainsPendingSelection(after error: Error, grant: IOSWorkspaceGrant) -> Bool {
+        let failure: IOSWorkspaceFailure? = if let documentFailure = error as? IOSDocumentFailure,
+                                               case let .access(reason) = documentFailure
+        {
+            reason
+        } else {
+            error as? IOSWorkspaceFailure
+        }
+        // A cloud download is not a type or permission failure. Retain only the
+        // still-current explicit selection so Files can refresh and retry it.
+        return (failure == .downloading || failure == .offline) && grant.scope == .singleFile && grantIsCurrent &&
+            currentGrant?.workspaceID == grant.workspaceID && currentGrant?.accessGeneration == grant.accessGeneration
     }
 }
 
