@@ -20,7 +20,13 @@ acceptance manifest's bundle digest is adapted to main's committed resource;
 no assertion is relaxed. Current-candidate complete/repeated native execution,
 actual UI launch, Mac/exact-head CI, and the new unsigned IPA are recorded in
 [evidence/main-production-20261023](evidence/main-production-20261023/README.md).
-Until those receipts are present they remain pending, not inherited passes.
+Clean implementation `1c1685a` completed modules448/448, complete Preview191/191
+and unchanged repeat191/191, iPhone+iPad UI launch1/1 each, components29/29,
+tooling44/44 and all six exact-head CI checks. Local Mac PreviewKit195 cases
+had192 passed/3 existing skips/0 failures; architecture6/6 andMac build pass.
+The new unsigned IPA and independent actual-ZIP audit pass. These receipts
+remain source-bound to that implementation, separate from documentation-only
+publication commits and their own current-head CI.
 
 Pre-composition M0 owner-reported prerequisites remain accepted at their recorded
 scope. The new artifact's owner installation/Files/iCloud/IME/Undo/background

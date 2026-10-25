@@ -16,4 +16,21 @@ final class IOSAcceptanceLaunchSmokeTests: XCTestCase {
         XCTAssertTrue(open.exists)
         XCTAssertTrue(open.isEnabled)
     }
+
+    func testRecoveredDraftsOpensAndDismissesFromProductionFiles() {
+        let app = XCUIApplication()
+        app.launch()
+        let recovery = app.buttons["plainsong.ios.recovery.open"]
+        let entryAppeared = expectation(for: NSPredicate(format: "exists == true"), evaluatedWith: recovery)
+        XCTAssertEqual(XCTWaiter.wait(for: [entryAppeared], timeout: 10), .completed)
+        XCTAssertTrue(recovery.isEnabled)
+        recovery.tap()
+        let drafts = app.navigationBars["Recovered Drafts"]
+        let draftsAppeared = expectation(for: NSPredicate(format: "exists == true"), evaluatedWith: drafts)
+        XCTAssertEqual(XCTWaiter.wait(for: [draftsAppeared], timeout: 10), .completed)
+        drafts.buttons["Done"].tap()
+        let files = app.navigationBars["Files"]
+        let filesReappeared = expectation(for: NSPredicate(format: "exists == true"), evaluatedWith: files)
+        XCTAssertEqual(XCTWaiter.wait(for: [filesReappeared], timeout: 10), .completed)
+    }
 }

@@ -317,6 +317,7 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     var visibleRangeObserver: CoordinatorNotificationObserver?
     var visibleRangeChangeHandler: ((NSRange) -> Void)?
     var lastVisibleTextRange: NSRange?
+    var lastCacheTrimSelection: NSRange?
     let textElementCacheTrimmer = EditorTextElementCacheTrimmer()
     var representableUpdateDepth = 0
     var selectionPublicationGeneration: UInt64 = 0
@@ -736,16 +737,16 @@ extension MarkdownTextViewCoordinator {
         willChangeTextIn affectedCharRange: NSTextRange,
         replacementString: String
     ) {
-        // Every replacement, including programmatic updates, keeps the scroll line
-        // index in step without rescanning the document.
-        scrollProxy?.textWillChange(
+        guard let textView = textView as? MarkdownSTTextView else {
+            return
+        }
+        // Every replacement, including programmatic updates, keeps the shared line index
+        // (scroll sync, line numbers) in step without rescanning the document.
+        textView.lineIndexCache.textWillChange(
             in: NSRange(affectedCharRange, in: textView.textContentManager),
-            replacementString: replacementString,
-            in: textView
+            replacementString: replacementString
         )
-        guard !isUpdating,
-              let textView = textView as? MarkdownSTTextView
-        else {
+        guard !isUpdating else {
             return
         }
         textView.confirmPotentialMarkedTextReplacementRange(NSRange(

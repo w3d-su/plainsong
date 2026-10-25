@@ -37,6 +37,8 @@ final class IOSProductionRuntime: ObservableObject {
     let scene: IOSShellSceneState
     let authoring = IOSAuthoringController()
     let images: IOSImageInsertionController
+    let recovery: IOSRecoveryController?
+    let conflictCopy: IOSConflictCopyCoordinator?
 
     @Published var showOpenChoices = false
     @Published var pickerRequest: IOSProductionPickerRequest?
@@ -65,7 +67,9 @@ final class IOSProductionRuntime: ObservableObject {
         currentGrant: @escaping () -> IOSWorkspaceGrant?,
         refreshWorkspace: @escaping @MainActor () async throws -> Void,
         openPickedURL: @escaping @MainActor (URL, IOSWorkspaceScope) async throws -> Void,
-        shutdown: @escaping @MainActor () async -> Bool
+        shutdown: @escaping @MainActor () async -> Bool,
+        recovery: IOSRecoveryController? = nil,
+        conflictCopy: IOSConflictCopyCoordinator? = nil
     ) throws {
         guard let assets = controller.capabilities.assets else {
             throw IOSDocumentFailure.unavailable
@@ -77,6 +81,8 @@ final class IOSProductionRuntime: ObservableObject {
         self.refreshWorkspace = refreshWorkspace
         self.openPickedURL = openPickedURL
         shutdownProvider = shutdown
+        self.recovery = recovery
+        self.conflictCopy = conflictCopy
         images = IOSImageInsertionController(writer: assets)
         scene = IOSShellSceneState(facade: controller)
         installSurfaces()
@@ -153,6 +159,23 @@ final class IOSProductionRuntime: ObservableObject {
         scene.dismissPresentation()
         authoring.linkDraft = nil
         pickerRequest = IOSProductionPickerRequest(scope: scope)
+    }
+
+    /// A read-only modal owns no source command route. Retire a yielded focus
+    /// claim before releasing the route, without changing native text or Undo.
+    func prepareForReadOnlyPresentation() {
+        pendingFocus = nil
+        focusTask?.cancel()
+        focusTask = nil
+        scene.releaseCommandFocus()
+        retireAuthoringCapture()
+    }
+
+    func requestConflictCopy() {
+        guard !isShutDown, !isOpening, pickerRequest == nil,
+              recovery?.isPresented != true, let conflictCopy else { return }
+        prepareForReadOnlyPresentation()
+        _ = conflictCopy.requestSaveCopy()
     }
 
     @discardableResult
@@ -263,6 +286,7 @@ final class IOSProductionRuntime: ObservableObject {
                 self?.imagePanel(context: context)
             },
             currentGrant: currentGrant,
+            resolveConflictCopy: conflictCopy == nil ? nil : { [weak self] in self?.requestConflictCopy() },
             refreshWorkspace: { [weak self] in
                 guard let self else { return }
                 Task {

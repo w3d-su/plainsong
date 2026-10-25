@@ -140,6 +140,9 @@ func makeActiveSearchRefreshFixture(
         shouldRestoreLastOpenedFile: false
     )
     appState.workspaceRootURL = rootURL
+    // A query is typed in the Search navigator; edit refreshes wait while it is hidden.
+    appState.selectWorkspaceSidebarMode(.search)
+    appState.workspaceSearchEditRefresh.delayNanoseconds = debounceNanoseconds
     appState.workspaceSnapshot = snapshot
     let rootAuthority = try WorkspaceFileSystemRootAuthority(rootURL: rootURL)
     appState.workspaceSearchRootAuthority = rootAuthority

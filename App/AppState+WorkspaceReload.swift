@@ -83,7 +83,7 @@ extension AppState {
             return
         }
 
-        restartActiveWorkspaceSearchWithFreshOverlays()
+        scheduleEditDrivenWorkspaceSearchRefresh()
     }
 
     func invalidateWorkspaceSearchForWorkspaceGenerationAdvance() {
@@ -852,7 +852,10 @@ extension AppState {
         }
     }
 
+    /// Also drops a waiting edit-driven refresh: every caller ends the current search (a new
+    /// query, a clear, a workspace-generation advance), so the refresh has nothing to refresh.
     func cancelWorkspaceSearchTask() {
+        workspaceSearchEditRefresh.cancel()
         workspaceSearchTask?.cancel()
         workspaceSearchTask = nil
         workspaceSearchTaskToken = nil

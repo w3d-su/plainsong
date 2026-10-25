@@ -27,13 +27,6 @@ public final class EditorScrollProxy: ObservableObject {
         attachment?.emitVisibleLine(containingUTF16Offset: offset)
     }
 
-    /// Native replacements arrive here before the content storage changes, so selection
-    /// and layout callbacks inside the edit already see an index for the new text.
-    func textWillChange(in range: NSRange, replacementString: String, in textView: STTextView) {
-        guard attachment?.isAttached(to: textView) == true else { return }
-        attachment?.textWillChange(in: range, replacementString: replacementString)
-    }
-
     func emitNavigationLine(
         containingUTF16Offset offset: Int,
         documentIdentity: EditorDocumentIdentity,
@@ -60,7 +53,7 @@ public final class EditorScrollProxy: ObservableObject {
         attachment = nil
     }
 
-    /// Full line-index scans since attachment; typing must not add any.
+    /// Full scans of the attached text view's shared line index; typing must not add any.
     var lineIndexRebuildCount: Int {
         attachment?.lineIndexRebuildCount ?? 0
     }
@@ -71,19 +64,20 @@ private final class EditorScrollAttachment {
     private weak var textView: STTextView?
     private weak var proxy: EditorScrollProxy?
     private var boundsObserver: NotificationObserver?
-    private var textObserver: NotificationObserver?
-    private var lineIndex: EditorScrollLineIndex?
-    /// Forwarded replacements whose `textDidChangeNotification` has not arrived yet.
-    private var editsAwaitingDidChange = 0
+    /// Shared with the line-number gutter; the coordinator forwards native edits to it.
+    private let lineIndexCache: EditorLineIndexCache
     private var lastEmittedLine: Int?
-    private(set) var lineIndexRebuildCount = 0
+
+    var lineIndexRebuildCount: Int {
+        lineIndexCache.rebuildCount
+    }
 
     init(textView: STTextView, proxy: EditorScrollProxy) {
         self.textView = textView
         self.proxy = proxy
+        lineIndexCache = EditorLineIndexCache.cache(for: textView)
 
         attachBoundsObserver(to: textView)
-        attachTextObserver(to: textView)
         emitVisibleLineIfNeeded()
     }
 
@@ -93,7 +87,6 @@ private final class EditorScrollAttachment {
 
     func detach() {
         boundsObserver = nil
-        textObserver = nil
     }
 
     func scrollToLine(_ line: Int) {
@@ -118,36 +111,6 @@ private final class EditorScrollAttachment {
                 self?.emitVisibleLineIfNeeded()
             }
         })
-    }
-
-    private func attachTextObserver(to textView: STTextView) {
-        textObserver = NotificationObserver(NotificationCenter.default.addObserver(
-            forName: STTextView.textDidChangeNotification,
-            object: textView,
-            queue: .main
-        ) { [weak self] _ in
-            // The observer is delivered on the main queue. A change that was not forwarded
-            // through `textWillChange` invalidates here, before a same-turn source
-            // installation can issue navigation into the new text.
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                if self.editsAwaitingDidChange > 0 {
-                    self.editsAwaitingDidChange -= 1
-                } else {
-                    self.lineIndex = nil
-                }
-            }
-        })
-    }
-
-    func textWillChange(in range: NSRange, replacementString: String) {
-        editsAwaitingDidChange += 1
-        guard var index = lineIndex else { return }
-        // Release the stored copy first so the edit mutates a uniquely referenced buffer.
-        lineIndex = nil
-        if index.replaceCharacters(in: range, with: replacementString) {
-            lineIndex = index
-        }
     }
 
     func emitVisibleLine(containingUTF16Offset offset: Int) {
@@ -188,20 +151,7 @@ private final class EditorScrollAttachment {
     }
 
     private func currentLineIndex() -> EditorScrollLineIndex {
-        // `mutableString` reads the storage in place, without bridging it to `String`.
-        let text = textView.map { textView -> NSString in
-            MarkdownTextView.textStorage(of: textView)?.mutableString
-                ?? (textView.text ?? "") as NSString
-        } ?? ""
-        // The length check is O(1) and catches any edit that bypassed `textWillChange`.
-        if let lineIndex, lineIndex.textUTF16Count == text.length {
-            return lineIndex
-        }
-
-        let newIndex = EditorScrollLineIndex(utf16: text)
-        lineIndexRebuildCount += 1
-        lineIndex = newIndex
-        return newIndex
+        lineIndexCache.currentIndex()
     }
 }
 
