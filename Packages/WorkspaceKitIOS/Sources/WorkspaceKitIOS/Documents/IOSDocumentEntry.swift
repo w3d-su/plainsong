@@ -44,6 +44,7 @@ final class IOSDocumentEntry {
     var autosaveTask: Task<Void, Never>?
     var autosaveGeneration: UInt64 = 0
     var externalToken: UUID?
+    var hasDeferredExternalChange = false
     var pendingProposal: IOSDocumentReloadProposal?
     var recoveryReceipt: IOSRecoveryReceipt?
     var lastAcknowledgement: IOSSaveAcknowledgement?

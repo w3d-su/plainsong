@@ -7,6 +7,7 @@ import XCTest
 final class PreviewIdentityTests: XCTestCase {
     func testLowerVersionDocumentDropsThePreviousCheckbox() {
         let controller = PreviewController(previewIndexURL: nil)
+        defer { controller.invalidate() }
         let first = DocumentSession(text: "first")
         let second = DocumentSession(text: "second")
         var callbacks: [ObjectIdentifier] = []
@@ -46,6 +47,7 @@ final class PreviewIdentityTests: XCTestCase {
 
     func testIOSCheckboxUsesDocumentIdentityAndIgnoresStaleRender() {
         let controller = PreviewController(previewIndexURL: nil)
+        defer { controller.invalidate() }
         let first = IOSDocumentIdentity(rawValue: UUID())
         let second = IOSDocumentIdentity(rawValue: UUID())
         var events: [IOSPreviewEvent] = []
@@ -76,6 +78,7 @@ final class PreviewIdentityTests: XCTestCase {
 
     func testCancelledObservationReceivesNoLaterEvents() {
         let controller = PreviewController(previewIndexURL: nil)
+        defer { controller.invalidate() }
         var events: [IOSPreviewEvent] = []
         let token = controller.observe { events.append($0) }
         token.cancel()
@@ -86,6 +89,7 @@ final class PreviewIdentityTests: XCTestCase {
 
     func testSingleFileGrantReportsMissingDirectoryAccessAndDoesNotReadSiblings() async {
         let controller = PreviewController(previewIndexURL: nil)
+        defer { controller.invalidate() }
         let reader = GatePreviewAssetReader()
         controller.installAssetReader(reader)
         var events: [IOSPreviewEvent] = []
@@ -123,6 +127,7 @@ final class PreviewIdentityTests: XCTestCase {
     func testWebContentTerminationDoesNotMutateSource() {
         let session = DocumentSession(text: "kept")
         let controller = PreviewController(previewIndexURL: nil)
+        defer { controller.invalidate() }
         controller.render(session.currentTextChange, for: session)
         controller.webViewWebContentProcessDidTerminate(controller.webView)
         XCTAssertFalse(controller.isReady)
@@ -132,6 +137,7 @@ final class PreviewIdentityTests: XCTestCase {
 
     func testHostReattachKeepsTheSameWebView() {
         let controller = PreviewController(previewIndexURL: nil)
+        defer { controller.invalidate() }
         let host = PreviewWebHostView(webView: controller.webView)
         let webView = controller.webView
         host.attach(webView: webView)
