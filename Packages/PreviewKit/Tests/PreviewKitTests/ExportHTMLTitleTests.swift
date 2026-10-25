@@ -28,10 +28,14 @@ final class ExportHTMLTitleTests: XCTestCase {
             ),
             .init(text: "No heading", kind: .markdown, title: "Untitled"),
         ]
-        for item in cases {
+        for (caseIndex, item) in cases.enumerated() {
+            let context = "title-case-\(caseIndex)"
+            PreviewHostedTestWait.note(context, phase: "controller-create")
             let controller = try support.makeController()
             defer { controller.invalidate() }
+            PreviewHostedTestWait.note(context, phase: "render-start")
             let renderID = try await support.render(controller, text: item.text, fileKind: item.kind, version: 0)
+            PreviewHostedTestWait.note(context, phase: "html-export-start")
             let result = await controller.exportHTML(matchingRenderID: renderID)
             controller.invalidate()
             guard case let .ready(html, _, _) = result else { return XCTFail("Expected ready: \(result)") }
