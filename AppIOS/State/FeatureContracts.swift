@@ -4,7 +4,7 @@ import MarkdownCore
 import WorkspaceCore
 import WorkspaceKitIOS
 
-/// Authoring actions share descriptors and keyboard bindings within a scene.
+/// Authoring actions use descriptors and handlers; keyboard actions install once per scene.
 enum IOSAuthoringActionID: Hashable, Sendable {
     case bold, italic, link, heading(Int), code
     case strikethrough, inlineCode, paragraph, quote, codeFence

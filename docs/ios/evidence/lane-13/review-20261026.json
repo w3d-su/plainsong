@@ -102,7 +102,7 @@
     },
     "AppIOS/State/FeatureContracts.swift": {
       "beforeSHA256": "c6b19edb56e69d3ef64b7230ebbb9c1440ad7c2db09c9019435afa1bbfe78361",
-      "afterSHA256": "2a9df6ee6e6415fe435233176ec718b0d1e92f365f263befbffeeb87c746fe6f",
+      "afterSHA256": "cd0bfadc279c0c2435914977304c30e19bf5d0b806bd7e15ff3089dafc828cba",
       "sourceWithoutLineCommentsSHA256": "23db5e920930d46461e11f469d46e8771741d541959fe08645562411e7b52202"
     },
     "Packages/EditorKit/Sources/EditorKit/MarkdownSyntaxToken.swift": {
