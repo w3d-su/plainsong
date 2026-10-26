@@ -35,6 +35,8 @@ adds evidence only; all tested native and prototype input hashes are verified.
   (zero serious violations) pass. The initial unchanged tooling run had one
   admission-fixture failure; its complete log and the successful unchanged rerun
   are both retained. The merged class-length lint failure is also retained.
+  `swiftlint-final.log.gz` is that historical pre-relocation failure;
+  `swiftlint-passing.log.gz` is the final successful run with zero serious violations.
 
 Earlier source-bound native passes **536/536** (before main integration) and
 **611/611** (before the method relocation) remain under `historical-native/`.
