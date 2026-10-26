@@ -64,10 +64,12 @@ function closingPattern(closer: SegmentCloser): RegExp {
   }
 }
 
-// CommonMark HTML blocks that continue across blank lines, by their opening line.
+// CommonMark HTML blocks that continue across blank lines, by their opening line. A comment
+// block ends at `-->`; `--!>` (which ends a comment in HTML) is also accepted, since an end
+// predicted too early only costs one more try.
 function htmlBlockEnd(line: string): RegExp | undefined {
   if (/^<(?:pre|script|style|textarea)(?:[\s>]|$)/iu.test(line)) return /<\/(?:pre|script|style|textarea)>/iu;
-  if (line.startsWith("<!--")) return /-->/u;
+  if (line.startsWith("<!--")) return /--!?>/u;
   if (line.startsWith("<?")) return /\?>/u;
   if (line.startsWith("<![CDATA[")) return /\]\]>/u;
   if (/^<![A-Za-z]/u.test(line)) return />/u;
