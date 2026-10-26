@@ -6,54 +6,17 @@ import mdxSyntaxError from "../../Fixtures/mdx-syntax-error.mdx?raw";
 import perf100 from "../../Fixtures/perf-100kb.md?raw";
 import type { PreviewFileKind } from "../src/bridge";
 import { renderMarkdown, renderMdx } from "../src/pipeline";
-import { type SegmentLimits, SegmentedRenderer } from "../src/segmented-render";
+import { SegmentedRenderer } from "../src/segmented-render";
+import { coarse, expectEquivalent, finest } from "./segmented-render-helpers";
 
 // The segmented renderer must return exactly what a whole-document render returns
-// (docs/decisions/2026-10-24-preview-segmented-render.md). `finest` tries every possible
-// cut, so a test document of a few hundred bytes is cut wherever the rules allow.
-const finest: SegmentLimits = {
-  minimumLength: 0,
-  maximumLength: 0,
-  cutHashModulus: 1,
-  maximumRejectedCuts: 1_000,
-};
-const coarse: SegmentLimits = {
-  minimumLength: 40,
-  maximumLength: 400,
-  cutHashModulus: 3,
-  maximumRejectedCuts: 2,
-};
+// (docs/decisions/2026-10-24-preview-segmented-render.md).
 
 // PLAINSONG_SEGMENT_SOAK=<n> multiplies the randomized runs for a local soak.
 const soak = Number(
   (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env
     .PLAINSONG_SEGMENT_SOAK ?? "1",
 );
-
-async function whole(kind: PreviewFileKind, text: string): Promise<string> {
-  return kind === "md" ? renderMarkdown(text) : renderMdx(text);
-}
-
-async function outcome(render: () => Promise<string>): Promise<string> {
-  try {
-    return await render();
-  } catch (error) {
-    return `THROWS ${(error as Error).message}`;
-  }
-}
-
-async function expectEquivalent(
-  renderer: SegmentedRenderer,
-  kind: PreviewFileKind,
-  text: string,
-  context: string,
-): Promise<void> {
-  const expected = await outcome(() => whole(kind, text));
-  const actual = await outcome(() => renderer.render(text));
-  if (actual !== expected) {
-    throw new Error(`${context}\n--- document ---\n${JSON.stringify(text)}\n--- whole ---\n${expected}\n--- segmented ---\n${actual}`);
-  }
-}
 
 function random(seed: number): () => number {
   let state = seed >>> 0;
@@ -133,6 +96,12 @@ const mdxBlocks = [
   "Inline <Badge>new</Badge> and {readingTime}.",
   "{1 + 1}",
   "{\n  multiLine,\n\n  expression\n}",
+  // Dropped after remark-rehype joined the root's nodes: a segment can render to nothing.
+  "<iframe src=\"https://example.com/embed\" />",
+  "<svg><path d=\"M0\" /></svg>",
+  "<script>{\"run()\"}</script>",
+  "<style>{\"p { color: red }\"}</style>",
+  "<foo />",
 ];
 
 // Each makes the whole MDX document fail to parse.
@@ -293,13 +262,14 @@ describe("segmented preview render", () => {
           await expectEquivalent(renderer, kind, text, `seed ${seed} initial`);
           for (let step = 1; step <= 24; step += 1) {
             text = edit(next, text, kind);
-            await expectEquivalent(renderer, kind, text, `seed ${seed} step ${step}`);
+            // A document that does not parse always renders whole, so only parsed ones count.
+            if (!(await expectEquivalent(renderer, kind, text, `seed ${seed} step ${step}`))) continue;
             renders += 1;
             segmented += renderer.assembledSegmentCount > 0 ? 1 : 0;
             segments += renderer.assembledSegmentCount;
           }
         }
-        console.log(`${kind} ${label}: ${segmented}/${renders} renders segmented, ${(segments / Math.max(segmented, 1)).toFixed(1)} segments each`);
+        console.log(`${kind} ${label}: ${segmented}/${renders} parsed renders segmented, ${(segments / Math.max(segmented, 1)).toFixed(1)} segments each`);
         // Guard against the comparison passing only because everything fell back.
         expect(segmented / renders).toBeGreaterThan(floor);
       });

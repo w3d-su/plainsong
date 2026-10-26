@@ -34,3 +34,19 @@ export class WholeDocumentRequired extends Error {
     super(`whole-document render required: ${reason}`);
   }
 }
+
+export interface WholeDocumentFileData extends Record<string, unknown> {
+  /** Whole mode: the document has a construct that a segmented render cannot reproduce. */
+  requiresWhole?: boolean;
+}
+
+/** A construct only a whole render reproduces: segment mode throws `WholeDocumentRequired`,
+ * whole mode records it so the renderer keeps rendering whole while it is there. */
+export function requireWholeDocument(
+  file: { data: Record<string, unknown> },
+  options: SegmentHoleOptions | undefined,
+  reason: string,
+): void {
+  if (options?.holes) throw new WholeDocumentRequired(reason);
+  (file.data as WholeDocumentFileData).requiresWhole = true;
+}

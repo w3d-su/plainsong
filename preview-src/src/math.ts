@@ -3,8 +3,8 @@ import type { VFileMessage } from "vfile-message";
 import type { TreeNode } from "./mdx-placeholders";
 import {
   holeMarker,
+  requireWholeDocument,
   type SegmentHoleOptions,
-  WholeDocumentRequired,
 } from "./segment-holes";
 
 // Shared KaTeX settings for both pipelines (docs/math plan §3.4):
@@ -88,7 +88,7 @@ export function rehypeMathDiagnostics(options?: SegmentHoleOptions) {
     }
 
     // Orphans pair with unhinted errors anywhere in the document, in order.
-    if (options?.holes && orphans.length > 0) throw new WholeDocumentRequired("unplaced KaTeX message");
+    if (orphans.length > 0) requireWholeDocument(file, options, "unplaced KaTeX message");
     annotateOrphanErrors(tree, orphans, hinted);
   };
 }

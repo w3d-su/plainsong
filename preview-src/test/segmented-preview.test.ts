@@ -15,9 +15,9 @@ async function loadPreview(): Promise<void> {
   await import("../src/index");
 }
 
-async function render(renderID: number, text: string): Promise<void> {
+async function render(renderID: number, text: string, fileKind: RenderPayload["fileKind"] = "md"): Promise<void> {
   const payload: RenderPayload = {
-    renderID, version: renderID, text, fileKind: "md", assetRootID: "root", baseDir: null,
+    renderID, version: renderID, text, fileKind, assetRootID: "root", baseDir: null,
     theme: "light", allowRemoteImages: false,
   };
   window.PlainsongBridge.receive({ name: "render", payload });
@@ -45,6 +45,19 @@ describe("segmented preview rendering through the bridge", () => {
     await loadPreview();
     await render(1, edits.at(-1)!);
     expect(incremental).toBe(previewHTML());
+  });
+
+  it("renders each file kind with its own pipeline after a switch", { timeout: 60_000 }, async () => {
+    const mdx = `import Button from "./Button"\n\n${perf100.replace(/^---[\s\S]*?\n---\n/u, "")}\n\n<Button>Go</Button>\n`;
+    await render(1, perf100);
+    await render(2, mdx, "mdx");
+    const edited = `${perf100}\n\nTyped at the end.\n`;
+    await render(3, edited);
+    const switched = previewHTML();
+
+    await loadPreview();
+    await render(1, edited);
+    expect(switched).toBe(previewHTML());
   });
 
   it("reports a task's current source line after an edit above it", { timeout: 60_000 }, async () => {

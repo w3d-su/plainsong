@@ -3,11 +3,11 @@ import { closedFrontmatterEnd } from "./frontmatter";
 import { HeadingSlugAllocator, headingIDPrefix } from "./heading-anchors";
 import {
   type RenderedSegment,
-  renderMarkdown,
-  renderMdx,
   renderSegment,
+  renderWholeDocument,
   SegmentBoundaryOpen,
 } from "./pipeline";
+import { closeOffset, closerForUnclosedJsx, type SegmentCloser } from "./segment-closers";
 import { WholeDocumentRequired } from "./segment-holes";
 
 // Incremental preview rendering (docs/decisions/2026-10-24-preview-segmented-render.md).
@@ -19,7 +19,9 @@ import { WholeDocumentRequired } from "./segment-holes";
 // continue a list (no `-`, `+`, `*` or `1.`/`1)`), open frontmatter, or carry a BOM.
 // The segment before the cut is parsed with a sentinel paragraph where the next one
 // starts: if a construct is still open there (a fence, math, an HTML block, MDX), the
-// sentinel does not come back as a paragraph of its own and the cut is not taken.
+// sentinel does not come back as a paragraph of its own and the cut is not taken. The
+// next try skips to where that construct closes, and is at least `retryGrowth` times as
+// long, so the tries from one start cost about as much as the segment they end with.
 
 export interface SegmentLimits {
   /** Smallest segment that may end at a content-chosen cut. */
@@ -28,8 +30,9 @@ export interface SegmentLimits {
   maximumLength: number;
   /** A content-chosen cut is a line whose hash is divisible by this. */
   cutHashModulus: number;
-  /** Open cuts tried from one segment start before the rest becomes one segment. */
-  maximumRejectedCuts: number;
+  /** After an open cut, the next try from the same start needs a segment at least this many
+   * times as long. */
+  retryGrowth: number;
 }
 
 // About 2-4 KB per segment: one segment re-renders in a few milliseconds, and a 1 MiB
@@ -38,42 +41,95 @@ const defaultLimits: SegmentLimits = {
   minimumLength: 2_048,
   maximumLength: 16_384,
   cutHashModulus: 4,
-  maximumRejectedCuts: 4,
+  retryGrowth: 2,
 };
 
-/** "open": a construct continues past the cut. "whole": the document needs a whole render. */
-type SegmentOutcome = RenderedSegment | "open" | "whole";
+/** What rendering one segment showed. */
+type SegmentOutcome =
+  | { kind: "rendered"; segment: RenderedSegment }
+  /** A construct continues past the cut; `closer` says how it ends, when that is known. */
+  | { kind: "open"; closer?: SegmentCloser }
+  /** The segment does not parse. `esm`: the error is in ESM, which parses differently after
+   * the imports of earlier segments. */
+  | { kind: "error"; esm: boolean }
+  /** Only a whole-document render is exact (a definition, an unplaced KaTeX message). */
+  | { kind: "whole" };
+
+/** Outcomes by segment text. A segment followed by another is parsed with the sentinel on the
+ * line after its text, so the text alone fixes its outcome; a last segment is parsed without
+ * one and is kept apart. */
+class SegmentCache {
+  readonly inner = new Map<string, SegmentOutcome>();
+  readonly last = new Map<string, SegmentOutcome>();
+}
 
 export class SegmentedRenderer {
-  private previous = new Map<string, SegmentOutcome>();
-  private current = new Map<string, SegmentOutcome>();
+  private previous = new SegmentCache();
+  private current = new SegmentCache();
+  /** The last render did not parse ("failed") or had a construct only a whole render
+   * reproduces ("required"). Renders stay whole, without a segment pass, until a whole render
+   * shows neither. */
+  private wholeNext: "failed" | "required" | undefined;
+  /** The definition-like lines (`definitionCandidates`) the last whole render saw. */
+  private checkedCandidates = "";
+  /** The definition-like lines of the text whose whole render was "required". */
+  private requiredCandidates = "";
   /** Segments the last `render` call ran through the pipeline (cache misses). */
   renderedSegmentCount = 0;
   /** Segments the last `render` call assembled, or 0 after a whole-document render. */
   assembledSegmentCount = 0;
 
   constructor(
-    private readonly fileKind: PreviewFileKind,
+    readonly fileKind: PreviewFileKind,
     private readonly limits: SegmentLimits = defaultLimits,
   ) {}
 
   /** Equal to `renderMarkdown(text)` (or `renderMdx`), including what it throws. */
   async render(text: string): Promise<string> {
-    let segments: PlacedSegment[] | undefined;
     this.renderedSegmentCount = 0;
+    this.assembledSegmentCount = 0;
+    // A definition makes the document render whole. New definition-like lines go to a whole
+    // render first, which says whether one is real, instead of to a segment pass that would
+    // find it only at its segment.
+    const candidates = definitionCandidates(text);
+    const startWhole =
+      this.wholeNext === "failed" ||
+      // Once the lines that showed the definitions are gone (another document, or deleted),
+      // segment again; a verdict those lines did not show stays until a whole render clears it.
+      (this.wholeNext === "required" && (candidates !== "" || this.requiredCandidates === "")) ||
+      (candidates !== "" && candidates !== this.checkedCandidates);
+    if (startWhole) {
+      this.checkedCandidates = candidates;
+      return this.renderWhole(text, candidates);
+    }
+
+    let segments: PlacedSegment[] | undefined;
     try {
       segments = this.segments(text);
     } finally {
       this.previous = this.current;
-      this.current = new Map();
+      this.current = new SegmentCache();
     }
-    this.assembledSegmentCount = segments?.length ?? 0;
-    if (segments !== undefined) return assemble(segments);
-    return this.fileKind === "md" ? renderMarkdown(text) : renderMdx(text);
+    if (segments === undefined) return this.renderWhole(text, candidates);
+    this.wholeNext = undefined;
+    this.assembledSegmentCount = segments.length;
+    return assemble(segments);
   }
 
-  /** Segments of `text` in order, or undefined when the whole text is one segment or a
-   * segment fails in a way only a whole-document render reproduces. */
+  /** The whole render, which also decides whether the next render may segment. It leaves the
+   * segment cache alone, so segmenting resumes with the segments of the last segmented render. */
+  private async renderWhole(text: string, candidates: string): Promise<string> {
+    // Stays set when the render throws: a document that does not parse renders whole until
+    // it does, instead of parsing as segments and then again as a whole for its error.
+    this.wholeNext = "failed";
+    const { html, requiresWhole } = await renderWholeDocument(this.fileKind, text);
+    this.wholeNext = requiresWhole ? "required" : undefined;
+    this.requiredCandidates = candidates;
+    return html;
+  }
+
+  /** Segments of `text` in order, or undefined when the whole text is one segment or only a
+   * whole-document render is exact. */
   private segments(text: string): PlacedSegment[] | undefined {
     // micromark counts a lone CR as a line ending; the scanner below counts LF only.
     if (/\r(?!\n)/u.test(text)) return undefined;
@@ -82,87 +138,143 @@ export class SegmentedRenderer {
     // segments never start with `-` or a BOM, so it reads none in them.
     const frontmatterEnd = closedFrontmatterEnd(text) ?? 0;
 
-    const { minimumLength, maximumLength, cutHashModulus, maximumRejectedCuts } = this.limits;
+    const { minimumLength, maximumLength, cutHashModulus, retryGrowth } = this.limits;
     const segments: PlacedSegment[] = [];
     let start = 0;
     let startLine = 1;
-    let rejected = 0;
-    let importsSeen = false;
-    // Whether an ESM block parses depends on the bindings earlier blocks import.
-    const place = (segment: RenderedSegment, line: number): boolean => {
-      if (importsSeen && segment.hasEsm) return false;
-      importsSeen ||= segment.importsBindings;
-      segments.push({ segment, startLine: line });
+    // After an open cut, the next try from `start` waits for a cut at this offset.
+    let retryFrom = 0;
+    // The first placed segment whose ESM imports a binding.
+    let importer: number | undefined;
+
+    // Places text[start, end), ending before document line `endLine` (none for the last).
+    const place = (outcome: SegmentOutcome, end: number, endLine: number | undefined): boolean => {
+      // micromark-extension-mdxjs-esm parses each ESM block after `var <imports of earlier
+      // blocks>`, so ESM parses differently after the imports of an earlier segment. Such a
+      // segment is merged with every segment from the importing one, which then parses with
+      // the same imports as in the whole document.
+      const esm = (outcome.kind === "rendered" && outcome.segment.hasEsm) ||
+        (outcome.kind === "error" && outcome.esm);
+      if (importer !== undefined && esm) {
+        const from = segments[importer];
+        const merged = this.outcome(
+          text.slice(from.offset, end),
+          endLine === undefined ? undefined : endLine - from.startLine + 1,
+        );
+        if (merged.kind !== "rendered") return false;
+        segments.length = importer;
+        segments.push({ segment: merged.segment, startLine: from.startLine, offset: from.offset });
+        return true;
+      }
+      if (outcome.kind !== "rendered") return false;
+      if (importer === undefined && outcome.segment.importsBindings) importer = segments.length;
+      segments.push({ segment: outcome.segment, startLine, offset: start });
       return true;
     };
+
     for (const cut of cuts(text, frontmatterEnd)) {
+      if (cut.offset < retryFrom) continue;
       const length = cut.offset - start;
       if (length < minimumLength) continue;
       if (length < maximumLength && cut.hash % cutHashModulus !== 0) continue;
 
       const outcome = this.outcome(text.slice(start, cut.offset), cut.line - startLine + 1);
-      if (outcome === "whole") return undefined;
-      if (outcome === "open") {
-        rejected += 1;
-        if (rejected > maximumRejectedCuts) break;
+      if (outcome.kind === "open") {
+        const retry = nextTry(text, start, cut.offset, outcome.closer, retryGrowth);
+        if (retry === "whole") return undefined;
+        if (retry === undefined) break;
+        retryFrom = retry;
         continue;
       }
-      if (!place(outcome, startLine)) return undefined;
+      if (!place(outcome, cut.offset, cut.line)) return undefined;
       start = cut.offset;
       startLine = cut.line;
-      rejected = 0;
+      retryFrom = 0;
     }
     if (segments.length === 0) return undefined;
 
-    // The last segment's errors are the document's: let the whole render report them.
-    let last: SegmentOutcome;
-    try {
-      last = this.outcome(text.slice(start), undefined);
-    } catch {
-      return undefined;
-    }
-    if (typeof last === "string" || !place(last, startLine)) return undefined;
+    // The last segment's errors are the document's: a whole render reports them.
+    if (!place(this.outcome(text.slice(start), undefined), text.length, undefined)) return undefined;
     return segments;
   }
 
   private outcome(text: string, nextSegmentLine: number | undefined): SegmentOutcome {
-    const key = `${nextSegmentLine === undefined ? "end" : nextSegmentLine}\n${text}`;
-    let outcome = this.current.get(key) ?? this.previous.get(key);
+    const cache = nextSegmentLine === undefined ? "last" : "inner";
+    let outcome = this.current[cache].get(text) ?? this.previous[cache].get(text);
     if (outcome === undefined) {
       this.renderedSegmentCount += 1;
-      try {
-        outcome = renderSegment(this.fileKind, text, nextSegmentLine);
-      } catch (error) {
-        if (error instanceof WholeDocumentRequired) {
-          outcome = "whole";
-        } else if (error instanceof SegmentBoundaryOpen || nextSegmentLine !== undefined) {
-          // A parse error before the last cut can come from cutting a construct in two.
-          outcome = "open";
-        } else {
-          throw error;
-        }
-      }
+      outcome = renderOutcome(this.fileKind, text, nextSegmentLine);
     }
-    this.current.set(key, outcome);
+    this.current[cache].set(text, outcome);
     return outcome;
   }
+}
+
+function renderOutcome(
+  fileKind: PreviewFileKind,
+  text: string,
+  nextSegmentLine: number | undefined,
+): SegmentOutcome {
+  try {
+    return { kind: "rendered", segment: renderSegment(fileKind, text, nextSegmentLine) };
+  } catch (error) {
+    if (error instanceof WholeDocumentRequired) return { kind: "whole" };
+    if (error instanceof SegmentBoundaryOpen) return { kind: "open", closer: error.closer };
+    // An MDX error placed at the sentinel's line or later, or with no place, comes from
+    // reaching the end of the text: the construct may close in a later segment. One placed
+    // before it is in the segment itself.
+    const line = (error as { line?: unknown }).line;
+    if (nextSegmentLine !== undefined && (typeof line !== "number" || line >= nextSegmentLine)) {
+      return { kind: "open", closer: closerForUnclosedJsx(error) };
+    }
+    return { kind: "error", esm: (error as { source?: unknown }).source === "micromark-extension-mdxjs-esm" };
+  }
+}
+
+/**
+ * Where the next try from `start` may cut after the cut at `cutOffset` came back open: past
+ * the line that closes the open construct and `growth` times as long as the open segment.
+ * Undefined: no later cut from `start` is worth a try, and the rest is the last segment.
+ * "whole": the MDX element never closes, so the document does not parse.
+ */
+function nextTry(
+  text: string,
+  start: number,
+  cutOffset: number,
+  closer: SegmentCloser | undefined,
+  growth: number,
+): number | "whole" | undefined {
+  const grown = start + (cutOffset - start) * growth;
+  if (closer === undefined) {
+    // Unknown end: stop before a try would hold more than half of the rest, which keeps the
+    // tries to about the length of the rest when the construct never closes.
+    return grown - start > (text.length - start) / 2 ? undefined : grown;
+  }
+  const close = closeOffset(text, cutOffset, closer);
+  if (close === undefined) return closer.kind === "jsx" ? "whole" : undefined;
+  return Math.max(grown, close);
 }
 
 interface PlacedSegment {
   segment: RenderedSegment;
   startLine: number;
+  /** UTF-16 offset of the segment's first character. */
+  offset: number;
 }
 
 function assemble(segments: PlacedSegment[]): string {
   const output: string[] = [];
   const slugs = new HeadingSlugAllocator();
   let mathOffset = 0;
+  let joined = false;
   for (const { segment, startLine } of segments) {
     const ids = segment.headingSlugs.map((base) => headingIDPrefix + slugs.next(base));
     const { pieces } = segment;
-    // The root's blocks are joined by newlines; an empty segment adds none.
-    if (pieces.length > 1 || pieces[0] !== "") {
-      if (output.length > 0) output.push("\n");
+    // The root's nodes are joined by newlines before the MDX pipeline drops any, so a segment
+    // joins when it had nodes, even if none reached its HTML.
+    if (segment.hasBlocks) {
+      if (joined) output.push("\n");
+      joined = true;
       output.push(pieces[0]);
       for (let index = 1; index < pieces.length; index += 3) {
         const value = Number(pieces[index + 1]);
@@ -182,6 +294,17 @@ function assemble(segments: PlacedSegment[]): string {
     mathOffset += segment.mathCount;
   }
   return output.join("");
+}
+
+// A line that may start a link reference or footnote definition: `[label]:` after
+// indentation, block quote markers and a list marker.
+const definitionLine = /^[ \t]*(?:>[ \t]*)*(?:(?:[-+*]|\d{1,9}[.)])[ \t]+)?\[[^\]\n]*\]:/gmu;
+
+/** The definition-like lines of `text`, joined. Every definition has `]:` after its label; one
+ * whose label spans lines is missed here, which costs a segment pass before its whole render. */
+function definitionCandidates(text: string): string {
+  if (!text.includes("]:")) return "";
+  return text.match(definitionLine)?.join("\n") ?? "";
 }
 
 interface Cut {

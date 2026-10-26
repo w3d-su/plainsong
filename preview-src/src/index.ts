@@ -60,11 +60,10 @@ let scrollAnchor: { position: number; top: number; offset: number } | undefined;
 let layoutWidth: number | undefined;
 const scrollAnchorOffset = 12;
 
-// Reuse the HTML of unchanged segments between renders (segmented-render.ts).
-const renderers = {
-  md: new SegmentedRenderer("md"),
-  mdx: new SegmentedRenderer("mdx"),
-};
+// Reuses the HTML of unchanged segments between renders (segmented-render.ts). Its cache holds
+// the last rendered document only, so a change of file kind starts a new one rather than
+// keeping the other kind's last document alive.
+let renderer: SegmentedRenderer | undefined;
 const mermaid = new LazyMermaid(() => loadMermaidScript(document));
 const mermaidRenderer = new MermaidRenderCoordinator(mermaid.render, mermaid.initialize);
 
@@ -207,7 +206,8 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
 
   let html: string;
   try {
-    html = await renderers[payload.fileKind].render(payload.text);
+    if (renderer?.fileKind !== payload.fileKind) renderer = new SegmentedRenderer(payload.fileKind);
+    html = await renderer.render(payload.text);
   } catch (error) {
     if (payload.fileKind !== "mdx") throw error;
     if (payload.renderID < latestRenderID) return;

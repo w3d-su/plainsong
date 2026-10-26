@@ -7,6 +7,7 @@ import remarkMdx from "remark-mdx";
 import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { unified } from "unified";
+import type { VFile } from "vfile";
 import type { PreviewFileKind } from "./bridge";
 import { remarkClosedFrontmatter } from "./frontmatter";
 import {
@@ -23,11 +24,13 @@ import {
   remarkMdxPlaceholders,
   type TreeNode,
 } from "./mdx-placeholders";
+import { closerForOpenNode, type SegmentCloser } from "./segment-closers";
 import {
   holeMarker,
+  requireWholeDocument,
   type SegmentHoleOptions,
   splitHoles,
-  WholeDocumentRequired,
+  type WholeDocumentFileData,
 } from "./segment-holes";
 
 const blockTags = new Set([
@@ -83,17 +86,30 @@ const sourceSvgTags = new Set([
 ]);
 
 export async function renderMarkdown(markdown: string): Promise<string> {
-  return String(await markdownProcessor.process(markdown));
+  return (await renderWholeDocument("md", markdown)).html;
 }
 
 export async function renderMdx(markdown: string): Promise<string> {
-  return String(await mdxProcessor.process(markdown));
+  return (await renderWholeDocument("mdx", markdown)).html;
+}
+
+/** A whole-document render. `requiresWhole`: the document has a construct a segmented render
+ * cannot reproduce (a definition, an unplaced KaTeX message). */
+export async function renderWholeDocument(
+  fileKind: PreviewFileKind,
+  text: string,
+): Promise<{ html: string; requiresWhole: boolean }> {
+  const file = await (fileKind === "md" ? markdownProcessor : mdxProcessor).process(text);
+  return { html: String(file), requiresWhole: (file.data as WholeDocumentFileData).requiresWhole ?? false };
 }
 
 /** One segment's HTML with assembly holes (segmented-render.ts). */
 export interface RenderedSegment {
   /** `splitHoles` output: text, then kind/value/text triples. */
   pieces: string[];
+  /** remark-rehype made at least one root node, even if the MDX pipeline then dropped all of
+   * them. The whole render joins root nodes with newlines before any are dropped. */
+  hasBlocks: boolean;
   /** Base slugs of the generated heading IDs, in order. */
   headingSlugs: string[];
   /** Math wrappers (`data-math-index` values) in the segment. */
@@ -105,13 +121,19 @@ export interface RenderedSegment {
   importsBindings: boolean;
 }
 
-/** Thrown when a construct in the segment is still open where the next one starts. */
-export class SegmentBoundaryOpen extends Error {}
+/** Thrown when a construct in the segment is still open where the next one starts.
+ * `closer` says how the construct ends, when it is one that can be found by text. */
+export class SegmentBoundaryOpen extends Error {
+  constructor(readonly closer?: SegmentCloser) {
+    super("segment boundary inside an open construct");
+  }
+}
 
 /**
  * Renders `text` in segment mode. When another segment follows, pass the segment-relative
  * line it starts on: the text is parsed with a sentinel paragraph on that line, which must
  * come back as a top-level paragraph of its own, proving that nothing was left open.
+ * The line is one more than the number of line feeds in `text`.
  * Throws `SegmentBoundaryOpen`, `WholeDocumentRequired`, or a parse error.
  */
 export function renderSegment(
@@ -128,6 +150,7 @@ export function renderSegment(
   const fileData = file.data as SegmentFileData & HeadingSlugFileData & { mathProvenance?: unknown[] };
   return {
     pieces: splitHoles(String(file)),
+    hasBlocks: fileData.hasBlocks ?? false,
     headingSlugs: fileData.headingSlugs ?? [],
     mathCount: fileData.mathProvenance?.length ?? 0,
     hasEsm: fileData.hasEsm ?? false,
@@ -143,6 +166,7 @@ interface EsmNode {
 
 interface SegmentFileData extends Record<string, unknown> {
   nextSegmentLine?: number;
+  hasBlocks?: boolean;
   hasEsm?: boolean;
   importsBindings?: boolean;
 }
@@ -161,6 +185,7 @@ function createMarkdownProcessor(options: SegmentHoleOptions) {
     .use(remarkMath)
     .use(remarkSegmentBoundary, options)
     .use(remarkRehype)
+    .use(rehypeSegmentBlocks, options)
     .use(rehypeHeadingAnchors, options)
     // Wrap display math before KaTeX consumes the positioned pre/code nodes;
     // diagnostics append after KaTeX so VFile messages exist.
@@ -182,6 +207,7 @@ function createMdxProcessor(options: SegmentHoleOptions) {
     .use(remarkSegmentBoundary, options)
     .use(remarkMdxPlaceholders)
     .use(remarkRehype)
+    .use(rehypeSegmentBlocks, options)
     .use(rehypeDropSourceSvgElements)
     .use(rehypeDropScriptLikeElements)
     .use(rehypeSanitize, mdxSanitizeSchema)
@@ -194,12 +220,18 @@ function createMdxProcessor(options: SegmentHoleOptions) {
     .use(rehypeStringify);
 }
 
-/** Segment mode only: checks and removes the sentinel, refuses definitions, which
- * resolve references in every other segment, and records the segment's ESM. */
+/** Finds definitions, which resolve references in every other segment: segment mode refuses
+ * them and whole mode records them (`requireWholeDocument`). Segment mode also checks and
+ * removes the sentinel and records the segment's ESM. */
 function remarkSegmentBoundary(options: SegmentHoleOptions) {
-  if (!options.holes) return;
-  return (tree: TreeNode, file: { data: SegmentFileData }) => {
-    const line = file.data.nextSegmentLine;
+  return (tree: TreeNode, file: VFile) => {
+    const data = file.data as SegmentFileData;
+    if (!options.holes) {
+      // Every definition has `]:` after its label.
+      if (String(file.value).includes("]:") && hasDefinition(tree)) requireWholeDocument(file, options, "definition");
+      return;
+    }
+    const line = data.nextSegmentLine;
     if (line !== undefined) {
       const sentinel = tree.children?.at(-1);
       const text = sentinel?.children?.length === 1 ? sentinel.children[0] : undefined;
@@ -210,22 +242,42 @@ function remarkSegmentBoundary(options: SegmentHoleOptions) {
         sentinel.position?.start?.line !== line ||
         sentinel.position.start.column !== 1
       ) {
-        throw new SegmentBoundaryOpen();
+        // The last top-level node holds the sentinel: it is the construct still open.
+        const open = tree.children?.at(-1);
+        throw new SegmentBoundaryOpen(
+          open && closerForOpenNode(open.type, String(file.value), open.position?.start?.offset),
+        );
       }
       tree.children?.pop();
     }
     visitTree(tree, (node) => {
-      if (node.type === "definition" || node.type === "footnoteDefinition") {
-        throw new WholeDocumentRequired(node.type);
-      }
+      if (isDefinition(node)) requireWholeDocument(file, options, node.type);
       if (node.type === "mdxjsEsm") {
-        file.data.hasEsm = true;
+        data.hasEsm = true;
         const body = (node as EsmNode).data?.estree?.body ?? [];
         if (body.some((statement) => statement.type === "ImportDeclaration" && (statement.specifiers?.length ?? 0) > 0)) {
-          file.data.importsBindings = true;
+          data.importsBindings = true;
         }
       }
     });
+  };
+}
+
+function isDefinition(node: TreeNode): boolean {
+  return node.type === "definition" || node.type === "footnoteDefinition";
+}
+
+function hasDefinition(node: TreeNode): boolean {
+  return isDefinition(node) || (node.children ?? []).some(hasDefinition);
+}
+
+/** Segment mode only: whether remark-rehype made any root node. The MDX pipeline may drop
+ * them all (sanitizing, script-like and source SVG elements) after the root's nodes have
+ * been joined with newlines, so assembly cannot tell from the HTML alone. */
+function rehypeSegmentBlocks(options: SegmentHoleOptions) {
+  if (!options.holes) return;
+  return (tree: TreeNode, file: VFile) => {
+    (file.data as SegmentFileData).hasBlocks = (tree.children?.length ?? 0) > 0;
   };
 }
 

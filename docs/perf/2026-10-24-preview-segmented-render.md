@@ -79,3 +79,26 @@ segment would remove that, and is left as follow-up work
 takes ~12 ms in the segmented renderer against ~2,000 ms for a whole render; the cold
 segmented render is no slower than the whole render. The 1 MiB fixture has 324 segments
 (~3.2 KB each).
+
+## Review follow-up (2026-10-26): long constructs, definitions, MDX errors
+
+The WebKit fixtures above have no blank lines inside fences, no definition-like lines and no
+MDX errors, so the review's cases never ran there. These runs use Node (vitest, the
+production modules, no DOM) on the same Mac, before and after the follow-up commit; load
+was ~19 for the follow-up runs and not recorded for the first-version runs. Edit values
+are means of five edits, except the first version's fence and definition edits (one edit
+each).
+
+| Case | First version | Follow-up | Whole render |
+|---|---|---|---|
+| 95 KB Markdown, 60-function fence with blank lines 20 KB in; edit near the end | 67.3 ms, 7 segments | 3.4 ms, 28 segments | 91.2 ms |
+| 35 KB MDX, `<Steps>` wrapping 40 sections at the top; edit near the end | whole render, 0 segments | 1.9 ms, 15 segments | 36.6 ms |
+| perf-100kb.md plus `[ref]: …` at the end; first render | 162.1 ms (27 segments, then whole) | 80.7 ms (whole only) | 76.3 ms |
+| same; edit | 90.8 ms (4 segments, then whole) | 79.3 ms (whole only) | 80.7 ms |
+| 90 KB MDX, unclosed `<Card>` at Part 300; keystroke | 120.4 ms | 88.0 ms | 85.9 ms |
+
+The first version stopped after four rejected cuts and made the rest of the document one
+segment, ran a segment pass before every whole render, and parsed an MDX document with an
+error both as segments and as a whole. The fixed renderer skips to where an open construct
+closes, keeps rendering whole while a definition is present or the document does not
+parse, and merges ESM after an import instead of rendering whole.

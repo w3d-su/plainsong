@@ -433,9 +433,10 @@ Two unified pipelines selected by `fileKind`:
   `mdxJsxTextElement` / `mdxjsEsm` nodes into placeholder HTML (§9) instead of compiling.
 
 Both run through `SegmentedRenderer`. It cuts the text at verified block boundaries and
-re-renders only changed segments, returning the exact whole-render string. Definitions,
-footnotes, ESM after an import and last-segment errors render whole
-(`docs/decisions/2026-10-24-preview-segmented-render.md`).
+re-renders only changed segments, returning the exact whole-render string. A cut inside an
+open construct retries past where it closes. Definitions, footnotes and documents that do
+not parse render whole, with no segment pass while that holds; ESM after an import merges
+segments (`docs/decisions/2026-10-24-preview-segmented-render.md`).
 
 Post-render in browser: `highlight.js` handles non-Mermaid code fences. A fence with no
 info string auto-detects its language only up to 4,000 UTF-16 units
