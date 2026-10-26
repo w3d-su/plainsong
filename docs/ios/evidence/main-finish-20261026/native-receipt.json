@@ -1,6 +1,6 @@
 {
   "schema": "IOS-MAIN-FINISH-NATIVE-RECEIPT-v1",
-  "base_sha": "e09801309e855dce6ee903101ac2180e164daef2",
+  "base_sha": "c479bcae4c6f613381e0228ae8349a7e211f280a",
   "source_sha": "565a7b15b47e66de9dc08d114e4dc117c033ebe1",
   "source_fingerprint": "3ac1cda78e689a2608c262edd0e766e12887f84fa9914405fed2f2ebad758218",
   "input_files": 810,
@@ -318,5 +318,16 @@
     "expected_failure": true,
     "boundary": "Tests-only negative source. Original required cases were retained. No diagnostic/native process intervention; failed runner retained intact."
   },
-  "boundary": "Native and IPA results retain the actual executed SHA. Later docs-only publication requires input equality and its own exact PR-head CI. Owner physical-device acceptance remains OPEN."
+  "boundary": "Native and IPA results retain the actual executed SHA. Later docs-only publication requires input equality and its own exact PR-head CI. Owner physical-device acceptance remains OPEN.",
+  "initial_port_base_sha": "e09801309e855dce6ee903101ac2180e164daef2",
+  "upstream_documentation_only_update": {
+    "sha": "c479bcae4c6f613381e0228ae8349a7e211f280a",
+    "paths": [
+      "README.md",
+      "docs/codex-handoff.md",
+      "docs/release-engineering-plan.md"
+    ],
+    "build_input_records_unchanged": true,
+    "boundary": "Actual native execution and IPA remain source 565a. Current main documentation is preserved by a normal merge; no divergent feature ancestry or source change was imported."
+  }
 }

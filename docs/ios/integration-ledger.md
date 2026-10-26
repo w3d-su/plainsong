@@ -7,7 +7,9 @@ The C0 tag preserves declarations and an unavailable scaffold. **The current bra
 ## Main completion candidate — 2026-10-26
 
 This section supersedes current-status claims below and preserves their historical receipts.
-Live main `e09801309e855dce6ee903101ac2180e164daef2` contains #210 and #211.
+Initial main `e09801309e855dce6ee903101ac2180e164daef2` contains #210 and #211.
+Latest main `c479bcae4c6f613381e0228ae8349a7e211f280a` adds #212 release documentation only;
+it is merged into this candidate with all 810 native/build/test input records unchanged.
 Merged #217 and #218 targeted the former stack branches, so their actual missing
 patches were transplanted into [#219](https://github.com/w3d-su/plainsong/pull/219)
 directly against main. No divergent history or duplicate #209 transplant was merged.

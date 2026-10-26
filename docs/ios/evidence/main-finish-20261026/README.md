@@ -1,10 +1,10 @@
 # Main completion integration — 2026-10-26
 
-[PR #219](https://github.com/w3d-su/plainsong/pull/219), branch `codex/ios-main-finish-20261026`, directly targets `main` at `e09801309e855dce6ee903101ac2180e164daef2`.
+[PR #219](https://github.com/w3d-su/plainsong/pull/219), branch `codex/ios-main-finish-20261026`, directly targets `main`. The initial port base was `e09801309e855dce6ee903101ac2180e164daef2`; current main `c479bcae4c6f613381e0228ae8349a7e211f280a` adds only #212 release documentation and is merged without changing any of the 810 tested inputs.
 
 ## Source and scope
 
-Only #217 squash `b28bf33691363b5084fc36a8c84e70dfa00d0901` and #218 squash `3de75ee278c552fb508bac7b36d16a6eb263f42d` were transplanted. Their successive parent trees matched the current main and intermediate candidate. The clean transplant `c5fc4f652205fc443321fe0463c0914720b262c7` was tree-identical to historical `b1380edc`; no divergent ancestry was merged and #209 was not repeated.
+Only #217 squash `b28bf33691363b5084fc36a8c84e70dfa00d0901` and #218 squash `3de75ee278c552fb508bac7b36d16a6eb263f42d` were transplanted. Their successive parent trees matched the initial main and intermediate candidate. The clean transplant `c5fc4f652205fc443321fe0463c0914720b262c7` was tree-identical to historical `b1380edc`; no divergent ancestry was merged and #209 was not repeated.
 
 The final implementation is `565a7b15b47e66de9dc08d114e4dc117c033ebe1`, input fingerprint `3ac1cda78e689a2608c262edd0e766e12887f84fa9914405fed2f2ebad758218` (810 inputs). It additionally fixes the reviewed Recent downloading/offline single-file regression: preserve the still-current selected scope for Refresh/retry and report the existing typed feedback. Cancelled, superseded, revoked, unsupported and shutdown paths remain fenced. [Decision](../../../decisions/2026-10-26-ios-recent-pending-file-retry.md).
 
