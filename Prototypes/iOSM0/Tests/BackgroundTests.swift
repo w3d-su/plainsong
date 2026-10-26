@@ -94,6 +94,7 @@ final class BackgroundTests: XCTestCase {
         // The conflict test intentionally discards only this recovered public
         // fixture after proving that the original file was never overwritten.
         let document = try XCTUnwrap(session.document)
+        document.updateChangeCount(.cleared)
         document.requestAutosave = { $0(true) }
         let closed: Bool = await withCheckedContinuation { continuation in
             document.close { continuation.resume(returning: $0) }
