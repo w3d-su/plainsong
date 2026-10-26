@@ -46,11 +46,22 @@ observation, not a passing readiness assertion. Their 20 s loops and optional
 
 | Run | Observed order | Observation |
 |---|---|---|
-| v1 | Raw real/tiny views after selected controller cases | Later raw views loaded; this does not reproduce the original first-controller path. |
+| v1 | Kitchen-sink case, controller readiness case, then raw real/tiny probes | Kitchen-sink failed its missing-bundle `XCTUnwrap` (0.758 s); controller readiness failed with `InvalidTransition` from `idle` to `failed(deinit)` (8.814 s). Later raw views printed ready at 0.853 / 0.662 s in the same process; they do not explain the controller failure. |
 | v2 | Controller first, raw variants later | Controller printed `readyAt=never`; later real-all configuration printed 0.660 s. The controller probe itself was marked Passed. |
 | v3 | Raw default-store real-all first, controller last | First raw view printed `ready=never`; later controller printed 0.736 s. |
 | v4 | First default-store real-all after 25 s idle | Start 2.452 s, commit 5.271 s, no finish within the diagnostic window. That idle delay did not avoid the observation in this run. |
 | v5 | Default-store real-all first; nonpersistent-1 second; nonpersistent-2 third; tiny fourth | First view printed `ready=never`; subsequent nonpersistent views printed 0.930 / 0.889 s; tiny printed 4.520 s with two diagnostic JS errors. |
+
+The v1 failures are
+`PreviewIOSHostedTests/testBundledKitchenSinkAndMDXStayVisible` and
+`PreviewIOSHostedTests/testHostedPageBecomesReadyAndRendersTheLatestDocument`,
+in that order. The missing-bundle unwrap is distinct from the controller's
+readiness failure. The runtime printed that the process has no `UIApplication`
+during the controller case, before its `InvalidTransition` failure. Both raw
+probes ran only after those failures. These observations retain the failed
+first-controller path without establishing what caused it; the later raw
+successes do not explain or negate that failure. Named outcomes and log
+locations are recorded in `review-20261021.json`.
 
 In v5, `testPPNonPersistentFirst` means the first *nonpersistent* test, not
 the first view in the process. Those cases load tiny HTML, while the preceding

@@ -151,7 +151,61 @@
       "passed": 2,
       "failed": 2,
       "skipped": 0,
-      "complete_xcresult": true
+      "complete_xcresult": true,
+      "named_outcomes_from_retained_log": [
+        {
+          "name": "PreviewIOSHostedTests/testBundledKitchenSinkAndMDXStayVisible",
+          "status": "Failed",
+          "duration_seconds": 0.758,
+          "observation": "Missing packaged preview resource: XCTUnwrap failed for URL; not a readiness timeout.",
+          "log_lines": [
+            1536,
+            1537,
+            1538
+          ]
+        },
+        {
+          "name": "PreviewIOSHostedTests/testHostedPageBecomesReadyAndRendersTheLatestDocument",
+          "status": "Failed",
+          "duration_seconds": 8.814,
+          "observation": "Runtime reports no UIApplication; caught InvalidTransition from idle to failed(deinit). Cause remains unproven.",
+          "log_lines": [
+            1539,
+            1542,
+            1554,
+            1555,
+            1556,
+            1557,
+            1558
+          ]
+        },
+        {
+          "name": "ZZReadyProbeTests/testProbeRealBundleLoad",
+          "status": "Passed",
+          "duration_seconds": 0.958,
+          "printed_ready_seconds": 0.853,
+          "observation": "Later raw real-bundle load in the same process; does not explain the controller failure.",
+          "log_lines": [
+            1562,
+            1576,
+            1578
+          ]
+        },
+        {
+          "name": "ZZReadyProbeTests/testProbeTinyPageLoad",
+          "status": "Passed",
+          "duration_seconds": 0.713,
+          "printed_ready_seconds": 0.662,
+          "observation": "Later raw tiny-page load in the same process; does not explain the controller failure.",
+          "log_lines": [
+            1579,
+            1596,
+            1598
+          ]
+        }
+      ],
+      "named_outcomes_log": "logs/hostless.log.gz",
+      "named_outcomes_review_date": "2026-10-26"
     }
   ],
   "limits": [
