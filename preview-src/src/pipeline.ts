@@ -1,13 +1,13 @@
 import rehypeKatex from "rehype-katex";
 import rehypeSanitize from "rehype-sanitize";
 import rehypeStringify from "rehype-stringify";
-import remarkFrontmatter from "remark-frontmatter";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import remarkMdx from "remark-mdx";
 import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { unified } from "unified";
+import { remarkClosedFrontmatter } from "./frontmatter";
 import { rehypeHeadingAnchors } from "./heading-anchors";
 import {
   katexRenderOptions,
@@ -83,7 +83,7 @@ export async function renderMdx(markdown: string): Promise<string> {
 const markdownProcessor = unified()
   .use(remarkParse)
   .use(remarkGfm)
-  .use(remarkFrontmatter, ["yaml"])
+  .use(remarkClosedFrontmatter)
   .use(stripFrontmatter)
   .use(remarkMath)
   .use(remarkRehype)
@@ -100,7 +100,7 @@ const mdxProcessor = unified()
   .use(remarkParse)
   .use(remarkMdx)
   .use(remarkGfm)
-  .use(remarkFrontmatter, ["yaml"])
+  .use(remarkClosedFrontmatter)
   .use(stripFrontmatter)
   .use(remarkMath)
   .use(remarkMdxPlaceholders)
