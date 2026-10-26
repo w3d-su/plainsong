@@ -1,6 +1,6 @@
 {
   "artifact": "PlainsongIOSM0-unsigned.ipa",
-  "sha256": "d09502242053f56dfac1bdaefb4ba886b982c1c630bed72280ba4bbac6c9bab4",
+  "sha256": "c51e3babc35f472f8303496d0af43b5e8ef645730a5dfab2c4f0145e029ca52e",
   "architectures": "arm64",
   "minimum_os": "26.0",
   "device_family": [
@@ -8,5 +8,10 @@
     2
   ],
   "unsigned": true,
-  "owner_resign_install_gate": "OPEN"
+  "owner_resign_install_gate": "OPEN",
+  "fixture_member": "Payload/PlainsongIOSM0.app/m0.md",
+  "fixture_sha256": "38b1b6a80749a22baa8cede8adf5af4ee598181ca4690dc4b7d64b6a850c5144",
+  "fixture_bytes": 243,
+  "implementation_sha": "e572d16f960233f525a2d8c60b81e2e48df05941",
+  "artifact_path": "Prototypes/iOSM0/Artifacts/20261026T111540Z-ipa-58BAE3F8/PlainsongIOSM0-unsigned.ipa"
 }
