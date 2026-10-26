@@ -104,6 +104,7 @@ final class DocumentSession: NSObject {
         defer {
             opening = false
             editor.textView.isEditable = (replaced || previousEditable) && ledger?.available == true && !conflict &&
+                !reloading &&
                 document?.documentState.contains(.closed) == false &&
                 document?.documentState.contains(.editingDisabled) == false
             updated?()
