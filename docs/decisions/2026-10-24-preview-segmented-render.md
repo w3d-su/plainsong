@@ -13,9 +13,15 @@ parse, image rewrite, Mermaid placeholders, morphdom, highlight) is unchanged.
 
 Cuts. A cut may go before a line that follows a blank line, starts in column 1, and does
 not start with `-`, `+`, `*`, an ordered-list marker (`1.`, `1)`) or a BOM, and lies after
-any frontmatter (including frontmatter after one leading BOM, which micromark skips). These
-rules keep a list from continuing across the cut, keep a cut out of frontmatter, and keep a
-segment from starting with frontmatter. The segment before a cut is parsed with a sentinel
+any frontmatter. These rules keep a list from continuing across the cut, keep a cut out of
+frontmatter, and keep a segment from starting with frontmatter. Where frontmatter ends comes
+from `closedFrontmatterEnd` in `frontmatter.ts`, the same rule `remarkClosedFrontmatter`
+(#220) uses to enable frontmatter for the text it parses: an opening `---` at the start,
+after at most one BOM, read only when a closing fence follows. The first segment therefore
+holds the closing fence and reads the frontmatter as the whole document does. Later segments
+never start with `-` or a BOM, so they read none, even when they contain `---` rules. An
+unclosed opener is a thematic break in both renders and is cut like any other document.
+The segment before a cut is parsed with a sentinel
 paragraph appended on the line where the next segment starts. If the sentinel does not
 come back as a top-level paragraph of its own on that line, a construct was still open: a
 fence, `$$` math, an HTML block of kinds 1-5, MDX JSX, an expression or ESM. The cut is
@@ -53,9 +59,6 @@ Whole renders. These cases render the whole document, as before:
 - A document whose only segment is the whole text, including any document under 2 KiB.
 - A parse error in the last segment, so the MDX error banner keeps the whole render's
   error and line.
-- An opening `---` frontmatter fence that never closes. micromark-extension-frontmatter
-  then leaves the parser unable to open lists or block quotes anywhere in the document.
-  This is a pre-existing upstream quirk, reproduced on purpose so that output matches.
 
 `test/segmented-render.test.ts` compares segmented and whole output, string for string,
 over random documents and random edits for both pipelines. Two cut settings are used:

@@ -1,4 +1,5 @@
 import type { PreviewFileKind } from "./bridge";
+import { closedFrontmatterEnd } from "./frontmatter";
 import { HeadingSlugAllocator, headingIDPrefix } from "./heading-anchors";
 import {
   type RenderedSegment,
@@ -76,8 +77,10 @@ export class SegmentedRenderer {
   private segments(text: string): PlacedSegment[] | undefined {
     // micromark counts a lone CR as a line ending; the scanner below counts LF only.
     if (/\r(?!\n)/u.test(text)) return undefined;
-    const frontmatterEnd = frontmatterEndOffset(text);
-    if (frontmatterEnd === undefined) return undefined;
+    // A cut inside frontmatter would split it. The first segment holds the closing fence,
+    // so remarkClosedFrontmatter reads it there as it does in the whole document; later
+    // segments never start with `-` or a BOM, so it reads none in them.
+    const frontmatterEnd = closedFrontmatterEnd(text) ?? 0;
 
     const { minimumLength, maximumLength, cutHashModulus, maximumRejectedCuts } = this.limits;
     const segments: PlacedSegment[] = [];
@@ -205,20 +208,6 @@ function* cuts(text: string, firstOffset: number): Generator<Cut> {
     lineStart = newline + 1;
     line += 1;
   }
-}
-
-/**
- * Where YAML frontmatter ends (0 without frontmatter); cuts inside it would split it.
- * Undefined for an opening fence that never closes: micromark-extension-frontmatter then
- * leaves the parser unable to open lists and block quotes anywhere in the document, which
- * only a whole render reproduces. Fences are `---` plus optional spaces or tabs, alone on
- * a line. micromark skips one leading BOM before it looks for the opening fence.
- */
-function frontmatterEndOffset(text: string): number | undefined {
-  if (!/^\uFEFF?---[ \t]*\r?\n/u.test(text)) return 0;
-  const closingFence = /\n---[ \t]*\r?(?:\n|$)/gu;
-  closingFence.lastIndex = 3;
-  return closingFence.exec(text) === null ? undefined : closingFence.lastIndex;
 }
 
 function isBlank(text: string, start: number, end: number): boolean {

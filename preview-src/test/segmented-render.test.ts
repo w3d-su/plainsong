@@ -226,6 +226,30 @@ describe("segmented preview render", () => {
     await expectEquivalent(new SegmentedRenderer(kind), kind, text, `${kind} BOM frontmatter`);
   });
 
+  it.each(["md", "mdx"] as const)("segments %s with closed or unclosed leading fences", async (kind) => {
+    // remarkClosedFrontmatter decides per parsed text, so only the first segment may read
+    // frontmatter, and only with its closing fence inside it. A later `---` thematic break,
+    // followed by another `---`, must not open frontmatter in the segment that holds it.
+    // An unclosed opener has no later `---` line at all (one would close it).
+    const body = (rule: string) =>
+      `Intro paragraph.\n\n- item\n\n> quote\n\nMiddle paragraph.\n\n${rule}\n\nAfter the rule.\n\n${rule}\n\n# Tail\n`;
+    for (const bom of ["", "\uFEFF"]) {
+      for (const [label, head, rule] of [
+        ["closed", "---\ntitle: x\n\ntags: y\n---\n\n", "---"],
+        ["unclosed", "---\n\ntitle: x\n\n", "***"],
+      ] as const) {
+        const renderer = new SegmentedRenderer(kind, finest);
+        const text = bom + head + body(rule);
+        await expectEquivalent(renderer, kind, text, `${kind} ${label} ${bom ? "BOM " : ""}leading fence`);
+        expect(renderer.assembledSegmentCount).toBeGreaterThan(1);
+        const html = await renderer.render(text);
+        expect(html).toContain("<li");
+        expect(html).toContain("<blockquote");
+        expect(html.includes("title: x")).toBe(label === "unclosed");
+      }
+    }
+  });
+
   it("reuses unchanged segments", async () => {
     const renderer = new SegmentedRenderer("md", finest);
     const blocks = Array.from({ length: 40 }, (_, index) => `## Section ${index}\n\nParagraph ${index}.`);

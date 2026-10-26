@@ -189,13 +189,13 @@ final class EditorReplaceLayeringTests: XCTestCase {
         XCTAssertEqual(npm.development, ["esbuild", "jsdom", "typescript", "vitest"])
     }
 
-    /// C0 must compile declarations without linking the Mac editor/workspace or
-    /// unfinished PreviewKit UIKit implementation. 13 owns this architecture pin.
+    /// Production uses the approved UIKit preview while keeping the Mac editor
+    /// and workspace providers out. 13 owns this architecture pin.
     func testIOSScaffoldDoesNotLinkMacOnlyProviders() throws {
         let project = try source("project.yml")
         let app = try XCTUnwrap(project.components(separatedBy: "\n  PlainsongIOS:").dropFirst().first)
             .components(separatedBy: "\n  PlainsongIOSTests:")[0]
-        XCTAssertTrue(app.contains("product: PreviewKitContracts"))
+        XCTAssertTrue(app.contains("- package: PreviewKit\n        product: PreviewKit\n"))
         XCTAssertFalse(app.contains("- package: EditorKit\n"))
         XCTAssertFalse(app.contains("- package: WorkspaceKit\n"))
         for package in ["MarkdownCore", "SyntaxKit", "WorkspaceCore"] {

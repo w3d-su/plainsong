@@ -81,6 +81,14 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
         await recovery.list()
     }
 
+    /// Reads the same private recovery store used by document persistence.
+    /// A record's historical path and grant metadata never authorize document I/O.
+    public func loadRecovery(recordID: UUID) async throws -> IOSRecoveryRecord {
+        let record = try await recovery.load(recordID)
+        guard record.recordID == recordID else { throw IOSRecoveryDiscardError.corrupt }
+        return record
+    }
+
     public func discardRecovery(
         recordID: UUID,
         persistedText: String,
