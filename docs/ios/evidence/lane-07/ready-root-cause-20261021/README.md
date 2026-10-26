@@ -63,7 +63,7 @@ during the controller case, before its `InvalidTransition` failure. Both raw
 probes ran only after those failures. These observations retain the failed
 first-controller path without establishing what caused it; the later raw
 successes do not explain or negate that failure. Named outcomes and log
-locations are recorded in `review-20261021.json`.
+locations are recorded in the [2026-10-26 review receipt](https://github.com/w3d-su/plainsong/blob/fb66039ba1da2f4a5692ea80d3d69fead5f029cd/docs/ios/evidence/lane-07/ready-root-cause-20261021/review-20261021.json).
 
 In v5, `testPPNonPersistentFirst` means the first *nonpersistent* test, not
 the first view in the process. Those cases load tiny HTML, while the preceding
