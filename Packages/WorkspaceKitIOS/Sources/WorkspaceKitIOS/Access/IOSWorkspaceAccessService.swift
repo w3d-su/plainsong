@@ -138,17 +138,6 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
         matchingRecord(context) != nil
     }
 
-    public func recentItems() -> [IOSRecentWorkspaceItem] {
-        ports.recents.load().map(\.item)
-    }
-
-    public func removeRecent(recordID: UUID) {
-        recentRestoreRequests[recordID] = nil
-        var items = ports.recents.load()
-        items.removeAll { $0.recordID == recordID }
-        ports.recents.save(items)
-    }
-
     public func expansionState(for workspaceID: IOSWorkspaceIdentity) -> WorkspaceExpansionState? {
         records[workspaceID]?.expansion
     }

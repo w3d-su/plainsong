@@ -1,6 +1,17 @@
 import Foundation
 
 public extension IOSWorkspaceAccessService {
+    func recentItems() -> [IOSRecentWorkspaceItem] {
+        ports.recents.load().map(\.item)
+    }
+
+    func removeRecent(recordID: UUID) {
+        recentRestoreRequests[recordID] = nil
+        var items = ports.recents.load()
+        items.removeAll { $0.recordID == recordID }
+        ports.recents.save(items)
+    }
+
     /// The UI supplies only this opaque ID. Bookmark bytes and the captured scope
     /// stay inside this service; a display name never becomes a file URL.
     func restoreRecent(recordID: UUID) async throws -> IOSWorkspaceGrant {
