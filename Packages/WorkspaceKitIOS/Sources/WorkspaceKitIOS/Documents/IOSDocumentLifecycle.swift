@@ -6,6 +6,14 @@ extension IOSUIDocumentStore {
         defer {
             entry.isClosing = false
             refreshWritableState(entry)
+            // A failed provider close leaves this document installed. Deliver a
+            // held proposal only after acknowledgements may rebase it again.
+            if !entry.fenced, !entry.isRetiring, !entry.portClosed,
+               let proposal = entry.pendingProposal,
+               guardCurrentAuthority(entry, generation: proposal.accessGeneration)
+            {
+                emit(.externalReloadRequested(proposal))
+            }
             resumeAutosaveAfterClose(entry)
         }
         if entry.session?.isDirty == true, !writeBarrier(entry, allowsClosing: true), entry.allowsProviderWrite {

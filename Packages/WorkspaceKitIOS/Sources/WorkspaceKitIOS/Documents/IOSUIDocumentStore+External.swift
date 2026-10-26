@@ -167,6 +167,10 @@ extension IOSUIDocumentStore {
         )
         entry.pendingProposal = proposal
         refreshWritableState(entry)
+        // Close drains reads to prove the current buffer safe to retire. A native
+        // editor would dirty that buffer before its closing acknowledgement can
+        // rebase it. Hold the proposal until close either discards it or fails.
+        guard !entry.isClosing else { return }
         emit(.externalReloadRequested(proposal))
     }
 
