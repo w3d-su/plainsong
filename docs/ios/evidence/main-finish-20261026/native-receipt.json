@@ -1,0 +1,333 @@
+{
+  "schema": "IOS-MAIN-FINISH-NATIVE-RECEIPT-v1",
+  "base_sha": "c479bcae4c6f613381e0228ae8349a7e211f280a",
+  "source_sha": "565a7b15b47e66de9dc08d114e4dc117c033ebe1",
+  "source_fingerprint": "3ac1cda78e689a2608c262edd0e766e12887f84fa9914405fed2f2ebad758218",
+  "input_files": 810,
+  "source_dirty": false,
+  "contract": "IOS-C0-v1",
+  "native_lanes": [
+    {
+      "label": "modules",
+      "executed": 566,
+      "passed": 566,
+      "failed": 0,
+      "skipped": 0,
+      "required_count": 199,
+      "runner_exit": 0,
+      "source_sha": "565a7b15b47e66de9dc08d114e4dc117c033ebe1",
+      "source_fingerprint": "3ac1cda78e689a2608c262edd0e766e12887f84fa9914405fed2f2ebad758218",
+      "private_evidence_directory": "/private/tmp/plainsong-main-finish-20261026/native-final/modules/evidence/565a7b15b47e-test-20261026-160727-9272",
+      "source_manifest_sha256": "e6dd10036a7894ea3931bdf31ab7cbe492725825cc302c8313affb08279878b6",
+      "required_manifest_sha256": "7af2d05d5fb306418d72e629e62d6f81468607c5ffe9643bb53265c63545e745",
+      "gate_sha256": "294875480180c8e5493a07f10f0b6eaae263482ad83db09ac8fa2efdf09f1581",
+      "native_process_intervention": false
+    },
+    {
+      "label": "preview",
+      "executed": 197,
+      "passed": 197,
+      "failed": 0,
+      "skipped": 0,
+      "required_count": 110,
+      "runner_exit": 0,
+      "source_sha": "565a7b15b47e66de9dc08d114e4dc117c033ebe1",
+      "source_fingerprint": "3ac1cda78e689a2608c262edd0e766e12887f84fa9914405fed2f2ebad758218",
+      "private_evidence_directory": "/private/tmp/plainsong-main-finish-20261026/native-final/preview/evidence/565a7b15b47e-preview-20261026-160920-12118",
+      "source_manifest_sha256": "e6dd10036a7894ea3931bdf31ab7cbe492725825cc302c8313affb08279878b6",
+      "required_manifest_sha256": "d27f61444e10bec7021332089da7c266445912b81cdcfed9824987e704112c86",
+      "gate_sha256": "15006d03ac2e9a082ecea832972c6cc01ff68505c983d896bd4442e27ca853aa",
+      "native_process_intervention": false
+    },
+    {
+      "label": "preview-repeat",
+      "executed": 197,
+      "passed": 197,
+      "failed": 0,
+      "skipped": 0,
+      "required_count": 110,
+      "runner_exit": 0,
+      "source_sha": "565a7b15b47e66de9dc08d114e4dc117c033ebe1",
+      "source_fingerprint": "3ac1cda78e689a2608c262edd0e766e12887f84fa9914405fed2f2ebad758218",
+      "private_evidence_directory": "/private/tmp/plainsong-main-finish-20261026/native-final/preview-repeat/evidence/565a7b15b47e-preview-20261026-161203-13961",
+      "source_manifest_sha256": "e6dd10036a7894ea3931bdf31ab7cbe492725825cc302c8313affb08279878b6",
+      "required_manifest_sha256": "d27f61444e10bec7021332089da7c266445912b81cdcfed9824987e704112c86",
+      "gate_sha256": "15006d03ac2e9a082ecea832972c6cc01ff68505c983d896bd4442e27ca853aa",
+      "native_process_intervention": false
+    },
+    {
+      "label": "launch",
+      "executed": 3,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "required_count": 3,
+      "runner_exit": 0,
+      "source_sha": "565a7b15b47e66de9dc08d114e4dc117c033ebe1",
+      "source_fingerprint": "3ac1cda78e689a2608c262edd0e766e12887f84fa9914405fed2f2ebad758218",
+      "private_evidence_directory": "/private/tmp/plainsong-main-finish-20261026/native-final/launch/evidence/565a7b15b47e-acceptance-20261026-161437-17020",
+      "source_manifest_sha256": "e6dd10036a7894ea3931bdf31ab7cbe492725825cc302c8313affb08279878b6",
+      "required_manifest_sha256": "ccda7b4984db73936f676185f72ec1c3b50179758190e7e4f14b382ab16b2b89",
+      "gate_sha256": "764ec30c617f8acc3dfd91e2d856d09ffa7c31a8c0376d49c38667e7aea39edc",
+      "native_process_intervention": false
+    },
+    {
+      "label": "launch-ipad",
+      "executed": 3,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "required_count": 3,
+      "runner_exit": 0,
+      "source_sha": "565a7b15b47e66de9dc08d114e4dc117c033ebe1",
+      "source_fingerprint": "3ac1cda78e689a2608c262edd0e766e12887f84fa9914405fed2f2ebad758218",
+      "private_evidence_directory": "/private/tmp/plainsong-main-finish-20261026/native-final/launch-ipad/evidence/565a7b15b47e-acceptance-20261026-161604-18650",
+      "source_manifest_sha256": "e6dd10036a7894ea3931bdf31ab7cbe492725825cc302c8313affb08279878b6",
+      "required_manifest_sha256": "ccda7b4984db73936f676185f72ec1c3b50179758190e7e4f14b382ab16b2b89",
+      "gate_sha256": "764ec30c617f8acc3dfd91e2d856d09ffa7c31a8c0376d49c38667e7aea39edc",
+      "native_process_intervention": false
+    },
+    {
+      "label": "components",
+      "executed": 29,
+      "passed": 29,
+      "failed": 0,
+      "skipped": 0,
+      "required_count": 29,
+      "runner_exit": 0,
+      "source_sha": "565a7b15b47e66de9dc08d114e4dc117c033ebe1",
+      "source_fingerprint": "3ac1cda78e689a2608c262edd0e766e12887f84fa9914405fed2f2ebad758218",
+      "private_evidence_directory": "/private/tmp/plainsong-main-finish-20261026/native-final/components/evidence/565a7b15b47e-components-20261026-161836-22729",
+      "source_manifest_sha256": "e6dd10036a7894ea3931bdf31ab7cbe492725825cc302c8313affb08279878b6",
+      "required_manifest_sha256": "7a97ebf30cecc34f0f42710b4e393376d4a22fa3ae8d7a7cd42c40996afad050",
+      "gate_sha256": "a7ba5fedffd4a96f8687e68ba357cb5474bd9d0a13578cda67f6347dd6a22bd7",
+      "native_process_intervention": false
+    }
+  ],
+  "ipa": {
+    "source_sha": "565a7b15b47e66de9dc08d114e4dc117c033ebe1",
+    "source_fingerprint": "3ac1cda78e689a2608c262edd0e766e12887f84fa9914405fed2f2ebad758218",
+    "ipa_sha256": "ac66708d41a1b45d0c4736dc7933f43f18a0b0daf4c7b3a3b9bf719d125a860c",
+    "ipa_bytes": 3247596,
+    "archive_sha256": "9204cfdc98aab7330ecab12e9ed34c9b16d7484169e2d658e8e94efd94108d17",
+    "exit_code": 0
+  },
+  "mac": {
+    "schema": "IOS-MAIN-FINISH-MAC-REGRESSION-v1",
+    "status": "PASS",
+    "source_sha": "565a7b15b47e66de9dc08d114e4dc117c033ebe1",
+    "source_fingerprint": "3ac1cda78e689a2608c262edd0e766e12887f84fa9914405fed2f2ebad758218",
+    "source_dirty": false,
+    "summary": {
+      "packages": 6,
+      "total": 1480,
+      "passed": 1469,
+      "failed": 0,
+      "skipped": 11,
+      "executed_excluding_skipped": 1469,
+      "F2_unittest": {
+        "total": 86,
+        "passed": 86,
+        "failed": 0,
+        "skipped": 0
+      },
+      "signed_sandbox_probes_passed": 2,
+      "signed_sandbox_probes_total": 2,
+      "Mac_build": "PASS"
+    },
+    "named_counts": {
+      "MarkdownCore": {
+        "total": 338,
+        "passed": 338,
+        "failed": 0,
+        "skipped": 0,
+        "executed_excluding_skipped": 338
+      },
+      "EditorKit": {
+        "total": 516,
+        "passed": 508,
+        "failed": 0,
+        "skipped": 8,
+        "executed_excluding_skipped": 508
+      },
+      "PreviewKit": {
+        "total": 201,
+        "passed": 198,
+        "failed": 0,
+        "skipped": 3,
+        "executed_excluding_skipped": 198
+      },
+      "WorkspaceKit": {
+        "total": 384,
+        "passed": 384,
+        "failed": 0,
+        "skipped": 0,
+        "executed_excluding_skipped": 384
+      },
+      "SyntaxKit": {
+        "total": 12,
+        "passed": 12,
+        "failed": 0,
+        "skipped": 0,
+        "executed_excluding_skipped": 12
+      },
+      "WorkspaceCore": {
+        "total": 29,
+        "passed": 29,
+        "failed": 0,
+        "skipped": 0,
+        "executed_excluding_skipped": 29
+      }
+    },
+    "raw_evidence": {
+      "packages": {
+        "path": "/private/tmp/plainsong-main-finish-20261026/mac/packages.log",
+        "bytes": 525378,
+        "sha256": "2b600fd6158f039f378b5c27b6c744b5c0a40de38767b9272fd81c325c6875b1"
+      },
+      "build": {
+        "path": "/private/tmp/plainsong-main-finish-20261026/mac/build.log",
+        "bytes": 1223181,
+        "sha256": "ae2314c843f2b8fde46c320121385ff639eebf7715f71e5c671643ba3c202669"
+      },
+      "wrapper_status": {
+        "path": "/private/tmp/plainsong-main-finish-20261026/mac/status.txt",
+        "bytes": 269,
+        "sha256": "a684fc6bf0a89e2b19764ef97a4bb49003f1a348cc11a2e6f4f224e7c7db450e"
+      },
+      "source_manifest": {
+        "path": "/private/tmp/plainsong-main-finish-20261026/final-source.json",
+        "bytes": 170696,
+        "sha256": "e6dd10036a7894ea3931bdf31ab7cbe492725825cc302c8313affb08279878b6"
+      },
+      "wrapper_script": {
+        "path": "/private/tmp/plainsong-main-finish-20261026/run-mac.sh",
+        "bytes": 1137,
+        "sha256": "aec7f449f5cc652a68abfa8f54fc9bed92705125e2fe4ef8912ea57a0d0eee97"
+      }
+    },
+    "commands": {
+      "packages": "make test-packages",
+      "build": "make build XCODE_DERIVED_DATA=/private/tmp/plainsong-main-finish-20261026/mac/build-dd",
+      "build_observed": [
+        "xcodegen generate",
+        "xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug -derivedDataPath \"/private/tmp/plainsong-main-finish-20261026/mac/build-dd\" build"
+      ],
+      "wrapper_observed": {
+        "packages": "CI=1 /usr/bin/lockf -k -t 45 /private/tmp/plainsong-xcodebuild-test.lock make test-packages > \"$out/packages.log\" 2>&1",
+        "build": "/usr/bin/lockf -k -t 45 /private/tmp/plainsong-xcodebuild-test.lock make build XCODE_DERIVED_DATA=\"$out/build-dd\" > \"$out/build.log\" 2>&1"
+      },
+      "packages_environment": {
+        "CI": "1",
+        "evidence": "Explicit assignment on packages case in retained wrapper script"
+      },
+      "build_environment": {
+        "explicit_CI_assignment": false,
+        "inherited_CI": "NOT_RECORDED"
+      },
+      "command_origin": "Per-lane status command strings are copied without adding environment assignments; exact retained wrapper cases and actual Makefile/log invocation markers are separate. No command executed by this parser"
+    },
+    "wrapper_exit_codes": {
+      "packages": 0,
+      "build": 0
+    },
+    "timing_classification": {
+      "packages": {
+        "CI": "1",
+        "classification": "ordinary loaded-machine package regression; existing unrelated work preserved",
+        "idle_measurement": false,
+        "performance_acceptance": "OPEN",
+        "actual_load_measurements": "NOT_RECORDED"
+      },
+      "build": {
+        "classification": "NOT_APPLICABLE_BUILD_ONLY",
+        "explicit_CI_assignment": false,
+        "inherited_CI": "NOT_RECORDED",
+        "performance_acceptance": "NOT_APPLICABLE"
+      }
+    },
+    "checks": {
+      "source_marker_matches_actual_execution_snapshot": true,
+      "packages_CI1_assignment_proven_by_wrapper": true,
+      "build_only_timing_not_applicable": true,
+      "both_original_wrapper_exits_zero": true,
+      "actual_wrapper_commands_recorded": true,
+      "six_full_package_named_runs_complete_no_failures": true,
+      "F2_named_unittest_and_scoped_audits_complete": true,
+      "signed_export_sandbox_probe_actual_checks": true,
+      "signed_single_file_sandbox_probe_actual_checks": true,
+      "actual_Mac_build_success_marker_and_invocation": true
+    },
+    "boundary": "Read-only extraction from complete retained logs, actual named terminal results, suite aggregates, sandbox runtime markers and original wrapper exits. Package skips remain explicit. F2 scoped PARTIAL audit is not full durable-evidence/performance acceptance. CI=1 is proven only for package regression through the wrapper case; ordinary loaded-machine package regression does not establish idle performance budgets, real-device acceptance or product completion. Build-only timing is not applicable. This is not another test run.",
+    "full_named_summary": {
+      "path": "/private/tmp/plainsong-main-finish-20261026/audit/mac-summary.json",
+      "bytes": 830256,
+      "sha256": "7d095f686a7be06842bffaf4c685032a57b52f763dfcf1036eaab9736ef8d173",
+      "delivery_member": "evidence/audit/mac-summary.json"
+    },
+    "skipped_cases": {
+      "EditorKit": [
+        "EditorKitTests.EditorLineNumberGutterCostProbeTests/testLineNumberCostOnLargeFixture",
+        "EditorKitTests.WYSIWYGActualIMEEventGateTests/testActualIMEEventPostingAccessIsGranted",
+        "EditorKitTests.WYSIWYGActualIMEEventGateTests/testActualPinyinEventStreamAtFoldBoundariesWhenEnabled",
+        "EditorKitTests.WYSIWYGActualIMEEventGateTests/testActualPinyinEventStreamAtImageBoundariesWhenEnabled",
+        "EditorKitTests.WYSIWYGActualIMEEventGateTests/testActualPinyinEventStreamAtLinkBoundariesWhenEnabled",
+        "EditorKitTests.WYSIWYGActualIMEEventGateTests/testActualZhuyinEventStreamAtFoldBoundaries",
+        "EditorKitTests.WYSIWYGActualIMEEventGateTests/testActualZhuyinEventStreamAtImageBoundaries",
+        "EditorKitTests.WYSIWYGActualIMEEventGateTests/testActualZhuyinEventStreamAtLinkBoundaries"
+      ],
+      "PreviewKit": [
+        "PreviewKitTests.PreviewRenderDispatchProbeTests/testIdleSubmissionMainThreadProbe",
+        "PreviewKitTests.PreviewRenderDispatchProbeTests/testTypingBurstProbe",
+        "PreviewKitTests.PreviewWebViewFootprintProbeTests/testIdleLivePreviewHelperFootprint"
+      ]
+    },
+    "F2_boundary": "F2's 86 named unittest cases and 36-file tooling inventory pass. The scoped retained-evidence audit emits one PARTIAL summary reporting runs=6 and preserves six OPEN gate markers. This does not establish full durable-evidence or performance acceptance."
+  },
+  "tooling": {
+    "executed": 44,
+    "passed": 44,
+    "log_sha256": "30a013bd19f5cb3d46129c9a5a2bf31d4177ea31a17bc7fd4a6db232567358f2"
+  },
+  "negative_control": {
+    "schema": "IOS-RECENT-PENDING-NEGATIVE-v1",
+    "source_sha": "b27c231795f33a5bda3c20ae9ea296468b6bc43e",
+    "source_fingerprint": "47e2a04dfa73fcec553d5f985b2b4340074babeef3e61b05add6ce31099ec1f0",
+    "source_dirty": false,
+    "raw_evidence": "/private/tmp/plainsong-main-finish-20261026/negative-modules/evidence/b27c231795f3-test-20261026-160303-2523",
+    "functional_execution": {
+      "total": 566,
+      "Passed": 558,
+      "Failed": 8
+    },
+    "required_count": 199,
+    "failed_cases": [
+      "IOSRecentAccessPresenterTests/testDownloadingFailureExplainsRetryWithoutRequiringReselection",
+      "IOSRecentAccessPresenterTests/testOfflineFailureExplainsRetryWithoutRequiringReselection",
+      "IOSRecentPendingAvailabilityTests/testDownloadingFailureAfterRecentSnapshotRetainsGrantForRetry",
+      "IOSRecentPendingAvailabilityTests/testDownloadingRecentRetainsItsGrantForRefreshAndRetry",
+      "IOSRecentPendingAvailabilityTests/testOfflineFailureAfterRecentSnapshotRetainsGrantForRetry",
+      "IOSRecentPendingAvailabilityTests/testOfflineRecentRetainsItsGrantForRefreshAndRetry",
+      "IOSRecentPendingAvailabilityTests/testPendingRecentDoesNotSurviveActualRevocation",
+      "IOSRecentPendingAvailabilityTests/testPendingRecentStillRejectsAnUnselectedSibling"
+    ],
+    "native_runner_exit": 65,
+    "outer_make_exit": 2,
+    "whole_run_uninterrupted": true,
+    "native_process_intervention": false,
+    "expected_failure": true,
+    "boundary": "Tests-only negative source. Original required cases were retained. No diagnostic/native process intervention; failed runner retained intact."
+  },
+  "boundary": "Native and IPA results retain the actual executed SHA. Later docs-only publication requires input equality and its own exact PR-head CI. Owner physical-device acceptance remains OPEN.",
+  "initial_port_base_sha": "e09801309e855dce6ee903101ac2180e164daef2",
+  "upstream_documentation_only_update": {
+    "sha": "c479bcae4c6f613381e0228ae8349a7e211f280a",
+    "paths": [
+      "README.md",
+      "docs/codex-handoff.md",
+      "docs/release-engineering-plan.md"
+    ],
+    "build_input_records_unchanged": true,
+    "boundary": "Actual native execution and IPA remain source 565a. Current main documentation is preserved by a normal merge; no divergent feature ancestry or source change was imported."
+  }
+}

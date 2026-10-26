@@ -363,47 +363,7 @@ final class MarkdownSTTextView: STTextView {
 
     private func wysiwygZeroWidthCharacterIndex(at pointInView: CGPoint) -> Int? {
         let point = CGPoint(x: pointInView.x - (gutterView?.frame.width ?? 0), y: pointInView.y)
-        textLayoutManager.ensureLayout(for: textLayoutManager.documentRange)
-        var nearest: (distance: CGFloat, offset: Int)?
-
-        textLayoutManager.enumerateTextLayoutFragments(
-            from: textLayoutManager.documentRange.location,
-            options: [.ensuresLayout]
-        ) { fragment in
-            let elementRange = NSRange(fragment.rangeInElement, in: textContentManager)
-            for lineFragment in fragment.textLineFragments {
-                let lineFrame = lineFragment.typographicBounds.offsetBy(
-                    dx: fragment.layoutFragmentFrame.minX,
-                    dy: fragment.layoutFragmentFrame.minY
-                )
-                let verticalDistance: CGFloat = if point.y < lineFrame.minY {
-                    lineFrame.minY - point.y
-                } else if point.y > lineFrame.maxY {
-                    point.y - lineFrame.maxY
-                } else {
-                    0
-                }
-
-                guard nearest == nil || verticalDistance < nearest!.distance else {
-                    continue
-                }
-
-                let localPoint = CGPoint(
-                    x: point.x - lineFrame.minX,
-                    y: point.y - lineFrame.minY
-                )
-                let localIndex = lineFragment.characterIndex(for: localPoint)
-                let lineRange = NSRange(
-                    location: elementRange.location + lineFragment.characterRange.location,
-                    length: lineFragment.characterRange.length
-                )
-                let offset = min(max(lineRange.location + localIndex, lineRange.location), NSMaxRange(lineRange))
-                nearest = (verticalDistance, offset)
-            }
-            return true
-        }
-
-        return nearest?.offset
+        return WYSIWYGPointerHitTest.characterIndex(at: point, in: self).offset
     }
 }
 

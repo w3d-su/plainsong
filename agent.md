@@ -192,6 +192,9 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 - An explicitly selected iOS single-file Markdown/MDX document that is downloading or
   offline retains its current file grant and Files snapshot for Refresh and retry.
   Availability is reported separately from document type; actual revocation still fences access.
+  Recent single-file restoration uses that same availability classification and retains
+  a live pending selection for Refresh/retry. Cancelled, superseded, revoked or retired
+  operations cannot keep an uninstalled scope; returned writers still drain safely.
 - An iOS external reload rechecks its store's current proposal and lifecycle immediately
   before native installation, including proposals deferred before close. Closing holds
   the proposal without retiring its operation; failed close can resume it. Root watcher
@@ -211,7 +214,8 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   the emptied directory is removed. `Scripts/check-single-file-save-sandbox.sh` exercises
   this in a signed sandboxed probe under a LaunchServices file-only grant.
 - Window chrome: a native `NavigationSplitView` with a resizable, collapsible sidebar
-  (Files / Search navigators) on macOS 27+, a fixed-width sidebar in an `HStack` before
+  (Files / Search navigators; ⇧⌘F in a window whose sidebar is hidden reveals it in
+  Search) on macOS 27+, a fixed-width sidebar in an `HStack` before
   (R17), then the document column and a right inspector for frontmatter and file details.
   Inspector intent and width are per-window scene state; visibility is derived
   (`docs/window-state-gates.md` §10.1). The `HStack` shell's window minimum is 780 pt
@@ -468,7 +472,11 @@ pending Mermaid wrappers. This preserves unchanged Mermaid SVG DOM, unchanged
 highlighted-code DOM, scroll position, and image loads.
 
 Frontmatter is **not** rendered as a table in the preview body; it is stripped (shown in
-the Frontmatter panel, §10). Optional toggle to show it as a styled block.
+the Frontmatter panel, §10). Optional toggle to show it as a styled block. A leading `---`
+with no closing fence is not frontmatter in the preview: `remark-frontmatter` runs only
+when the block closes (`src/frontmatter.ts`), because its concrete construct otherwise
+stops lists and block quotes from opening anywhere in the document. The `---` renders as
+a thematic break; the inspector still reports the missing closing delimiter (§10).
 
 ### 7.3 Swift ↔ JS bridge protocol
 

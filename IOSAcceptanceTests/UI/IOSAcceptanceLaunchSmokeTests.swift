@@ -33,4 +33,21 @@ final class IOSAcceptanceLaunchSmokeTests: XCTestCase {
         let filesReappeared = expectation(for: NSPredicate(format: "exists == true"), evaluatedWith: files)
         XCTAssertEqual(XCTWaiter.wait(for: [filesReappeared], timeout: 10), .completed)
     }
+
+    func testRecentFilesOpensAndDismissesFromProductionFiles() {
+        let app = XCUIApplication()
+        app.launch()
+        let recent = app.buttons["plainsong.ios.browser.recents"]
+        let entryAppeared = expectation(for: NSPredicate(format: "exists == true"), evaluatedWith: recent)
+        XCTAssertEqual(XCTWaiter.wait(for: [entryAppeared], timeout: 10), .completed)
+        XCTAssertTrue(recent.isEnabled)
+        recent.tap()
+        let list = app.navigationBars["Recent Files and Folders"]
+        let listAppeared = expectation(for: NSPredicate(format: "exists == true"), evaluatedWith: list)
+        XCTAssertEqual(XCTWaiter.wait(for: [listAppeared], timeout: 10), .completed)
+        list.buttons["Done"].tap()
+        let files = app.navigationBars["Files"]
+        let filesReappeared = expectation(for: NSPredicate(format: "exists == true"), evaluatedWith: files)
+        XCTAssertEqual(XCTWaiter.wait(for: [filesReappeared], timeout: 10), .completed)
+    }
 }

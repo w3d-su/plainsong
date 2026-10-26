@@ -14,6 +14,7 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
     var pendingNotices: [IOSQueuedWorkspaceNotice.CoalescingKey: IOSQueuedWorkspaceNotice] = [:]
     var persistedLeaves: [UUID: IOSPersistedLeaf] = [:]
     var noticeFlushScheduled = false
+    var recentRestoreRequests: [UUID: UUID] = [:]
     public var includesHiddenEntries = false
     public var includesAllFiles = false
     let maximumRecentItems = 10
@@ -142,6 +143,7 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
     }
 
     public func removeRecent(recordID: UUID) {
+        recentRestoreRequests[recordID] = nil
         var items = ports.recents.load()
         items.removeAll { $0.recordID == recordID }
         ports.recents.save(items)

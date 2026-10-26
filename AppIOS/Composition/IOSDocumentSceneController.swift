@@ -29,6 +29,9 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     var isShuttingDown = false
     var isDisposed = false
     var transitioning = false
+    var recentTransitionActive = false
+    var recentTransitionSuperseded = false
+    var pendingRecentNavigation: IOSPendingRecentNavigation?
     var recoveryEpoch: UInt64 = 0
     var grantIsCurrent = false
     var workspaceSnapshot: IOSWorkspaceSnapshot?
@@ -89,6 +92,7 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     /// Only the explicit picker/OS Open URL path may mint a new grant. Browser
     /// rows and preview links use openSelectedURL and existing descriptors.
     func openPickedURL(_ url: URL, scope: IOSWorkspaceScope) async throws {
+        try await waitForRecentTransition(preserving: nil)
         try beginTransition()
         defer { finishTransition() }
         try await closeCurrent()
@@ -129,6 +133,7 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     }
 
     func openSelectedURL(_ url: URL, scope: IOSWorkspaceScope) async throws {
+        try await waitForRecentTransition(preserving: currentGrant)
         guard scope == .singleFile, let location = documentLocation(for: url) else {
             throw IOSDocumentFailure.access(.outsideGrant)
         }
@@ -159,7 +164,17 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     }
 
     func resolveExternal(_ choice: IOSExternalResolution) async throws {
-        guard !transitioning, let handle else { throw IOSDocumentFailure.unavailable }
+        guard let handle else { throw IOSDocumentFailure.unavailable }
+        // Reload installation already defers through the native relay while
+        // composing. Navigation and copy transitions still refuse marked text.
+        if case .reload = choice {
+            try beginTransition(allowMarkedText: true)
+        } else {
+            try beginTransition()
+        }
+        updateEditorAccess()
+        publish()
+        defer { finishTransition() }
         try await documents.resolveExternal(handle.identity, choice: choice)
     }
 
@@ -197,9 +212,11 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
         return observation
     }
 
-    func beginTransition() throws {
+    func beginTransition(allowMarkedText: Bool = false) throws {
         guard !transitioning, !isShuttingDown, !isDisposed else { throw IOSDocumentFailure.unavailable }
-        guard editor.captureSnapshot()?.hasMarkedText != true else { throw IOSDocumentFailure.sourceChanged }
+        guard allowMarkedText || editor.captureSnapshot()?.hasMarkedText != true else {
+            throw IOSDocumentFailure.sourceChanged
+        }
         recoveryEpoch &+= 1
         transitioning = true
     }
@@ -365,7 +382,7 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
 }
 
 extension IOSDocumentSceneController {
-    private func pickedDocumentLocation(for url: URL) throws -> IOSFileLocation {
+    func pickedDocumentLocation(for url: URL) throws -> IOSFileLocation {
         guard let entry = documentEntry(for: url) else { throw IOSDocumentFailure.access(.unsupportedType) }
         switch entry.availability {
         case .available: return entry.location
@@ -376,7 +393,7 @@ extension IOSDocumentSceneController {
         }
     }
 
-    private func retainsPendingSelection(after error: Error, grant: IOSWorkspaceGrant) -> Bool {
+    func retainsPendingSelection(after error: Error, grant: IOSWorkspaceGrant) -> Bool {
         let failure: IOSWorkspaceFailure? = if let documentFailure = error as? IOSDocumentFailure,
                                                case let .access(reason) = documentFailure
         {

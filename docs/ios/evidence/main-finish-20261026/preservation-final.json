@@ -1,0 +1,221 @@
+{
+  "base": "e09801309e855dce6ee903101ac2180e164daef2",
+  "candidate": "565a7b15b47e66de9dc08d114e4dc117c033ebe1",
+  "candidate_tree": "f1b7b8d7df765c41fc28355418e9d3750e18d2f3",
+  "checks": [
+    {
+      "changed_count": 55,
+      "expected_count": 55,
+      "name": "baseline-transplant-is-exact-two-patch-union",
+      "pass": true,
+      "symmetric_difference": []
+    },
+    {
+      "name": "squash-parents-and-transplant-tree-provenance",
+      "pairs": [
+        {
+          "left": "e09801309e855dce6ee903101ac2180e164daef2",
+          "left_tree": "107e72a97d54e7b3fce9b90d82ede6b721003ff3",
+          "right": "085369faf5d6de55f5061f13594a49bbe4e238f3",
+          "right_tree": "107e72a97d54e7b3fce9b90d82ede6b721003ff3"
+        },
+        {
+          "left": "b28bf33691363b5084fc36a8c84e70dfa00d0901",
+          "left_tree": "460e655ec5e0d1e66b071de2ddb2b8fe6e2960e4",
+          "right": "a39e2a6c879901c2b9055804f5aa1f4a76c6e333",
+          "right_tree": "460e655ec5e0d1e66b071de2ddb2b8fe6e2960e4"
+        },
+        {
+          "left": "3de75ee278c552fb508bac7b36d16a6eb263f42d",
+          "left_tree": "7b599c3f29e478a8cf067d4cb8575de60083e198",
+          "right": "b1380edcaa89ab60535f62fa3e6aa57e2f2ac82d",
+          "right_tree": "7b599c3f29e478a8cf067d4cb8575de60083e198"
+        },
+        {
+          "left": "c5fc4f652205fc443321fe0463c0914720b262c7",
+          "left_tree": "7b599c3f29e478a8cf067d4cb8575de60083e198",
+          "right": "b1380edcaa89ab60535f62fa3e6aa57e2f2ac82d",
+          "right_tree": "7b599c3f29e478a8cf067d4cb8575de60083e198"
+        }
+      ],
+      "pass": true
+    },
+    {
+      "name": "squash-first-parents-match-reviewed-stack",
+      "pass": true,
+      "squash217_parent": "085369faf5d6de55f5061f13594a49bbe4e238f3",
+      "squash218_parent": "a39e2a6c879901c2b9055804f5aa1f4a76c6e333"
+    },
+    {
+      "name": "candidate-descends-from-main-and-reviewed-transplant",
+      "pass": true
+    },
+    {
+      "conflict_copy_patch_id": "e445571314e380d9c763ab547ffb8694301c4112",
+      "name": "transplant-patch-identities",
+      "pass": true,
+      "recent_patch_id": "f0e8f86b1142721eeed0ffec3845788e5343b5de"
+    },
+    {
+      "name": "transplant-cherry-pick-trailers",
+      "pass": true
+    },
+    {
+      "changed_count": 59,
+      "explicit_additional_allowlist": [
+        "agent.md",
+        "docs/decisions/2026-10-26-ios-recent-pending-file-retry.md"
+      ],
+      "name": "only-reviewed-feature-retry-and-explicit-doc-paths-change",
+      "pass": true,
+      "retry_delta_paths": [
+        "AppIOS/Composition/IOSDocumentSceneController+Recents.swift",
+        "AppIOS/Composition/IOSDocumentSceneController.swift",
+        "AppIOS/Features/Recents/IOSRecentAccessPresenter.swift",
+        "AppIOSTests/Integration/IOSDocumentSceneControllerStoreSupport.swift",
+        "AppIOSTests/Integration/IOSRecentAccessPresenterTests.swift",
+        "AppIOSTests/Integration/IOSRecentPendingAvailabilityTests.swift",
+        "Scripts/ios/required-named-tests.txt",
+        "agent.md",
+        "docs/decisions/2026-10-26-ios-recent-pending-file-retry.md"
+      ],
+      "unexpected": []
+    },
+    {
+      "frozen_count": 13,
+      "mismatches": [],
+      "name": "frozen13-match-recorded-freeze-sha256",
+      "pass": true
+    },
+    {
+      "name": "frozen-registry-bytes-retained",
+      "pass": true
+    },
+    {
+      "approved_aliases": [
+        {
+          "name": "MarkdownSyntaxToken",
+          "path": "Packages/EditorKit/Sources/EditorKit/MarkdownSyntaxToken.swift",
+          "reason": "Exact unchanged approved Mac compatibility alias to the sole SyntaxKit declaration."
+        }
+      ],
+      "expected_count": 71,
+      "mismatches": {},
+      "name": "71-frozen-declarations-remain-unique",
+      "pass": true
+    },
+    {
+      "checked_count": 342,
+      "mismatches": [],
+      "name": "retained-mac-app",
+      "pass": true
+    },
+    {
+      "checked_count": 536,
+      "mismatches": [],
+      "name": "retained-mac-shared-packages",
+      "pass": true
+    },
+    {
+      "checked_count": 77,
+      "mismatches": [],
+      "name": "retained-preview-source-and-dist",
+      "pass": true
+    },
+    {
+      "checked_count": 21,
+      "mismatches": [],
+      "name": "retained-dependency-pins-and-manifests",
+      "pass": true
+    },
+    {
+      "checked_count": 2,
+      "mismatches": [],
+      "name": "retained-global-build-entries",
+      "pass": true
+    },
+    {
+      "checked_count": 3,
+      "mismatches": [],
+      "name": "retained-workflows",
+      "pass": true
+    },
+    {
+      "checked_count": 180,
+      "mismatches": [],
+      "name": "retained-original-tests-tooling-outside-feature-scope",
+      "pass": true
+    },
+    {
+      "candidate_count": 199,
+      "name": "required-main125-names-retained",
+      "original_count": 125,
+      "pass": true,
+      "removed": []
+    },
+    {
+      "candidate_count": 199,
+      "name": "required-stack187-names-retained",
+      "original_count": 187,
+      "pass": true,
+      "removed": []
+    },
+    {
+      "candidate_count": 3,
+      "name": "retained-names-required-hosted-smoke.txt",
+      "original_count": 2,
+      "pass": true,
+      "removed": []
+    },
+    {
+      "candidate_count": 29,
+      "name": "retained-names-required-component-tests.txt",
+      "original_count": 29,
+      "pass": true,
+      "removed": []
+    },
+    {
+      "after": {
+        "branch": "phase3-preview-npm-audit-fix",
+        "claude_sha256": "e21f184f6d7f8f6d47f042f213065ee7d78844157b9eba4a6d48a61d26fdaeca",
+        "head": "60f74e1bfb2c9ddf0303a7e8d49841317d157f99",
+        "status": " M CLAUDE.md\n?? .omc/\n"
+      },
+      "before": {
+        "branch": "phase3-preview-npm-audit-fix",
+        "claude_sha256": "e21f184f6d7f8f6d47f042f213065ee7d78844157b9eba4a6d48a61d26fdaeca",
+        "head": "60f74e1bfb2c9ddf0303a7e8d49841317d157f99",
+        "status": " M CLAUDE.md\n?? .omc/\n",
+        "time": "2026-10-26T08:01:10.383276+00:00"
+      },
+      "mismatches": [],
+      "name": "owner-checkout-head-branch-status-and-claude-retained",
+      "pass": true
+    },
+    {
+      "current_head": "565a7b15b47e66de9dc08d114e4dc117c033ebe1",
+      "dirty_status": "",
+      "name": "candidate-is-current-clean-worktree-head",
+      "pass": true
+    }
+  ],
+  "historical_stack": "b1380edcaa89ab60535f62fa3e6aa57e2f2ac82d",
+  "result": "PASS",
+  "reviewed_transplant": "c5fc4f652205fc443321fe0463c0914720b262c7",
+  "schema": "IOS-MAIN-FINISH-PRESERVATION-AUDIT-v1",
+  "scope": "Independent source/content/provenance audit; no native test or owner-device acceptance claimed.",
+  "source": {
+    "contract_version": "IOS-C0-v1",
+    "input_count": 810,
+    "schema": "IOS-SOURCE-v1",
+    "source_dirty": false,
+    "source_fingerprint": "3ac1cda78e689a2608c262edd0e766e12887f84fa9914405fed2f2ebad758218",
+    "source_sha": "565a7b15b47e66de9dc08d114e4dc117c033ebe1"
+  },
+  "summary": {
+    "failed": [],
+    "passed": 23,
+    "total": 23
+  },
+  "time": "2026-10-26T08:08:23.194585+00:00"
+}
