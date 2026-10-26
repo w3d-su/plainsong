@@ -117,6 +117,39 @@ final class IOSConflictReloadCloseTests: XCTestCase {
         XCTAssertTrue(fixture.port.written.isEmpty)
     }
 
+    func testNewerExternalReadFailureRetiresTheHeldExplicitReload() async throws {
+        let (fixture, access, recovery, handle) = try await conflict()
+        let entry = try XCTUnwrap(fixture.store.byIdentity[handle.identity])
+        await access.blockNextReadWithFailure()
+        fixture.port.emitExternalChange()
+        try await waitUntil { await access.hasBlockedFailingRead }
+        fixture.editor.hasMarkedText = true
+        try await fixture.store.resolveExternal(handle.identity, choice: .reload)
+        XCTAssertNotNil(entry.pendingProposal)
+        XCTAssertEqual(fixture.editor.installed.count, 1)
+        await recovery.blockPersist()
+        let closing = Task { try await fixture.store.close(handle.identity) }
+        try await waitUntil { entry.isClosing }
+
+        await access.releaseFailingRead()
+        try await waitUntil { await recovery.hasBlockedPersist }
+        XCTAssertNil(entry.pendingProposal, "Retire the older successful read before awaiting recovery")
+        XCTAssertNil(entry.explicitReloadOperationID)
+        fixture.removeMarkedState()
+        await recovery.releasePersist()
+        guard case .retained = try await closing.value else { return XCTFail("Preserve the local draft") }
+        fixture.editor.emitSnapshot()
+
+        XCTAssertEqual(fixture.editor.installed.count, 1, "A newer read failure cannot replay the earlier proposal")
+        XCTAssertEqual(handle.session.text, "local draft")
+        XCTAssertTrue(handle.session.isDirty)
+        XCTAssertTrue(entry.fenced)
+        guard case .unavailable(_, .access(.offline)) = fixture.store.state(for: handle.identity) else {
+            return XCTFail("The newer read-failure fence must survive retained close")
+        }
+        XCTAssertTrue(fixture.port.written.isEmpty)
+    }
+
     private func heldConflictReload() async throws -> (
         IOSDeferredReloadCloseFixture, IOSConflictReloadCloseRecovery, IOSDocumentHandle,
         IOSDocumentEntry, Task<IOSDocumentCloseOutcome, Error>
@@ -145,6 +178,7 @@ final class IOSConflictReloadCloseTests: XCTestCase {
         let fixture = IOSDeferredReloadCloseFixture(coordinatedAccess: access, recovery: recovery)
         addTeardownBlock { @MainActor in
             await access.releaseReads()
+            await access.releaseFailingRead()
             await recovery.releasePersist()
             await fixture.cleanUp()
             await recovery.cleanUp()

@@ -32,11 +32,15 @@ extension IOSUIDocumentStore {
         }
     }
 
-    func fenceUnavailable(_ entry: IOSDocumentEntry, _ reason: IOSDocumentFailure) {
-        // A new provider loss retires published and still-reading explicit reloads.
+    func invalidateReloadProposals(_ entry: IOSDocumentEntry) {
+        // New unknown/unavailable bytes retire published and still-reading reloads.
         entry.providerAvailabilityGeneration &+= 1
         entry.pendingProposal = nil
         entry.explicitReloadOperationID = nil
+    }
+
+    func fenceUnavailable(_ entry: IOSDocumentEntry, _ reason: IOSDocumentFailure) {
+        invalidateReloadProposals(entry)
         entry.fenced = true
         entry.allowsProviderWrite = false
         entry.autosaveTask?.cancel()
@@ -158,6 +162,7 @@ extension IOSUIDocumentStore {
         else { return }
         let failure = (mapped(error) as? IOSDocumentFailure) ?? .unavailable
         // Unknown external bytes are not permission to resume overwriting the original.
+        invalidateReloadProposals(entry)
         entry.fenced = true
         entry.externalToken = nil
         entry.autosaveTask?.cancel()

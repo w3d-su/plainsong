@@ -8,8 +8,9 @@ Track explicitly requested external reload proposals separately from automatic
 observations. A retained close may resume a current explicit proposal even while
 the original conflict remains fenced. It must still pass the live operation,
 revision, grant and lifecycle checks immediately before native installation.
-A new provider-loss fence invalidates the pending proposal; a former request
-cannot authorize a later unavailable provider or changed authority.
+A new provider-loss fence invalidates published and still-reading proposals;
+current-token external-read failures do so before waiting for recovery as well.
+A former request cannot authorize a later unavailable provider or changed authority.
 
 When an M0 replacement is refused after closing the original document, reopen
 that original without replacing its editor identity, source, selection or Undo

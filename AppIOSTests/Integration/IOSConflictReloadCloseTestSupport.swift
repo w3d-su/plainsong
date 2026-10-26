@@ -7,6 +7,19 @@ actor IOSConflictReloadCloseAccess: IOSCoordinatedFileAccess {
     private var blocksReads = false
     private var readWaiters: [CheckedContinuation<Void, Never>] = []
     private(set) var hasBlockedRead = false
+    private var failsNextRead = false
+    private var failingReadWaiter: CheckedContinuation<Void, Never>?
+    private(set) var hasBlockedFailingRead = false
+
+    func blockNextReadWithFailure() {
+        failsNextRead = true
+        hasBlockedFailingRead = false
+    }
+
+    func releaseFailingRead() {
+        failingReadWaiter?.resume()
+        failingReadWaiter = nil
+    }
 
     func blockReads() {
         blocksReads = true
@@ -23,6 +36,12 @@ actor IOSConflictReloadCloseAccess: IOSCoordinatedFileAccess {
     func read(_ location: IOSFileLocation, lease _: any IOSWorkspaceAccessLease,
               operationID: UUID, maximumByteCount _: Int) async throws -> IOSCoordinatedRead
     {
+        if failsNextRead {
+            failsNextRead = false
+            hasBlockedFailingRead = true
+            await withCheckedContinuation { failingReadWaiter = $0 }
+            throw IOSDocumentFailure.access(.offline)
+        }
         if blocksReads {
             hasBlockedRead = true
             await withCheckedContinuation { readWaiters.append($0) }
