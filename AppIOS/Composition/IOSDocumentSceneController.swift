@@ -382,7 +382,7 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
 }
 
 extension IOSDocumentSceneController {
-    private func pickedDocumentLocation(for url: URL) throws -> IOSFileLocation {
+    func pickedDocumentLocation(for url: URL) throws -> IOSFileLocation {
         guard let entry = documentEntry(for: url) else { throw IOSDocumentFailure.access(.unsupportedType) }
         switch entry.availability {
         case .available: return entry.location
@@ -393,7 +393,7 @@ extension IOSDocumentSceneController {
         }
     }
 
-    private func retainsPendingSelection(after error: Error, grant: IOSWorkspaceGrant) -> Bool {
+    func retainsPendingSelection(after error: Error, grant: IOSWorkspaceGrant) -> Bool {
         let failure: IOSWorkspaceFailure? = if let documentFailure = error as? IOSDocumentFailure,
                                                case let .access(reason) = documentFailure
         {

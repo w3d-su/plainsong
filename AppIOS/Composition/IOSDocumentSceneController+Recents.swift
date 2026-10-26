@@ -47,7 +47,12 @@ extension IOSDocumentSceneController {
             } else if handle == nil, currentGrant?.workspaceID == grant.workspaceID {
                 let selectedScopeRemainsLive = error is CancellationError && grantIsCurrent &&
                     pendingRecentNavigation?.preserves(grant) == true
-                if !selectedScopeRemainsLive {
+                // A transient cloud failure keeps the same restored file
+                // selection for Files Refresh/retry, unless this issuance was
+                // cancelled, superseded or retired by scene shutdown.
+                let pendingFileRemainsLive = !Task.isCancelled && !recentTransitionSuperseded &&
+                    !isShuttingDown && !isDisposed && retainsPendingSelection(after: error, grant: grant)
+                if !selectedScopeRemainsLive, !pendingFileRemainsLive {
                     releaseCurrentGrant()
                 }
             }
@@ -66,9 +71,7 @@ extension IOSDocumentSceneController {
 
     private func installSingleRecent(_ grant: IOSWorkspaceGrant) async throws {
         guard grant.scope == .singleFile else { return }
-        guard let location = documentLocation(for: grant.rootURL) else {
-            throw IOSDocumentFailure.access(.unsupportedType)
-        }
+        let location = try pickedDocumentLocation(for: grant.rootURL)
         try await install(location, initialText: nil)
         if Task.isCancelled || recentTransitionSuperseded {
             // Drain the returned writer through the normal close path before

@@ -72,7 +72,7 @@ final class IOSRecentAccessPresenter: ObservableObject {
                 // A cancelled issuance never routes a later completion to the UI.
             } catch {
                 if !Task.isCancelled, epoch == capturedEpoch, operationID == token {
-                    errorMessage = "The recent item could not be opened. Choose the file or folder again."
+                    errorMessage = IOSOperationFeedback.message(for: error)
                 }
             }
             guard operationID == token else { return }
