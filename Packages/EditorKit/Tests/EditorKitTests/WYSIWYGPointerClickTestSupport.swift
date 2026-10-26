@@ -15,7 +15,8 @@ enum WYSIWYGPointerClickTestSupport {
     /// The caller closes the returned window.
     static func makeEditor(
         _ source: String,
-        size: NSSize = NSSize(width: 900, height: 800)
+        size: NSSize = NSSize(width: 900, height: 800),
+        paragraphSpacing: CGFloat = 0
     ) throws -> Editor {
         let frame = NSRect(origin: .zero, size: size)
         let scrollView = MarkdownSTTextView.scrollableTextView(frame: frame)
@@ -28,6 +29,7 @@ enum WYSIWYGPointerClickTestSupport {
         textView.font = MarkdownSyntaxHighlighter.defaultFont
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.lineHeightMultiple = 1.25
+        paragraphStyle.paragraphSpacing = paragraphSpacing
         textView.defaultParagraphStyle = paragraphStyle
         let window = NSWindow(contentRect: frame, styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false

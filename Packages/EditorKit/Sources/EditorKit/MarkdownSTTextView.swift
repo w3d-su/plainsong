@@ -363,12 +363,6 @@ final class MarkdownSTTextView: STTextView {
 
     private func wysiwygZeroWidthCharacterIndex(at pointInView: CGPoint) -> Int? {
         let point = CGPoint(x: pointInView.x - (gutterView?.frame.width ?? 0), y: pointInView.y)
-        let hit = WYSIWYGPointerHitTest.characterIndex(at: point, in: self)
-        guard !hit.coversPoint, needsLayout else {
-            return hit.offset
-        }
-        // A scroll or edit since the last layout pass moved the text away from the viewport.
-        layoutSubtreeIfNeeded()
         return WYSIWYGPointerHitTest.characterIndex(at: point, in: self).offset
     }
 }

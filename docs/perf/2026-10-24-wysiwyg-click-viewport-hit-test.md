@@ -39,11 +39,13 @@ remove). At the end there is nothing below the caret, so A and B type alike ther
 single worst click in 1,296 was 19.9 ms (run 11 at the end, load 26.4); its p95 never
 exceeded 0.231 ms.
 
-Placement: every one of B's 1,296 clicks landed on the clicked line. A missed 24 per
-run, the same 8 targets in each round: link text and the thumbnail line at every
-position (the wrapped-line offset error), plus folded bold in the middle and at the end
-(whole-document layout replaced the estimated heights above the viewport and moved the
-clicked text).
+Placement: every one of B's 1,296 clicks landed in the clicked source line. That check
+compared the caret with the whole source line (paragraph), so a caret on another visual
+line of the same wrapped paragraph would also have passed; the 2026-10-26 re-run below
+checks the clicked character. A missed 24 per run, the same 8 targets in each round: link
+text and the thumbnail line at every position (the wrapped-line offset error), plus folded
+bold in the middle and at the end (whole-document layout replaced the estimated heights
+above the viewport and moved the clicked text).
 
 Raw runs (top / middle / end: first click / later-click median / p95 / keystroke, ms):
 
@@ -73,3 +75,49 @@ layout. As a negative control, re-inserting main's
 whole-document `ensureLayout` in front of the new hit-test failed it: 43.3 ms and
 1,685.9 ms clicks, all five probe paragraphs laid out, and carets on the wrong line in
 both documents.
+
+## Review-fix re-run (2026-10-26)
+
+- Commit: B′ is the review-fix commit on `phase3-wysiwyg-click-layout` (parent `1d6a22d`):
+  the viewport walk enumerates without `.ensuresLayout` and stops before a fragment without
+  layout, and a stale viewport lays out a band around the point instead of running the
+  view's layout. T is the parent `1d6a22d` with the same probe file, its stale check read
+  through `coversPoint`.
+- Environment: as above (battery power, release build); 1-minute load 9.3–20.2, recorded
+  per run below.
+- Procedure: the same command with `PLAINSONG_WYSIWYG_CLICK_PROBE_ROUNDS=3`, 3 processes in
+  the order B′ T B′. The probe changed in two ways. A caret now counts as placed only at
+  either edge of the clicked character's composed sequence, not anywhere in its source line.
+  Each position also gets one click after scrolling a screen and a half (down, or up at the
+  end) without a layout pass, at the middle of the visible area. That stale click passes
+  when, after the next layout pass, the laid-out viewport maps the same window point to the
+  same caret.
+- Result: regular clicks are unchanged; every click of every run, stale ones included,
+  landed on target. A stale click costs 1.3–15 ms on B′, against 12–40 ms on T, whose
+  click ran the view's whole layout pass.
+
+| Run | Side | Load before → after | top | middle | end |
+|---:|:---:|---|---|---|---|
+| 1 | B′ | 9.64 → 9.32 | 0.048 / 0.071 / 1.34 (1.75) | 0.070 / 0.131 / 6.24 (7.56) | 0.075 / 0.176 / 14.98 (15.64) |
+| 2 | T | 14.10 → 20.21 | 0.049 / 0.078 / 12.21 (13.88) | 0.108 / 0.439 / 40.42 (49.14) | 0.078 / 0.114 / 31.34 (32.48) |
+| 3 | B′ | 17.80 → 16.74 | 0.049 / 0.166 / 1.50 (1.74) | 0.073 / 0.178 / 6.90 (8.11) | 0.070 / 0.142 / 13.04 (24.33) |
+
+Cells: later-click median / p95 / stale-click median (max), ms. First clicks were
+0.066–0.183 ms and the keystroke after a click 2.18–8.92 ms on both sides.
+
+Placement: 216 regular clicks per run, each at the clicked character, and 9 stale clicks
+per run, each where the laid-out viewport maps the point. T's stale clicks also landed,
+because the probe leaves no post-layout action pending; the two ways T misplaces a stale
+click are covered by `WYSIWYGPointerHitTestTests` instead. A variant of B′ whose band was
+laid out from its own top missed all 12 of its stale clicks over two runs (load 49.8–74.6),
+by 44–120 characters. TextKit's height estimate for the never-laid-out text between the
+band and the next viewport's top edge put the band's lines a line or two from where the
+next layout pass drew them, so B′ lays out from that edge.
+
+The stale click's cost grows with the text above the point. TextKit's lookups by position
+(`ensureLayout(for: CGRect)`, `textLayoutFragment(for: CGPoint)`) scan the fragment frames
+above it, but lay out and create only the band's paragraphs. The viewport walk, still the
+path for every click on a laid-out viewport, does not grow: in the debug suite
+`testClickWorkDoesNotGrowWithTheDocument` visits 32 fragments at both 1,500 and 60,000
+lines. Its former wall-clock assertion is now a printed diagnostic: 0.09–0.15 ms for each
+document in this session's debug runs.
