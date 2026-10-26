@@ -97,6 +97,30 @@ final class IOSRecentAccessPresenterTests: XCTestCase {
         XCTAssertEqual(choices, [.directory])
     }
 
+    func testDownloadingFailureExplainsRetryWithoutRequiringReselection() async throws {
+        try await assertPendingFailureFeedback(.downloading)
+    }
+
+    func testOfflineFailureExplainsRetryWithoutRequiringReselection() async throws {
+        try await assertPendingFailureFeedback(.offline)
+    }
+
+    private func assertPendingFailureFeedback(_ failure: IOSWorkspaceFailure) async throws {
+        let access = IOSRecentTestAccess()
+        let id = access.add(scope: .singleFile)
+        var routes = 0
+        let presenter = IOSRecentAccessPresenter(access: access, openRecent: { _ in
+            throw IOSDocumentFailure.access(failure)
+        }, chooseAgain: { _ in XCTFail("A transient provider failure cannot require a new picker") },
+        didOpen: { _ in routes += 1 })
+        presenter.open(recordID: id)
+        try await waitUntil { !presenter.isBusy }
+        XCTAssertEqual(presenter.errorMessage, IOSOperationFeedback.message(for: IOSDocumentFailure.access(failure)))
+        XCTAssertEqual(routes, 0)
+        XCTAssertEqual(presenter.rows.map(\.id), [id])
+        XCTAssertEqual(presenter.rows.first?.status, .available)
+    }
+
     private func waitUntil(_ condition: @escaping @MainActor () -> Bool) async throws {
         for _ in 0 ..< 100 {
             if condition() {
