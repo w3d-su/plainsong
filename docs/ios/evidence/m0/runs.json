@@ -1,11 +1,11 @@
 {
-  "implementation_sha": "151ac66067745594480123dcf294e0fe533a97b4",
-  "worktree": "/private/tmp/plainsong-pr221-fix-20261026",
-  "test_attempt": "Prototypes/iOSM0/Artifacts/20261026T141055Z-test-722E0018",
-  "ipa_attempt": "Prototypes/iOSM0/Artifacts/20261026T141338Z-ipa-A06E2B91",
+  "implementation_sha": "ec8eb5c50c7a8ec3524ee9372ea677dbfd29bfe1",
+  "worktree": "/Users/davis._.su/.codex/worktrees/pr221-followup-fixes/blogeditor",
+  "test_attempt": "Prototypes/iOSM0/Artifacts/20261026T154425Z-test-EE86AB27",
+  "ipa_attempt": "Prototypes/iOSM0/Artifacts/20261026T154502Z-ipa-4218A56F",
   "hosted_result": {
-    "total": 35,
-    "passed": 35,
+    "total": 38,
+    "passed": 38,
     "failed": 0,
     "skipped": 0,
     "exit_code": 0
@@ -36,6 +36,9 @@
     "ReplacementTests/testInitialOpenFailureLeavesNoEditableDocument",
     "ReplacementTests/testNonUTF8ReplacementRetainsWorkingSession",
     "ReplacementTests/testSuccessfulReplacementAttachesNewDocument",
+    "RollbackBaselineTests/testReopenedOriginalCanonicalEquivalentBytesStillConflict",
+    "RollbackBaselineTests/testReopenedOriginalChangedWhileClosedPreservesEditorAndFencesWrites",
+    "RollbackBaselineTests/testRollbackRecoveryFailureKeepsConflictFenceAndFailureVisible",
     "SaveTests/testCanonicallyEquivalentUnicodeStillDirtyWhenBytesDiffer",
     "SaveTests/testConflictAndUnavailableRefuseOverwrite",
     "SaveTests/testFailedSavePreservesBaselineAndSource",
@@ -50,13 +53,13 @@
   "prototype_input_sha256": {
     ".gitignore": "711c29106ff9484cfb0bfdd19d107f24bcbf8b3a7d70917592bc4fddd8679a1e",
     "Fixtures/m0.md": "38b1b6a80749a22baa8cede8adf5af4ee598181ca4690dc4b7d64b6a850c5144",
-    "README.md": "04f5926ad8c5dc5c977fd1e297abd2c788e3f427995338dd9cfced96b2fb94b6",
+    "README.md": "634e9eb0a4625ff605e6bc6c696bb5d4021204d3abbe8eeea6f2d681fa12ad70",
     "Scripts/CoreChecks.swift": "53769b0ed032d95dc5a7eb7e6622882686108a005d7823cf8f9e2df8f0ee4763",
     "Scripts/package-ipa.py": "3940a9b2480bffbf923ec70c52345beccee1b23c5a62916f75c567cd90f5660b",
     "Scripts/run.sh": "7f310e563cfff1545e3a24315f7a551afce54c009df08abede816624af85496f",
     "Scripts/test-package-ipa.py": "6d8f3aa14b71f816aa3ac96de7e82654849b305da38c716b2c93219f16a8110e",
     "Sources/AccessGrant.swift": "2337f1213e106f54a37897f3051190a129a359cf19d373f07892398758e47385",
-    "Sources/DocumentSession.swift": "9b911cf62c8b33013d286733bee3525448c701d7631974257559fe36656fcfbe",
+    "Sources/DocumentSession.swift": "71df898d1aa14dc5bb79f7dd6c96594e7071399df46480b054379e8798596652",
     "Sources/Probe.swift": "15014a16698fd8a0d81718efcddc99ee659c098c2ed1bce1f114cb6fb1f0cc31",
     "Sources/ReplacementCandidate.swift": "1d8969a30161d81441880706ced493a076aa8764ff74ece5f8a92531ff4e21e5",
     "Sources/SaveLedger.swift": "1f71146114721a0b6aee8fd87ad036de521f0810e3e3e42355c2b0ec42fbfa6d",
@@ -67,14 +70,15 @@
     "Tests/CandidateStagingTests.swift": "ca8a31df9239ae877ef2fba1f1a808b7fc2e743fd5839706418b55da68579a42",
     "Tests/DocumentTests.swift": "2621c7c42e1fb283129096393b9689a932c2d3acd8f46bafd30504c3fa0ea8e4",
     "Tests/EditorTests.swift": "4d4a2f9af9d72e8a7437795de86babeef8b7ae2133332dfccc1c39b751f5d4f6",
-    "Tests/ReplacementTests.swift": "d4d335a07ee20b92338d5388e1af7bbcaf66e36d0fd49f793b716784ca588a6c",
+    "Tests/ReplacementTests.swift": "c38eb031342809d0e0e1350f1aa62d7b0c101d944a4b700d653128b77dfefd28",
+    "Tests/RollbackBaselineTests.swift": "9e14abb097f9d7c7aba1e1b99571acba63354a0e1186e9d6b42b8e0f97bdfe71",
     "Tests/SaveTests.swift": "472786a3afd81d41ae646d1e03016165e09ee00c5f81c8bdf40a0c8806e63e0f",
     "Tests/WorkflowTests.swift": "f92db3e907d6e1218154662584cdf3312934da33255b1e1804fb4205411ed24c",
     "project.yml": "6adbed2faf96946b46c17e209386f192086170a284af5a1fd2bdb5f3a2769d3d"
   },
   "ipa_receipt": {
     "artifact": "PlainsongIOSM0-unsigned.ipa",
-    "sha256": "b4fe8eb6630b7aea62e5169fb873f04b858dc7ff8f21e5d76014d0fb5d676bd9",
+    "sha256": "575c957457f4f7a148a87b9fd21fd69fe421df6e68f414f5d91aedeec32b9e55",
     "architectures": "arm64",
     "minimum_os": "26.0",
     "device_family": [
@@ -85,14 +89,16 @@
     "owner_resign_install_gate": "OPEN",
     "fixture_member": "Payload/PlainsongIOSM0.app/m0.md",
     "fixture_sha256": "38b1b6a80749a22baa8cede8adf5af4ee598181ca4690dc4b7d64b6a850c5144",
-    "fixture_bytes": 243
+    "fixture_bytes": 243,
+    "implementation_sha": "ec8eb5c50c7a8ec3524ee9372ea677dbfd29bfe1",
+    "path": "/Users/davis._.su/.codex/worktrees/pr221-followup-fixes/blogeditor/Prototypes/iOSM0/Artifacts/20261026T154502Z-ipa-4218A56F/PlainsongIOSM0-unsigned.ipa"
   },
   "receipt_paths": {
-    "test_manifest": "/private/tmp/plainsong-pr221-fix-20261026/Prototypes/iOSM0/Artifacts/20261026T141055Z-test-722E0018/manifest.json",
-    "test_log": "/private/tmp/plainsong-pr221-fix-20261026/Prototypes/iOSM0/Artifacts/20261026T141055Z-test-722E0018/run.log",
-    "xcresult": "/private/tmp/plainsong-pr221-fix-20261026/Prototypes/iOSM0/Artifacts/20261026T141055Z-test-722E0018/Tests.xcresult",
-    "ipa_manifest": "/private/tmp/plainsong-pr221-fix-20261026/Prototypes/iOSM0/Artifacts/20261026T141338Z-ipa-A06E2B91/manifest.json",
-    "ipa": "/private/tmp/plainsong-pr221-fix-20261026/Prototypes/iOSM0/Artifacts/20261026T141338Z-ipa-A06E2B91/PlainsongIOSM0-unsigned.ipa"
+    "test_manifest": "/Users/davis._.su/.codex/worktrees/pr221-followup-fixes/blogeditor/Prototypes/iOSM0/Artifacts/20261026T154425Z-test-EE86AB27/manifest.json",
+    "test_log": "/Users/davis._.su/.codex/worktrees/pr221-followup-fixes/blogeditor/Prototypes/iOSM0/Artifacts/20261026T154425Z-test-EE86AB27/run.log",
+    "xcresult": "/Users/davis._.su/.codex/worktrees/pr221-followup-fixes/blogeditor/Prototypes/iOSM0/Artifacts/20261026T154425Z-test-EE86AB27/Tests.xcresult",
+    "ipa_manifest": "/Users/davis._.su/.codex/worktrees/pr221-followup-fixes/blogeditor/Prototypes/iOSM0/Artifacts/20261026T154502Z-ipa-4218A56F/manifest.json",
+    "ipa": "/Users/davis._.su/.codex/worktrees/pr221-followup-fixes/blogeditor/Prototypes/iOSM0/Artifacts/20261026T154502Z-ipa-4218A56F/PlainsongIOSM0-unsigned.ipa"
   },
   "owner_gates": "OPEN"
 }

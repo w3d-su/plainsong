@@ -1,6 +1,6 @@
 {
   "artifact": "PlainsongIOSM0-unsigned.ipa",
-  "sha256": "b4fe8eb6630b7aea62e5169fb873f04b858dc7ff8f21e5d76014d0fb5d676bd9",
+  "sha256": "575c957457f4f7a148a87b9fd21fd69fe421df6e68f414f5d91aedeec32b9e55",
   "architectures": "arm64",
   "minimum_os": "26.0",
   "device_family": [
@@ -12,6 +12,6 @@
   "fixture_member": "Payload/PlainsongIOSM0.app/m0.md",
   "fixture_sha256": "38b1b6a80749a22baa8cede8adf5af4ee598181ca4690dc4b7d64b6a850c5144",
   "fixture_bytes": 243,
-  "implementation_sha": "151ac66067745594480123dcf294e0fe533a97b4",
-  "path": "/private/tmp/plainsong-pr221-fix-20261026/Prototypes/iOSM0/Artifacts/20261026T141338Z-ipa-A06E2B91/PlainsongIOSM0-unsigned.ipa"
+  "implementation_sha": "ec8eb5c50c7a8ec3524ee9372ea677dbfd29bfe1",
+  "path": "/Users/davis._.su/.codex/worktrees/pr221-followup-fixes/blogeditor/Prototypes/iOSM0/Artifacts/20261026T154502Z-ipa-4218A56F/PlainsongIOSM0-unsigned.ipa"
 }
