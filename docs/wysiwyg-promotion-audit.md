@@ -2,13 +2,14 @@
 
 Re-verification of every gate in `docs/wysiwyg-release-checklist.md` (A, B1-B13, C, D),
 `docs/image-thumbnail-gates.md` (I0-I10) and `docs/link-folding-gates.md` (L1-L9) against
-`origin/main` `1428bf1`, before the D.4 promotion. Most evidence dates from June-July;
+`origin/main` `1428bf1`, before the D.4 promotion, and the pointer path again after merging
+`origin/main` `03db181` (with #214) on 2026-10-26. Most evidence dates from June-July;
 the editor changed a lot since. This audit asks, per gate: does the cited evidence still
 run, does it still pass, and could a later change have invalidated it?
 
-**Result:** every automated gate still passes. Two blockers remain: the click-layout fix
-(no PR yet) and the owner's dogfood sign-off (`docs/wysiwyg-dogfood-checklist.md`), which
-includes the owner-run actual-IME harness. No WYSIWYG product bug was found. Four test
+**Result:** every automated gate still passes. The click-layout fix landed in #214 and its
+pointer gates pass on the merged branch. One blocker remains: the owner's dogfood sign-off
+(`docs/wysiwyg-dogfood-checklist.md`), which includes the owner-run actual-IME harness. No WYSIWYG product bug was found. Four test
 gaps were closed with new tests and one perf record.
 
 ## What changed since the evidence
@@ -42,6 +43,16 @@ gaps were closed with new tests and one perf record.
 - Final full EditorKit suite on the promotion head `a56f412`: 520 tests, 8 opt-in skips; the
   three new gate classes pass except the production-viewport perf gate, which failed at
   80.256 ms at load 84-89 (it passed 3/3 at load 12-14; see the perf record).
+- **After merging `origin/main` `03db181` (2026-10-26, #214 and #216/#220/#196):** full
+  EditorKit `swift test`, 528 tests, 9 opt-in skips. Every pointer-path test passes:
+  `WYSIWYGNativePointerGateTests` 5, `WYSIWYGEdgeSnappingGateTests` 17,
+  `WYSIWYGLinkNativePointerGateTests` 2, `WYSIWYGImageThumbnailNativePointerGateTests` 4,
+  #214's `WYSIWYGPointerHitTestTests` 6 and `WYSIWYGWrappedLinePointerTests` 1, and this
+  audit's gutter-pointer and cache-trim gates. The one failure was the production-viewport
+  perf gate at 126.578 ms (samples `[126.578, 75.844, 39.553]`) while load rose from 14 to 47;
+  B10, L8 and I8 stayed normal in that run (25.957, 19.256, 17.682 ms). Run alone four times
+  at load 43-48 it passed every time at 28.8-30.3 ms. It has now failed twice inside the full
+  suite and never alone, so it is flaky in full-suite context, not a regression.
 - Not run locally: full `make test` (it includes PlainsongUITests, which kill a running
   Plainsong), PreviewKit and preview-src (no WYSIWYG code path), and the opt-in
   actual-IME harness (owner-run; it switches the system input source). CI runs the first
@@ -67,8 +78,8 @@ gaps were closed with new tests and one perf record.
 | B2 Pinyin | Same | Same | **Owner rerun required** |
 | B3 Arrow near folds | Both cited tests pass | — | Holds |
 | B4 Reverse shift-selection | Both cited tests pass | — | Holds |
-| B5 Pointer click | Three cited tests pass; new gutter-visible test passes | Every pointer click lays out the whole document (`ensureLayout(documentRange)` in the hit-test) | Holds; rerun after the click-layout PR |
-| B6 Pointer drag | Passes | Same hit-test | Holds; rerun after the click-layout PR |
+| B5 Pointer click | Three cited tests pass; new gutter-visible test passes | Every pointer click laid out the whole document; #214 hit-tests the viewport | Holds; reran green after #214 |
+| B6 Pointer drag | Passes | Same hit-test, replaced by #214 | Holds; reran green after #214 |
 | B7 Raw copy | Both cited tests pass | — | Holds |
 | B8 Paste | Passes | — | Holds |
 | B9 AX value | Passes | — | Holds |
@@ -82,7 +93,7 @@ gaps were closed with new tests and one perf record.
 | Gate | Evidence rerun | Status |
 |---|---|---|
 | C.1 Reveal timing | B10 and the production-viewport gate under budget; selection-driven reparse covered by the hosted Replace/Keep Mine tests | Holds; dogfood §2 rechecks the feel |
-| C.2 Edge snapping | `WYSIWYGEdgeSnappingGateTests`: all 17 pass, including the 10 cited | Holds; pointer rows rerun after the click-layout PR |
+| C.2 Edge snapping | `WYSIWYGEdgeSnappingGateTests`: all 17 pass, including the 10 cited | Holds; pointer rows reran green after #214 |
 | C.3 Selection on delimiters | Cited tests pass; `EditorInteractionRegressionTests` 9/9 | Holds |
 | C.4 Copy policy | Cited tests pass | Holds |
 | C.5 Link folding | L1-L9 below; the owner IME run is from 2026-07-06 | Holds; owner IME rerun required |
@@ -113,7 +124,7 @@ single-file images, fenced code, tables, Mermaid/math and MDX stay raw (`testL1R
 | I3 Caret/selection | 7 cited tests pass | Holds |
 | I4 Copy/paste | 2 cited tests pass | Holds |
 | I5 IME | Opt-in; last owner run 2026-07-12 | **Owner rerun required** |
-| I6 Pointer | 4 cited tests pass | Holds; rerun after the click-layout PR |
+| I6 Pointer | 4 cited tests pass | Holds; reran green after #214 |
 | I7 AX | 3 cited tests pass | Holds |
 | I8 Perf/memory | 16.2-17.3 ms over 3 runs (was 15.234 ms); in-flight typing, off-main decode, 32 MiB cache tests pass | Holds |
 | I9 Undo/redo | 3 cited tests pass | Holds |
@@ -128,7 +139,7 @@ single-file images, fenced code, tables, Mermaid/math and MDX stay raw (`testL1R
 | L3 Destination-edge snapping | 3 cited tests pass | Holds |
 | L4 Copy/paste | 2 cited tests pass | Holds |
 | L5 IME | Opt-in; last owner run 2026-07-06 | **Owner rerun required** |
-| L6 Pointer | 2 cited tests pass | Holds; rerun after the click-layout PR |
+| L6 Pointer | 2 cited tests pass | Holds; reran green after #214 |
 | L7 AX | Passes | Holds |
 | L8 Perf | Failed once at 159.651 ms in the full suite at load 85-106 (the other samples were 24 and 30 ms); 15.6-16.0 ms over 3 isolated runs at load 12-14 (was 16.968 ms) | Holds (contention, R15) |
 | L9 Undo/redo | Passes | Holds |
@@ -146,16 +157,16 @@ single-file images, fenced code, tables, Mermaid/math and MDX stay raw (`testL1R
 3. **The pointer gates run with line numbers off.** Added
    `WYSIWYGLineNumberGutterPointerGateTests`; offsetting the click by the gutter width
    makes it fail.
-4. **Known blocker: a WYSIWYG click lays out the whole document.** The hit-test in
-   `MarkdownSTTextView.swift` (`wysiwygZeroWidthCharacterIndex`) calls
-   `ensureLayout(for: documentRange)` and enumerates every fragment. A separate session
-   owns the fix; as of this audit it has no pushed branch or PR. After it lands, rerun B5,
-   B6, C.2 pointer, I6, L6 and the new gutter test.
+4. **Former blocker: a WYSIWYG click laid out the whole document.** The hit-test called
+   `ensureLayout(for: documentRange)` and enumerated every fragment. #214 hit-tests the
+   viewport instead (a bounded TextKit band around the point when the viewport is stale,
+   native `mouseDown` when that band cannot place the caret). B5, B6, C.2 pointer, I6, L6
+   and the gutter test reran green on the merged branch.
 5. **Doc drift fixed:** EditorKit doc comments in `WYSIWYGInlineFoldPresentation.swift`,
    `EditorReplaceTypes.swift` and `WYSIWYGZeroWidthTextContentProjection.swift`; the
    checklist's §D intro still described the pre-June binary toggle. Two comments in
    `MarkdownSTTextView.swift` and `MarkdownSTTextView+WYSIWYGCaret.swift` still say
-   "non-user-facing development hook"; they are left to the click-layout change.
+   "non-user-facing development hook"; fixed after #214 merged.
 6. **Left as follow-ups:** Swift names still say Experimental
    (`experimentalWYSIWYGEnabled`, `isExperimentalWYSIWYGAvailable`, the `...ExperimentalFlag...`
    test names) and the EditorKit API still says development

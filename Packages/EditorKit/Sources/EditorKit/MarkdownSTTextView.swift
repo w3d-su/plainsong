@@ -367,7 +367,7 @@ final class MarkdownSTTextView: STTextView {
     }
 }
 
-/// Caret edge-snapping for the non-user-facing WYSIWYG development hook.
+/// Caret edge-snapping for the WYSIWYG presentation.
 ///
 /// When a *collapsed* caret would rest strictly inside a folded (zero-width) delimiter
 /// run, it is relocated to that run's edge so it never visually sits on hidden

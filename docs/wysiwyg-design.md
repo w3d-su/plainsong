@@ -13,8 +13,8 @@
 > folder-workspace image-thumbnail extensions. WYSIWYG remains available only as an
 > off-by-default Experimental mode, and stable/default promotion remains blocked by
 > `docs/wysiwyg-release-checklist.md` D.4. Promotion note (2026-10-24): the gates were
-> re-verified (`docs/wysiwyg-promotion-audit.md`) and D.4 now waits only for the click-layout
-> fix and the owner's dogfood sign-off (`docs/wysiwyg-dogfood-checklist.md`).
+> re-verified (`docs/wysiwyg-promotion-audit.md`); the click-layout fix landed in #214, and D.4
+> now waits only for the owner's dogfood sign-off (`docs/wysiwyg-dogfood-checklist.md`).
 
 ## 1. Goal & non-goals
 

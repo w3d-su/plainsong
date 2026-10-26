@@ -3,8 +3,8 @@
 > **Status: PROMOTION PREPARED, NOT SIGNED OFF. Every gate except the D.4 promotion box is
 > checked**, and every automated gate was re-verified against `origin/main` on 2026-10-24
 > (`docs/wysiwyg-promotion-audit.md`). The promotion makes WYSIWYG a normal layout choice, on
-> by default, with the Settings switch as its kill switch. It waits for the click-layout fix
-> and the owner's dogfood and actual-IME rerun (`docs/wysiwyg-dogfood-checklist.md`; B1, B2,
+> by default, with the Settings switch as its kill switch. The click-layout fix landed in #214;
+> it waits for the owner's dogfood and actual-IME rerun (`docs/wysiwyg-dogfood-checklist.md`; B1, B2,
 > I5 and L5 need that rerun). Check D.4 only with that evidence and the dated Decision Log
 > entry, and in the same change set this line to "COMPLETE: WYSIWYG left Experimental on
 > <date>" (`docs/decisions/<date>-wysiwyg-leaves-experimental.md`).
@@ -323,7 +323,7 @@ turned this into a **three-state** cycle per `agent.md` §13.
   Check this box only once every placeholder in its evidence is filled.
   Evidence: every gate re-verified against `origin/main` `1428bf1` on 2026-10-24
   (`docs/wysiwyg-promotion-audit.md`, `docs/perf/2026-10-24-wysiwyg-promotion-gates.md`); the
-  click-layout fix **<PR link>**; owner dogfood and actual-IME sign-off
+  click-layout fix #214 (pointer gates reran green on the merged branch, 2026-10-26); owner dogfood and actual-IME sign-off
   (`docs/wysiwyg-dogfood-checklist.md`) **<maintainer: date and record link>**; Decision Log
   `docs/decisions/YYYY-MM-DD-wysiwyg-leaves-experimental.md`. The switch defaults on, the
   first-launch layout is unchanged, and Settings, the View menu, the toolbar and README drop

@@ -534,7 +534,7 @@ until dogfood evidence plus a Decision Log entry justify promotion.
 
 Status 2026-10-24: every gate was re-verified against `origin/main`
 (`docs/wysiwyg-promotion-audit.md`) and the promotion is prepared in a draft PR (branch
-`phase3-wysiwyg-promotion-prep`). It waits for the click-layout fix and the owner checklist
+`phase3-wysiwyg-promotion-prep`). The click-layout fix landed in #214; it waits for the owner checklist
 `docs/wysiwyg-dogfood-checklist.md`, which includes the actual-IME harness rerun.
 
 ## Goal 11 — Link visual folding sub-gate — completed by phase2-link-folding-enable

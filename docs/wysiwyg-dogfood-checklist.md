@@ -6,8 +6,8 @@
 > VoiceOver and real documents. The automated re-verification is
 > `docs/wysiwyg-promotion-audit.md`.
 
-Run the checks on a build of the promotion branch, rebased after the click-layout PR
-(`phase3-wysiwyg-click-layout`) has merged. Use it for real writing, not only these steps.
+Run the checks on a build of the promotion branch. It includes the click-layout fix
+(#214, merged into the branch on 2026-10-26). Use it for real writing, not only these steps.
 File each problem as a GitHub issue and link it in the record below. A check fails if
 source text changes in a way you did not type, the caret lands somewhere you did not
 click or arrow to, or the app stalls.
@@ -32,7 +32,7 @@ WYSIWYG mode is on (the new default). Select WYSIWYG from the toolbar layout pic
   with both input methods enabled. Pass: 10 tests, 0 failures, neither input method
   skipped. The last run was 2026-07-12, before STTextView 2.4.1.
 
-## 2. Pointer (blocking; needs the click-layout PR)
+## 2. Pointer (blocking)
 
 - [ ] Click inside bold, strike, inline-code and link text, and on a heading. Pass: the
   caret lands where you clicked and only the touched span reveals its Markdown.
