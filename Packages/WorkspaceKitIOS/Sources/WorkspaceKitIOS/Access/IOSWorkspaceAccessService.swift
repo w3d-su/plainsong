@@ -39,15 +39,15 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
         do {
             resolution = try ports.bookmarks.resolve(bookmark)
         } catch {
-            markBookmark(bookmark, status: .needsReselection)
-            throw IOSWorkspaceFailureMapping.map(error)
+            markUnusableBookmark(bookmark, after: error)
+            try rethrowWorkspace(error)
         }
         // LANE06_GUARD_DENIED_BOOKMARK
         if let failure = resolution.failure {
             if failure == .offline {
                 throw IOSWorkspaceFailure.offline
             }
-            markBookmark(bookmark, status: .needsReselection)
+            markUnusableBookmark(bookmark, after: failure)
             throw failure
         }
         guard let url = resolution.url else {
@@ -68,8 +68,8 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
             }
             return grant
         } catch {
-            markBookmark(bookmark, status: .needsReselection)
-            throw IOSWorkspaceFailureMapping.map(error)
+            markUnusableBookmark(bookmark, after: error)
+            try rethrowWorkspace(error)
         }
     }
 
@@ -116,7 +116,10 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
     }
 
     public func refresh(_ grant: IOSWorkspaceGrant) async throws -> IOSWorkspaceSnapshot {
-        let requestID = UUID()
+        try await refresh(grant, requestID: UUID())
+    }
+
+    func refresh(_ grant: IOSWorkspaceGrant, requestID: UUID) async throws -> IOSWorkspaceSnapshot {
         let lease = try acquireLease(for: grant)
         defer { lease.release() }
         return try await directorySnapshot(for: grant, lease: lease, requestID: requestID)

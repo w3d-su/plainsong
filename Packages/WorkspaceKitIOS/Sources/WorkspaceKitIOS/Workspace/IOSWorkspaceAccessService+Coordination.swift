@@ -157,7 +157,7 @@ extension IOSWorkspaceAccessService: IOSCoordinatedFileAccess {
         } catch {
             await finishWork(context.ticket)
             if workspaceFailure(error) == .offline {
-                await publishOffline(grant.workspaceID)
+                await publishOffline(context.ticket)
             }
             try rethrowWorkspace(error)
         }
@@ -318,9 +318,9 @@ extension IOSWorkspaceAccessService {
         try publishSnapshot(snapshot, record: record)
     }
 
-    func publishOffline(_ workspaceID: IOSWorkspaceIdentity) async {
-        guard records[workspaceID] != nil else { return }
-        publish(.unavailable(workspaceID: workspaceID, reason: .offline))
+    func publishOffline(_ ticket: IOSOperationTicket) async {
+        guard !Task.isCancelled, let record = try? accept(ticket), !record.revoked, !record.stopped else { return }
+        publish(.unavailable(workspaceID: ticket.workspaceID, reason: .offline))
     }
 
     func makeEventStream(
