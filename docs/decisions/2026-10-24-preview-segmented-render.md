@@ -13,8 +13,9 @@ parse, image rewrite, Mermaid placeholders, morphdom, highlight) is unchanged.
 
 Cuts. A cut may go before a line that follows a blank line, starts in column 1, and does
 not start with `-`, `+`, `*`, an ordered-list marker (`1.`, `1)`) or a BOM, and lies after
-any frontmatter. These rules keep a list from continuing across the cut and keep a segment
-from starting with frontmatter. The segment before a cut is parsed with a sentinel
+any frontmatter (including frontmatter after one leading BOM, which micromark skips). These
+rules keep a list from continuing across the cut, keep a cut out of frontmatter, and keep a
+segment from starting with frontmatter. The segment before a cut is parsed with a sentinel
 paragraph appended on the line where the next segment starts. If the sentinel does not
 come back as a top-level paragraph of its own on that line, a construct was still open: a
 fence, `$$` math, an HTML block of kinds 1-5, MDX JSX, an expression or ESM. The cut is

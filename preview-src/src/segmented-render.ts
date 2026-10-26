@@ -212,10 +212,10 @@ function* cuts(text: string, firstOffset: number): Generator<Cut> {
  * Undefined for an opening fence that never closes: micromark-extension-frontmatter then
  * leaves the parser unable to open lists and block quotes anywhere in the document, which
  * only a whole render reproduces. Fences are `---` plus optional spaces or tabs, alone on
- * a line.
+ * a line. micromark skips one leading BOM before it looks for the opening fence.
  */
 function frontmatterEndOffset(text: string): number | undefined {
-  if (!/^---[ \t]*\r?\n/u.test(text)) return 0;
+  if (!/^\uFEFF?---[ \t]*\r?\n/u.test(text)) return 0;
   const closingFence = /\n---[ \t]*\r?(?:\n|$)/gu;
   closingFence.lastIndex = 3;
   return closingFence.exec(text) === null ? undefined : closingFence.lastIndex;

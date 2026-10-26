@@ -218,6 +218,14 @@ describe("segmented preview render", () => {
     }
   });
 
+  it.each(["md", "mdx"] as const)("does not cut %s frontmatter that follows a BOM", async (kind) => {
+    // micromark skips one leading BOM before the opening fence. The blank line inside the
+    // YAML sits past the default maximum segment length, so a cut there would be taken.
+    const fields = Array.from({ length: 1_000 }, (_, index) => `field${index}: value ${index}`);
+    const text = `\uFEFF---\n${fields.join("\n")}\n\nsummary: tail\n---\n\n# Body\n`;
+    await expectEquivalent(new SegmentedRenderer(kind), kind, text, `${kind} BOM frontmatter`);
+  });
+
   it("reuses unchanged segments", async () => {
     const renderer = new SegmentedRenderer("md", finest);
     const blocks = Array.from({ length: 40 }, (_, index) => `## Section ${index}\n\nParagraph ${index}.`);
