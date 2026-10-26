@@ -180,7 +180,12 @@ final class ReplacementTests: XCTestCase {
     @MainActor
     private func close(_ session: DocumentSession) async {
         guard let document = session.document else { return }
-        document.requestAutosave = { $0(true) }
+        if session.dirty {
+            let saved: Bool = await withCheckedContinuation { continuation in
+                session.save { continuation.resume(returning: $0) }
+            }
+            XCTAssertTrue(saved)
+        }
         let success: Bool = await withCheckedContinuation { continuation in
             document.close { continuation.resume(returning: $0) }
         }
