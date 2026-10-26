@@ -309,10 +309,11 @@ final class IOSShellSceneState: ObservableObject {
         }
     }
 
-    /// Retry opening an unavailable document at its last known location.
-    func retryOpenUnavailableDocument() {
-        guard let location = sceneSnapshot.document?.location else { return }
-        openSelectedURL(location.fileURL, scope: .singleFile)
+    /// Explicit reselection preserves the current native source until the same
+    /// scene's safe-close path permits a new grant. No same-location no-op.
+    func reselectUnavailableDocument() {
+        guard chrome.status == .unavailable else { return }
+        surfaces.reselectUnavailableWorkspace?()
     }
 
     func flushForBackground() {

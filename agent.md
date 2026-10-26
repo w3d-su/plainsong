@@ -192,6 +192,9 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 - An explicitly selected iOS single-file Markdown/MDX document that is downloading or
   offline retains its current file grant and Files snapshot for Refresh and retry.
   Availability is reported separately from document type; actual revocation still fences access.
+  Recent single-file restoration uses that same availability classification and retains
+  a live pending selection for Refresh/retry. Cancelled, superseded, revoked or retired
+  operations cannot keep an uninstalled scope; returned writers still drain safely.
 - Saves stage their temporary file beside the document and publish it with
   `renameatx_np`. A file-only grant (Open panel or Finder "Open With") refuses that sibling
   with `EPERM`; only then does the transaction stage in Foundation's item-replacement

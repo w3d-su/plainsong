@@ -1,0 +1,151 @@
+{
+  "schema": "IOS-FINAL-IPA-INDEPENDENT-AUDIT-v1",
+  "status": "PASS",
+  "audited_at_utc": "2026-10-26T08:22:10.480659+00:00",
+  "source_sha": "565a7b15b47e66de9dc08d114e4dc117c033ebe1",
+  "ipa_sha256": "ac66708d41a1b45d0c4736dc7933f43f18a0b0daf4c7b3a3b9bf719d125a860c",
+  "ipa_bytes": 3247596,
+  "packaging_provenance_revalidated": true,
+  "auditor_sha256": "1f5fbd999316013075c29243d2a0f6c072c44da1d9ffa43267d72427b00fe51c",
+  "verifier_sha256": {
+    "ios-provenance.py": "90fedebd6e4b0ebd39601208e79f53dfc3765db3832ac56b416a8d187cec1ec2",
+    "ios-resource-preflight.py": "9f2ce50c3cad3abdb76ee717dae9b030acb3c23569d430dae7bf7f64e871fa3f"
+  },
+  "zip": {
+    "members": 42,
+    "unique_members": true,
+    "crc_valid": true,
+    "only_production_app": true,
+    "signing_material_absent": true,
+    "executable_mode_preserved": true
+  },
+  "metadata": {
+    "CFBundleIdentifier": "app.plainsong.editor.ios",
+    "CFBundleExecutable": "PlainsongIOS",
+    "CFBundlePackageType": "APPL",
+    "CFBundleShortVersionString": "0.1.0",
+    "CFBundleVersion": "1",
+    "MinimumOSVersion": "26.0",
+    "UIDeviceFamily": [
+      1,
+      2
+    ],
+    "LSSupportsOpeningDocumentsInPlace": true,
+    "CFBundleDocumentTypes": [
+      {
+        "CFBundleTypeName": "Markdown Document",
+        "CFBundleTypeRole": "Editor",
+        "LSHandlerRank": "Default",
+        "LSItemContentTypes": [
+          "net.daringfireball.markdown"
+        ]
+      },
+      {
+        "CFBundleTypeName": "MDX Document",
+        "CFBundleTypeRole": "Editor",
+        "LSHandlerRank": "Owner",
+        "LSItemContentTypes": [
+          "app.plainsong.mdx"
+        ]
+      }
+    ],
+    "UTImportedTypeDeclarations": [
+      {
+        "UTTypeConformsTo": [
+          "public.plain-text"
+        ],
+        "UTTypeDescription": "Markdown Document",
+        "UTTypeIdentifier": "net.daringfireball.markdown",
+        "UTTypeTagSpecification": {
+          "public.filename-extension": [
+            "md",
+            "markdown"
+          ]
+        }
+      }
+    ],
+    "UTExportedTypeDeclarations": [
+      {
+        "UTTypeConformsTo": [
+          "public.plain-text"
+        ],
+        "UTTypeDescription": "MDX Document",
+        "UTTypeIdentifier": "app.plainsong.mdx",
+        "UTTypeTagSpecification": {
+          "public.filename-extension": [
+            "mdx"
+          ]
+        }
+      }
+    ]
+  },
+  "mach_o": {
+    "platform": "IOS",
+    "architectures": [
+      "arm64"
+    ],
+    "file_type": "MH_EXECUTE",
+    "additional_dylibs_checked": 0,
+    "minimum_os": "26.0",
+    "app_vtool_build_output": "/var/folders/v1/_k4hb2vx2vzcys_t5pbhdcdm0000gn/T/plainsong-final-ipa-audit-n4sdfdnf/Payload/PlainsongIOS.app/PlainsongIOS:\nLoad command 11\n      cmd LC_BUILD_VERSION\n  cmdsize 32\n platform IOS\n    minos 26.0\n      sdk 27.0\n   ntools 1\n     tool LD\n  version 1328.2\n",
+    "executable_sha256": "4981b9cd9c817a6794e99bdd2dd800ed1d2b601610240adbf6398330bfe69e6f"
+  },
+  "code_signatures": [
+    {
+      "member": "Payload/PlainsongIOS.app",
+      "unsigned": true
+    }
+  ],
+  "resources": {
+    "declared": 4,
+    "found": 4,
+    "missing": [],
+    "preview_files_compared": 25,
+    "preview_inventory_exact": true,
+    "required": [
+      {
+        "path": "preview/index.html",
+        "bytes": 503,
+        "sha256": "0d13d50cad21da80a8642f8e45919aa79fbbd9b2ded1b1184ac907e6e4ca3547"
+      },
+      {
+        "path": "preview/bundle.js",
+        "bytes": 797498,
+        "sha256": "288338b6b287cc18e350759098e8e8694ee030797aabef1b41386866c7fdb760"
+      },
+      {
+        "path": "preview/bundle.css",
+        "bytes": 30668,
+        "sha256": "fb2e4eaae1ce3e92ba6fc1e8863e5bbc5b6cbd0248d73029ee91be3544fd3ef6"
+      },
+      {
+        "path": "preview/font-manifest.json",
+        "bytes": 718,
+        "sha256": "cb9aa207391a171bc683027ad6acb8bbacd7d9f7b29ba6112560849176961cc8"
+      }
+    ]
+  },
+  "checks": {
+    "packaging_provenance_revalidated": true,
+    "zip_members_unique": true,
+    "zip_crc_valid": true,
+    "zip_only_production_app": true,
+    "zip_signing_material_absent": true,
+    "zip_executable_mode_preserved": true,
+    "production_bundle_identifier": true,
+    "info_minimum_os_26": true,
+    "iphone_and_ipad_families": true,
+    "in_place_files_opening": true,
+    "markdown_and_mdx_uti_validated": true,
+    "mach_o_ios_arm64_execute": true,
+    "mach_o_minimum_os_26": true,
+    "all_nested_code_unsigned": true,
+    "required_resources_present": true,
+    "preview_25_exact_inventory_and_parity": true
+  },
+  "limits": [
+    "This audit executes no application, test, build, simulator or device install.",
+    "It verifies the packaged unsigned device artifact and revalidates its existing exact-head provenance.",
+    "Owner signing/install, final product acceptance and native test execution require separate receipts."
+  ]
+}

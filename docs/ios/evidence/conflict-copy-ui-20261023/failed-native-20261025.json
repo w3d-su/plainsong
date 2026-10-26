@@ -1,0 +1,20 @@
+{
+  "failed_source_sha": "f91f7aad8bf1ba95f704b95934a57d011e4807fa",
+  "raw_evidence": "/private/tmp/plainsong-ios-conflict-copy-ui-20261025/modules/evidence/f91f7aad8bf1-test-20261025-154729-44498",
+  "executed": 486,
+  "passed": 477,
+  "failed": 9,
+  "runner_exit_code": 65,
+  "process_interruption": "None. The failed runner completed normally before the guarded cancellation check; no signal was sent and no cancellation receipt was written.",
+  "observed": [
+    "The new production Copy fixture did not start scene/runtime observation before asserting command-focus retirement.",
+    "The existing edit/preview/save workflow received conflict from the store and retained its writer at ordinary shutdown; later production-factory cases then refused process writer admission.",
+    "Static inspection confirmed Save was enabled for dirty ready states whose store/editor canWrite was false.",
+    "Separate review found the new external-resolution fence rejected native marked text before the established reload relay could defer."
+  ],
+  "repairs": [
+    {"commit": "d93979c07050c3ab5ede7b7033562239589bfded", "changes": "Match production observation lifecycle in the factory fixture; allow only Reload through marked-text transition admission and retain native deferred reconciliation. Add native composition/Undo regression."},
+    {"commit": "24d7a633f7277de6d545539229e4cfbc2e67dacd", "changes": "Gate Save on existing store/editor writable authority; test injected read-only/observation states. Establish a concrete warm-preview native edit then perform one actual enabled Save without retrying conflict or lengthening autosave delay. Preserve bytes/baseline/reopen assertions and capture failure writer state; safely drain fixture-only cleanup."}
+  ],
+  "causal_boundary": "The exact historical autosave/external-notice ordering was not instrumented. The confirmed UI eligibility defect and observation-fixture defect do not prove which private/provider event caused the original conflict. A later successful run must retain its own source and cannot erase this failure."
+}
