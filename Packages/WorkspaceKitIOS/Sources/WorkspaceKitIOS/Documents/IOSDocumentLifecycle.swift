@@ -12,9 +12,8 @@ extension IOSUIDocumentStore {
             _ = try? await saveSnapshot(entry, allowsClosing: true)
         }
         await entry.queue.drain()
-        if entry.session?.isDirty == true || entry.fenced
-            || entry.externalToken != nil || entry.pendingProposal != nil
-        {
+        await drainExternalReadsForClose(entry)
+        if entry.session?.isDirty == true || entry.fenced {
             return await retainDraft(entry)
         }
         guard let session = entry.session else { throw IOSDocumentFailure.unavailable }
@@ -27,15 +26,25 @@ extension IOSUIDocumentStore {
             throw IOSDocumentFailure.closeFailed
         }
         // Closing a provider is asynchronous. A newer source cannot be retired by its result.
-        if session.version != version || session.isDirty || entry.fenced
-            || entry.externalToken != nil || entry.pendingProposal != nil
-        {
+        await drainExternalReadsForClose(entry)
+        if session.version != version || session.isDirty || entry.fenced {
             let retained = await retainDraft(entry)
             await reopenRetainedDraft(entry)
             return retained
         }
+        entry.externalToken = nil
+        entry.pendingProposal = nil
         publishClosed(entry, superseded: false)
         return .closed
+    }
+
+    /// Drain issued I/O before releasing its lease; a clean reload proposal need not block close.
+    func drainExternalReadsForClose(_ entry: IOSDocumentEntry) async {
+        while !entry.externalReadTasks.isEmpty {
+            for read in Array(entry.externalReadTasks.values) {
+                await read.value
+            }
+        }
     }
 
     func retainDraft(_ entry: IOSDocumentEntry) async -> IOSDocumentCloseOutcome {
@@ -69,7 +78,7 @@ extension IOSUIDocumentStore {
     /// A replacement keeps the old registry slot until every old operation is drained.
     func retireForReplacement(_ entry: IOSDocumentEntry) async throws {
         if let retirement = entry.retirementTask {
-            try await retirement.value
+            _ = try await retirement.value
             return
         }
         entry.isRetiring = true
@@ -86,30 +95,34 @@ extension IOSUIDocumentStore {
             entry.isClosing = false
             refreshWritableState(entry)
         }
-        try await task.value
+        _ = try await task.value
     }
 
-    func performRetirement(_ entry: IOSDocumentEntry) async throws {
+    func performRetirement(_ entry: IOSDocumentEntry) async throws -> IOSDocumentCloseOutcome {
         do {
             if !entry.openFinished {
                 _ = try await entry.awaitReady()
             }
             // Preserve a dirty snapshot even while an earlier provider write is parked.
-            _ = try await persistStableRecovery(entry, reason: .closeIncomplete)
+            var retainedRecovery = try await persistRetirementRecovery(entry)
             await entry.queue.drain()
             let reads = Array(entry.externalReadTasks.values)
             reads.forEach { $0.cancel() }
             for read in reads {
                 await read.value
             }
-            _ = try await persistStableRecovery(entry, reason: .closeIncomplete)
+            retainedRecovery = try await persistRetirementRecovery(entry) ?? retainedRecovery
             if !entry.portClosed {
                 try await entry.filePort.close()
                 entry.portClosed = true
             }
             // Edits received during either drain or close must also be durable.
-            _ = try await persistStableRecovery(entry, reason: .closeIncomplete)
+            retainedRecovery = try await persistRetirementRecovery(entry) ?? retainedRecovery
             publishClosed(entry, superseded: true)
+            if let retainedRecovery {
+                return .retained(recovery: retainedRecovery)
+            }
+            return .closed
         } catch {
             entry.fenced = true
             let failure = (mapped(error) as? IOSDocumentFailure) ?? .closeFailed
@@ -117,6 +130,12 @@ extension IOSUIDocumentStore {
             emit(.failed(entry.identity, operationID: UUID(), reason: failure))
             throw failure
         }
+    }
+
+    /// Historical recovery does not make a subsequently saved clean document a retained draft.
+    func persistRetirementRecovery(_ entry: IOSDocumentEntry) async throws -> IOSRecoveryReceipt? {
+        guard entry.session?.isDirty == true || entry.fenced else { return nil }
+        return try await persistStableRecovery(entry, reason: .closeIncomplete)
     }
 
     func persistStableRecovery(_ entry: IOSDocumentEntry,

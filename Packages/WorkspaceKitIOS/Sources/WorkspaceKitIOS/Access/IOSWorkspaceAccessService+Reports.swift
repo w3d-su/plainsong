@@ -91,6 +91,18 @@ extension IOSWorkspaceAccessService {
         guard let record = records[queued.workspaceID], !record.stopped else { return }
         guard record.generation == queued.generation, record.rootToken == queued.rootToken else { return }
         switch queued.notice {
+        case .rootChanged:
+            refreshRoot(record)
+        case .rootDeleted:
+            _ = invalidate(record.workspaceID)
+            publish(.unavailable(workspaceID: record.workspaceID, reason: .notFound))
+        case .rootMoved:
+            // The frozen grant has an immutable root; require a newly proved selection.
+            if let bookmark = record.bookmark {
+                markBookmark(bookmark, status: .needsReselection)
+            }
+            _ = invalidate(record.workspaceID)
+            publish(.unavailable(workspaceID: record.workspaceID, reason: .grantChanged))
         case .offlineRoot:
             publish(.unavailable(workspaceID: record.workspaceID, reason: .offline))
         case let .changed(path), let .deleted(path), let .availability(path, _):
@@ -101,6 +113,29 @@ extension IOSWorkspaceAccessService {
             publish(.resourceChanged(location))
             if let destination = reportLocation(to, record: record) {
                 publish(.resourceChanged(destination))
+            }
+        }
+    }
+
+    func refreshRoot(_ record: IOSWorkspaceScopeRecord) {
+        if record.scope == .singleFile {
+            if let location = reportLocation(record.displayName, record: record) {
+                publish(.resourceChanged(location))
+            }
+            return
+        }
+        let grant = record.grant
+        Task { @MainActor in
+            do {
+                _ = try await self.refresh(grant)
+            } catch {
+                guard self.currentGrant(for: grant.workspaceID)?.accessGeneration == grant.accessGeneration else {
+                    return
+                }
+                self.publish(.unavailable(
+                    workspaceID: grant.workspaceID,
+                    reason: IOSWorkspaceFailureMapping.map(error)
+                ))
             }
         }
     }

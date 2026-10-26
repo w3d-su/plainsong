@@ -54,18 +54,23 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
             markBookmark(bookmark, status: .needsReselection)
             throw IOSWorkspaceFailure.permissionDenied
         }
-        var storedBookmark = bookmark
-        if resolution.isStale {
-            storedBookmark = try ports.bookmarks.bookmark(for: url)
-            replaceBookmark(bookmark, with: storedBookmark)
+        do {
+            // A stale bookmark must be minted by adopt, after scope admission.
+            let grant = try await adopt(
+                url: url,
+                scope: scope,
+                provenance: .bookmarkRestore,
+                bookmark: resolution.isStale ? nil : bookmark,
+                replacingGeneration: nil
+            )
+            if resolution.isStale, let refreshed = records[grant.workspaceID]?.bookmark {
+                replaceBookmark(bookmark, with: refreshed)
+            }
+            return grant
+        } catch {
+            markBookmark(bookmark, status: .needsReselection)
+            throw IOSWorkspaceFailureMapping.map(error)
         }
-        return try await adopt(
-            url: url,
-            scope: scope,
-            provenance: .bookmarkRestore,
-            bookmark: storedBookmark,
-            replacingGeneration: nil
-        )
     }
 
     public func acquireLease(for grant: IOSWorkspaceGrant) throws -> any IOSWorkspaceAccessLease {
