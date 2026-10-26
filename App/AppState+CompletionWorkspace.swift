@@ -69,6 +69,9 @@ private struct WorkspaceSearchDirtyOverlayInput {
 
 @MainActor
 extension AppState {
+    /// Refreshes completion metadata. Paths and sibling frontmatter keys are read once per
+    /// installed capture and current file; a typing pause recomputes only heading anchors and
+    /// MDX component names, and republishes only when the result literally changed.
     func scheduleCompletionWorkspaceRefresh(
         debounceNanoseconds: UInt64 = 0,
         workspaceGeneration expectedWorkspaceGeneration: UInt64? = nil
@@ -77,21 +80,15 @@ extension AppState {
 
         let snapshot = workspaceSnapshot
         let rootAuthority = workspaceSearchRootAuthority
+        let captureGeneration = workspaceInstalledCaptureGeneration
         let workspaceGeneration = expectedWorkspaceGeneration ?? workspaceGeneration
         let fileURL = currentDocument.fileURL
         let text = currentDocument.text
-        let currentFileLocation: WorkspaceFileSystemLocation? = {
-            if let retainedLocation = retainedAnchoredSessionLocation(for: currentDocument) {
-                guard retainedLocation.rootAuthority == rootAuthority else { return nil }
-                return retainedLocation
-            }
-            guard let rootAuthority, let fileURL,
-                  let relativePath = try? rootAuthority.relativePath(forFileURL: fileURL)
-            else {
-                return nil
-            }
-            return try? rootAuthority.location(relativePath: relativePath)
-        }()
+        let currentFileLocation = completionCurrentFileLocation(rootAuthority: rootAuthority)
+        let baseLookup = completionWorkspaceBaseLookup(
+            captureGeneration: captureGeneration,
+            currentFileLocation: currentFileLocation
+        )
 
         completionWorkspaceTask = Task { @MainActor [weak self] in
             if debounceNanoseconds > 0 {
@@ -102,36 +99,14 @@ extension AppState {
                 }
             }
 
-            let workspace = await Task.detached(priority: .utility) {
-                if let rootAuthority, let currentFileLocation, let snapshot {
-                    do {
-                        return try CompletionWorkspaceProvider().workspace(
-                            rootAuthority: rootAuthority,
-                            currentFileLocation: currentFileLocation,
-                            currentText: text,
-                            snapshot: snapshot
-                        )
-                    } catch {
-                        return CompletionWorkspace(
-                            currentFilePath: currentFileLocation.fileURL.lastPathComponent,
-                            currentFileHeadingAnchors: []
-                        )
-                    }
-                } else {
-                    do {
-                        return try CompletionWorkspaceProvider().workspace(
-                            rootURL: nil,
-                            currentFileURL: fileURL,
-                            currentText: text,
-                            tree: nil
-                        )
-                    } catch {
-                        return CompletionWorkspace(
-                            currentFilePath: fileURL?.lastPathComponent,
-                            currentFileHeadingAnchors: []
-                        )
-                    }
-                }
+            let (workspace, computedBase) = await Task.detached(priority: .utility) {
+                CompletionWorkspaceRefresh.workspace(
+                    currentFileLocation: currentFileLocation,
+                    snapshot: snapshot,
+                    fileURL: fileURL,
+                    text: text,
+                    baseLookup: baseLookup
+                )
             }.value
 
             guard let self,
@@ -144,8 +119,51 @@ extension AppState {
             else {
                 return
             }
+            if case let .computed(base) = computedBase,
+               let captureGeneration,
+               let currentFileLocation,
+               workspaceInstalledCaptureGeneration == captureGeneration
+            {
+                completionWorkspaceBaseCache = CompletionWorkspaceBaseCache(
+                    captureGeneration: captureGeneration,
+                    currentFileLocation: currentFileLocation,
+                    base: base
+                )
+            }
+            // An unchanged value must not publish: every AppState observer re-renders.
+            guard !completionWorkspace.isLiterallyIdentical(to: workspace) else { return }
             completionWorkspace = workspace
         }
+    }
+
+    private func completionCurrentFileLocation(
+        rootAuthority: WorkspaceFileSystemRootAuthority?
+    ) -> WorkspaceFileSystemLocation? {
+        if let retainedLocation = retainedAnchoredSessionLocation(for: currentDocument) {
+            guard retainedLocation.rootAuthority == rootAuthority else { return nil }
+            return retainedLocation
+        }
+        guard let rootAuthority, let fileURL = currentDocument.fileURL,
+              let relativePath = try? rootAuthority.relativePath(forFileURL: fileURL)
+        else {
+            return nil
+        }
+        return try? rootAuthority.location(relativePath: relativePath)
+    }
+
+    private func completionWorkspaceBaseLookup(
+        captureGeneration: UInt64?,
+        currentFileLocation: WorkspaceFileSystemLocation?
+    ) -> CompletionWorkspaceBaseLookup {
+        guard let cache = completionWorkspaceBaseCache,
+              let captureGeneration,
+              let currentFileLocation,
+              cache.captureGeneration == captureGeneration,
+              cache.currentFileLocation == currentFileLocation
+        else {
+            return .uncached
+        }
+        return .cached(cache.base)
     }
 
     func workspaceSearchDirtyOverlays(
@@ -261,17 +279,31 @@ extension AppState {
         }
     }
 
+    /// `fileResults` stays sorted by path, so a result is placed by binary search instead of
+    /// a linear lookup plus a full re-sort per event (quadratic over a large result set).
     func applyWorkspaceSearchFileResult(_ result: WorkspaceSearchFileResult) {
-        if let existingIndex = workspaceSearchState.fileResults.firstIndex(where: {
-            ExactSourceText.matches($0.relativePath, result.relativePath)
-        }) {
-            workspaceSearchState.fileResults[existingIndex] = result
-        } else {
-            workspaceSearchState.fileResults.append(result)
+        let results = workspaceSearchState.fileResults
+        var lower = 0
+        var upper = results.count
+        while lower < upper {
+            let middle = lower + (upper - lower) / 2
+            if Self.workspaceSearchPathLessThan(results[middle].relativePath, result.relativePath) {
+                lower = middle + 1
+            } else {
+                upper = middle
+            }
         }
-        workspaceSearchState.fileResults.sort {
-            Self.workspaceSearchPathLessThan($0.relativePath, $1.relativePath)
+        var index = lower
+        while index < results.count,
+              !Self.workspaceSearchPathLessThan(result.relativePath, results[index].relativePath)
+        {
+            if ExactSourceText.matches(results[index].relativePath, result.relativePath) {
+                workspaceSearchState.fileResults[index] = result
+                return
+            }
+            index += 1
         }
+        workspaceSearchState.fileResults.insert(result, at: lower)
     }
 
     func applyWorkspaceSearchSkippedFile(_ skippedFile: WorkspaceSearchSkippedFile) {

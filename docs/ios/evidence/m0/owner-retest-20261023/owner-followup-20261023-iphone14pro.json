@@ -1,0 +1,64 @@
+{
+  "status": "OWNER_REPORTED_PRECOMPOSITION_CONDITIONS_PASS",
+  "reported_local_date": "2026-10-23",
+  "timezone": "Asia/Taipei",
+  "recorded_at_utc": "2026-10-23T06:04:58.380475+00:00",
+  "source_basis": "Additional owner reply directly received in the root conversation after its explicit four-category question; the root supplied the exact question and answer for this receipt.",
+  "question_verbatim": "為了依既有 M0 關卡開始正式 App 接線，請補充目前還缺的真機結果：① 注音／拼音候選字確認及原生 Undo/Redo；② 本機 Files 與 iCloud 的檔案／資料夾開啟、儲存、重開；③ 退到背景後儲存／復原；④ 修正版 IPA 是否已自行重簽安裝。只回覆實際測過的項目與結果即可；已確認的 Fixture、A→Save→B、iPhone 14 Pro／iOS 27 不必重做或重述。",
+  "owner_report_verbatim": "都測過了，正常",
+  "device_context": {
+    "model": "iPhone 14 Pro",
+    "os": "iOS 27",
+    "basis": "Inherited from the previously established owner device context. The follow-up question explicitly said this context need not be repeated; this reply did not independently reconfirm it."
+  },
+  "named_owner_reported_conditions": {
+    "IME_Undo_Redo": {
+      "question_category_verbatim": "注音／拼音候選字確認及原生 Undo/Redo",
+      "status": "OWNER_REPORTED_PASS"
+    },
+    "local_Files_iCloud_open_save_reopen": {
+      "question_category_verbatim": "本機 Files 與 iCloud 的檔案／資料夾開啟、儲存、重開",
+      "status": "OWNER_REPORTED_PASS"
+    },
+    "background_save_recovery": {
+      "question_category_verbatim": "退到背景後儲存／復原",
+      "status": "OWNER_REPORTED_PASS"
+    },
+    "owner_resign_install": {
+      "question_category_verbatim": "修正版 IPA 是否已自行重簽安裝",
+      "status": "OWNER_REPORTED_PASS"
+    }
+  },
+  "scope_basis": "The answer covers all four categories in the immediately preceding explicit question. It supplies owner-reported results for those categories, without a per-step execution record or additional details.",
+  "precomposition_named_owner_reported_conditions_satisfied": true,
+  "delivered_unsigned_ipa_sha256": "95b7882c2ec32c0f7a01f25b46bef8b25209bf6ad5bd98fdd6db52e37347ee96",
+  "delivered_kit_sha256": "0f6cb91161d62aa738215965e66957eb4627c4f00e7f681fbab858e447f386e2",
+  "artifact_context_basis": "Inherited fixed M0 delivery context from the earlier targeted-retest receipt; the owner reported self re-sign/install, but did not supply the installed signed IPA digest.",
+  "installed_signed_ipa_sha256": null,
+  "signing_method": null,
+  "signing_tool": null,
+  "signing_tool_version": null,
+  "actual_test_started_at": null,
+  "actual_test_ended_at": null,
+  "step_by_step_evidence": null,
+  "formal_full_device_matrix_gates": {
+    "M0-IME": "OPEN",
+    "M0-Presentation": "OPEN",
+    "M0-Files": "OPEN",
+    "M0-Save": "OPEN",
+    "M0-Install": "OPEN"
+  },
+  "formal_gate_boundary": "The named owner-reported prerequisites for starting composition are satisfied for the inherited iPhone context. The complete per-device checklist and final acceptance matrix are not closed by this category-level reply.",
+  "remaining_final_acceptance": [
+    "Physical iPad",
+    "iOS/iPadOS 26 minimum runtime",
+    "Full per-device/input/provider/lifecycle checklist",
+    "Installed signed-artifact identity",
+    "Composed production App acceptance",
+    "VoiceOver and keyboard acceptance",
+    "Typing, highlighting and render performance"
+  ],
+  "composition_boundary": "This receipt records the owner prerequisite results. Candidate provider integration and real-preview readiness must be assessed separately by the integration owner; it does not certify a composed App, a new-head binary or v1 completion.",
+  "historical_fixture_timeout": "Retained; cause remains unproven. Owner-reported success does not establish its cause or erase the historical result.",
+  "preserved_receipts": "The earlier targeted-retest JSON and Markdown note, original delivery and historical evidence remain unchanged. This additional receipt supplies later owner feedback."
+}

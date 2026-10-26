@@ -9,7 +9,9 @@ import XCTest
 /// dedicated offscreen export controller uses before `exportHTML(matchingRenderID:)`.
 @MainActor
 final class ExportRenderLifecycleTests: XCTestCase {
-    private let support = ExportHTMLHostedTests()
+    private var support: ExportHTMLTestSupport {
+        ExportHTMLTestSupport(owner: self)
+    }
 
     func testRenderQueuedBeforeReadyCompletesAtItsExactIDAndFeedsExportHTML() async throws {
         let controller = try support.makeController()

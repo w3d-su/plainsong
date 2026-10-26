@@ -200,7 +200,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ui-tests
         GENERATE_INFOPLIST_FILE: YES
 
-  # C0 links declarations only. Full PreviewKit's UIKit port belongs to 07.
+  # Production composition uses the reviewed UIKit preview provider.
   PlainsongIOS:
     type: application
     platform: iOS
@@ -220,7 +220,7 @@ targets:
       - package: EditorKitIOS
       - package: WorkspaceKitIOS
       - package: PreviewKit
-        product: PreviewKitContracts
+        product: PreviewKit
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ios
@@ -319,6 +319,9 @@ targets:
     deploymentTarget: "26.0"
     sources:
       - path: Packages/PreviewKit/Tests/PreviewKitTests
+        excludes:
+          # Opt-in paired benchmarks remain available through SwiftPM.
+          - PreviewRenderDispatchProbeTests.swift
     dependencies:
       - target: IOSPreviewTestHost
       - package: PreviewKit

@@ -372,7 +372,7 @@ Acceptance (checklist §A + §B):
   attribute compatibility, no undo pollution).
 - New layout-geometry test (B13): folded-line fragment height ≈ unfolded-line height; multi-line fold does
   not displace the viewport.
-- Rerun B1–B12 against the new mechanism (IME harness opt-in). Record large-doc perf in docs/perf-log.md.
+- Rerun B1–B12 against the new mechanism (IME harness opt-in). Record large-doc perf in docs/perf/YYYY-MM-DD-<slug>.md.
 - Record the chosen mechanism in the Decision Log (`docs/decision-log.md`); update R18 (close only when A + B13 are green).
 
 Verification:
@@ -555,6 +555,10 @@ sandbox + network-client entitlements); its auto-generated changelog compares ag
 `v0.1.0-alpha.4` was published as a GitHub prerelease on 2026-10-21 (Release run 39605975561,
 `main` at `60e5ac1`, build 160, `Plainsong-0.1.0-160-unsigned.dmg`); it is a
 fix and performance release and its changelog compares against alpha.3.
+`v0.1.0-alpha.5` was published as a GitHub prerelease on @@DATE@@ (Release run @@RUN_ID@@,
+`main` at `@@TAG_SHA@@`, build @@BUILD@@, `Plainsong-0.1.0-@@BUILD@@-unsigned.dmg`); it is a
+privacy fix (#193) plus performance release, the first with a stripped executable and a
+private dSYM artifact (#192), and its changelog compares against alpha.4.
 Per-DMG clean-machine spot-checking remains good practice and is not a release
 blocker (artifact family already passed P5 with alpha.1). P1/P2 signing and notarization remain
 deferred until Apple Developer Program membership.
@@ -614,7 +618,7 @@ Branch and PR discipline:
         hidden-URL span), plus the L3/L4/L6/L7/L9 gates (keyboard, partial-URL raw copy,
         real-NSEvent pointer, accessibility, undo) and the L8 perf probe
         (visible-range fold recompute on Fixtures/large-1mb.md <= 50 ms, recorded in
-        docs/perf-log.md; add a link-dense section to the fixture if needed).
+        docs/perf/YYYY-MM-DD-<slug>.md; add a link-dense section to the fixture if needed).
   PR C: ONLY after the owner has run the opt-in actual-IME harness (L5,
         PLAINSONG_RUN_ACTUAL_IME=1, Zhuyin + Pinyin) on a real Mac: check the remaining
         gates in docs/link-folding-gates.md, add the Decision Log entry recording the

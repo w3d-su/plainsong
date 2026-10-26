@@ -13,6 +13,24 @@ final class MarkdownSTTextView: STTextView {
     var wysiwygZeroWidthContentStorageDelegate: WYSIWYGZeroWidthTextContentStorageDelegate?
     var replacePresentationSnapshot: EditorReplacePresentationSnapshot?
     private var previousTextContentStorageDelegate: NSTextContentStorageDelegate?
+    /// Source lines for scroll sync and line numbers, edited in place as the text changes.
+    private(set) lazy var lineIndexCache = EditorLineIndexCache(textView: self)
+    /// EditorKit's line-number gutter, tiled by `EditorScrollView`. STTextView's own gutter
+    /// (`showsLineNumbers`) stays off.
+    var lineNumberGutter: EditorLineNumberGutterView?
+
+    /// STTextView's scroll view setup, on the scroll view that tiles the line-number gutter.
+    override static func scrollableTextView(frame: NSRect = .zero) -> NSScrollView {
+        let scrollView = EditorScrollView(frame: frame)
+        let textView = MarkdownSTTextView()
+        scrollView.clipsToBounds = true
+        scrollView.wantsLayer = true
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = true
+        scrollView.drawsBackground = false
+        scrollView.documentView = textView
+        return scrollView
+    }
 
     /// `nil === nil` would match in source mode, where document installation disables
     /// folding on SwiftUI updates while typing: the whole-document invalidation then
@@ -345,47 +363,7 @@ final class MarkdownSTTextView: STTextView {
 
     private func wysiwygZeroWidthCharacterIndex(at pointInView: CGPoint) -> Int? {
         let point = CGPoint(x: pointInView.x - (gutterView?.frame.width ?? 0), y: pointInView.y)
-        textLayoutManager.ensureLayout(for: textLayoutManager.documentRange)
-        var nearest: (distance: CGFloat, offset: Int)?
-
-        textLayoutManager.enumerateTextLayoutFragments(
-            from: textLayoutManager.documentRange.location,
-            options: [.ensuresLayout]
-        ) { fragment in
-            let elementRange = NSRange(fragment.rangeInElement, in: textContentManager)
-            for lineFragment in fragment.textLineFragments {
-                let lineFrame = lineFragment.typographicBounds.offsetBy(
-                    dx: fragment.layoutFragmentFrame.minX,
-                    dy: fragment.layoutFragmentFrame.minY
-                )
-                let verticalDistance: CGFloat = if point.y < lineFrame.minY {
-                    lineFrame.minY - point.y
-                } else if point.y > lineFrame.maxY {
-                    point.y - lineFrame.maxY
-                } else {
-                    0
-                }
-
-                guard nearest == nil || verticalDistance < nearest!.distance else {
-                    continue
-                }
-
-                let localPoint = CGPoint(
-                    x: point.x - lineFrame.minX,
-                    y: point.y - lineFrame.minY
-                )
-                let localIndex = lineFragment.characterIndex(for: localPoint)
-                let lineRange = NSRange(
-                    location: elementRange.location + lineFragment.characterRange.location,
-                    length: lineFragment.characterRange.length
-                )
-                let offset = min(max(lineRange.location + localIndex, lineRange.location), NSMaxRange(lineRange))
-                nearest = (verticalDistance, offset)
-            }
-            return true
-        }
-
-        return nearest?.offset
+        return WYSIWYGPointerHitTest.characterIndex(at: point, in: self).offset
     }
 }
 

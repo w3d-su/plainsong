@@ -20,12 +20,6 @@ protocol RecentItemPersisting: AnyObject {
 
 extension RecentItemStore: RecentItemPersisting {}
 
-protocol WorkspaceDirectoryScanning: Sendable {
-    func snapshotCapture(root: URL) async throws -> WorkspaceDirectorySnapshotCapture
-}
-
-extension WorkspaceDirectoryScanner: WorkspaceDirectoryScanning {}
-
 protocol ExternalReloadApplicationPreparing: Sendable {
     func prepare(
         snapshot: WorkspaceCoherentFileSnapshot,
@@ -152,7 +146,7 @@ final class AppState: ObservableObject {
         }
     }
 
-    @Published var isSaving = false
+    var isSaving = false // Synchronous save guard; unpublished, since no view can observe `true`.
     @Published private(set) var layoutMode: EditorLayoutMode
     @Published var workspaceRootURL: URL? {
         didSet {
@@ -177,6 +171,8 @@ final class AppState: ObservableObject {
     @Published var workspaceSearchFocusKeyEpoch: UInt64 = 0
     /// When non-`nil`, replaces `NSWindow.isKeyWindow` for search focus eligibility (tests).
     var workspaceSearchFocusKeyWindowCheck: ((NSWindow) -> Bool)?
+    /// Windows whose split-view sidebar is hidden, so ⇧⌘F there opens Search instead of Files.
+    let workspaceSidebarHiddenWindows = NSHashTable<NSWindow>.weakObjects()
     let editorFindHost = EditorFindHost()
     @Published var editorNavigationCommand: EditorNavigationCommand?
     @Published var showAllFiles = false
@@ -244,6 +240,7 @@ final class AppState: ObservableObject {
         WorkspaceNoFollowFileWriteExpectation
     ) throws -> WorkspaceFileWriteOutcome)?
     var workspaceSearchTask: Task<Void, Never>?
+    var workspaceSearchEditRefresh = WorkspaceSearchEditRefresh()
     var workspaceSearchTaskToken: UUID?
     var workspaceSearchQueryGeneration: UInt64 = 0
     var workspaceSearchRefreshIntent: WorkspaceSearchRefreshIntent?
@@ -292,6 +289,7 @@ final class AppState: ObservableObject {
         EditorDocumentBindingInstallation: EditorDocumentSourceSynchronizer
     ] = [:]
     var completionWorkspaceTask: Task<Void, Never>?
+    var completionWorkspaceBaseCache: CompletionWorkspaceBaseCache?
     var sessionAutosaveTasks: [ObjectIdentifier: SessionBackgroundTask] = [:]
     var sessionStatisticsTasks: [ObjectIdentifier: SessionBackgroundTask] = [:]
     var documentChangeCancellable: AnyCancellable?
@@ -949,11 +947,6 @@ final class RetiredWorkspaceAuthorityOwner: @unchecked Sendable {
             authority.stop()
         }
     }
-}
-
-struct SessionBackgroundTask {
-    let token: UUID
-    let task: Task<Void, Never>
 }
 
 enum AppStateError: LocalizedError {

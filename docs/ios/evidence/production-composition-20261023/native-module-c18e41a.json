@@ -1,0 +1,43 @@
+{
+  "schema": "IOS-PRODUCTION-COMPOSITION-VALIDATION-v1",
+  "source_sha": "c18e41ace508165f8de1f1b397abb8e6e1359da6",
+  "source_dirty": false,
+  "source_fingerprint": "c85ac2fd58edef38827dcf1b843c25880a29093a4a9846f73bca0a016272d1b4",
+  "scheme": "PlainsongIOS",
+  "configuration": "Debug",
+  "xcode": "27.0 (27A5194q)",
+  "sdk": "iphonesimulator27.0",
+  "simulator_model": "iPhone 17",
+  "simulator_os": "27.0",
+  "exit_code": 0,
+  "executed": 430,
+  "passed": 430,
+  "failed": 0,
+  "skipped": 0,
+  "required_names": 63,
+  "real_provider_workflows": {
+    "IOSProductionDocumentWorkflowTests/testFilesOpenNativeEditPreviewSaveAndReopen": "Passed",
+    "IOSProductionDocumentWorkflowTests/testFolderRowsReuseTheGrantAndReopenTheDocument": "Passed",
+    "IOSProductionDocumentWorkflowTests/testNewFileUsesTheGrantedParentAndDoesNotReplaceAnExistingFile": "Passed",
+    "IOSProductionDocumentWorkflowTests/testObservationAfterOpeningImmediatelyReceivesTheCurrentDocument": "Passed",
+    "IOSProductionDocumentWorkflowTests/testSingleFileSelectionDoesNotAuthorizeItsSibling": "Passed"
+  },
+  "close_observation_regressions": {
+    "IOSDocumentCloseObservationTests/testCloseDoesNotEraseAGenerationBarrierWhileTheExternalReadDrains": "Passed",
+    "IOSDocumentCloseObservationTests/testCloseStillRetainsAChangedCleanReadAsAnUnacknowledgedReloadProposal": "Passed",
+    "IOSDocumentCloseObservationTests/testCloseStillRetainsDirtySourceAndRecoveryAfterTheParkedReadConflicts": "Passed",
+    "IOSDocumentCloseObservationTests/testCloseWaitsForAnAlreadyIssuedSelfNoticeReadBeforeClosingTheProvider": "Passed"
+  },
+  "raw_evidence_local": "/private/tmp/plainsong-ios-production-20261023/close-fixed-full/evidence/c18e41ace508-test-20261023-150246-46592",
+  "raw_files_sha256": {
+    "source.json": "e01f30cc2a340e9bb123bf8bb51fae7dc2524bc70e788c7e947ff5a4ac5c4c85",
+    "test-gate.json": "4c6f1f5fd0b4d5d87298d549c9f1b01a96dd4e6e665320625628f3432a1f2e9a",
+    "required-tests.txt": "0a348249d3419381ab36bff0d52f77520625a7eaf7ec98ad9287ecda58628186",
+    "named-tests.txt": "c042117d70b414711c5de6d944daf73be8762f892d482faab189747b83cca418",
+    "build-for-testing.log": "40f307c409ade706bc52174267cdea7d797afeb26c6e41e6995f6a65e865076d",
+    "test.log": "c59b6e1d95d88fbd5386370fe5b07d231cd1d0c3e1dad7195721e75417855e00",
+    "resources.json": "d9bbd26d854c4defb735222949138b129872a21b4dda34e38d09bdc181d31fad",
+    "admission.json": "1df917b52bbbbc061460dc2a7c27fe21666c708d8ac80d261c934d6faa091441"
+  },
+  "post_case_collection_note": "All cases completed by 15:03:55.955 +0800; xcodebuild collected simctl diagnose with its 600-second limit and completed successfully at 15:13:56.455. This wall duration is not a product performance result."
+}

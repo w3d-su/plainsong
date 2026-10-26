@@ -1,0 +1,59 @@
+{
+  "status": "OWNER_REPORTED_TARGETED_RETEST_PASS",
+  "reported_local_date": "2026-10-23",
+  "timezone": "Asia/Taipei",
+  "recorded_at_utc": "2026-10-23T05:35:02.191243+00:00",
+  "owner_report": "測完了都正常",
+  "device_context": {
+    "model": "iPhone 14 Pro",
+    "os": "iOS 27",
+    "basis": "Inherited from the owner device answer in this same conversation; not separately reconfirmed in the latest message."
+  },
+  "targeted_workflows": {
+    "Fixture": "OWNER_REPORTED_PASS",
+    "three_second_delay_A_Save_B": "OWNER_REPORTED_PASS"
+  },
+  "scope_basis": "The reply follows delivery of the fixed M0 kit and the explicit request to retest Fixture and the three-second A/Save/B workflow. Individual steps were not enumerated in this reply.",
+  "delivered_unsigned_ipa_sha256": "95b7882c2ec32c0f7a01f25b46bef8b25209bf6ad5bd98fdd6db52e37347ee96",
+  "delivered_kit_sha256": "0f6cb91161d62aa738215965e66957eb4627c4f00e7f681fbab858e447f386e2",
+  "installed_signed_ipa_sha256": null,
+  "signing_method": null,
+  "actual_test_started_at": null,
+  "actual_test_ended_at": null,
+  "step_by_step_evidence": null,
+  "formal_device_gates": {
+    "M0-IME": "OPEN",
+    "M0-Presentation": "OPEN",
+    "M0-Files": "OPEN",
+    "M0-Save": "OPEN",
+    "M0-Install": "OPEN"
+  },
+  "remaining_scope": [
+    "iPad physical device",
+    "iOS/iPadOS 26 minimum runtime",
+    "full per-device/input/provider checklist and signed-artifact identity"
+  ],
+  "historical_fixture_timeout": "Retained; cause remains unproven. A successful owner retest does not establish its cause or erase the historical result.",
+  "live_pr_snapshot": {
+    "repair_pr": 202,
+    "state": "MERGED",
+    "head_sha": "902486d167a2d73a45cf3b92952c7be11d12e660",
+    "merged_at_utc": "2026-10-22T16:53:47Z",
+    "base_branch": "codex/ios-m0-validation-20261022",
+    "ci_run": 39805639523,
+    "ci": {
+      "changes": "SUCCESS",
+      "preview": "SUCCESS",
+      "packages": "SUCCESS",
+      "hosted (app)": "SUCCESS",
+      "hosted (ui-performance)": "SUCCESS",
+      "build-and-test": "SUCCESS"
+    },
+    "dependency_pr": 191,
+    "dependency_state": "OPEN",
+    "dependency_head_sha": "74db3caffc5d4cfc7af75330a6f2c28551718108",
+    "main_integration": "NOT ESTABLISHED; PR202 merged into the verification branch and PR191 remains open."
+  },
+  "preserved_delivery": "Original kit, IPA and original evidence receipts are unchanged. This is an additional owner-feedback receipt.",
+  "production_composition_allowed": false
+}

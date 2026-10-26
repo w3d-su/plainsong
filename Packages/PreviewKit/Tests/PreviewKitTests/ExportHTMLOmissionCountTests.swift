@@ -38,8 +38,9 @@ final class ExportHTMLOmissionCountTests: XCTestCase {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
         let controller = try PreviewController(previewIndexURL: PreviewBundleFixture.indexURL())
+        defer { controller.invalidate() }
+        addTeardownBlock { @MainActor [controller] in controller.invalidate() }
         controller.exportTimeoutNanoseconds = 30_000_000_000
-        addTeardownBlock { @MainActor [weak controller] in controller?.invalidate() }
         controller.setAllowsRemoteImages(false)
 
         let render = await controller.renderForExport(DocumentTextChange(

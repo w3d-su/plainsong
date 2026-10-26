@@ -6,6 +6,30 @@ public enum CompletionWorkspaceProviderError: Error, Equatable {
     case workspaceEntryEscapesRoot(String)
 }
 
+/// Completion metadata that depends on the installed workspace capture and the current
+/// file's location, but not on the current file's text.
+public struct CompletionWorkspaceBase: Sendable, Equatable {
+    public let currentFilePath: String
+    public let currentFileKind: FileKind?
+    public let markdownFilePaths: [String]
+    public let imageFilePaths: [String]
+    public let frontmatterKeys: [String]
+
+    public init(
+        currentFilePath: String,
+        currentFileKind: FileKind?,
+        markdownFilePaths: [String],
+        imageFilePaths: [String],
+        frontmatterKeys: [String]
+    ) {
+        self.currentFilePath = currentFilePath
+        self.currentFileKind = currentFileKind
+        self.markdownFilePaths = markdownFilePaths
+        self.imageFilePaths = imageFilePaths
+        self.frontmatterKeys = frontmatterKeys
+    }
+}
+
 public struct CompletionWorkspaceProvider: Sendable {
     public init() {}
 
@@ -40,6 +64,25 @@ public struct CompletionWorkspaceProvider: Sendable {
         currentText: String,
         snapshot: WorkspaceFileSnapshot
     ) throws -> CompletionWorkspace {
+        try workspace(
+            base: workspaceBase(
+                rootAuthority: rootAuthority,
+                currentFileLocation: currentFileLocation,
+                snapshot: snapshot
+            ),
+            currentText: currentText
+        )
+    }
+
+    /// The workspace-derived half of completion metadata: snapshot paths and the sibling
+    /// frontmatter keys. It depends only on the installed capture and the current file's
+    /// location, so callers cache it per capture and recompute only `workspace(base:...)`
+    /// while the user types.
+    public func workspaceBase(
+        rootAuthority: WorkspaceFileSystemRootAuthority,
+        currentFileLocation: WorkspaceFileSystemLocation,
+        snapshot: WorkspaceFileSnapshot
+    ) throws -> CompletionWorkspaceBase {
         guard currentFileLocation.rootAuthority == rootAuthority else {
             throw CompletionWorkspaceProviderError.currentFileOutsideWorkspace
         }
@@ -57,19 +100,30 @@ public struct CompletionWorkspaceProvider: Sendable {
                 throw CompletionWorkspaceProviderError.workspaceEntryEscapesRoot(relativePath)
             }
         }
-        let frontmatterKeys = try siblingFrontmatterKeys(
+        let frontmatterKeys = siblingFrontmatterKeys(
             rootAuthority: rootAuthority,
             currentRelativePath: currentRelativePath,
             markdownPaths: markdownPaths
         )
 
-        return CompletionWorkspace(
+        return CompletionWorkspaceBase(
             currentFilePath: currentRelativePath,
+            currentFileKind: FileKind(url: currentFileLocation.fileURL),
             markdownFilePaths: markdownPaths,
             imageFilePaths: imagePaths,
+            frontmatterKeys: frontmatterKeys
+        )
+    }
+
+    /// Combines a cached base with metadata derived from the current text only.
+    public func workspace(base: CompletionWorkspaceBase, currentText: String) -> CompletionWorkspace {
+        CompletionWorkspace(
+            currentFilePath: base.currentFilePath,
+            markdownFilePaths: base.markdownFilePaths,
+            imageFilePaths: base.imageFilePaths,
             currentFileHeadingAnchors: headingAnchors(in: currentText),
-            frontmatterKeys: frontmatterKeys,
-            componentNames: FileKind(url: currentFileLocation.fileURL) == .mdx
+            frontmatterKeys: base.frontmatterKeys,
+            componentNames: base.currentFileKind == .mdx
                 ? MDXImportParser.componentNames(in: currentText)
                 : []
         )
@@ -99,6 +153,45 @@ public struct CompletionWorkspaceProvider: Sendable {
     }
 }
 
+extension CompletionWorkspaceProvider {
+    /// Frontmatter sits at the start of a file; reading a bounded prefix keeps a typing pause
+    /// from loading (and hashing) whole sibling documents. Keys after this many bytes of one
+    /// sibling's frontmatter are not offered.
+    static let siblingFrontmatterPrefixByteLimit = 32 * 1024
+
+    /// Reads at most `siblingFrontmatterPrefixByteLimit` bytes through the anchored,
+    /// no-follow descriptor walk. No digest is computed: completion only needs keys.
+    static func frontmatterPrefixText(at location: WorkspaceFileSystemLocation) -> String? {
+        guard FileKind(url: location.fileURL) != nil,
+              let data = try? WorkspaceAnchoredFileSystem.read(
+                  location,
+                  maximumByteCount: siblingFrontmatterPrefixByteLimit
+              ).data
+        else {
+            return nil
+        }
+        return decodedUTF8Prefix(
+            data,
+            mayEndInsideScalar: data.count >= siblingFrontmatterPrefixByteLimit
+        )
+    }
+
+    /// A bounded read can stop inside a multi-byte scalar. Drop at most the three bytes of an
+    /// incomplete trailing scalar; anything else that is not UTF-8 is rejected as before.
+    static func decodedUTF8Prefix(_ data: Data, mayEndInsideScalar: Bool) -> String? {
+        if let text = String(data: data, encoding: .utf8) {
+            return text
+        }
+        guard mayEndInsideScalar else { return nil }
+        for droppedByteCount in 1 ... 3 where data.count > droppedByteCount {
+            if let text = String(data: data.dropLast(droppedByteCount), encoding: .utf8) {
+                return text
+            }
+        }
+        return nil
+    }
+}
+
 private extension CompletionWorkspaceProvider {
     static let siblingFrontmatterReadLimit = 50
 
@@ -120,10 +213,9 @@ private extension CompletionWorkspaceProvider {
         rootAuthority: WorkspaceFileSystemRootAuthority,
         currentRelativePath: String,
         markdownPaths: [String]
-    ) throws -> [String] {
+    ) -> [String] {
         var keys: [String] = []
         var seen: Set<String> = []
-        let fileStore = MarkdownFileStore()
         let currentPathKey = WorkspacePathByteKey(currentRelativePath)
 
         let siblingPaths = markdownPaths.lazy
@@ -131,16 +223,19 @@ private extension CompletionWorkspaceProvider {
             // Keep completion metadata refresh bounded in large content workspaces.
             .prefix(Self.siblingFrontmatterReadLimit)
 
-        for relativePath in siblingPaths {
-            guard let location = try? rootAuthority.location(relativePath: relativePath),
-                  let text = try? fileStore.load(at: location).text
-            else {
-                continue
-            }
+        // Every sibling shares the root's security scope: enter it once for the whole pass.
+        SecurityScopedAccess.withAccess(to: rootAuthority.securityScopedURL) {
+            for relativePath in siblingPaths {
+                guard let location = try? rootAuthority.location(relativePath: relativePath),
+                      let text = Self.frontmatterPrefixText(at: location)
+                else {
+                    continue
+                }
 
-            for key in frontmatterKeys(in: text) where !seen.contains(key) {
-                seen.insert(key)
-                keys.append(key)
+                for key in frontmatterKeys(in: text) where !seen.contains(key) {
+                    seen.insert(key)
+                    keys.append(key)
+                }
             }
         }
 

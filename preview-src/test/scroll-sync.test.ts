@@ -33,7 +33,9 @@ beforeEach(async () => {
   });
   vi.spyOn(window, "scrollY", "get").mockImplementation(() => scrollY);
   vi.spyOn(window, "scrollTo").mockImplementation(((options: ScrollToOptions) => {
-    scrollY = options.top ?? scrollY;
+    // WebKit can quantize a fractional CSS-pixel target downward. In particular,
+    // 899.9999999999999 must expose the 900 -> 899 round-trip regression.
+    scrollY = Math.floor(options.top ?? scrollY);
     window.dispatchEvent(new Event("scroll"));
   }) as typeof window.scrollTo);
   document.body.innerHTML = '<main id="preview-root"></main>';
@@ -59,6 +61,71 @@ async function render(text: string) {
 const paragraphs = Array.from({ length: 200 }, (_, line) => `Paragraph ${line + 1}`).join("\n\n");
 
 describe("preview scroll sync across reflow", () => {
+  it("does not scroll or claim editor ownership for a width change without anchor reflow", async () => {
+    lineHeight = 25;
+    await render(paragraphs);
+    scrollY = 900;
+    window.dispatchEvent(new Event("scroll"));
+    await vi.waitFor(() => expect(messages.some((message) => message.name === "previewScrolled")).toBe(true));
+    vi.mocked(window.scrollTo).mockClear();
+    messages.length = 0;
+
+    // A scroller or a max-width-constrained root can change width without moving
+    // the source anchors. The fractional source position is 37.48; mapping it
+    // back produces 899.9999999999999 rather than the actual scrollY of 900.
+    resize(585);
+    expect(scrollY).toBe(900);
+    expect(window.scrollTo).not.toHaveBeenCalled();
+
+    scrollY = 950;
+    window.dispatchEvent(new Event("scroll"));
+    await vi.waitFor(() => expect(messages.some((message) => message.name === "previewScrolled")).toBe(true));
+  });
+
+  it("preserves a user scroll beyond the final source anchor when the width changes", async () => {
+    await render("One paragraph");
+    scrollY = 900;
+    window.dispatchEvent(new Event("scroll"));
+    await vi.waitFor(() => expect(messages.some((message) => message.name === "previewScrolled")).toBe(true));
+    vi.mocked(window.scrollTo).mockClear();
+
+    resize(585);
+    expect(scrollY).toBe(900);
+    expect(window.scrollTo).not.toHaveBeenCalled();
+  });
+
+  it("preserves the original pixel residual through repeated narrow and wide reflows", async () => {
+    lineHeight = 25;
+    await render(paragraphs);
+    scrollY = 900;
+    window.dispatchEvent(new Event("scroll"));
+    await vi.waitFor(() => expect(messages.some((message) => message.name === "previewScrolled")).toBe(true));
+
+    for (let cycle = 0; cycle < 3; cycle++) {
+      lineHeight = 40;
+      resize(300);
+      expect(scrollY).toBe(1447);
+      vi.mocked(window.scrollTo).mockClear();
+      resize(285);
+      expect(window.scrollTo).not.toHaveBeenCalled();
+      lineHeight = 25;
+      resize(600);
+      expect(scrollY).toBe(900);
+    }
+  });
+
+  it("does not rewrite a scroll the browser already adjusted to the reflowed anchor", async () => {
+    await render(paragraphs);
+    window.PlainsongBridge.receive({ name: "scrollToLine", payload: { line: 101, animated: false } });
+    lineHeight = 40;
+    scrollY = 100 * 40 - 12;
+    vi.mocked(window.scrollTo).mockClear();
+
+    resize(300);
+    expect(scrollY).toBe(100 * 40 - 12);
+    expect(window.scrollTo).not.toHaveBeenCalled();
+  });
+
   it("keeps the editor's source line at the top when only the preview width changes", async () => {
     await render(paragraphs);
     window.PlainsongBridge.receive({ name: "scrollToLine", payload: { line: 101, animated: false } });

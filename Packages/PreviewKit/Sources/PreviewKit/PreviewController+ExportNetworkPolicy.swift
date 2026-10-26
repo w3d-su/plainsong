@@ -27,17 +27,35 @@ extension PreviewController {
         )
     }
 
+    /// The store keeps compiled lists on disk across launches, so only the first export
+    /// compiles. The identifier is versioned: a changed rule needs a new identifier.
+    static let exportNetworkRuleIdentifier = "plainsong-export-no-http-v1"
+    static let exportNetworkRuleSource = #"[{"trigger":{"url-filter":"^https?://"},"action":{"type":"block"}}]"#
+
     private static func exportNetworkRule() async throws -> WKContentRuleList {
-        try await withCheckedThrowingContinuation { continuation in
+        if let stored = await storedExportNetworkRule() {
+            return stored
+        }
+        return try await withCheckedThrowingContinuation { continuation in
             WKContentRuleListStore.default().compileContentRuleList(
-                forIdentifier: "plainsong-export-no-http-v1",
-                encodedContentRuleList: #"[{"trigger":{"url-filter":"^https?://"},"action":{"type":"block"}}]"#
+                forIdentifier: exportNetworkRuleIdentifier,
+                encodedContentRuleList: exportNetworkRuleSource
             ) { rule, error in
                 if let rule {
                     continuation.resume(returning: rule)
                 } else {
                     continuation.resume(throwing: error ?? URLError(.resourceUnavailable))
                 }
+            }
+        }
+    }
+
+    private static func storedExportNetworkRule() async -> WKContentRuleList? {
+        await withCheckedContinuation { continuation in
+            WKContentRuleListStore.default().lookUpContentRuleList(
+                forIdentifier: exportNetworkRuleIdentifier
+            ) { rule, _ in
+                continuation.resume(returning: rule)
             }
         }
     }

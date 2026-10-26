@@ -78,7 +78,7 @@ jobs:
       - name: Acceptance component package
         run: make ios-acceptance-components
 
-      - name: Acceptance hosted smoke
+      - name: Production Files/Open launch smoke
         run: make ios-acceptance
 
       - name: Device archive (unsigned)

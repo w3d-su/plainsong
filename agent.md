@@ -56,7 +56,7 @@ projects such as Astro/Next.js content directories).
 |---|---|---|
 | Language | Swift 5.10+ (enable strict concurrency; migrate to Swift 6 language mode when all deps allow) | |
 | UI shell | SwiftUI (windows, sidebar, settings, toolbars) | |
-| Text editor | [STTextView](https://github.com/krzyzanowskim/STTextView) (TextKit 2, AppKit) wrapped in `NSViewRepresentable` | Actively maintained; provides line numbers, plugins, completion window. Keep it behind our own `MarkdownEditorView` abstraction so it can be swapped for raw `NSTextView`+TextKit 2 if needed. |
+| Text editor | [STTextView](https://github.com/krzyzanowskim/STTextView) (TextKit 2, AppKit) wrapped in `NSViewRepresentable` | Actively maintained; provides plugins and the completion window (line numbers are EditorKit's own, §6.1). Keep it behind our own `MarkdownEditorView` abstraction so it can be swapped for raw `NSTextView`+TextKit 2 if needed. |
 | Syntax highlighting | [SwiftTreeSitter](https://github.com/tree-sitter/swift-tree-sitter) behind the EditorKit `MarkdownSyntaxHighlighter` façade | Async, visible-range highlighting; Neon adoption is deferred until its dependency graph is deterministic (§18). |
 | Grammars | `tree-sitter-markdown` (block) + `tree-sitter-markdown-inline`, with injections: yaml (frontmatter), html, tsx (MDX/JSX regions), plus common fence languages (swift, js, ts, tsx, python, bash, json, css, html, yaml, go, rust) | Grammars vendored as SPM targets (each grammar repo ships an SPM package, or we wrap the C source). |
 | Structure parsing (outline, etc.) | Reuse the tree-sitter syntax tree. Optionally [swift-markdown](https://github.com/swiftlang/swift-markdown) for export tasks. | Avoid two parsers driving the same UI. |
@@ -160,8 +160,12 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 - UI mutation on `@MainActor` only.
 - tree-sitter parsing and highlight query execution off main thread (`MarkdownHighlightService`
   handles this; do not block it).
-- Preview render requests are coalesced: only the latest version may be in flight; stale
-  `renderComplete` responses are ignored.
+- Preview render requests are single-flight: one render is in JavaScript at a time and the
+  newest request replaces the pending one, sent when the in-flight render posts
+  `renderComplete` or after a 2 s watchdog (a throwing md pipeline or a stale-dropped render
+  posts nothing). Stale `renderComplete` responses still free the slot but are otherwise
+  ignored. A session render whose (session, version, file, presented document, asset root,
+  theme, remote-image policy) equals the last submission is dropped as a duplicate.
 - Editor highlight requests restart through `EditorHighlightScheduler`: each request cancels
   the executing request and replaces the pending revision in the caller's turn. One runner
   waits for cancelled work to return before starting the latest request, so at most one
@@ -185,6 +189,9 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 - Descriptor-backed parent capture and document/image authority fall back to `O_SEARCH`
   when directory read access is denied. A single-file Powerbox grant permits parent lookup
   without directory enumeration; ordinary read descriptors retain permission-loss behavior.
+- An explicitly selected iOS single-file Markdown/MDX document that is downloading or
+  offline retains its current file grant and Files snapshot for Refresh and retry.
+  Availability is reported separately from document type; actual revocation still fences access.
 - Saves stage their temporary file beside the document and publish it with
   `renameatx_np`. A file-only grant (Open panel or Finder "Open With") refuses that sibling
   with `EPERM`; only then does the transaction stage in Foundation's item-replacement
@@ -195,7 +202,8 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   the emptied directory is removed. `Scripts/check-single-file-save-sandbox.sh` exercises
   this in a signed sandboxed probe under a LaunchServices file-only grant.
 - Window chrome: a native `NavigationSplitView` with a resizable, collapsible sidebar
-  (Files / Search navigators) on macOS 27+, a fixed-width sidebar in an `HStack` before
+  (Files / Search navigators; ⇧⌘F in a window whose sidebar is hidden reveals it in
+  Search) on macOS 27+, a fixed-width sidebar in an `HStack` before
   (R17), then the document column and a right inspector for frontmatter and file details.
   Inspector intent and width are per-window scene state; visibility is derived
   (`docs/window-state-gates.md` §10.1). The `HStack` shell's window minimum is 780 pt
@@ -203,7 +211,10 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   the 521 pt Split floor). The inspector auto-collapses when the document column cannot fit it.
 - Open folder: sidebar shows the tree; filter to show only markdown-related files by
   default (`.md`, `.markdown`, `.mdx`), toggle "Show all files". Images shown so they can
-  be drag-inserted.
+  be drag-inserted. In the default mode the scan skips `WorkspaceIgnoredDirectories`
+  (`node_modules`, `dist`, `build`, `.next`, `.astro`, `.build`, `deriveddata`, `.git`;
+  the list Search ignores) without enumerating them; only the chain down to an open
+  session's file in that root is scanned inside them. "Show all files" rescans everything.
 - File tree operations: create/rename/delete/move file & folder (Finder-style, with
   trash not hard delete). Watch root recursively via `FSEventStream`; debounce 300 ms;
   reconcile tree diff instead of full reload to preserve expansion state.
@@ -211,6 +222,9 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   fresh capture in the same generation; a newer reload, workspace switch, or close cancels it.
 - External change to the open file: if editor is clean → silently reload; if dirty →
   non-modal banner "File changed on disk: Reload / Keep mine".
+- An active workspace search refreshes for document edits only after a 500 ms typing
+  pause, and only while the Search navigator shows (an edit made while Files shows
+  refreshes when Search shows again); typing never resets the search state.
 - Multiple workspace windows are structurally allowed, one preview per editor pane, but
   Phase 1 currently shares one App-scoped `AppState` across the `WindowGroup`. Separate
   windows mirror the same workspace/current document until window-scoped state is built.
@@ -240,6 +254,15 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 Configure: line numbers gutter (toggleable), invisible characters off, wraps lines,
 variable-width font allowed (default: SF Mono 13 for source mode).
 
+Line numbers are EditorKit's `EditorLineNumberGutterView`, which `EditorScrollView` tiles
+left of the clip view; STTextView's `showsLineNumbers` gutter stays off (it rebuilt one view
+per visible line and counted the paragraphs above the viewport on every layout pass). The
+gutter only draws: the laid-out viewport fragments it shows, numbered from the shared
+`EditorScrollLineIndex` (only `\n` starts a line), on the painted baseline of each source
+line's first visual line (STTextView raises lines by half their line-height multiple's
+extra height). Its width follows the line count's digits with hysteresis and never
+changes while marked text is composed.
+
 **Abstraction rule:** App/ and MarkdownCore/ must never import STTextView types. Only
 EditorKit knows the concrete editor. This keeps the Phase-2 WYSIWYG swap and any library
 replacement local to EditorKit.
@@ -253,6 +276,14 @@ replacement local to EditorKit.
   SwiftUI update. Edits, document/appearance changes and WYSIWYG selection changes
   still restart the revision-fenced scheduler; fence/frontmatter context is expanded
   once per source highlight, off the main actor.
+- Fenced-code state has one definition, `MarkdownFenceScanner` (MarkdownCore), shared by
+  the visible-range expansion, the Enter fence helper (§6.3) and MDX component
+  completion (§6.5). CommonMark §4.5 per line (`\n`, `\r`, `\r\n`): a run of ≥ 3
+  `` ` `` or `~` after ≤ 3 spaces (the Enter helper accepts any spaces/tabs, for
+  list-item fences); a backtick opener's info string has no backtick; only the same
+  character, at least as long, followed by nothing but spaces/tabs, closes; a leading
+  `---`/`+++` frontmatter block closed by the same marker is skipped. It walks native
+  UTF-8 storage with `memchr` (bridged strings as UTF-16) and returns UTF-16 offsets.
 - Applying a highlight skips runs whose stored attributes already equal the new ones:
   re-setting equal attributes still marks the run edited, and TextKit then re-typesets
   every visible paragraph. The stored result is identical either way.
@@ -283,7 +314,9 @@ replacement local to EditorKit.
   caret so bullets and manually typed italics stay natural. Wrapping: with a selection,
   typing a pair character wraps the selection. Skip-over on closing char except for `*`.
 - **Code fence helper:** typing ``` ``` ``` then Enter auto-inserts closing fence and places
-  cursor inside; language autocomplete fires after the opening fence.
+  cursor inside; language autocomplete fires after the opening fence. Inside an already
+  open fence of either marker (`~~~` included, any indentation) nothing is inserted:
+  the typed line is code or the closing fence.
 - **Smart paste:** pasting a URL over selected text creates `[selection](url)`. Pasting an
   image from clipboard saves it to `assets/` (configurable, relative to the file) and
   inserts `![](path)`. Drag-in image files insert relative-path links (copy into
@@ -345,6 +378,11 @@ the trigger characters below, or ⌃Space manually. Engine is pure Swift in Mark
 Ranking: prefix match > fuzzy; recently used boosted. Max 50 items. Never block typing —
 compute async, cancel stale requests.
 
+Workspace paths and sibling frontmatter keys are read once per installed workspace capture
+and current file (keys from the first 32 KiB of up to 50 siblings, no digest); a typing
+pause recomputes only heading anchors and MDX component names, and `completionWorkspace`
+republishes only when its value changes literally.
+
 ---
 
 ## 7. Preview (PreviewKit + preview-src)
@@ -356,6 +394,14 @@ compute async, cancel stale requests.
   view's `@StateObject` state owns its `PreviewController`: closures stored on the
   controller or handed to AppKit views capture the objects they use, never the view
   struct, so closing the workspace root releases the controller and its web view.
+  The controller (and so its WebContent process) is created the first time the preview
+  pane is shown (`LazyPreviewController`); a source-only window has none. Hiding the pane
+  keeps it. After a WebContent termination a live controller reloads the page and
+  re-submits its newest render under a new render ID, giving up after three terminations
+  without a completed render (each later render retries once); export controllers fail.
+  Only iOS arms the one-shot 2.5 s silent-initial-page retry; macOS retains its normal
+  initial load. A retry with no navigation token probes the current page when ready
+  arrives, and accepts only a protocol match from the current page generation.
 - **Security:** strict CSP (`default-src 'none'; script-src 'self'; style-src 'self'
   'unsafe-inline'; img-src asset: data: https:`), `isElementFullscreenEnabled` off, and
   no remote loads by default. The preview JS removes remote image `src` values unless
@@ -373,6 +419,8 @@ compute async, cancel stale requests.
 - Link clicks: intercepted in Swift. `http(s)` → `NSWorkspace.open` (external browser).
   Relative `.md`/`.mdx` → open that file in the editor. `#anchor` stays in JavaScript
   and scrolls the preview to a generated heading ID (Unicode and duplicate headings supported).
+  On iOS, PreviewKit also owns external browser opening; production scene observation
+  must not open its informational external-link event a second time.
 
 ### 7.2 JS pipeline (preview-src)
 
@@ -412,12 +460,20 @@ pending Mermaid wrappers. This preserves unchanged Mermaid SVG DOM, unchanged
 highlighted-code DOM, scroll position, and image loads.
 
 Frontmatter is **not** rendered as a table in the preview body; it is stripped (shown in
-the Frontmatter panel, §10). Optional toggle to show it as a styled block.
+the Frontmatter panel, §10). Optional toggle to show it as a styled block. A leading `---`
+with no closing fence is not frontmatter in the preview: `remark-frontmatter` runs only
+when the block closes (`src/frontmatter.ts`), because its concrete construct otherwise
+stops lists and block quotes from opening anywhere in the document. The `---` renders as
+a thematic break; the inspector still reports the missing closing delimiter (§10).
 
 ### 7.3 Swift ↔ JS bridge protocol
 
-`window.webkit.messageHandlers.bridge.postMessage(...)` (JS→Swift) and
-`webView.evaluateJavaScript("render(payloadJSON)")` (Swift→JS). Keep the protocol in
+`window.webkit.messageHandlers.bridge.postMessage(...)` (JS→Swift, read field by field from
+the Foundation body, never through `JSONSerialization`) and
+`window.PlainsongBridge.receive(message)` (Swift→JS). `render` goes through
+`callAsyncJavaScript` with the message as a Foundation argument, so the document text is
+never JSON-encoded, interpolated into a script, or parsed as source; the other messages are
+JSON-encoded into an `evaluateJavaScript` script. Both carry the same message shape. Keep the protocol in
 `BridgeMessage.swift` + `ExportBridgeMessages.swift` (Codable) and `bridge.ts` —
 **these must be kept in sync; both sides list message names in the same order with a
 `PROTOCOL_VERSION` constant checked at `ready`.**
@@ -471,13 +527,20 @@ block-level element.
   list is measured lazily and reused while the two anchors bounding a lookup are still
   where it recorded them; otherwise it is re-measured.
 - **Reflow:** the preview remembers the (fractional) source position at its top and
-  re-places it when its width changes (`ResizeObserver`, before paint), because the
-  editor reports nothing new when its own top line survives a window resize.
+  its actual pixel offset from the mapped anchor. A width change (`ResizeObserver`,
+  before paint) adjusts scrolling only when that anchor's layout top changes and
+  the browser has not already placed it at the target. Width notifications without
+  anchor reflow leave scroll position and ownership untouched. The pixel offset
+  survives repeated resizes without accumulating scroll-coordinate rounding.
 - The editor's source-line index is edited in place from `willChangeTextIn`
   (O(log n) per keystroke; a full rebuild walked the 1 MiB storage on every selection
   change), with a length check and a change-notification fallback that rebuild in bulk.
 - **Loop prevention:** a `scrollOwner` token (`editor` | `preview` | `none`) with 100 ms
-  decay; messages from the non-owner are dropped.
+  decay (a deadline timestamp, not a timer per event); messages from the non-owner are
+  dropped.
+- Editor viewport traffic carries no completion: one `scrollToLine` is in flight and only
+  the newest line waits. Document navigation keeps its render barrier and receipt, and
+  discards waiting viewport lines so they cannot scroll back over it.
 - Cursor-follow option: "typewriter sync" — on text edit, preview scrolls to the edited
   line (on by default, like Typora).
 
@@ -520,7 +583,9 @@ attempt without a Decision Log entry.
   type-aware controls (string, date picker for `date`, tag token field for `tags`, toggle
   for `draft`).
 - Edits write back into the source text (panel ↔ text always derived from the document;
-  the text is the single source of truth).
+  the text is the single source of truth). An inspector edit is computed from the session's
+  text at that moment and shown at once; editor typing reaches the panel after a 150 ms
+  pause, and the Yams parse reruns only when the frontmatter block itself changed.
 - Malformed YAML → panel shows raw text + error, never crashes, never rewrites what it
   cannot parse.
 - String and string-list form writes use explicitly quoted YAML scalars with serializer-owned
@@ -553,9 +618,10 @@ attempt without a Decision Log entry.
 | Memory (app host RSS) | < 400 MB in the Plainsong host process with 8 warm sessions + 2 settled live WKWebViews |
 
 Techniques: tree-sitter incremental edits (`InputEdit`), visible-range-first
-highlighting, morphdom patching, render-version dropping, LRU sessions, and bounded
-success-only Mermaid memoization by exact fence source + Mermaid-fence ordinal within a
-theme generation. The ordinal prevents duplicate Mermaid-generated SVG IDs when equal
+highlighting, a line-number gutter that draws only the visible viewport fragments from an
+incrementally edited line index, morphdom patching, render-version dropping, LRU sessions,
+and bounded success-only Mermaid memoization by exact fence source + Mermaid-fence ordinal
+within a theme generation. The ordinal prevents duplicate Mermaid-generated SVG IDs when equal
 source appears more than once; inserting or removing a fence intentionally invalidates
 shifted following ordinals. While a changed diagram renders, morphdom keeps its prior
 SVG children only as non-authoritative pending content, avoiding a temporary collapse.
@@ -569,6 +635,10 @@ which normalizes a bridged string from its first character. Edit derived indexes
 place. Release TextKit 2's cached text elements below the viewport once scrolling
 settles (`EditorTextElementCacheTrimmer`): each edit rewrites the range of every cached
 element after it, so typing above a once-viewed document end cost ~50 ms per keystroke.
+Admit each chunk against the real live viewport and selected paragraphs immediately
+before its attribute edit; a captured range is only a candidate. Keep their prefetch
+protection while releasing safe ranges around an offscreen selection. Selection-only
+changes reschedule trimming without republishing an unchanged viewport.
 The synchronous typing gates do not see SwiftUI, layout or display work a keystroke
 schedules; typing with the preview visible is measured by the opt-in hosted
 busy-slice probe (`MainThreadStallHostedTests`, `TEST_RUNNER_PLAINSONG_RUN_SCROLL_PROBE=1`).
@@ -578,6 +648,11 @@ highlighting instrumentation, not from the historical 250 KB full-document inlin
 parsing cutoff. The memory budget is scoped to deterministic app host-process RSS.
 OS-managed WebKit helper processes should be recorded as diagnostic/informational
 data because helper reuse and process-pool ownership vary across runs and CI hosts.
+
+Record a new measurement as `docs/perf/YYYY-MM-DD-<slug>.md`, one file per entry.
+`docs/perf-log.md` is the archive and takes no new sections; its header has the file
+format. The 2026-10-18 profile above, and every earlier budget, stay in that archive.
+`Scripts/editor_find_f2_evidence_tests` still reads the F2 trust-root rows there.
 
 ---
 
@@ -779,7 +854,10 @@ make format           # swiftformat . && swiftlint --fix
 7. **No new dependencies** (Swift or npm) without a Decision Log entry with rationale and
    alternatives considered.
 8. **Performance budgets (§12) are gates**, not suggestions. When touching the edit path,
-   state how you verified typing latency.
+   state how you verified typing latency. Record the measurement as a new file,
+   `docs/perf/YYYY-MM-DD-<slug>.md` (format in the `docs/perf-log.md` header). Do not
+   append a section to `docs/perf-log.md`: that shared end made open performance PRs
+   conflict, and resolving the conflict forced a full CI run.
 9. **Main-thread discipline:** parsing/rendering off main; UI on `@MainActor`. No new
    `DispatchQueue.global` calls.
 10. **Naming/style:** Swift API Design Guidelines; SwiftFormat config is authoritative;

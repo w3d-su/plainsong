@@ -83,7 +83,7 @@ extension AppState {
             return
         }
 
-        restartActiveWorkspaceSearchWithFreshOverlays()
+        scheduleEditDrivenWorkspaceSearchRefresh()
     }
 
     func invalidateWorkspaceSearchForWorkspaceGenerationAdvance() {
@@ -102,11 +102,12 @@ extension AppState {
         let selectedRoot = root
         let generation = advanceWorkspaceGeneration()
         let scanner = directoryScanner
+        let pruning = workspaceScanPruning(root: selectedRoot)
         workspaceReloadTask?.cancel()
 
         workspaceReloadTask = Task { @MainActor [weak self, scanner] in
             do {
-                let capture = try await scanner.snapshotCapture(root: selectedRoot)
+                let capture = try await scanner.snapshotCapture(root: selectedRoot, pruning: pruning)
                 guard let self else { return }
                 try await reloadWorkspaceCapture(
                     root: selectedRoot,
@@ -134,7 +135,10 @@ extension AppState {
     func reloadWorkspaceTree(root: URL, selectFirstIfNeeded: Bool) async throws {
         let selectedRoot = root
         let generation = advanceWorkspaceGeneration()
-        let capture = try await directoryScanner.snapshotCapture(root: selectedRoot)
+        let capture = try await directoryScanner.snapshotCapture(
+            root: selectedRoot,
+            pruning: workspaceScanPruning(root: selectedRoot)
+        )
         try await reloadWorkspaceCapture(
             root: selectedRoot,
             scanner: directoryScanner,
@@ -172,9 +176,57 @@ extension AppState {
                 guard isCurrentWorkspaceReload(root: root, generation: generation) else {
                     throw CancellationError()
                 }
-                capture = try await scanner.snapshotCapture(root: root)
+                capture = try await scanner.snapshotCapture(
+                    root: root,
+                    pruning: workspaceScanPruning(root: root)
+                )
             }
         }
+    }
+
+    /// "Show all files" off skips generated and vendored directories (`node_modules`,
+    /// `dist`, …) at scan time, except the chain down to a managed session's file: an open
+    /// document there must not look missing after the rescan.
+    ///
+    /// Only paths inside `root` count. During a workspace switch the outgoing workspace's
+    /// current document and its anchored binding are still installed until the new root's
+    /// first file activates; their root-relative paths name the *old* root and must not
+    /// keep, say, `node_modules/pkg` alive in the new one.
+    func workspaceScanPruning(root: URL) -> WorkspaceScanPruning {
+        guard !showAllFiles else { return .none }
+        let rootPrefixes = Set(Self.pathSpellings(of: root).map { $0.hasSuffix("/") ? $0 : $0 + "/" })
+        func namesScannedRoot(_ authority: WorkspaceFileSystemRootAuthority) -> Bool {
+            [authority.originalRootURL, authority.canonicalRootURL].contains { url in
+                let path = url.standardizedFileURL.path(percentEncoded: false)
+                return rootPrefixes.contains(path.hasSuffix("/") ? path : path + "/")
+            }
+        }
+        let installedAuthority = workspaceSearchRootAuthority.flatMap { namesScannedRoot($0) ? $0 : nil }
+        var retained: Set<String> = []
+        for session in [currentDocument] + Array(sessionCache.values) {
+            // Every spelling that may name the session inside this root; extra entries only
+            // make the scan enumerate more.
+            if let location = retainedAnchoredSessionLocation(for: session),
+               namesScannedRoot(location.rootAuthority)
+            {
+                retained.insert(location.relativePath)
+            }
+            guard let fileURL = sessionStateURL(for: session) else { continue }
+            if let installedAuthority, let relativePath = try? installedAuthority.relativePath(forFileURL: fileURL) {
+                retained.insert(relativePath)
+            }
+            for filePath in Self.pathSpellings(of: fileURL) {
+                for rootPrefix in rootPrefixes where filePath.hasPrefix(rootPrefix) {
+                    retained.insert(String(filePath.dropFirst(rootPrefix.count)))
+                }
+            }
+        }
+        return .ignoredDirectories(retaining: retained)
+    }
+
+    /// `url`'s standardized and symlink-resolved paths.
+    private static func pathSpellings(of url: URL) -> Set<String> {
+        Set([url.standardizedFileURL, url.resolvingSymlinksInPath()].map { $0.path(percentEncoded: false) })
     }
 
     func advanceWorkspaceGeneration() -> UInt64 {
@@ -800,7 +852,10 @@ extension AppState {
         }
     }
 
+    /// Also drops a waiting edit-driven refresh: every caller ends the current search (a new
+    /// query, a clear, a workspace-generation advance), so the refresh has nothing to refresh.
     func cancelWorkspaceSearchTask() {
+        workspaceSearchEditRefresh.cancel()
         workspaceSearchTask?.cancel()
         workspaceSearchTask = nil
         workspaceSearchTaskToken = nil

@@ -1,0 +1,14 @@
+{
+  "status": "OWNER_OBSERVATION_ONLY",
+  "recorded_utc": "2026-10-22T15:30:34.550067+00:00",
+  "reported_device_model": "iPhone 14 Pro",
+  "reported_os": "iOS 27",
+  "owner_report": "測完了除了fixture不工作跟delay不知道什麼意思已外都是好的",
+  "fixture_followup": "完全沒反應",
+  "installed_artifact_digest": null,
+  "original_delivered_ipa_sha256": "3a7ec6b11151a79a4279680d0152fd2bc1765652255605674ec129e0b708adcf",
+  "assessment": "The delivered original IPA has no m0.md. Other successful steps were not enumerated; Delay was not understood. No formal gate is closed from this observation.",
+  "fixed_artifact_device_retest": "OPEN",
+  "iPad_device_evidence": "OPEN",
+  "iOS_iPadOS_26_evidence": "OPEN"
+}

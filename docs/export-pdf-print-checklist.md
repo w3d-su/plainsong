@@ -141,8 +141,9 @@ Debug/Release, destination, typed writer outcome, and any remaining paths in
 - [ ] Run with source-only, source+preview and Experimental WYSIWYG, and with
   light, dark and resolved-system themes. Untitled/non-workspace windows refuse.
 
-Performance remains **pending idle-machine run** for formal PDF/Print E9. The A1
-acceptance suite now records per-fixture pages/widest page/smallest scale/capture
-time under recorded load in `docs/perf-log.md`, including the opt-in `large-1mb.md`
-capture; these are recorded-load observations, not budgets,
-and no owner-acceptance result is inferred from them.
+Performance remains **pending idle-machine run** for formal PDF/Print E9. Record that
+run as `docs/perf/YYYY-MM-DD-<slug>.md`. The A1 acceptance suite already records
+per-fixture pages/widest page/smallest scale/capture time under recorded load in the
+`docs/perf-log.md` archive, including the opt-in `large-1mb.md` capture; these are
+recorded-load observations, not budgets, and no owner-acceptance result is inferred
+from them.

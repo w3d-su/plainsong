@@ -43,6 +43,7 @@ final class ExportNetworkInterceptorTests: XCTestCase {
                 fileURL: directory.appendingPathComponent(fileKind == .mdx ? "post.mdx" : "post.md")
             )
             let export = try await makeExportController(dataStore: dataStore)
+            defer { export.invalidate() }
             // App's order (D1): forced off before the first render, whatever the live preference is.
             export.setAllowsRemoteImages(false)
             export.setTheme("light")
@@ -77,6 +78,7 @@ final class ExportNetworkInterceptorTests: XCTestCase {
 
         // Positive control: the same document with remote images allowed reaches the proxy.
         let live = try makeController(dataStore: dataStore)
+        defer { live.invalidate() }
         live.setAllowsRemoteImages(true)
         live.render(DocumentTextChange(
             text: Self.markdown,
@@ -115,7 +117,8 @@ final class ExportNetworkInterceptorTests: XCTestCase {
             proxy.stop()
         }
         let directory = try makeDirectory()
-        let live = makeController(dataStore: dataStore)
+        let live = try makeController(dataStore: dataStore)
+        defer { live.invalidate() }
         live.setAllowsRemoteImages(false)
 
         for (fileKind, source) in [(FileKind.markdown, Self.markdown), (FileKind.mdx, Self.mdx)] {
@@ -179,6 +182,11 @@ final class ExportNetworkInterceptorTests: XCTestCase {
         configuration.setURLSchemeHandler(handler, forURLScheme: "plainsong-e4")
         configuration.websiteDataStore = dataStore
         let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
+        defer {
+            webView.stopLoading()
+            webView.navigationDelegate = nil
+            webView.uiDelegate = nil
+        }
         let navigation = InterceptorNavigationWaiter()
         webView.navigationDelegate = navigation
         try webView.load(URLRequest(url: XCTUnwrap(URL(string: "plainsong-e4://document"))))
@@ -209,8 +217,8 @@ final class ExportNetworkInterceptorTests: XCTestCase {
 
     private func makeController(dataStore: WKWebsiteDataStore) throws -> PreviewController {
         let controller = try PreviewController(previewIndexURL: previewIndexURL(), websiteDataStore: dataStore)
+        addTeardownBlock { @MainActor [controller] in controller.invalidate() }
         controller.exportTimeoutNanoseconds = 30_000_000_000
-        addTeardownBlock { @MainActor [weak controller] in controller?.invalidate() }
         return controller
     }
 
@@ -218,8 +226,8 @@ final class ExportNetworkInterceptorTests: XCTestCase {
         let controller = try await PreviewController.makeHTMLExportController(
             previewIndexURL: previewIndexURL(), websiteDataStore: dataStore
         )
+        addTeardownBlock { @MainActor [controller] in controller.invalidate() }
         controller.exportTimeoutNanoseconds = 30_000_000_000
-        addTeardownBlock { @MainActor [weak controller] in controller?.invalidate() }
         return controller
     }
 

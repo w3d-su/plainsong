@@ -51,9 +51,9 @@ extension EditorFindHostedGateTests {
     func mountDesignatedKeyWorkspace(
         in group: HostedWorkspaceGroup,
         appState: AppState,
-        originX: CGFloat = 0
+        originX: CGFloat = 0,
+        width: CGFloat = 1000
     ) -> DesignatedKeyWindow {
-        let width: CGFloat = 1000
         let height: CGFloat = 680
         #if DEBUG
             EditorPreviewScrollCoordinator.latestDebugInstance = nil
@@ -78,7 +78,12 @@ extension EditorFindHostedGateTests {
         hostingView.layoutSubtreeIfNeeded()
         #if DEBUG
             let mounted = EditorPreviewScrollCoordinator.latestDebugInstance?.previewControllerForTesting
-            XCTAssertNotNil(mounted, "Hosted workspace did not mount its own preview controller")
+            // The preview controller is created on the first preview show.
+            if appState.isPreviewVisible {
+                XCTAssertNotNil(mounted, "Hosted workspace did not mount its own preview controller")
+            } else {
+                XCTAssertNil(mounted, "A hidden preview pane created a preview controller")
+            }
             previewLifecycle.capture(mounted)
         #endif
         let host = HostedWorkspace(
@@ -168,7 +173,8 @@ extension EditorFindHostedGateTests {
     /// Forces SwiftUI to re-run every mounted find field's `updateNSView` without issuing a
     /// new focus or select-all request.
     func republishFindChrome(_ appState: AppState) {
-        appState.setEditorFindUI(appState.editorFindHost.ui)
+        // `setEditorFindUI` no longer publishes an identical value; publish directly.
+        appState.objectWillChange.send()
     }
 
     private func registerTeardown(group: HostedWorkspaceGroup, fixture: WorkspaceFixture) {

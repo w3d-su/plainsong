@@ -35,18 +35,24 @@ private struct DocumentInspectorForm: View {
     let rootURL: URL?
     let replaceText: (String, DocumentSession) -> Void
 
-    /// Latest text seen on the session's change stream, or an edit made here that the
-    /// session has not echoed yet.
-    @State private var textSnapshot: String?
+    /// Parsed frontmatter shown by the rows. Assigned only when the parse result changes.
+    @State private var frontmatter = FrontmatterParseResult(block: nil)
+    /// Not observed: holds the last parsed frontmatter prefix so body-only edits skip Yams.
+    @State private var frontmatterMemo = FrontmatterParseMemo()
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 InspectorSection("Frontmatter") {
-                    FrontmatterRows(text: currentText) { newText in
-                        textSnapshot = newText
-                        replaceText(newText, session)
-                    }
+                    FrontmatterRows(
+                        result: frontmatter,
+                        currentText: { session.text },
+                        replaceText: { newText in
+                            replaceText(newText, session)
+                            // Show an edit made here at once; the debounced echo is a no-op.
+                            refreshFrontmatter(from: session.text)
+                        }
+                    )
                 }
 
                 Divider()
@@ -90,17 +96,33 @@ private struct DocumentInspectorForm: View {
         }
     }
 
-    private var currentText: String {
-        textSnapshot ?? session.text
-    }
-
-    @MainActor
-    private func observeSession() async {
-        textSnapshot = session.text
-        for await change in session.textChanges(includeCurrent: true) {
-            textSnapshot = change.text
+    private func refreshFrontmatter(from text: String) {
+        if frontmatterMemo.update(text: text) {
+            frontmatter = frontmatterMemo.result
         }
     }
+
+    /// Follows the session's text with a debounce: typing in the editor must not re-render
+    /// the inspector (or re-parse its frontmatter) on every keystroke.
+    @MainActor
+    private func observeSession() async {
+        refreshFrontmatter(from: session.text)
+        var debounce: Task<Void, Never>?
+        defer { debounce?.cancel() }
+        for await change in session.textChanges(includeCurrent: false) {
+            debounce?.cancel()
+            let text = change.text
+            debounce = Task { @MainActor in
+                try? await Task.sleep(for: InspectorTiming.textDebounce)
+                guard !Task.isCancelled else { return }
+                refreshFrontmatter(from: text)
+            }
+        }
+    }
+}
+
+enum InspectorTiming {
+    static let textDebounce: Duration = .milliseconds(150)
 }
 
 /// An inspector section like Xcode's: a bold title over a two-column label/value grid.

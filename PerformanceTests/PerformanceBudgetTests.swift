@@ -430,7 +430,7 @@ final class PerformanceBudgetTests: XCTestCase {
     }
 }
 
-private extension PerformanceBudgetTests {
+extension PerformanceBudgetTests {
     struct TypingScenario {
         let label: String
         let fileKind: FileKind

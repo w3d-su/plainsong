@@ -211,234 +211,152 @@ extension AppState {
         )
     }
 
-    func recordRestoringCreationDestinationParent(
-        _ record: WorkspaceMutationOperationRecoveryRecord
-    ) -> (
+    typealias RecordRestoration = (
         record: WorkspaceMutationOperationRecoveryRecord,
         authority: RestoredMutationBookmarkAuthority,
         didUpdate: Bool
-    ) {
-        let authority = restoredCreationDestinationParentAuthority(from: record)
+    )
+
+    /// Writes a restored authority's refreshed bookmark back into `record`. `replacing`
+    /// returns the payload with that slot replaced, or `nil` when the record has no such slot;
+    /// an authority that refreshed nothing leaves the record unchanged.
+    private func recordRestoring(
+        _ record: WorkspaceMutationOperationRecoveryRecord,
+        authority: RestoredMutationBookmarkAuthority,
+        replacing: (Data, URL) -> WorkspaceMutationOperationRecoveryRecord.Payload?
+    ) -> RecordRestoration {
         guard let bookmarkData = authority.refreshedBookmarkData,
               let displayURL = authority.displayURL,
-              case let .creation(creation) = record.payload,
-              let leafName = creation.destinationLeafName,
-              let parentExpectation = creation.destinationLocatorParentExpectation
+              let payload = replacing(bookmarkData, displayURL)
         else {
             return (record, authority, false)
         }
         return (
-            record.replacingPayload(
-                .creation(creation.replacingDestinationParentLocator(
-                    bookmarkData: bookmarkData,
-                    displayURL: displayURL,
-                    leafName: leafName,
-                    parentExpectation: parentExpectation
-                )),
-                textRecoveryRecords: record.textRecoveryRecords
-            ),
+            record.replacingPayload(payload, textRecoveryRecords: record.textRecoveryRecords),
             authority,
             true
         )
+    }
+
+    func recordRestoringCreationDestinationParent(
+        _ record: WorkspaceMutationOperationRecoveryRecord
+    ) -> RecordRestoration {
+        let authority = restoredCreationDestinationParentAuthority(from: record)
+        return recordRestoring(record, authority: authority) { bookmarkData, displayURL in
+            guard case let .creation(creation) = record.payload,
+                  let leafName = creation.destinationLeafName,
+                  let parentExpectation = creation.destinationLocatorParentExpectation
+            else { return nil }
+            return .creation(creation.replacingDestinationParentLocator(
+                bookmarkData: bookmarkData,
+                displayURL: displayURL,
+                leafName: leafName,
+                parentExpectation: parentExpectation
+            ))
+        }
     }
 
     func recordRestoringCreationCreatedItem(
         _ record: WorkspaceMutationOperationRecoveryRecord
-    ) -> (
-        record: WorkspaceMutationOperationRecoveryRecord,
-        authority: RestoredMutationBookmarkAuthority,
-        didUpdate: Bool
-    ) {
+    ) -> RecordRestoration {
         let authority = restoredCreationCreatedItemAuthority(from: record)
-        guard let bookmarkData = authority.refreshedBookmarkData,
-              let displayURL = authority.displayURL,
-              case let .creation(creation) = record.payload
-        else {
-            return (record, authority, false)
+        return recordRestoring(record, authority: authority) { bookmarkData, displayURL in
+            guard case let .creation(creation) = record.payload else { return nil }
+            return .creation(creation.replacingCreatedItemAuthority(
+                bookmarkData: bookmarkData,
+                displayURL: displayURL
+            ))
         }
-        return (
-            record.replacingPayload(
-                .creation(creation.replacingCreatedItemAuthority(
-                    bookmarkData: bookmarkData,
-                    displayURL: displayURL
-                )),
-                textRecoveryRecords: record.textRecoveryRecords
-            ),
-            authority,
-            true
-        )
     }
 
     func recordRestoringReportedTrashAuthority(
         _ record: WorkspaceMutationOperationRecoveryRecord
-    ) -> (
-        record: WorkspaceMutationOperationRecoveryRecord,
-        authority: RestoredMutationBookmarkAuthority,
-        didUpdate: Bool
-    ) {
+    ) -> RecordRestoration {
         let authority = restoredReportedTrashAuthority(from: record)
-        guard let bookmarkData = authority.refreshedBookmarkData,
-              let displayURL = authority.displayURL,
-              case let .trash(trash) = record.payload
-        else {
-            return (record, authority, false)
+        return recordRestoring(record, authority: authority) { bookmarkData, displayURL in
+            guard case let .trash(trash) = record.payload else { return nil }
+            return .trash(trash.replacingReportedTrashAuthority(
+                bookmarkData: bookmarkData,
+                displayURL: displayURL
+            ))
         }
-        return (
-            record.replacingPayload(
-                .trash(trash.replacingReportedTrashAuthority(
-                    bookmarkData: bookmarkData,
-                    displayURL: displayURL
-                )),
-                textRecoveryRecords: record.textRecoveryRecords
-            ),
-            authority,
-            true
-        )
     }
 
     func recordRestoringTrashExpectedItemAuthority(
         _ record: WorkspaceMutationOperationRecoveryRecord
-    ) -> (
-        record: WorkspaceMutationOperationRecoveryRecord,
-        authority: RestoredMutationBookmarkAuthority,
-        didUpdate: Bool
-    ) {
+    ) -> RecordRestoration {
         let authority = restoredTrashExpectedItemAuthority(from: record)
-        guard let bookmarkData = authority.refreshedBookmarkData,
-              let displayURL = authority.displayURL,
-              case let .trash(trash) = record.payload
-        else {
-            return (record, authority, false)
+        return recordRestoring(record, authority: authority) { bookmarkData, displayURL in
+            guard case let .trash(trash) = record.payload else { return nil }
+            return .trash(trash.replacingExpectedItemAuthority(
+                bookmarkData: bookmarkData,
+                displayURL: displayURL
+            ))
         }
-        return (
-            record.replacingPayload(
-                .trash(trash.replacingExpectedItemAuthority(
-                    bookmarkData: bookmarkData,
-                    displayURL: displayURL
-                )),
-                textRecoveryRecords: record.textRecoveryRecords
-            ),
-            authority,
-            true
-        )
     }
 
     func recordRestoringTrashSourceParent(
         _ record: WorkspaceMutationOperationRecoveryRecord
-    ) -> (
-        record: WorkspaceMutationOperationRecoveryRecord,
-        authority: RestoredMutationBookmarkAuthority,
-        didUpdate: Bool
-    ) {
+    ) -> RecordRestoration {
         let authority = restoredTrashSourceParentAuthority(from: record)
-        guard let bookmarkData = authority.refreshedBookmarkData,
-              let displayURL = authority.displayURL,
-              case let .trash(trash) = record.payload,
-              let leafName = trash.sourceLeafName
-        else {
-            return (record, authority, false)
+        return recordRestoring(record, authority: authority) { bookmarkData, displayURL in
+            guard case let .trash(trash) = record.payload,
+                  let leafName = trash.sourceLeafName
+            else { return nil }
+            return .trash(trash.replacingSourceParentLocator(
+                bookmarkData: bookmarkData,
+                displayURL: displayURL,
+                leafName: leafName,
+                parentExpectation: trash.sourceLocatorParentExpectation
+            ))
         }
-        return (
-            record.replacingPayload(
-                .trash(trash.replacingSourceParentLocator(
-                    bookmarkData: bookmarkData,
-                    displayURL: displayURL,
-                    leafName: leafName,
-                    parentExpectation: trash.sourceLocatorParentExpectation
-                )),
-                textRecoveryRecords: record.textRecoveryRecords
-            ),
-            authority,
-            true
-        )
     }
 
     func recordRestoringRelocationSourceParent(
         _ record: WorkspaceMutationOperationRecoveryRecord
-    ) -> (
-        record: WorkspaceMutationOperationRecoveryRecord,
-        authority: RestoredMutationBookmarkAuthority,
-        didUpdate: Bool
-    ) {
+    ) -> RecordRestoration {
         let authority = restoredRelocationSourceParentAuthority(from: record)
-        guard let bookmarkData = authority.refreshedBookmarkData,
-              let displayURL = authority.displayURL,
-              case let .relocation(relocation) = record.payload,
-              let leafName = relocation.sourceLeafName
-        else {
-            return (record, authority, false)
+        return recordRestoring(record, authority: authority) { bookmarkData, displayURL in
+            guard case let .relocation(relocation) = record.payload,
+                  let leafName = relocation.sourceLeafName
+            else { return nil }
+            return .relocation(relocation.replacingSourceParentLocator(
+                bookmarkData: bookmarkData,
+                displayURL: displayURL,
+                leafName: leafName,
+                parentExpectation: relocation.sourceLocatorParentExpectation
+            ))
         }
-        return (
-            record.replacingPayload(
-                .relocation(relocation.replacingSourceParentLocator(
-                    bookmarkData: bookmarkData,
-                    displayURL: displayURL,
-                    leafName: leafName,
-                    parentExpectation: relocation.sourceLocatorParentExpectation
-                )),
-                textRecoveryRecords: record.textRecoveryRecords
-            ),
-            authority,
-            true
-        )
     }
 
     func recordRestoringRelocationDestinationParent(
         _ record: WorkspaceMutationOperationRecoveryRecord
-    ) -> (
-        record: WorkspaceMutationOperationRecoveryRecord,
-        authority: RestoredMutationBookmarkAuthority,
-        didUpdate: Bool
-    ) {
+    ) -> RecordRestoration {
         let authority = restoredRelocationDestinationParentAuthority(from: record)
-        guard let bookmarkData = authority.refreshedBookmarkData,
-              let displayURL = authority.displayURL,
-              case let .relocation(relocation) = record.payload,
-              let leafName = relocation.destinationLeafName
-        else {
-            return (record, authority, false)
+        return recordRestoring(record, authority: authority) { bookmarkData, displayURL in
+            guard case let .relocation(relocation) = record.payload,
+                  let leafName = relocation.destinationLeafName
+            else { return nil }
+            return .relocation(relocation.replacingDestinationParentLocator(
+                bookmarkData: bookmarkData,
+                displayURL: displayURL,
+                leafName: leafName,
+                parentExpectation: relocation.destinationLocatorParentExpectation
+            ))
         }
-        return (
-            record.replacingPayload(
-                .relocation(relocation.replacingDestinationParentLocator(
-                    bookmarkData: bookmarkData,
-                    displayURL: displayURL,
-                    leafName: leafName,
-                    parentExpectation:
-                    relocation.destinationLocatorParentExpectation
-                )),
-                textRecoveryRecords: record.textRecoveryRecords
-            ),
-            authority,
-            true
-        )
     }
 
     func recordRestoringRelocatedItem(
         _ record: WorkspaceMutationOperationRecoveryRecord
-    ) -> (
-        record: WorkspaceMutationOperationRecoveryRecord,
-        authority: RestoredMutationBookmarkAuthority,
-        didUpdate: Bool
-    ) {
+    ) -> RecordRestoration {
         let authority = restoredRelocationItemAuthority(from: record)
-        guard let bookmarkData = authority.refreshedBookmarkData,
-              let displayURL = authority.displayURL,
-              case let .relocation(relocation) = record.payload
-        else {
-            return (record, authority, false)
+        return recordRestoring(record, authority: authority) { bookmarkData, displayURL in
+            guard case let .relocation(relocation) = record.payload else { return nil }
+            return .relocation(relocation.replacingRelocatedItemAuthority(
+                bookmarkData: bookmarkData,
+                displayURL: displayURL
+            ))
         }
-        return (
-            record.replacingPayload(
-                .relocation(relocation.replacingRelocatedItemAuthority(
-                    bookmarkData: bookmarkData,
-                    displayURL: displayURL
-                )),
-                textRecoveryRecords: record.textRecoveryRecords
-            ),
-            authority,
-            true
-        )
     }
 
     func persistAndInstallWorkspaceMutationRecovery(
@@ -1283,6 +1201,13 @@ extension AppState {
     }
 
     struct RestoredMutationBookmarkAuthority {
+        /// An authority that could not be restored: no location, bookmark or display URL.
+        static let unavailable = RestoredMutationBookmarkAuthority(
+            location: nil,
+            refreshedBookmarkData: nil,
+            displayURL: nil
+        )
+
         let location: WorkspaceFileSystemLocation?
         let refreshedBookmarkData: Data?
         let displayURL: URL?
@@ -1389,11 +1314,7 @@ extension AppState {
         guard case let .creation(context) = record.payload,
               let parentExpectation = context.destinationLocatorParentExpectation
         else {
-            return RestoredMutationBookmarkAuthority(
-                location: nil,
-                refreshedBookmarkData: nil,
-                displayURL: nil
-            )
+            return .unavailable
         }
         return restoredWorkspaceMutationParentEntryAuthority(
             bookmarkData: context.destinationParentBookmarkData,
@@ -1410,11 +1331,7 @@ extension AppState {
               let expectation = context.expectedCreatedItem ??
               context.recoveryExpectation
         else {
-            return RestoredMutationBookmarkAuthority(
-                location: nil,
-                refreshedBookmarkData: nil,
-                displayURL: nil
-            )
+            return .unavailable
         }
         return restoredWorkspaceMutationBookmarkAuthority(
             bookmarkData: context.createdItemBookmarkData,
@@ -1427,11 +1344,7 @@ extension AppState {
         from record: WorkspaceMutationOperationRecoveryRecord
     ) -> RestoredMutationBookmarkAuthority {
         guard case let .trash(context) = record.payload else {
-            return RestoredMutationBookmarkAuthority(
-                location: nil,
-                refreshedBookmarkData: nil,
-                displayURL: nil
-            )
+            return .unavailable
         }
         return restoredWorkspaceMutationParentEntryAuthority(
             bookmarkData: context.sourceParentBookmarkData,
@@ -1457,11 +1370,7 @@ extension AppState {
                   expectingParent: parentExpectation
               )
         else {
-            return RestoredMutationBookmarkAuthority(
-                location: nil,
-                refreshedBookmarkData: nil,
-                displayURL: nil
-            )
+            return .unavailable
         }
 
         if resolution.isStale {
@@ -1476,11 +1385,7 @@ extension AppState {
                     expectingParent: parentExpectation
                 )
             else {
-                return RestoredMutationBookmarkAuthority(
-                    location: nil,
-                    refreshedBookmarkData: nil,
-                    displayURL: nil
-                )
+                return .unavailable
             }
             return RestoredMutationBookmarkAuthority(
                 location: refreshedLocation,
@@ -1512,11 +1417,7 @@ extension AppState {
                   context.sourceLocatorParentExpectation.runtimeValue
               )
         else {
-            return RestoredMutationBookmarkAuthority(
-                location: nil,
-                refreshedBookmarkData: nil,
-                displayURL: nil
-            )
+            return .unavailable
         }
 
         if resolution.isStale {
@@ -1534,11 +1435,7 @@ extension AppState {
                     context.sourceLocatorParentExpectation.runtimeValue
                 )
             else {
-                return RestoredMutationBookmarkAuthority(
-                    location: nil,
-                    refreshedBookmarkData: nil,
-                    displayURL: nil
-                )
+                return .unavailable
             }
             return RestoredMutationBookmarkAuthority(
                 location: refreshedLocation,
@@ -1559,11 +1456,7 @@ extension AppState {
         from record: WorkspaceMutationOperationRecoveryRecord
     ) -> RestoredMutationBookmarkAuthority {
         guard case let .relocation(context) = record.payload else {
-            return RestoredMutationBookmarkAuthority(
-                location: nil,
-                refreshedBookmarkData: nil,
-                displayURL: nil
-            )
+            return .unavailable
         }
         guard let bookmarkData = context.destinationParentBookmarkData,
               let destinationLeafName = context.destinationLeafName,
@@ -1576,11 +1469,7 @@ extension AppState {
                   context.destinationLocatorParentExpectation.runtimeValue
               )
         else {
-            return RestoredMutationBookmarkAuthority(
-                location: nil,
-                refreshedBookmarkData: nil,
-                displayURL: nil
-            )
+            return .unavailable
         }
 
         if resolution.isStale {
@@ -1598,11 +1487,7 @@ extension AppState {
                     context.destinationLocatorParentExpectation.runtimeValue
                 )
             else {
-                return RestoredMutationBookmarkAuthority(
-                    location: nil,
-                    refreshedBookmarkData: nil,
-                    displayURL: nil
-                )
+                return .unavailable
             }
             return RestoredMutationBookmarkAuthority(
                 location: refreshedLocation,
@@ -1623,11 +1508,7 @@ extension AppState {
         from record: WorkspaceMutationOperationRecoveryRecord
     ) -> RestoredMutationBookmarkAuthority {
         guard case let .relocation(context) = record.payload else {
-            return RestoredMutationBookmarkAuthority(
-                location: nil,
-                refreshedBookmarkData: nil,
-                displayURL: nil
-            )
+            return .unavailable
         }
         return restoredWorkspaceMutationBookmarkAuthority(
             bookmarkData: context.relocatedItemBookmarkData,
@@ -1640,11 +1521,7 @@ extension AppState {
         from record: WorkspaceMutationOperationRecoveryRecord
     ) -> RestoredMutationBookmarkAuthority {
         guard case let .trash(context) = record.payload else {
-            return RestoredMutationBookmarkAuthority(
-                location: nil,
-                refreshedBookmarkData: nil,
-                displayURL: nil
-            )
+            return .unavailable
         }
         return restoredWorkspaceMutationBookmarkAuthority(
             bookmarkData: context.expectedItemBookmarkData,
@@ -1657,11 +1534,7 @@ extension AppState {
         from record: WorkspaceMutationOperationRecoveryRecord
     ) -> RestoredMutationBookmarkAuthority {
         guard case let .trash(context) = record.payload else {
-            return RestoredMutationBookmarkAuthority(
-                location: nil,
-                refreshedBookmarkData: nil,
-                displayURL: nil
-            )
+            return .unavailable
         }
         return restoredWorkspaceMutationBookmarkAuthority(
             bookmarkData: context.reportedTrashBookmarkData,
@@ -1683,11 +1556,7 @@ extension AppState {
                   expecting: expectation
               )
         else {
-            return RestoredMutationBookmarkAuthority(
-                location: nil,
-                refreshedBookmarkData: nil,
-                displayURL: nil
-            )
+            return .unavailable
         }
 
         if resolution.isStale {
@@ -1704,11 +1573,7 @@ extension AppState {
                     expecting: expectation
                 )
             else {
-                return RestoredMutationBookmarkAuthority(
-                    location: nil,
-                    refreshedBookmarkData: nil,
-                    displayURL: nil
-                )
+                return .unavailable
             }
             return RestoredMutationBookmarkAuthority(
                 location: refreshedLocation,

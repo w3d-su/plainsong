@@ -1,8 +1,33 @@
 # M5 Performance Log
 
-Record M5 performance measurements here before accepting the milestone. Each entry should identify
-the commit, environment, fixture, measurement procedure, measured value, and pass/fail result. Keep
-raw profiler exports or screenshots outside the repo unless they are small and intentionally useful.
+**New measurements go in [`docs/perf/`](perf/), one file per entry**, named
+`YYYY-MM-DD-<short-slug>.md` after the measurement date. A new file cannot conflict
+with another PR's new file. This document is the archive and takes no new sections:
+performance PRs appended to its end, so any two open PRs conflicted here and each
+resolution forced a full CI run.
+
+Each file identifies the commit, environment, fixture, measurement procedure, measured
+value, and pass/fail result:
+
+```markdown
+# <What was measured, in one line>
+
+- Date: YYYY-MM-DD
+- Commit: `<sha>`
+- Environment: macOS, Xcode, machine, and Debug or Release
+- Fixture: path, and the agent.md §12 budget when one applies
+- Procedure: the command that produced the number
+- Result: measured value, budget, and pass or fail
+
+<What the number means. Include raw samples when a gate asks for them.>
+```
+
+Keep raw profiler exports or screenshots outside the repo unless they are small and
+intentionally useful. Order within a date is not meaningful. Read this archive, then
+`ls docs/perf` for every measurement after it.
+
+`Scripts/editor_find_f2_evidence_tests` checks the F2 trust-root rows in the sections
+below. Gate docs cite those sections by name. Leave the sections in place.
 
 ## Environment
 
@@ -2733,6 +2758,73 @@ reconciled-source restore and the Reload/Keep Mine synchronizer — through one
 after the write; hosted tests now pin the silent same-length reload and the same-length
 local edit directly. No per-keystroke work was added: the helper runs only for whole-source
 writes, never on the native typing path, so the typing measurements above are unaffected.
+
+## EditorKit line-number gutter, paired A/B (recorded load) — 2026-10-21
+
+Two trees: main `15913f8` plus this branch's probe files, and this branch. Apple M1 Pro;
+the 1-minute load average is recorded per run. Observed under recorded load, not
+idle-machine acceptance.
+
+**EditorKit release harness** (`EditorLineNumberGutterCostProbeTests`,
+`PLAINSONG_RUN_GUTTER_PROBE=1 swift test -c release -Xswiftc -enable-testing`): a
+900 x 800 pt window on `large-1mb.md` without highlighting, the caret at 5%, 50% or 95% of
+the document; per run, line numbers off and on alternate over two rounds of 5 warm-up and
+40 measured keystrokes, each timed through `insertText`, `layoutSubtreeIfNeeded` and
+`displayIfNeeded`. Two runs per tree and position, interleaved main/branch; medians over
+runs. Load 3.1-3.9.
+
+| Caret | main off: layout / keystroke | main on: layout (p95) / keystroke (p95, max) | branch off | branch on: layout (p95) / keystroke (p95, max) |
+|---|---|---|---|---|
+| 5% | 1.24 / 1.60 ms | 10.48 (11.16) / 11.09 (11.86, 12.54) ms | 1.20 / 1.54 ms | 1.21 (1.59) / 1.60 (2.09, 2.79) ms |
+| 50% | 1.02 / 1.35 ms | 12.07 (13.00) / 12.68 (13.70, 14.18) ms | 1.02 / 1.36 ms | 1.05 (1.39) / 1.41 (1.89, 2.18) ms |
+| 95% | 0.91 / 1.27 ms | 13.96 (14.75) / 14.62 (15.47, 16.19) ms | 0.90 / 1.23 ms | 0.93 (1.23) / 1.29 (1.70, 2.01) ms |
+
+The window server does not display a test process's windows, so the branch's gutter also
+drew into a bitmap after each keystroke, timed by its own `draw(_:)`: median 0.27-0.29 ms
+(p95 0.33-0.36 ms) per draw while typing and 0.26-0.27 ms per 12 pt scroll step, at every
+caret position. Caching typeset numbers per style and appearance halved it from 0.55 ms.
+Main's cost grows with the caret position (the paragraph count above the viewport); the
+branch's does not.
+
+**Hosted probes**, built `-configuration Debug SWIFT_OPTIMIZATION_LEVEL=-O
+GCC_OPTIMIZATION_LEVEL=s` as in #180 and run with `TEST_RUNNER_PLAINSONG_RUN_SCROLL_PROBE=1
+TEST_RUNNER_PLAINSONG_RUN_HOSTED_TYPING_GATE=1`; `TEST_RUNNER_PLAINSONG_SCROLL_PROBE_LINE_NUMBERS=0`
+hides line numbers from the start. Three interleaved rounds per configuration, load 5.1-8.0.
+The new source-only probe types the same 50 keys as #180's busy-slice probe into the middle
+of `large-1mb.md` without the preview, whose layer-tree commits dominate the source+preview
+slices (a `sample` of one such run put about three quarters of main-thread time in
+`RemoteLayerTreeDrawingAreaProxy::commitLayerTree`).
+
+| Main-thread busy time, 50 keys (slices > 50 ms / > 16 ms) | main | branch |
+|---|---|---|
+| Source-only, line numbers on | 4,720 / 4,575 / 4,579 ms (21-22 / 98-103) | 2,297 / 5,529 / 2,298 ms (2-46 / 53-75) |
+| Source-only, line numbers off | 2,086 / 2,057 / 2,072 ms (2-3 / 40-49) | 2,176 / 2,013 / 2,128 ms (2-3 / 45-48) |
+| Source+preview from the middle, on | 4,554 / 5,554 / 5,558 ms (6-18 / 90-102) | 2,874 / 2,867 / 2,808 ms (3-6 / 23-29) |
+| Source+preview after viewing the end, on | 5,182 / 5,488 / 5,599 ms (31-47 / 90-98) | 3,208 / 2,320 / 2,872 ms (1-14 / 38-58) |
+
+| Other hosted measures, line numbers on | main | branch |
+|---|---|---|
+| Editor scroll workload p95 / max | 9.8-10.8 / 27.3-29.5 ms | 1.5-1.8 / 2.2-3.4 ms |
+| Editor scroll workload p95, line numbers off | 1.3-1.5 ms | 1.2-1.6 ms |
+| Typing gate (synchronous `insertText`), source-only median / max | 3.9-4.0 / 4.3-4.9 ms | 4.1-4.2 / 4.4-5.1 ms |
+| Typing gate, WYSIWYG median / max | 4.0 / 4.3-4.5 ms | 4.0-4.2 / 4.3-4.4 ms |
+
+In the branch's source-only runs the gutter drew 111-127 times per 50 keys for 18-21 ms in
+total, with no width change and no line-index rebuild.
+
+**Intermittent slow source-only runs with line numbers on.** Of 58 hosted source-only runs
+on this branch with line numbers on, 6 took 5.1-5.6 s instead of ~2.3 s (36-46 slices over
+50 ms, a first keystroke of 600-730 ms). None of 45 runs with line numbers off (either
+tree) and none of 20 on main with line numbers on did. In the slow runs the gutter's own
+work was unchanged (18-20 ms of drawing, no width change, no line-index rebuild); the
+extra time was in STTextView's `layout()` (1.5 s instead of 0.48 s) and `insertText`
+(2.1-2.4 s instead of 0.5 s), measured with temporary counters. The three slow runs whose
+start state was recorded began typing from the same TextKit state: the element-cache
+trimmer had released the text below the top of the document but not below the middle
+(trimmed length 983,040 instead of 578,843), with a taller height estimate (882,743.5 pt
+instead of 871,769.5) and a shorter viewport. With line numbers on, 3 of the 7 runs that
+started from that state were slow; with them off, none of the 5 that did. The probe now
+reports these counters; the cause is open (see the PR).
 
 ## Preview bundle split: Mermaid on demand, woff2-only KaTeX — 2026-10-22
 

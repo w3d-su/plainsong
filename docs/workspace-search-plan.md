@@ -1,32 +1,27 @@
 # Phase 3 Workspace Search Plan
 
-> **Status: IN PROGRESS. WS1, WS2, WS3A, and headless WS3B (PR #85 + merged PR #82 lifecycle
-> hardening + PR #84 mutation recovery) are complete. **WS3C PR A/B/C have landed** (Files/Search
-> sidebar shell, pure grouped-results presentation, keyboard selection + accessibility wiring).
-> WS3C PR C owner keyboard smoke is **signed off** via hosted `testHostedOwnerKeyboardSmokeFiveScenarios`,
-> which drives **real `NSEvent`s** through `window.sendEvent` — field ↓/Escape through the field
-> editor's `doCommandBy`, ↑/↓/Return/Escape through the concrete results key responder, and a real
-> click on a backing table row — so silent native-table fallback or a broken focus handoff fails
-> the gate. **Owner physical ⇧⌘F / search-field focus sign-off is complete** (PR #89): app-active
-> Carbon hot key (`kVK_ANSI_F` + `cmdKey|shiftKey` while active), Files↔Search toggle, and
-> owned `plainsong.workspaceSearch.queryField` focus — verified on the built-in keyboard under
-> ABC and Zhuyin. Ordinary-edit/FSEvent **active-search refresh is complete**: only a query that
-> actually ran is refreshed, with post-debounce dirty overlays and root-bound reload intent. WS4A
-> now has an out-of-process XCUITest acceptance gate for the same search workflow; these synthetic
-> events are not additional physical-keyboard evidence. **WS4B performance gates are implemented
-> by PR #93** with production-shaped probes and evidence-frozen budgets (2,000-file workspace under
-> both the `.sensitive` and default `.smart` case policies, exactly-admitted 512 KiB file, a
-> 512 KiB CJK file under `.smart`, an oversized sibling proving reads stay bounded, dense
-> whole-word rejection, the global 10,000-match ceiling, pinned resource ceilings, and rapid
-> cancellation of a saturated read window; see `docs/perf-log.md`). A 2026-08-08 evidence audit
-> confirmed that the WS4 regression suites named in the CI matrix are present across
-> MarkdownCore, WorkspaceKit, AppState, EditorKit, XCUITest, and PerformanceTests. The fresh
-> package slice is green, but that does not replace the current-tip App/UI/performance/full-suite
-> gates below. A 2026-09-18 DoD pass added named tests for click→cross-file native selection/scroll
-> and production reader/matcher off-main; `make test` still cannot finish while
-> `PlainsongUITests-Runner` fails to initialize, and physical ⇧⌘F still needs maintainer
-> confirmation as residual owner evidence. The overall Definition of Done remains open, so
-> Workspace Search as a whole stays **IN PROGRESS**.**
+> **Status: COMPLETE (2026-10-24). Every §7 Definition of Done box is checked.** WS1-WS4 landed
+> in PR #72 through #93 (literal matcher, WorkspaceKit orchestration, Files/Search sidebar, exact
+> navigation, active-search refresh, the WS4A XCUITest and the WS4B performance gates), and the
+> 2026-09-18 pass (#117) added the hosted click→cross-file selection/scroll and production
+> off-main reader/matcher gates. The 2026-10-24 close-out, at `3ae52db`:
+> - One serialized `make test` exited 0 with `PlainsongUITests` executing: 31/31 UI tests
+>   passed with none skipped, `PlainsongTests` 995 with 0 failures, `PerformanceTests` 31 with 0
+>   failures (including all 14 WS4B probes), every package, and `preview-src` 154/154. The
+>   September runner failure ("Authentication canceled", then "Timed out while enabling
+>   automation mode") was macOS asking the owner to approve Automation Mode for UI testing; the
+>   owner approved it during the run.
+> - The owner confirmed physical ⇧⌘F as residual owner evidence and re-ran it on the built-in
+>   keyboard under ABC and Zhuyin on that commit, including the new hidden-sidebar case below.
+>   XCUITest and the hosted `NSEvent` gates stay synthetic evidence with their own scopes.
+> - A post-sign-off gap was fixed: since #152 the macOS 27 sidebar can be hidden, and ⇧⌘F then
+>   changed nothing visible. A hidden sidebar in the key window now opens Search and comes back
+>   (`testShortcutRevealsAHiddenSidebarAndFocusesTheQueryField`; Decision Log 2026-10-24).
+> - Dedicated WS4B Debug runs stayed under every frozen budget with at least 3.0x headroom
+>   (`docs/perf/2026-10-24-ws4b-recheck.md`).
+>
+> Deferred scope (§2.2) remains deferred and is not part of this completion.
+>
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
@@ -400,7 +395,9 @@ of the exact relative-path bytes, so NFC/NFD directories neither share children 
 
 `Command-Shift-F` (physical ⇧⌘F via the app-active Carbon hot key from PR #89) toggles
 Files↔Search: opening Search advances the search-focus request token onto the owned query
-field; a second press returns to Files without clearing query/results. The menu item remains
+field; a second press returns to Files without clearing query/results. On the macOS 27 split
+shell a key window whose sidebar is hidden is not showing Search, so the press opens Search and
+reveals the sidebar there (Decision Log 2026-10-24). The menu item remains
 for discovery and mouse. `Command-F` editor find remains separate, unfinished work; workspace
 search does not claim that shortcut.
 Keyboard selection and Return should open results; every result row needs an accessibility
@@ -979,13 +976,12 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   an oversized-`.gitignore` probe plus an under-ceiling control, progress coalescing is exercised
   at a candidate count that is neither below nor divisible by the 100-event cap, and the `.smart`
   probes carry `.sensitive` controls that must find nothing.
-- [ ] Update `agent.md`, `docs/acceptance-matrix.md`, and `docs/risk-register.md` only
+- [x] Update `agent.md`, `docs/acceptance-matrix.md`, and `docs/risk-register.md` only
   after their corresponding gates have evidence.
-  This PR records the click→selection/scroll and off-main reader/matcher gates in the Decision
-  Log, matrix, and risk register. The box stays open because `make test` still cannot complete
-  while `PlainsongUITests-Runner` fails to initialize (`Authentication canceled` / system
-  authentication), and physical ⇧⌘F still needs maintainer confirmation as residual owner
-  evidence.
+  The 2026-09-18 pass recorded the click→selection/scroll and off-main reader/matcher gates.
+  The 2026-10-24 close-out records the serialized `make test` with `PlainsongUITests`, the
+  owner's physical ⇧⌘F confirmation and re-run, and the hidden-sidebar ⇧⌘F behavior in the
+  Decision Log (`docs/decisions/2026-10-24-*.md`), the matrix, R20, and `agent.md` §5.
 
 ## 6. CI Validation Matrix
 
@@ -994,7 +990,7 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
 | MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order; authorized-editor exact no-op and persisted-baseline dirty restoration; saved-baseline rebasing; half-open exact-source reconciliation across surrogate pairs and combining sequences; ambiguous repeated-source alignment rejection |
 | WorkspaceKitTests | Candidate filtering; alias/outside-root rejection; byte-distinct NFC/NFD candidates, overlays, ignore rules, tree IDs, completion ordering, and longest root spelling; retained-root no-follow component I/O; immutable result authorities; descriptor identity and exact-digest writes; post-swap rollback/cleanup proofs; invalid UTF-8, unreadable, deletion, same-size/restored-mtime, cancellation, cap, sorting, and terminal-count contracts; production disk `readChunk` and `TextSearchEngine.matches` observed off the main actor |
 | EditorKitTests | Same-file/cross-file navigation including IME; monotonic cancellation and transition lifetime; contract-free retry; exact installation/writer/base provenance and literal publication equality; shared preflight for command, completion, smart-paste, and image mutations; async image authority before side effects and across placement validation with no untracked rejected-window artifact; post-validation exact context/source fencing and recovery-preserving discard; literal NFC/NFD image-context supersession and commit fencing; selection-only writer bypass; pending composition and half-open stale publication; revision-only synchronization/reacquisition before native mutation; newest-candidate supersession; dismantle cleanup; exact selection/reveal/scroll/focus; stale request rejection; WYSIWYG reveal without mutation |
-| PlainsongTests | Hosted click of a result in another file applies the exact native UTF-16 selection and scrolls it into view; debounce/latest-query wins; active-query current/warm dirty-overlay refresh after debounce; edited-document-only pending-navigation cancellation; undo-to-baseline overlay removal; FSEvent/namespace reload intent consumed only after a distinct newest snapshot and its freshly captured root authority/generation install, with the latest overlay edited while scan is pending; failed/stale/cancelled reload plus direct late-token/context event rejection; real UI replacement/options and empty-query plus genuinely pending close/switch/teardown/root-mismatch precedence; mode/options/focus preservation; authority-bound workspace close/switch/reload; transactional result activation with identity/fingerprint/range/hard-link failures preserving prior state; cached/retired physical-ownership collision detachment before stale-inspection eviction; detached observation cancellation propagation; dirty-overlay and clean pending-native activation arbitration before proof adoption; accepted-or-conflicted coherent search observations surviving fingerprint/range rejection and superseding older external work; body-safe exact document-authority caching and fail-closed existing-session cache misses; controlled read-to-adoption parent replacement with the original inode hard-linked into the replacement namespace; retained-parent-lineage rejection after leaf replacement; durable atomic-save and pre-writer Save Copy authority binding through retained destination parents, including committed-but-unadoptable reconciliation with durable cleanup notice retention and visible artifact paths; precommit document, created-asset, and existing-reference component/content validation across move/replacement/hard-link races; workspace-reference authority capture before reads; descriptor-bound discard that durably acquires and fail-closed retains a cleanup racer without a mutable-source restore, reports the separately retained created inode, never attributes a later symlink occupant's path to the acquired racer, distinguishes proven absence from namespace/link inspection failure, refreshes after every successful recovery rename, and never check-then-unlinks a replacement; dirty overlay and completion A/B isolation; exact-path and typed-write recovery/quarantine; session-scoped conflicts; fresh-C Reload/Keep Mine baseline adoption; multi-window installation retirement/reactivation; watcher X-to-Y supersession; native-input and partial-convergence fences; Save Copy during resolution; lifecycle restart; 1 MiB off-main preparation; pending-source and stale-IME arbitration; no-follow substitution races; clean quarantine retention; registration-before-revoke cleanup; stale fingerprint refresh |
+| PlainsongTests | Hosted click of a result in another file applies the exact native UTF-16 selection and scrolls it into view; ⇧⌘F with the key window's split-view sidebar hidden opens Search and reveals it with the query field focused, from Files and from Search; debounce/latest-query wins; active-query current/warm dirty-overlay refresh after debounce; edited-document-only pending-navigation cancellation; undo-to-baseline overlay removal; FSEvent/namespace reload intent consumed only after a distinct newest snapshot and its freshly captured root authority/generation install, with the latest overlay edited while scan is pending; failed/stale/cancelled reload plus direct late-token/context event rejection; real UI replacement/options and empty-query plus genuinely pending close/switch/teardown/root-mismatch precedence; mode/options/focus preservation; authority-bound workspace close/switch/reload; transactional result activation with identity/fingerprint/range/hard-link failures preserving prior state; cached/retired physical-ownership collision detachment before stale-inspection eviction; detached observation cancellation propagation; dirty-overlay and clean pending-native activation arbitration before proof adoption; accepted-or-conflicted coherent search observations surviving fingerprint/range rejection and superseding older external work; body-safe exact document-authority caching and fail-closed existing-session cache misses; controlled read-to-adoption parent replacement with the original inode hard-linked into the replacement namespace; retained-parent-lineage rejection after leaf replacement; durable atomic-save and pre-writer Save Copy authority binding through retained destination parents, including committed-but-unadoptable reconciliation with durable cleanup notice retention and visible artifact paths; precommit document, created-asset, and existing-reference component/content validation across move/replacement/hard-link races; workspace-reference authority capture before reads; descriptor-bound discard that durably acquires and fail-closed retains a cleanup racer without a mutable-source restore, reports the separately retained created inode, never attributes a later symlink occupant's path to the acquired racer, distinguishes proven absence from namespace/link inspection failure, refreshes after every successful recovery rename, and never check-then-unlinks a replacement; dirty overlay and completion A/B isolation; exact-path and typed-write recovery/quarantine; session-scoped conflicts; fresh-C Reload/Keep Mine baseline adoption; multi-window installation retirement/reactivation; watcher X-to-Y supersession; native-input and partial-convergence fences; Save Copy during resolution; lifecycle restart; 1 MiB off-main preparation; pending-source and stale-IME arbitration; no-follow substitution races; clean quarantine retention; registration-before-revoke cleanup; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility; keyboard: field ↓ selects first result, ↑/↓ move without wrap, Return activates, Escape results→field and field→editor without clearing query/results; click a result then ↑/↓ still routes through search selection (not only native table) |
 | PerformanceTests | 2,000-file workspace; 512 KiB admitted file; hosted public `MarkdownEditorView` plus real AppState/source-contract/coordinator/native-view ordinary, re-entrant pair, and multiple marked-text 1 MiB updates with zero App/native activation full-source comparisons; authorized-session exact no-op, same-length edit, and persisted-baseline literal checks; a local hard `<16 ms` gate for both groups; rapid cancellation; result/read byte caps; memory boundedness. WS4B satisfies the workspace-search half of this row through `WorkspaceSearchPerformanceTests`, where memory boundedness means hard structural limits (four-read window, finite event bound, per-file/per-query match caps, bounded snippets, exact admitted bytes) rather than a resident-memory threshold |
 
@@ -1015,8 +1011,26 @@ the hosted `NSEvent` gate and owner physical-keyboard smoke retain their distinc
 below is checked only when one same-repository production path plus a directly relevant named
 test support it without composing two partial workflows.
 
-- [ ] `make lint`, `make test`, and `make build` pass.
-  Exact-tip 2026-09-18 (`phase3-workspace-search-dod`): `make lint` passed (local SwiftFormat
+- [x] `make lint`, `make test`, and `make build` pass.
+  2026-10-24 at `3ae52db` (`main` `1428bf1` plus the hidden-sidebar fix), screen unlocked and
+  the owner present: `caffeinate -di make test` with `XCODE_DERIVED_DATA` set exited 0
+  (14:36-14:52). It ran the F2 tooling suite (86), MarkdownCore 338, EditorKit 516 (8
+  skipped), PreviewKit 185 (3 skipped), WorkspaceKit 384 including
+  `testProductionDiskReadAndMatchingExecuteOffTheMainActor`, SyntaxKit, WorkspaceCore, both
+  sandbox probes, then `PlainsongUITests` 31/31 passed with none skipped (all four
+  `WorkspaceSearchAcceptanceTests`), `PlainsongTests` 995 with 0 failures (16 skipped)
+  including both `WorkspaceSearchHostedActivationTests`, `PerformanceTests` 31 with 0 failures
+  (4 skipped) including WS4B 14/14, and `preview-src` 154/154. `make build` then reported
+  `** BUILD SUCCEEDED **`, and `make lint` with the pinned SwiftFormat 0.62.1 reported 0/969
+  files to format and 0 serious SwiftLint violations. The September runner failure was macOS
+  asking for authentication to enable Automation Mode (`automationmodetool`: "This device
+  requires user authentication to enable Automation Mode"); with nobody present it was
+  cancelled. Of the four 2026-10-24 attempts at that commit, two timed out after 60 s ("Timed
+  out while enabling automation mode"), and one passed every package and hosted bundle,
+  `PlainsongUITests` included, then stopped at `test-preview` because the fresh worktree had no
+  `preview-src/node_modules` (`npm ci` fixed it). A UI-inclusive `make test` therefore needs
+  the owner at the Mac when the hosted stage starts, about 2½ minutes in on a warm build.
+  Superseded exact-tip 2026-09-18 (`phase3-workspace-search-dod`): `make lint` passed (local SwiftFormat
   0.61.1 warned against the CI pin 0.62.1; 0/382 files required formatting; SwiftLint 283
   warnings, 0 serious). `make build` passed (`** BUILD SUCCEEDED **`). `make test` package
   slices were green (MarkdownCore 173, EditorKit 320 with 7 skipped, PreviewKit 24,
@@ -1029,12 +1043,13 @@ test support it without composing two partial workflows.
   initialize (`Authentication canceled` / `System authentication is running.`); a
   dedicated `-only-testing:PlainsongUITests` retry hit the same runner error. Keep this
   box open until one `make test` completes without that runner failure.
-- [ ] No functional acceptance item depends on a manual-only checklist.
-  Physical ⇧⌘F has owner smoke evidence (PR #89 Carbon hot key + owner-run ABC/Zhuyin).
-  XCUITest remains synthetic; hosted gates inject AppKit events. This PR proposes treating
-  that physical shortcut as residual owner evidence (Decision Log 2026-09-18) and leaves
-  the box unchecked until the maintainer confirms. No repeatable non-manual physical-keyboard
-  gate is added.
+- [x] No functional acceptance item depends on a manual-only checklist.
+  Every functional item has an automated gate; XCUITest drives the shortcut synthetically and
+  hosted gates inject AppKit events. Physical ⇧⌘F through the Carbon hot key is residual owner
+  evidence, as proposed on 2026-09-18: the owner confirmed that on 2026-10-24 and re-ran it on
+  the built-in keyboard on `3ae52db` under ABC and Zhuyin (Files↔Search toggle with the query
+  kept, query-field focus, a hidden sidebar returning in Search from both modes, and the View
+  menu item). No repeatable physical-keyboard gate is added.
 - [x] A newly typed unsaved string appears in workspace search results after debounce.
 - [x] Clicking a result in another file selects the exact UTF-16 match and scrolls it
   into view.
@@ -1060,13 +1075,12 @@ test support it without composing two partial workflows.
   `.beforeMatching` checkpoint immediately before `TextSearchEngine.matches`, and requires
   every observation to be off-main. The authority-capture off-main test remains a narrower
   seam.
-- [ ] Existing file tree, preview, source-only, and Experimental WYSIWYG behavior remain green;
-  `Command-F` editor find remains separate unfinished work.
-  `PlainsongTests` (591 passed + 1 skipped) and `PerformanceTests` (25/25) were green on the
-  exact tip, including source-only/preview/WYSIWYG suites already in those targets.
-  `Command-F` stays in `docs/editor-find-gates.md`. Keep this box open with line 1012 until
-  `PlainsongUITests` actually execute; the 2026-09-18 serialized `make test` and the UI-only
-  retry both died in `PlainsongUITests-Runner` initialization (`Authentication canceled`).
+- [x] Existing file tree, preview, source-only, and Experimental WYSIWYG behavior remain green;
+  `Command-F` editor find remains separate work.
+  The 2026-10-24 `make test` above ran every target green with the UI tests executing,
+  including the Files sidebar XCUITests (`testFilesSingleClicksKeepSelectionAndEditorInSync`,
+  `testFilesFilenameDragStillMovesIntoAFolder`) and the source-only, preview and WYSIWYG suites
+  in `PlainsongTests` and the packages. `Command-F` is tracked in `docs/editor-find-gates.md`.
 
 ## 8. WS1 Implementation Prompt
 

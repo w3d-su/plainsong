@@ -1,0 +1,24 @@
+{
+  "source_sha": "e20162e5c2402800e84cf1f68ae4787535228c50",
+  "source_dirty": false,
+  "prototype_files_sha256": {
+    ".gitignore": "711c29106ff9484cfb0bfdd19d107f24bcbf8b3a7d70917592bc4fddd8679a1e",
+    "Fixtures/m0.md": "38b1b6a80749a22baa8cede8adf5af4ee598181ca4690dc4b7d64b6a850c5144",
+    "README.md": "d2a244c3788dab80b6c2389ff2f2730ebf0c0c10759e0cd0d2eb9ea101803f89",
+    "Scripts/CoreChecks.swift": "53769b0ed032d95dc5a7eb7e6622882686108a005d7823cf8f9e2df8f0ee4763",
+    "Scripts/package-ipa.py": "6d0ce164789fa4ef0849dd19fb7aeba65f7c83df8924635d292cd4e264d0af9e",
+    "Scripts/run.sh": "afb98fdd037a945972eca574129bdf7e3d6544eb6a6eabc4febcec962d092a22",
+    "Sources/AccessGrant.swift": "50276b079dea96b0c6458713b404ffc69e25d57e1f5faa60a746356283bb2470",
+    "Sources/DocumentSession.swift": "9e6140808cc63449fce18618c0b55f3a476dda35f769b343999fdd3b3f31fcb9",
+    "Sources/Probe.swift": "15014a16698fd8a0d81718efcddc99ee659c098c2ed1bce1f114cb6fb1f0cc31",
+    "Sources/SaveLedger.swift": "1f71146114721a0b6aee8fd87ad036de521f0810e3e3e42355c2b0ec42fbfa6d",
+    "Sources/SourceEditor.swift": "37b92a8d00b71fb656d8ef2c6066b3670de0a76568d2be8cfb68e9aa89cacddb",
+    "Sources/SpikeApp.swift": "f40e37b250e0266ba18a68c6983bd6c5b67d6a72f6396820ef5d5050256e94f9",
+    "Sources/SpikeDocument.swift": "dd88d4ee74806df719af3966639061a01cd2906401194e8d123f8f6d6d364366",
+    "Tests/DocumentTests.swift": "2621c7c42e1fb283129096393b9689a932c2d3acd8f46bafd30504c3fa0ea8e4",
+    "Tests/EditorTests.swift": "4d4a2f9af9d72e8a7437795de86babeef8b7ae2133332dfccc1c39b751f5d4f6",
+    "Tests/SaveTests.swift": "472786a3afd81d41ae646d1e03016165e09ee00c5f81c8bdf40a0c8806e63e0f",
+    "project.yml": "8190cc3ec3a02c3a21ccf5471ff1f7794c0bdc91619401da2f03457bb43d1b22"
+  },
+  "source_fingerprint": "048b2db4514b1a45f80c63eb2f0b0a96ac05be9c7fd043b4b20726a5dead391e"
+}
