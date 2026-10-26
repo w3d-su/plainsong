@@ -126,8 +126,8 @@ public enum IOSDocumentEvent: Sendable {
     case closed(IOSDocumentIdentity)
 }
 
-/// Facade implemented by 05's UIDocument store. Same-resource opens share one entry,
-/// session and serialized writer. Async cancellation must not discard dirty source.
+/// Same-resource opens share one entry, session and serialized writer.
+/// Async cancellation must not discard dirty source.
 /// Throws IOSDocumentFailure or CancellationError; failure never implies clean state.
 @MainActor
 public protocol IOSDocumentStore: AnyObject {
@@ -145,7 +145,7 @@ public protocol IOSDocumentStore: AnyObject {
         lease: any IOSWorkspaceAccessLease
     ) async throws -> IOSSaveAcknowledgement
     func resolveExternal(_ identity: IOSDocumentIdentity, choice: IOSExternalResolution) async throws
-    /// 13 calls after the editor's synchronous reconciliation guard, without await.
+    /// Called after the editor's synchronous reconciliation guard, without await.
     func acknowledgeExternalReload(operationID: UUID, outcome: IOSDocumentReloadOutcome)
     func state(for identity: IOSDocumentIdentity) -> IOSDocumentState?
     func snapshot(for identity: IOSDocumentIdentity) -> IOSStoredDocumentSnapshot?

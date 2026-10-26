@@ -21,7 +21,6 @@ struct IOSAppSceneSnapshot: Sendable {
     let unavailableReason: String?
 }
 
-/// The 10 shell consumes this facade. Only 13 supplies its production implementation.
 /// Observers receive immutable state; no shadow editable String or global writer.
 @MainActor
 protocol IOSAppSceneControlling: AnyObject {

@@ -2,9 +2,13 @@
 
 日期：2026-10-08。狀態：**C0 宣告已落實；provider／完整 App 尚未實作**。IOS-C0-v1 的唯一 Swift declarations 及所有權見 §9；基準／驗證狀態見 integration-ledger.md。初次凍結同時具體化 binding identity、focus、reload acknowledgement 與 observer ownership，不能將 specification 中的省略當成另一個可自行實作的 API。此後單一欄位、隔離或回傳語意變更都須由 13 升契約版本並通知所有 consumer。
 
+2026-10-26 review 僅清理 Swift 註解中的 lane 指派，未變更 declarations／語意；目前 full-file hashes 與原始凍結 inventory 的對照見 [review receipt](evidence/lane-13/review-20261026.md)。已發布的 `ios-c0-v1` tag 保持不變。
+
 ## 1. 層次與 manifest
 
-固定依賴：
+以下為 02／04／05 等 implementation lanes 落實後的目標依賴圖，不代表 C0 已有這些 provider。C0 實際 manifests：`SyntaxKit` 只依賴 `MarkdownCore`，尚未搬入 tree-sitter／grammars；`EditorKitIOS` 與 `WorkspaceKitIOS` 只編譯契約宣告，尚無 UIKit source engine 或 UIDocument store。`PreviewKitContracts` 是 portable declarations；完整 PreviewKit iOS host 也留待後續 lane。
+
+後續目標依賴：
 
 - `MarkdownCore`：Foundation／Combine、Yams；原始碼與 pure edit logic，沒有 UIKit／AppKit／WebKit。
 - `SyntaxKit` → MarkdownCore + 既有 pinned tree-sitter／grammars；沒有 UI attributed text。

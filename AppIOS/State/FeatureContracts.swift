@@ -4,7 +4,7 @@ import MarkdownCore
 import WorkspaceCore
 import WorkspaceKitIOS
 
-/// 08 supplies descriptors and handlers; 10 installs keyboard actions once per scene.
+/// Authoring actions share descriptors and keyboard bindings within a scene.
 enum IOSAuthoringActionID: Hashable, Sendable {
     case bold, italic, link, heading(Int), code
     case strikethrough, inlineCode, paragraph, quote, codeFence
@@ -43,7 +43,7 @@ protocol IOSAuthoringActionProviding: AnyObject {
     func perform(_ action: IOSAuthoringActionID, using editor: any IOSSourceEditorControlling)
 }
 
-/// 09 captures this before showing a picker; insert cannot retarget the latest caret.
+/// Captured before showing a picker; insert cannot retarget the latest caret.
 struct IOSImageInsertionContext: Sendable {
     let operationID: UUID
     let editor: IOSSourceEditorSnapshot
@@ -67,7 +67,7 @@ protocol IOSImageInsertionControlling: AnyObject {
         destination: IOSFileLocation,
         grant: IOSWorkspaceGrant
     ) -> IOSImageInsertionContext?
-    /// Photos/Files normalization supplies bytes; 06 alone persists the asset.
+    /// Photos/Files normalization supplies bytes; the asset writer alone persists them.
     func insert(
         bytes: Data,
         contentType: String,

@@ -1,0 +1,254 @@
+{
+  "review": 5649056231,
+  "baseSHA": "3274bfc8ad7f70105fe10c03cb111cf987ca1800",
+  "contractVersion": "IOS-C0-v1",
+  "scope": "Comment-only source cleanup; declarations and semantic invariants unchanged.",
+  "originalBaselineInventory": {
+    "contractVersion": "IOS-C0-v1",
+    "frozenFiles": {
+      "AppIOS/State/Contracts.swift": "d5146a1a803e2e890fed799d8f4020103f72fb22d1262e3861c8bb5e5bf82b56",
+      "AppIOS/State/FeatureContracts.swift": "c6b19edb56e69d3ef64b7230ebbb9c1440ad7c2db09c9019435afa1bbfe78361",
+      "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift": "fc07a44c9743be3444bb47ddd15e9a12d1cf2b2de6602650558ef97966f0e567",
+      "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift": "f2bec4e93b0262d45ae4456b4b2c0cdb2a0cb0abe5176424ef0599ae4362d285",
+      "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift": "5ec2bfc76bb6237f5ff019cc3381361f5219b2fa8e0f2d6eff8a43412113b593",
+      "Packages/PreviewKit/Sources/PreviewKit/PreviewContractExports.swift": "bea8b7f635a3705691f5c1016d08b2f016663b498409463d6b2f2453096f39fa",
+      "Packages/PreviewKit/Sources/PreviewKit/PreviewContracts.swift": "ffae81620f5ceb09ea28aa4bab49a4319dfd30a965bbb89ad7ead81fa2d0fdfe",
+      "Packages/SyntaxKit/Sources/SyntaxKit/Contracts.swift": "77ae739d3ad480b9380eb12f85cb171c2277576dd4c633ca215731b30f767174",
+      "Packages/SyntaxKit/Sources/SyntaxKit/MarkdownSyntaxToken.swift": "0be329653fb003ef5c1a9adac577d809a570779a8fe198a8f244032b51a7bed6",
+      "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift": "e56ba2961c82d2192994b96ef355813ca13aaec2598e2ff4ae7671a333ce0f8e",
+      "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift": "eec068b9deaf94912de7af2654b54f11650d0e2c8d76e8b7f9e2d3a43269eb14",
+      "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift": "beb9d47293b3aeb029de4fa9716d7d8b8af18f2971eec9495354936185c0c06b",
+      "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift": "259d40b8b25c997db2d0f44c34ef2c16517132dfbadd123178349070c53a2748"
+    },
+    "uniqueDeclarations": {
+      "IOSAppSceneControlling": "AppIOS/State/Contracts.swift",
+      "IOSAppSceneSnapshot": "AppIOS/State/Contracts.swift",
+      "IOSAssetCommitOutcome": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift",
+      "IOSAssetRecoveryReceipt": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift",
+      "IOSAssetRollbackOutcome": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift",
+      "IOSAssetStageFailure": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift",
+      "IOSAuthoringAction": "AppIOS/State/FeatureContracts.swift",
+      "IOSAuthoringActionID": "AppIOS/State/FeatureContracts.swift",
+      "IOSAuthoringActionPlacement": "AppIOS/State/FeatureContracts.swift",
+      "IOSAuthoringActionProviding": "AppIOS/State/FeatureContracts.swift",
+      "IOSAuthorizedEdit": "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift",
+      "IOSCoordinatedFileAccess": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+      "IOSCoordinatedRead": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+      "IOSCreatedLeaf": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+      "IOSDocumentCloseOutcome": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+      "IOSDocumentEvent": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+      "IOSDocumentFailure": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+      "IOSDocumentFlushOutcome": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+      "IOSDocumentHandle": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+      "IOSDocumentIdentity": "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift",
+      "IOSDocumentReloadOutcome": "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift",
+      "IOSDocumentReloadProposal": "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift",
+      "IOSDocumentReloadRefusal": "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift",
+      "IOSDocumentRevision": "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift",
+      "IOSDocumentState": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+      "IOSDocumentStore": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+      "IOSEditOutcome": "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift",
+      "IOSEditRefusal": "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift",
+      "IOSExternalResolution": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+      "IOSFileAvailability": "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift",
+      "IOSFileLocation": "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift",
+      "IOSImageAssetRequest": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift",
+      "IOSImageInsertionContext": "AppIOS/State/FeatureContracts.swift",
+      "IOSImageInsertionControlling": "AppIOS/State/FeatureContracts.swift",
+      "IOSImageInsertionOutcome": "AppIOS/State/FeatureContracts.swift",
+      "IOSKeyboardModifiers": "AppIOS/State/FeatureContracts.swift",
+      "IOSObservation": "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift",
+      "IOSPreviewControlling": "Packages/PreviewKit/Sources/PreviewKit/PreviewContracts.swift",
+      "IOSPreviewEvent": "Packages/PreviewKit/Sources/PreviewKit/PreviewContracts.swift",
+      "IOSRecoveryReceipt": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+      "IOSSaveAcknowledgement": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+      "IOSSceneCapabilities": "AppIOS/State/Contracts.swift",
+      "IOSSourceEditorBinding": "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift",
+      "IOSSourceEditorControlling": "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift",
+      "IOSSourceEditorDocumentBinding": "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift",
+      "IOSSourceEditorEvent": "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift",
+      "IOSSourceEditorSnapshot": "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift",
+      "IOSStagedImageAsset": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift",
+      "IOSStoredDocumentSnapshot": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+      "IOSWorkspaceAccessLease": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+      "IOSWorkspaceAccessProviding": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+      "IOSWorkspaceAssetWriting": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift",
+      "IOSWorkspaceEntry": "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift",
+      "IOSWorkspaceEvent": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+      "IOSWorkspaceFailure": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+      "IOSWorkspaceGrant": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+      "IOSWorkspaceIdentity": "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift",
+      "IOSWorkspaceResourceIdentity": "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift",
+      "IOSWorkspaceScope": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+      "IOSWorkspaceSnapshot": "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift",
+      "MarkdownSyntaxToken": "Packages/SyntaxKit/Sources/SyntaxKit/MarkdownSyntaxToken.swift",
+      "MarkdownSyntaxTokenizing": "Packages/SyntaxKit/Sources/SyntaxKit/Contracts.swift",
+      "PreviewAssetAccessChecking": "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift",
+      "PreviewAssetAccessContext": "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift",
+      "PreviewAssetReadFailure": "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift",
+      "PreviewAssetReadRequest": "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift",
+      "PreviewAssetReadResult": "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift",
+      "PreviewAssetReading": "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift",
+      "SyntaxFailure": "Packages/SyntaxKit/Sources/SyntaxKit/Contracts.swift",
+      "SyntaxRequest": "Packages/SyntaxKit/Sources/SyntaxKit/Contracts.swift",
+      "SyntaxResult": "Packages/SyntaxKit/Sources/SyntaxKit/Contracts.swift"
+    }
+  },
+  "commentOnlyFiles": {
+    "AppIOS/State/Contracts.swift": {
+      "beforeSHA256": "d5146a1a803e2e890fed799d8f4020103f72fb22d1262e3861c8bb5e5bf82b56",
+      "afterSHA256": "eff2b5273a4790c19576f74e771d6a5e182688bddf495d06d93a486c47dfde40",
+      "sourceWithoutLineCommentsSHA256": "13cd14f21f6115da60e3ee3cdf1f054a538e330bce2012a4230beaa4e432b711"
+    },
+    "AppIOS/State/FeatureContracts.swift": {
+      "beforeSHA256": "c6b19edb56e69d3ef64b7230ebbb9c1440ad7c2db09c9019435afa1bbfe78361",
+      "afterSHA256": "2a9df6ee6e6415fe435233176ec718b0d1e92f365f263befbffeeb87c746fe6f",
+      "sourceWithoutLineCommentsSHA256": "23db5e920930d46461e11f469d46e8771741d541959fe08645562411e7b52202"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownSyntaxToken.swift": {
+      "beforeSHA256": "4a5fc021d32c839799e7ed1c1127bf26aca3de37329d7ad14e8720a1e87d3eee",
+      "afterSHA256": "73baf9041701e6ad04ef3d27ac64f4268f3f7ebda129c56e7b905f66a2c52caa",
+      "sourceWithoutLineCommentsSHA256": "6111ef9b3140e36f1538b997fa4138ce9c58b064cac10152d247f2c6caac7cc5"
+    },
+    "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift": {
+      "beforeSHA256": "fc07a44c9743be3444bb47ddd15e9a12d1cf2b2de6602650558ef97966f0e567",
+      "afterSHA256": "ec3a782261a189c87095b6ee4aae060647a0ac2a1ce19d48df36d96a051ac464",
+      "sourceWithoutLineCommentsSHA256": "dcbb1c4135e426ca96fbee3ce076100481c5c515509edaab7a01fc39e6096809"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift": {
+      "beforeSHA256": "5ec2bfc76bb6237f5ff019cc3381361f5219b2fa8e0f2d6eff8a43412113b593",
+      "afterSHA256": "2619af99cd06f5d27e12f6fcca6a6c63774b0f535cdfc8ba38746e336cf6167b",
+      "sourceWithoutLineCommentsSHA256": "aa45138f035ae78a082dca1b2ed72bdeef7a9ad09faef5a86e1fdb00ba099ad6"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/PreviewContracts.swift": {
+      "beforeSHA256": "ffae81620f5ceb09ea28aa4bab49a4319dfd30a965bbb89ad7ead81fa2d0fdfe",
+      "afterSHA256": "47cac5a5efcc75aa2f7b4da781c3ddf04963ed90c7f6bb7440dabaf3a9457363",
+      "sourceWithoutLineCommentsSHA256": "f29578a8ca8239ae11e93b177c1026d93ee03ae0d08dddb743ab0cd3aa9ad926"
+    },
+    "Packages/SyntaxKit/Sources/SyntaxKit/MarkdownSyntaxToken.swift": {
+      "beforeSHA256": "0be329653fb003ef5c1a9adac577d809a570779a8fe198a8f244032b51a7bed6",
+      "afterSHA256": "0f10b87bdc6a60f23a3399cd4d7643fd8f27b56287adac19f59424ae3aa4ee65",
+      "sourceWithoutLineCommentsSHA256": "5bfe64c030f067bb5fd33fb0ec0d3e0c7babec11459467745d7fb93dc57986bb"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift": {
+      "beforeSHA256": "beb9d47293b3aeb029de4fa9716d7d8b8af18f2971eec9495354936185c0c06b",
+      "afterSHA256": "4f91914487f5399ecc085654d6e1c29a6fbb4e075db418bbbd9848d6338f6efc",
+      "sourceWithoutLineCommentsSHA256": "75d6f88de43d0497acb9984f25423631d82b01d9076e056af6e825bb7e42f3c8"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift": {
+      "beforeSHA256": "259d40b8b25c997db2d0f44c34ef2c16517132dfbadd123178349070c53a2748",
+      "afterSHA256": "897d414d05098dd643d14ce115701c01d8572b7108942c008db09f35a6df4f63",
+      "sourceWithoutLineCommentsSHA256": "71198763580ad5cf1843d45ba37cef25bfa35e873e029d86590a73dc6a1fcae2"
+    }
+  },
+  "packageResolution": {
+    "toolchain": "Apple Swift 6.4 (swiftlang-6.4.0.20.104)",
+    "records": {
+      "EditorKit": {
+        "pins": [
+          {
+            "identity": "coretextswift",
+            "kind": "remoteSourceControl",
+            "location": "https://github.com/krzyzanowskim/CoreTextSwift",
+            "state": {
+              "revision": "833177201d6421e6322296f39fce6ff6ae52618a",
+              "version": "0.2.0"
+            }
+          },
+          {
+            "identity": "sttextkitplus",
+            "kind": "remoteSourceControl",
+            "location": "https://github.com/krzyzanowskim/STTextKitPlus",
+            "state": {
+              "revision": "2ee74906f4d753458eeaa9a2f6d4538aacb86a1d",
+              "version": "0.3.0"
+            }
+          },
+          {
+            "identity": "sttextview",
+            "kind": "remoteSourceControl",
+            "location": "https://github.com/krzyzanowskim/STTextView.git",
+            "state": {
+              "revision": "8569251785daf1f0310eaa9235d1254264f0d249",
+              "version": "2.3.10"
+            }
+          },
+          {
+            "identity": "swift-tree-sitter",
+            "kind": "remoteSourceControl",
+            "location": "https://github.com/tree-sitter/swift-tree-sitter.git",
+            "state": {
+              "revision": "f97df585296977d8fcaf644cbde567151d1367b8",
+              "version": "0.10.0"
+            }
+          },
+          {
+            "identity": "tree-sitter",
+            "kind": "remoteSourceControl",
+            "location": "https://github.com/tree-sitter/tree-sitter",
+            "state": {
+              "revision": "da6fe9beb4f7f67beb75914ca8e0d48ae48d6406",
+              "version": "0.25.10"
+            }
+          },
+          {
+            "identity": "tree-sitter-markdown",
+            "kind": "remoteSourceControl",
+            "location": "https://github.com/tree-sitter-grammars/tree-sitter-markdown.git",
+            "state": {
+              "revision": "f969cd3ae3f9fbd4e43205431d0ae286014c05b5",
+              "version": "0.5.3"
+            }
+          },
+          {
+            "identity": "yams",
+            "kind": "remoteSourceControl",
+            "location": "https://github.com/jpsim/Yams.git",
+            "state": {
+              "revision": "a27b21e0c81c5bf42049b897a62aaf387e80f279",
+              "version": "6.2.2"
+            }
+          }
+        ],
+        "ordinaryResolveExit": 0,
+        "lockedResolveExit": 0,
+        "beforeSHA256": "c1e756f3d0670fdd08887f63217313d8960e5e15e1deb850224ade73a6487387",
+        "afterSHA256": "c1e756f3d0670fdd08887f63217313d8960e5e15e1deb850224ade73a6487387"
+      },
+      "PreviewKit": {
+        "pins": [
+          {
+            "identity": "yams",
+            "kind": "remoteSourceControl",
+            "location": "https://github.com/jpsim/Yams.git",
+            "state": {
+              "revision": "a27b21e0c81c5bf42049b897a62aaf387e80f279",
+              "version": "6.2.2"
+            }
+          }
+        ],
+        "ordinaryResolveExit": 0,
+        "lockedResolveExit": 0,
+        "beforeSHA256": "07999ac7b74c5ba347a1512c857c20cc7d8dcc8c4d7fd03c911e3a7a1fc8567b",
+        "afterSHA256": "07999ac7b74c5ba347a1512c857c20cc7d8dcc8c4d7fd03c911e3a7a1fc8567b"
+      },
+      "MarkdownCore": {
+        "pins": [
+          {
+            "identity": "yams",
+            "kind": "remoteSourceControl",
+            "location": "https://github.com/jpsim/Yams.git",
+            "state": {
+              "revision": "a27b21e0c81c5bf42049b897a62aaf387e80f279",
+              "version": "6.2.2"
+            }
+          }
+        ],
+        "ordinaryResolveExit": 0,
+        "lockedResolveExit": 0,
+        "beforeSHA256": "1559b4aef54e126f72dc1798de7fdaded1e73e2c8ed7abac24f8747c64512fa1",
+        "afterSHA256": "1559b4aef54e126f72dc1798de7fdaded1e73e2c8ed7abac24f8747c64512fa1"
+      }
+    }
+  }
+}

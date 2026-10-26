@@ -10,7 +10,7 @@ public enum IOSPreviewEvent: Sendable {
     case failed(PreviewAssetReadFailure)
 }
 
-/// No view type in the contract. 07 owns the retained UIKit/WebKit host.
+/// No view type in the contract.
 /// A nil assetAccess disables sibling reads for a single-file grant.
 @MainActor
 public protocol IOSPreviewControlling: AnyObject {
