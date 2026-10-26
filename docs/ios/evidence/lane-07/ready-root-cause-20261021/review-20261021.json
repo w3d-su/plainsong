@@ -142,7 +142,25 @@
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "complete_xcresult": true
+      "complete_xcresult": true,
+      "tiny_page_poll_observation": {
+        "log": "logs/hostless-v5.log.gz",
+        "log_lines": [
+          211,
+          222
+        ],
+        "printed_ready_seconds": 4.52,
+        "printed_jsErrors": 2,
+        "webcontent_launch_seconds": 4.417469,
+        "navigation_event_seconds": {
+          "start": 4.469,
+          "commit": 4.471,
+          "finish": 4.471
+        },
+        "counter_meaning": "Count of thrown PreviewHostedTestWait.javascript readiness polls, including its default 2-second reply timeout; no exception strings were printed.",
+        "interpretation": "Two reply timeouts during WebContent launch are consistent with the counter. The retained case has no navigation fail event or exception text, so the counter does not establish page-script errors.",
+        "review_date": "2026-10-26"
+      }
     },
     {
       "label": "hostless",
@@ -213,7 +231,8 @@
     "Probe pass statuses do not assert readiness; printed ready=never can accompany a passed diagnostic case.",
     "v5 nonpersistent-1 was the second web view after real-all, and uses a different page.",
     "The full94 bundle case ran after earlier web-view tests. The separate selected hosted run put it first.",
-    "These results do not prove UIApplication or RunningBoard causality, exonerate every historical failure, or diagnose the historical memory spike."
+    "These results do not prove UIApplication or RunningBoard causality, exonerate every historical failure, or diagnose the historical memory spike.",
+    "v5 tiny jsErrors=2 counts thrown readiness polls, including reply timeouts; it does not establish two page-script exceptions."
   ],
   "reviewed_base": "fdd2a071c04f61f5259d31cf17699534d77fce9e",
   "product_or_test_source_changes": false

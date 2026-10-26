@@ -50,7 +50,7 @@ observation, not a passing readiness assertion. Their 20 s loops and optional
 | v2 | Controller first, raw variants later | Controller printed `readyAt=never`; later real-all configuration printed 0.660 s. The controller probe itself was marked Passed. |
 | v3 | Raw default-store real-all first, controller last | First raw view printed `ready=never`; later controller printed 0.736 s. |
 | v4 | First default-store real-all after 25 s idle | Start 2.452 s, commit 5.271 s, no finish within the diagnostic window. That idle delay did not avoid the observation in this run. |
-| v5 | Default-store real-all first; nonpersistent-1 second; nonpersistent-2 third; tiny fourth | First view printed `ready=never`; subsequent nonpersistent views printed 0.930 / 0.889 s; tiny printed 4.520 s with two diagnostic JS errors. |
+| v5 | Default-store real-all first; nonpersistent-1 second; nonpersistent-2 third; tiny fourth | First view printed `ready=never`; subsequent nonpersistent views printed 0.930 / 0.889 s; tiny printed `ready=4.520 jsErrors=2`; the WebContent launch line reports 4.417469 s. |
 
 The v1 failures are
 `PreviewIOSHostedTests/testBundledKitchenSinkAndMDXStayVisible` and
@@ -62,6 +62,14 @@ probes ran only after those failures. These observations retain the failed
 first-controller path without establishing what caused it; the later raw
 successes do not explain or negate that failure. Named outcomes and log
 locations are recorded in `review-20261021.json`.
+
+In the v5 tiny-page probe, `jsErrors=2` counts thrown readiness-poll calls,
+including the helper's default 2 s JavaScript reply timeout. The log prints
+`ready=4.520`, navigation start/commit/finish at 4.469/4.471/4.471 s, and
+`WebContent process ... took 4.417469 seconds to launch`. It retains no
+navigation `fail:` event or exception string for that case. Two reply timeouts
+during that launch are consistent with the counter; these records do not
+establish two page-script exceptions or identify the thrown errors.
 
 In v5, `testPPNonPersistentFirst` means the first *nonpersistent* test, not
 the first view in the process. Those cases load tiny HTML, while the preceding
