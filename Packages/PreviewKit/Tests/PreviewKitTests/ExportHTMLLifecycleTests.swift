@@ -7,7 +7,9 @@ import XCTest
 
 @MainActor
 final class ExportHTMLLifecycleTests: XCTestCase {
-    private let support = ExportHTMLHostedTests()
+    private var support: ExportHTMLTestSupport {
+        ExportHTMLTestSupport(owner: self)
+    }
 
     func testCancellationResolvesPendingExportAndReleasesController() async throws {
         try await assertTerminal(reason: "cancelled") { controller, task in
@@ -168,6 +170,7 @@ final class ExportHTMLLifecycleTests: XCTestCase {
     ) async throws {
         var controller: PreviewController? = try support.makeController()
         weak var releasedController = controller
+        defer { releasedController?.invalidate() }
         weak var releasedWebView = controller?.webView
         let renderID = try await support.render(controller!, text: "# Lifecycle", fileKind: .markdown, version: 1)
         controller!.exportTimeoutNanoseconds = timeout

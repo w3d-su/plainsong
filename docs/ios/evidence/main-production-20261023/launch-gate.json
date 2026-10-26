@@ -1,0 +1,12 @@
+{
+  "cases": {
+    "IOSAcceptanceLaunchSmokeTests/testLaunchShowsFilesAndOpenControl": "Passed"
+  },
+  "executed": 1,
+  "failed": 0,
+  "passed": 1,
+  "required": [
+    "IOSAcceptanceLaunchSmokeTests/testLaunchShowsFilesAndOpenControl"
+  ],
+  "skipped": 0
+}

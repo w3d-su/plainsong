@@ -189,6 +189,9 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 - Descriptor-backed parent capture and document/image authority fall back to `O_SEARCH`
   when directory read access is denied. A single-file Powerbox grant permits parent lookup
   without directory enumeration; ordinary read descriptors retain permission-loss behavior.
+- An explicitly selected iOS single-file Markdown/MDX document that is downloading or
+  offline retains its current file grant and Files snapshot for Refresh and retry.
+  Availability is reported separately from document type; actual revocation still fences access.
 - Saves stage their temporary file beside the document and publish it with
   `renameatx_np`. A file-only grant (Open panel or Finder "Open With") refuses that sibling
   with `EPERM`; only then does the transaction stage in Foundation's item-replacement
@@ -395,6 +398,9 @@ republishes only when its value changes literally.
   keeps it. After a WebContent termination a live controller reloads the page and
   re-submits its newest render under a new render ID, giving up after three terminations
   without a completed render (each later render retries once); export controllers fail.
+  Only iOS arms the one-shot 2.5 s silent-initial-page retry; macOS retains its normal
+  initial load. A retry with no navigation token probes the current page when ready
+  arrives, and accepts only a protocol match from the current page generation.
 - **Security:** strict CSP (`default-src 'none'; script-src 'self'; style-src 'self'
   'unsafe-inline'; img-src asset: data: https:`), `isElementFullscreenEnabled` off, and
   no remote loads by default. The preview JS removes remote image `src` values unless
@@ -412,6 +418,8 @@ republishes only when its value changes literally.
 - Link clicks: intercepted in Swift. `http(s)` → `NSWorkspace.open` (external browser).
   Relative `.md`/`.mdx` → open that file in the editor. `#anchor` stays in JavaScript
   and scrolls the preview to a generated heading ID (Unicode and duplicate headings supported).
+  On iOS, PreviewKit also owns external browser opening; production scene observation
+  must not open its informational external-link event a second time.
 
 ### 7.2 JS pipeline (preview-src)
 

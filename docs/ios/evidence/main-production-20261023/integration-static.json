@@ -1,0 +1,2937 @@
+{
+  "schemaVersion": 1,
+  "generatedAtUTC": "2026-10-23T12:28:06.888838+00:00",
+  "scope": "Read-only Git/blob/hash/source-structure audit. This is not native execution, CI, simulator UI, device acceptance, or performance evidence.",
+  "repository": "/Users/davis._.su/.codex/worktrees/ios-main-production-20261023/blogeditor",
+  "sources": {
+    "mainBaseSHA": "cdb528d4a565cd15e31ddc1b6312b5a45b27236a",
+    "source209SquashSHA": "e13e2bd3d7ebbeda7bdb016620da4548c229aa61",
+    "source209ParentSHA": "a8bff9c1a73b29b12f8a75c0d3e999b9019fc73b",
+    "originalTransplantSHA": "af1d895b37f5db1bdfebf539524dc0bf9e12145f",
+    "originalParentSHA": "cdb528d4a565cd15e31ddc1b6312b5a45b27236a",
+    "currentAdaptedSHA": "1c1685adb7a594f3ecaf81a16d61f5d41e032363",
+    "observedHeadSHA": "1c1685adb7a594f3ecaf81a16d61f5d41e032363",
+    "freezeTagSHA": "642cb212703220409874a2741c5adbfb8c80fe8a"
+  },
+  "workingTreeStatusPorcelain": "",
+  "originalTransplant": {
+    "sourcePatchIDStable": "ae4e94e0ea65ee4f1d54c2a50c48f826eb369428",
+    "originalPatchIDStable": "ae4e94e0ea65ee4f1d54c2a50c48f826eb369428",
+    "commitCountAfterMainBase": 1,
+    "sourcePatchChangedPathCount": 63,
+    "postBlobs": [
+      {
+        "path": ".github/workflows/ios.yml",
+        "source": {
+          "gitBlobSHA1": "f01098bba84f2ea13060d61f20081ac56a867e24",
+          "sha256": "d837dc47aace73c828682b4d81a9d35f3b0375d2d0405cfb2255ee75288c6284",
+          "byteCount": 3566
+        },
+        "original": {
+          "gitBlobSHA1": "f01098bba84f2ea13060d61f20081ac56a867e24",
+          "sha256": "d837dc47aace73c828682b4d81a9d35f3b0375d2d0405cfb2255ee75288c6284",
+          "byteCount": 3566
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "AppIOS/App/IOSProductionRootView.swift",
+        "source": {
+          "gitBlobSHA1": "e8a39f533f926e238ffd0f213a026cd64e8c7e91",
+          "sha256": "79f606db7a95280bff56f004d9e6570be65b7f0e33db64ef7c468a72b4057807",
+          "byteCount": 6969
+        },
+        "original": {
+          "gitBlobSHA1": "e8a39f533f926e238ffd0f213a026cd64e8c7e91",
+          "sha256": "79f606db7a95280bff56f004d9e6570be65b7f0e33db64ef7c468a72b4057807",
+          "byteCount": 6969
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "AppIOS/App/PlainsongIOSApp.swift",
+        "source": {
+          "gitBlobSHA1": "39878268009c60bf7755ec6457dbcddbc435a983",
+          "sha256": "14050b3ae9f51376fc5bb3412f4e2c18d000bb4860667aec6a25c68a2999802c",
+          "byteCount": 155
+        },
+        "original": {
+          "gitBlobSHA1": "39878268009c60bf7755ec6457dbcddbc435a983",
+          "sha256": "14050b3ae9f51376fc5bb3412f4e2c18d000bb4860667aec6a25c68a2999802c",
+          "byteCount": 155
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "AppIOS/Composition/IOSDocumentReloadRelay.swift",
+        "source": {
+          "gitBlobSHA1": "e6b303506afb9781b1d1732f736be1e3751ffb18",
+          "sha256": "18d02c8f0e89f00a354b2d7cfdd0d52f86262dcffa7962732df575ef8697d0ab",
+          "byteCount": 7293
+        },
+        "original": {
+          "gitBlobSHA1": "e6b303506afb9781b1d1732f736be1e3751ffb18",
+          "sha256": "18d02c8f0e89f00a354b2d7cfdd0d52f86262dcffa7962732df575ef8697d0ab",
+          "byteCount": 7293
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "AppIOS/Composition/IOSDocumentSceneController+Events.swift",
+        "source": {
+          "gitBlobSHA1": "e2c0298137fc72a4e347b0ef6ce1c351375bb86c",
+          "sha256": "eabdea100bfe3cc8da31a284c1dec596a2730de8a3dc72e947743c9de4c47f13",
+          "byteCount": 5771
+        },
+        "original": {
+          "gitBlobSHA1": "e2c0298137fc72a4e347b0ef6ce1c351375bb86c",
+          "sha256": "eabdea100bfe3cc8da31a284c1dec596a2730de8a3dc72e947743c9de4c47f13",
+          "byteCount": 5771
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "AppIOS/Composition/IOSDocumentSceneController+Lifecycle.swift",
+        "source": {
+          "gitBlobSHA1": "562a46173aed0e2888a5911f80670245d14638f9",
+          "sha256": "1765fbaff0fe04f7ce8f5fb662195c203e6ab63beef1948c12062e7978874170",
+          "byteCount": 5954
+        },
+        "original": {
+          "gitBlobSHA1": "562a46173aed0e2888a5911f80670245d14638f9",
+          "sha256": "1765fbaff0fe04f7ce8f5fb662195c203e6ab63beef1948c12062e7978874170",
+          "byteCount": 5954
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "AppIOS/Composition/IOSDocumentSceneController.swift",
+        "source": {
+          "gitBlobSHA1": "fd45f62d38256ce7da3ddd108d53c933eebbcb3e",
+          "sha256": "9e1e0d5167833cbe969bdfa2a679aa85094cf44e7c22dd414b405bc98d629505",
+          "byteCount": 14282
+        },
+        "original": {
+          "gitBlobSHA1": "fd45f62d38256ce7da3ddd108d53c933eebbcb3e",
+          "sha256": "9e1e0d5167833cbe969bdfa2a679aa85094cf44e7c22dd414b405bc98d629505",
+          "byteCount": 14282
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "AppIOS/Composition/IOSProductionComposition.swift",
+        "source": {
+          "gitBlobSHA1": "bda5f9d4f9f6552a3c20e330deb15c43639d1003",
+          "sha256": "9d8b9c8fc3c42b80ae7325e1618aabe1adcff77e36952d39e7e79541a1bd6c28",
+          "byteCount": 2933
+        },
+        "original": {
+          "gitBlobSHA1": "bda5f9d4f9f6552a3c20e330deb15c43639d1003",
+          "sha256": "9d8b9c8fc3c42b80ae7325e1618aabe1adcff77e36952d39e7e79541a1bd6c28",
+          "byteCount": 2933
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "AppIOS/Composition/IOSProductionSurfaces.swift",
+        "source": {
+          "gitBlobSHA1": "744eb5d0e109be68d4304a1cbb84c486c45501fc",
+          "sha256": "d929de7cbbeac8d895c6d5aa9a14651b5e663bb1da759d0bc8f718932e5f139e",
+          "byteCount": 15454
+        },
+        "original": {
+          "gitBlobSHA1": "744eb5d0e109be68d4304a1cbb84c486c45501fc",
+          "sha256": "d929de7cbbeac8d895c6d5aa9a14651b5e663bb1da759d0bc8f718932e5f139e",
+          "byteCount": 15454
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "AppIOSTests/Integration/IOSDocumentReloadRelayTestSupport.swift",
+        "source": {
+          "gitBlobSHA1": "163a27f023fa93da4472cf2c06288f666a4f2fb2",
+          "sha256": "af83c0316bad49c257ebe6672bed49b25eea674a977987954808aef6dc4fea57",
+          "byteCount": 7470
+        },
+        "original": {
+          "gitBlobSHA1": "163a27f023fa93da4472cf2c06288f666a4f2fb2",
+          "sha256": "af83c0316bad49c257ebe6672bed49b25eea674a977987954808aef6dc4fea57",
+          "byteCount": 7470
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "AppIOSTests/Integration/IOSDocumentReloadRelayTests.swift",
+        "source": {
+          "gitBlobSHA1": "a5257435749f63ad4a6be1b883f3b23bc1473e93",
+          "sha256": "a8eed317de82d53cad93fcc06c321954ae84ef7ee58db9530ae9cb34d4424149",
+          "byteCount": 13842
+        },
+        "original": {
+          "gitBlobSHA1": "a5257435749f63ad4a6be1b883f3b23bc1473e93",
+          "sha256": "a8eed317de82d53cad93fcc06c321954ae84ef7ee58db9530ae9cb34d4424149",
+          "byteCount": 13842
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "AppIOSTests/Integration/IOSDocumentSceneControllerAvailabilityTests.swift",
+        "source": {
+          "gitBlobSHA1": "21b66cb9cf722e901786ee995bc7cca7e3b3dd00",
+          "sha256": "885acd137584183f0af263ed696251ba25ebca4052142337b62a3e5f872f6a7a",
+          "byteCount": 9419
+        },
+        "original": {
+          "gitBlobSHA1": "21b66cb9cf722e901786ee995bc7cca7e3b3dd00",
+          "sha256": "885acd137584183f0af263ed696251ba25ebca4052142337b62a3e5f872f6a7a",
+          "byteCount": 9419
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "AppIOSTests/Integration/IOSDocumentSceneControllerNavigationTests.swift",
+        "source": {
+          "gitBlobSHA1": "eb62091c06f742e1692b595103c3900730a965df",
+          "sha256": "5ee47a734cdf7ec9a7484610013e76b7247007414a9caef65d6fa77edc800369",
+          "byteCount": 6573
+        },
+        "original": {
+          "gitBlobSHA1": "eb62091c06f742e1692b595103c3900730a965df",
+          "sha256": "5ee47a734cdf7ec9a7484610013e76b7247007414a9caef65d6fa77edc800369",
+          "byteCount": 6573
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "AppIOSTests/Integration/IOSDocumentSceneControllerProviderSupport.swift",
+        "source": {
+          "gitBlobSHA1": "365c65643ed853373b0a7933c78ee11938ca4a3c",
+          "sha256": "793d0815df1173ff80cc62bcf4e75c35b690cc38c23090c9a0dca8a4100a3bc2",
+          "byteCount": 6115
+        },
+        "original": {
+          "gitBlobSHA1": "365c65643ed853373b0a7933c78ee11938ca4a3c",
+          "sha256": "793d0815df1173ff80cc62bcf4e75c35b690cc38c23090c9a0dca8a4100a3bc2",
+          "byteCount": 6115
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "AppIOSTests/Integration/IOSDocumentSceneControllerStoreSupport.swift",
+        "source": {
+          "gitBlobSHA1": "36c1d5e8b5911fcbf278a3c720223e4a56397cad",
+          "sha256": "0445d221acf26cce0de1d68f9133ebb57ad34a117ed620413e082a66ee8e3257",
+          "byteCount": 5434
+        },
+        "original": {
+          "gitBlobSHA1": "36c1d5e8b5911fcbf278a3c720223e4a56397cad",
+          "sha256": "0445d221acf26cce0de1d68f9133ebb57ad34a117ed620413e082a66ee8e3257",
+          "byteCount": 5434
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "AppIOSTests/Integration/IOSDocumentSceneControllerTests.swift",
+        "source": {
+          "gitBlobSHA1": "22dffb6930951554f52f3d96f29402f52d515590",
+          "sha256": "dfc6e6fdc53b9664048bc230b6c26f57cc983355411e187581e2db23b04c4a55",
+          "byteCount": 19326
+        },
+        "original": {
+          "gitBlobSHA1": "22dffb6930951554f52f3d96f29402f52d515590",
+          "sha256": "dfc6e6fdc53b9664048bc230b6c26f57cc983355411e187581e2db23b04c4a55",
+          "byteCount": 19326
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "AppIOSTests/Integration/IOSProductionDocumentWorkflowTests.swift",
+        "source": {
+          "gitBlobSHA1": "04ffa8725f62510325a553f02b458ccc943afbd8",
+          "sha256": "7afb88cd28f98e4397398b81c9f40957b0fdb292995c61fce84a7bb1fb01d1af",
+          "byteCount": 10442
+        },
+        "original": {
+          "gitBlobSHA1": "04ffa8725f62510325a553f02b458ccc943afbd8",
+          "sha256": "7afb88cd28f98e4397398b81c9f40957b0fdb292995c61fce84a7bb1fb01d1af",
+          "byteCount": 10442
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "AppIOSTests/Integration/IOSProductionSurfaceTests.swift",
+        "source": {
+          "gitBlobSHA1": "40bb32816bb26d511bb53e6be76f490639761ed6",
+          "sha256": "5cd7b8eb6a1ff8f206bde101122750310488476df8df7ddbf09be31fc3a2030a",
+          "byteCount": 13196
+        },
+        "original": {
+          "gitBlobSHA1": "40bb32816bb26d511bb53e6be76f490639761ed6",
+          "sha256": "5cd7b8eb6a1ff8f206bde101122750310488476df8df7ddbf09be31fc3a2030a",
+          "byteCount": 13196
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "IOSAcceptanceTests/Resources/acceptance-resource-manifest.txt",
+        "source": {
+          "gitBlobSHA1": "7ca90d5ef9d83a889a31ddb4da25c1662bd0f77a",
+          "sha256": "61cb24700b22fd3a4777e1b1491924a22ff4e311a046857e9dfe4d4baa86b5ca",
+          "byteCount": 3949
+        },
+        "original": {
+          "gitBlobSHA1": "7ca90d5ef9d83a889a31ddb4da25c1662bd0f77a",
+          "sha256": "61cb24700b22fd3a4777e1b1491924a22ff4e311a046857e9dfe4d4baa86b5ca",
+          "byteCount": 3949
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "IOSAcceptanceTests/Tests/IOSAcceptanceHarnessTests/BehaviorTests.swift",
+        "source": {
+          "gitBlobSHA1": "05917df859111ab2905e8c1591d7fb88d94eb81d",
+          "sha256": "2b4a5203f15a982c0aacc48d135116965432f38000531a1ae51d12206513dd80",
+          "byteCount": 15537
+        },
+        "original": {
+          "gitBlobSHA1": "05917df859111ab2905e8c1591d7fb88d94eb81d",
+          "sha256": "2b4a5203f15a982c0aacc48d135116965432f38000531a1ae51d12206513dd80",
+          "byteCount": 15537
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "IOSAcceptanceTests/Tests/IOSAcceptanceHarnessTests/ResourceAndLeaseTests.swift",
+        "source": {
+          "gitBlobSHA1": "e7d6383a31902e405ee74a39a72067921739b581",
+          "sha256": "5588d71318a4eb569de61ebc92e107029992fc07ed1c23c44fb01c7b5e2bd56a",
+          "byteCount": 8233
+        },
+        "original": {
+          "gitBlobSHA1": "e7d6383a31902e405ee74a39a72067921739b581",
+          "sha256": "5588d71318a4eb569de61ebc92e107029992fc07ed1c23c44fb01c7b5e2bd56a",
+          "byteCount": 8233
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "IOSAcceptanceTests/UI/IOSAcceptanceLaunchSmokeTests.swift",
+        "source": {
+          "gitBlobSHA1": "ec20597b97203ec7ed98d56c668c7e4f61f6d36e",
+          "sha256": "9ae9bbd1cedd7345c9fcad2dcb56a0c9cae213905e066faf07defd1861c87992",
+          "byteCount": 918
+        },
+        "original": {
+          "gitBlobSHA1": "ec20597b97203ec7ed98d56c668c7e4f61f6d36e",
+          "sha256": "9ae9bbd1cedd7345c9fcad2dcb56a0c9cae213905e066faf07defd1861c87992",
+          "byteCount": 918
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Makefile",
+        "source": {
+          "gitBlobSHA1": "4d26cc874eae5543333618dde3d8dd6a1a313aac",
+          "sha256": "61c5f843a5a13b70ba9c10daa65f20adf5ce2e298a73cb8271cb1ebe34e85af4",
+          "byteCount": 6647
+        },
+        "original": {
+          "gitBlobSHA1": "4d26cc874eae5543333618dde3d8dd6a1a313aac",
+          "sha256": "61c5f843a5a13b70ba9c10daa65f20adf5ce2e298a73cb8271cb1ebe34e85af4",
+          "byteCount": 6647
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/EditorKit/Tests/EditorKitTests/EditorReplaceLayeringTests.swift",
+        "source": {
+          "gitBlobSHA1": "c154094e312be19f0cf2f2a8eeb335898405bcee",
+          "sha256": "f2b6e12f3781dc34a67ca62e421f44c33095e591ec484e4e9f2277758ff8313b",
+          "byteCount": 14140
+        },
+        "original": {
+          "gitBlobSHA1": "c154094e312be19f0cf2f2a8eeb335898405bcee",
+          "sha256": "f2b6e12f3781dc34a67ca62e421f44c33095e591ec484e4e9f2277758ff8313b",
+          "byteCount": 14140
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Sources/PreviewKit/PreviewController+InitialReadiness.swift",
+        "source": {
+          "gitBlobSHA1": "7ea3c7b6070b9c410a540327c15f5d14bcc81043",
+          "sha256": "7e8dedc40d55acf4406842b81b1c76884cf97bcbb391306147f454eb251d3aa3",
+          "byteCount": 2575
+        },
+        "original": {
+          "gitBlobSHA1": "7ea3c7b6070b9c410a540327c15f5d14bcc81043",
+          "sha256": "7e8dedc40d55acf4406842b81b1c76884cf97bcbb391306147f454eb251d3aa3",
+          "byteCount": 2575
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Sources/PreviewKit/PreviewController.swift",
+        "source": {
+          "gitBlobSHA1": "caaea8215b14bb8b00a09a4bb0df6ef9fcfa5231",
+          "sha256": "eab06c45ca12480230f93aa06b8c2d7ce240db913c189ef33cdad82508e4aaef",
+          "byteCount": 22547
+        },
+        "original": {
+          "gitBlobSHA1": "caaea8215b14bb8b00a09a4bb0df6ef9fcfa5231",
+          "sha256": "eab06c45ca12480230f93aa06b8c2d7ce240db913c189ef33cdad82508e4aaef",
+          "byteCount": 22547
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLHostedTests.swift",
+        "source": {
+          "gitBlobSHA1": "daba8408c19d19fdb39cf762e3dc795cc63b15b5",
+          "sha256": "b624c760a6067d23754294722c6972ee8f912bb98c81274675ca6dd5189d5794",
+          "byteCount": 5875
+        },
+        "original": {
+          "gitBlobSHA1": "daba8408c19d19fdb39cf762e3dc795cc63b15b5",
+          "sha256": "b624c760a6067d23754294722c6972ee8f912bb98c81274675ca6dd5189d5794",
+          "byteCount": 5875
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLLifecycleTests.swift",
+        "source": {
+          "gitBlobSHA1": "b821ee3c556ae7c7fa472c752a28f98611d68dd8",
+          "sha256": "5835fa47a19b9894b10ca428843f2f3272e6c7c87a237e5bcd396bc3f60734bb",
+          "byteCount": 10141
+        },
+        "original": {
+          "gitBlobSHA1": "b821ee3c556ae7c7fa472c752a28f98611d68dd8",
+          "sha256": "5835fa47a19b9894b10ca428843f2f3272e6c7c87a237e5bcd396bc3f60734bb",
+          "byteCount": 10141
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLOfflineTests.swift",
+        "source": {
+          "gitBlobSHA1": "b985ccd94d8120ba93b1e95fcbe75ba76d304b09",
+          "sha256": "357f1a9364b3c3994f38169f54a62eb11fe590755a7bbfed68b6417978d43541",
+          "byteCount": 12764
+        },
+        "original": {
+          "gitBlobSHA1": "b985ccd94d8120ba93b1e95fcbe75ba76d304b09",
+          "sha256": "357f1a9364b3c3994f38169f54a62eb11fe590755a7bbfed68b6417978d43541",
+          "byteCount": 12764
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLOmissionCountTests.swift",
+        "source": {
+          "gitBlobSHA1": "f78d7996375b679b44c65e60aa6d35531f117464",
+          "sha256": "58786a691d19e79e0b1ba4ff765a264bd708a7aa3097fc0903321d5288050d97",
+          "byteCount": 3194
+        },
+        "original": {
+          "gitBlobSHA1": "f78d7996375b679b44c65e60aa6d35531f117464",
+          "sha256": "58786a691d19e79e0b1ba4ff765a264bd708a7aa3097fc0903321d5288050d97",
+          "byteCount": 3194
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLTestSupport.swift",
+        "source": {
+          "gitBlobSHA1": "b51682ea195318d73f8927470ff0cfa90480e29b",
+          "sha256": "fa02d804e7604ea3126f09a60334f793436431ef859f044a4cf09438a72055b0",
+          "byteCount": 1622
+        },
+        "original": {
+          "gitBlobSHA1": "b51682ea195318d73f8927470ff0cfa90480e29b",
+          "sha256": "fa02d804e7604ea3126f09a60334f793436431ef859f044a4cf09438a72055b0",
+          "byteCount": 1622
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLTitleTests.swift",
+        "source": {
+          "gitBlobSHA1": "ab98d5836da34ee8d4d833744c7371b3d91a068f",
+          "sha256": "2b2da002002a325f1a242972280cc9fb272266824095660c8d357c29dafb5d6d",
+          "byteCount": 1638
+        },
+        "original": {
+          "gitBlobSHA1": "ab98d5836da34ee8d4d833744c7371b3d91a068f",
+          "sha256": "2b2da002002a325f1a242972280cc9fb272266824095660c8d357c29dafb5d6d",
+          "byteCount": 1638
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Tests/PreviewKitTests/ExportNetworkInterceptorTests.swift",
+        "source": {
+          "gitBlobSHA1": "ce77a2b77b6606769634575eaf9940d77c0dc1d0",
+          "sha256": "465e935f27ed2b74c3a2ad9e72df2636c2b627192b519dd52948009be9f6991d",
+          "byteCount": 15441
+        },
+        "original": {
+          "gitBlobSHA1": "ce77a2b77b6606769634575eaf9940d77c0dc1d0",
+          "sha256": "465e935f27ed2b74c3a2ad9e72df2636c2b627192b519dd52948009be9f6991d",
+          "byteCount": 15441
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Tests/PreviewKitTests/ExportRenderLifecycleTests.swift",
+        "source": {
+          "gitBlobSHA1": "12ec8557afe5bb2e465150418d6d439742f35128",
+          "sha256": "4ee28cfdbc2da25cdafc34569147d343ae26b79332b5b4e186e085855f06f74a",
+          "byteCount": 4430
+        },
+        "original": {
+          "gitBlobSHA1": "12ec8557afe5bb2e465150418d6d439742f35128",
+          "sha256": "4ee28cfdbc2da25cdafc34569147d343ae26b79332b5b4e186e085855f06f74a",
+          "byteCount": 4430
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Tests/PreviewKitTests/PreviewBridgeTransportTests.swift",
+        "source": {
+          "gitBlobSHA1": "8f0d060f6ff18f8a5040cd844a1740fe6f85791a",
+          "sha256": "133ea7fc207f15dda172199c9f95671066b726b251ffa42092960f90b9fba7d5",
+          "byteCount": 6395
+        },
+        "original": {
+          "gitBlobSHA1": "8f0d060f6ff18f8a5040cd844a1740fe6f85791a",
+          "sha256": "133ea7fc207f15dda172199c9f95671066b726b251ffa42092960f90b9fba7d5",
+          "byteCount": 6395
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Tests/PreviewKitTests/PreviewIdentityTests.swift",
+        "source": {
+          "gitBlobSHA1": "5e45588b3750701f7364989c0d18a08b76b6a3bf",
+          "sha256": "015c637b6c3e84401d32a4631c7893045d0f06c33923cc3c2bf0104235e93b18",
+          "byteCount": 7014
+        },
+        "original": {
+          "gitBlobSHA1": "5e45588b3750701f7364989c0d18a08b76b6a3bf",
+          "sha256": "015c637b6c3e84401d32a4631c7893045d0f06c33923cc3c2bf0104235e93b18",
+          "byteCount": 7014
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Tests/PreviewKitTests/PreviewInitialReadinessTestSupport.swift",
+        "source": {
+          "gitBlobSHA1": "5dcf17966d8f0d5dd88067e89d2aa04e0ea2618e",
+          "sha256": "bce2b3267c6e0d8619c17bda1a84dd6421a27e6f67db5b934590561853cdb4f6",
+          "byteCount": 2518
+        },
+        "original": {
+          "gitBlobSHA1": "5dcf17966d8f0d5dd88067e89d2aa04e0ea2618e",
+          "sha256": "bce2b3267c6e0d8619c17bda1a84dd6421a27e6f67db5b934590561853cdb4f6",
+          "byteCount": 2518
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Tests/PreviewKitTests/PreviewInitialReadinessTests.swift",
+        "source": {
+          "gitBlobSHA1": "36715204e25681c167c3344c8149813a6447211b",
+          "sha256": "70d453aee49409d8e15d1eaa87cb17f094583fc475a06aaea7c1c11890a2d4d4",
+          "byteCount": 12193
+        },
+        "original": {
+          "gitBlobSHA1": "36715204e25681c167c3344c8149813a6447211b",
+          "sha256": "70d453aee49409d8e15d1eaa87cb17f094583fc475a06aaea7c1c11890a2d4d4",
+          "byteCount": 12193
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Tests/PreviewKitTests/PreviewKitTests.swift",
+        "source": {
+          "gitBlobSHA1": "161341e4d83d3bf351e0baba7b452fafac853eaa",
+          "sha256": "faf639a95a4c3061d06d4cf1c29916b0fc19da5b6e460d00ddff45bb494ef62d",
+          "byteCount": 15336
+        },
+        "original": {
+          "gitBlobSHA1": "161341e4d83d3bf351e0baba7b452fafac853eaa",
+          "sha256": "faf639a95a4c3061d06d4cf1c29916b0fc19da5b6e460d00ddff45bb494ef62d",
+          "byteCount": 15336
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Tests/PreviewKitTests/PreviewRenderDispatchTests.swift",
+        "source": {
+          "gitBlobSHA1": "0bb30350cf0dc1b098eca89b350c199be1fa7b2d",
+          "sha256": "bc9c0aaa46d1561e18b248f89bc4333b2515d1a50b95ed5dff26a0b3ea904892",
+          "byteCount": 13902
+        },
+        "original": {
+          "gitBlobSHA1": "0bb30350cf0dc1b098eca89b350c199be1fa7b2d",
+          "sha256": "bc9c0aaa46d1561e18b248f89bc4333b2515d1a50b95ed5dff26a0b3ea904892",
+          "byteCount": 13902
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Tests/PreviewKitTests/PreviewScrollDeliveryTests.swift",
+        "source": {
+          "gitBlobSHA1": "7b4c53b61c462d59f274310ec879db5a0be1015d",
+          "sha256": "f7052ebafbb7eee395ba08e4421710d86966c5ee762a9f8238112dc878dd19db",
+          "byteCount": 6865
+        },
+        "original": {
+          "gitBlobSHA1": "7b4c53b61c462d59f274310ec879db5a0be1015d",
+          "sha256": "f7052ebafbb7eee395ba08e4421710d86966c5ee762a9f8238112dc878dd19db",
+          "byteCount": 6865
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Tests/PreviewKitTests/PreviewWebContentRecoveryTests.swift",
+        "source": {
+          "gitBlobSHA1": "98507f448565aa93178a0f5b9747d2e0a920aa58",
+          "sha256": "56e358421a5e69e692a61ebd3d9a7939e6cf293dfe8995448e9a8af9644deb48",
+          "byteCount": 4034
+        },
+        "original": {
+          "gitBlobSHA1": "98507f448565aa93178a0f5b9747d2e0a920aa58",
+          "sha256": "56e358421a5e69e692a61ebd3d9a7939e6cf293dfe8995448e9a8af9644deb48",
+          "byteCount": 4034
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/IOSDocumentEntry.swift",
+        "source": {
+          "gitBlobSHA1": "072e8357e9a70a4fc2b7c5d9173f13d91d9d5a13",
+          "sha256": "83c36cedf5b3bfb2368e73d50bb9fb1129782c16a93a825730a563d5674214ef",
+          "byteCount": 2829
+        },
+        "original": {
+          "gitBlobSHA1": "072e8357e9a70a4fc2b7c5d9173f13d91d9d5a13",
+          "sha256": "83c36cedf5b3bfb2368e73d50bb9fb1129782c16a93a825730a563d5674214ef",
+          "byteCount": 2829
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/IOSDocumentLifecycle.swift",
+        "source": {
+          "gitBlobSHA1": "9c5538d9f892f8ca2cb2c1df7175d5654268f264",
+          "sha256": "cc16dc95637409b0e6212898f7d3f50a610e50ac169125da4141d8e331457ae7",
+          "byteCount": 8118
+        },
+        "original": {
+          "gitBlobSHA1": "9c5538d9f892f8ca2cb2c1df7175d5654268f264",
+          "sha256": "cc16dc95637409b0e6212898f7d3f50a610e50ac169125da4141d8e331457ae7",
+          "byteCount": 8118
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/IOSDocumentWriteBarrier.swift",
+        "source": {
+          "gitBlobSHA1": "c952fb9afdf5034791388672c4083c4e22b81211",
+          "sha256": "7a2218173c2644963f69404268ddab61286158e871f2245afa9d068bf45b7e96",
+          "byteCount": 1105
+        },
+        "original": {
+          "gitBlobSHA1": "c952fb9afdf5034791388672c4083c4e22b81211",
+          "sha256": "7a2218173c2644963f69404268ddab61286158e871f2245afa9d068bf45b7e96",
+          "byteCount": 1105
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/IOSUIDocumentStore+External.swift",
+        "source": {
+          "gitBlobSHA1": "55300721fa5a076387d9a8d6490d1ad07dc6b137",
+          "sha256": "b087533ed7d3d0fbda3dac1ef233a618baa9c0d2da402c070429d6b8b4c4a092",
+          "byteCount": 12789
+        },
+        "original": {
+          "gitBlobSHA1": "55300721fa5a076387d9a8d6490d1ad07dc6b137",
+          "sha256": "b087533ed7d3d0fbda3dac1ef233a618baa9c0d2da402c070429d6b8b4c4a092",
+          "byteCount": 12789
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentCloseObservationTests.swift",
+        "source": {
+          "gitBlobSHA1": "1becb7ee1357da59e488ec44350e121235c1f024",
+          "sha256": "0ce9f7352dcb2ae7f9fdf28cadaf8f2f28c27a1c9c76a5cfd8747eaded15c52d",
+          "byteCount": 7431
+        },
+        "original": {
+          "gitBlobSHA1": "1becb7ee1357da59e488ec44350e121235c1f024",
+          "sha256": "0ce9f7352dcb2ae7f9fdf28cadaf8f2f28c27a1c9c76a5cfd8747eaded15c52d",
+          "byteCount": 7431
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentDeferredCloseTests.swift",
+        "source": {
+          "gitBlobSHA1": "df9f66b6505fb1ead9285fe4e1e9e0cac93bcc7e",
+          "sha256": "97a8f2606a5ac45a8ab68ad2c5482c32e9722ef394815e5944f58ae4d6325fe6",
+          "byteCount": 9948
+        },
+        "original": {
+          "gitBlobSHA1": "df9f66b6505fb1ead9285fe4e1e9e0cac93bcc7e",
+          "sha256": "97a8f2606a5ac45a8ab68ad2c5482c32e9722ef394815e5944f58ae4d6325fe6",
+          "byteCount": 9948
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/Support/DocumentIOHarness.swift",
+        "source": {
+          "gitBlobSHA1": "1f5035d2a2c585b1434e6cfc2b7628a90e39c7f7",
+          "sha256": "e4ecc7ca0d133db522331395a4a8ec2a605cefd28e1f8cd77ae8e7ea2f90927d",
+          "byteCount": 14038
+        },
+        "original": {
+          "gitBlobSHA1": "1f5035d2a2c585b1434e6cfc2b7628a90e39c7f7",
+          "sha256": "e4ecc7ca0d133db522331395a4a8ec2a605cefd28e1f8cd77ae8e7ea2f90927d",
+          "byteCount": 14038
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Scripts/ios/required-named-tests.txt",
+        "source": {
+          "gitBlobSHA1": "3e90638791629ac6ebc12b26acc7014166efb77a",
+          "sha256": "28a8bcda2e8b62acc1fda195df04f0fe1e5d7508828431ca97a5891066c9776c",
+          "byteCount": 7866
+        },
+        "original": {
+          "gitBlobSHA1": "3e90638791629ac6ebc12b26acc7014166efb77a",
+          "sha256": "28a8bcda2e8b62acc1fda195df04f0fe1e5d7508828431ca97a5891066c9776c",
+          "byteCount": 7866
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "Scripts/ios/required-preview-tests.txt",
+        "source": {
+          "gitBlobSHA1": "ec50c387757a1dbc0725a1a5d27b11a7947776f3",
+          "sha256": "4f60e83579f09b889a7d409a75657d285856c7eedd58ff74fad5a012a69a0cc4",
+          "byteCount": 7736
+        },
+        "original": {
+          "gitBlobSHA1": "ec50c387757a1dbc0725a1a5d27b11a7947776f3",
+          "sha256": "4f60e83579f09b889a7d409a75657d285856c7eedd58ff74fad5a012a69a0cc4",
+          "byteCount": 7736
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "docs/decisions/2026-10-23-ios-composition-review-fixes.md",
+        "source": {
+          "gitBlobSHA1": "90efedd7d52636a6f9e30d60a00b8e16d3def6cd",
+          "sha256": "91f3f87d03fcb0fa1b2c62714a014952e5db2c79b91100badd961fc4210fa04a",
+          "byteCount": 2606
+        },
+        "original": {
+          "gitBlobSHA1": "90efedd7d52636a6f9e30d60a00b8e16d3def6cd",
+          "sha256": "91f3f87d03fcb0fa1b2c62714a014952e5db2c79b91100badd961fc4210fa04a",
+          "byteCount": 2606
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "docs/decisions/2026-10-23-ios-production-document-composition.md",
+        "source": {
+          "gitBlobSHA1": "e149e51758f05ddb0edaa74004585d9814367a1c",
+          "sha256": "b33b5b5a9bd6108a0dd6101931ae07af789989de075dabf42261aaf69104fa5a",
+          "byteCount": 4174
+        },
+        "original": {
+          "gitBlobSHA1": "e149e51758f05ddb0edaa74004585d9814367a1c",
+          "sha256": "b33b5b5a9bd6108a0dd6101931ae07af789989de075dabf42261aaf69104fa5a",
+          "byteCount": 4174
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "docs/decisions/2026-10-23-preview-initial-readiness-watchdog.md",
+        "source": {
+          "gitBlobSHA1": "90acbb415fdbda9c18f1fa10789fcdf05446537e",
+          "sha256": "6ff2d3450523ec1bc987cf8e1f56e58bf06ba860ad6f3f6b3b9d6cff9965f028",
+          "byteCount": 4427
+        },
+        "original": {
+          "gitBlobSHA1": "90acbb415fdbda9c18f1fa10789fcdf05446537e",
+          "sha256": "6ff2d3450523ec1bc987cf8e1f56e58bf06ba860ad6f3f6b3b9d6cff9965f028",
+          "byteCount": 4427
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "docs/ios/evidence/README.md",
+        "source": {
+          "gitBlobSHA1": "dff9c473fedc616d1e1301f4e89d17ec371a081f",
+          "sha256": "5894390308354ecf7cc14c07364f0166e1a7d2543114852d70b224e0b220d3b8",
+          "byteCount": 4312
+        },
+        "original": {
+          "gitBlobSHA1": "dff9c473fedc616d1e1301f4e89d17ec371a081f",
+          "sha256": "5894390308354ecf7cc14c07364f0166e1a7d2543114852d70b224e0b220d3b8",
+          "byteCount": 4312
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "docs/ios/evidence/production-composition-20261023/README.md",
+        "source": {
+          "gitBlobSHA1": "3e05a136f95882c76f1d6bdd8ee3acdebd379c69",
+          "sha256": "806e1b7c1633a4cfd7844253b2ecd676e7ee88ad50bb1c7dc3cff942add53e53",
+          "byteCount": 5397
+        },
+        "original": {
+          "gitBlobSHA1": "3e05a136f95882c76f1d6bdd8ee3acdebd379c69",
+          "sha256": "806e1b7c1633a4cfd7844253b2ecd676e7ee88ad50bb1c7dc3cff942add53e53",
+          "byteCount": 5397
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "docs/ios/evidence/production-composition-20261023/native-module-c18e41a.json",
+        "source": {
+          "gitBlobSHA1": "d7f9bdd139c181dca37a4a4ea92231651bfec30e",
+          "sha256": "c971beeb00ce000142344cdd1a7614fde1f6e58e3231e4fa254bc96fc4190f33",
+          "byteCount": 2739
+        },
+        "original": {
+          "gitBlobSHA1": "d7f9bdd139c181dca37a4a4ea92231651bfec30e",
+          "sha256": "c971beeb00ce000142344cdd1a7614fde1f6e58e3231e4fa254bc96fc4190f33",
+          "byteCount": 2739
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "docs/ios/evidence/validation/README.md",
+        "source": {
+          "gitBlobSHA1": "36a98159d9c8351b6486564585e9ab8a4b530005",
+          "sha256": "6a9920747f41efccb05d5d9bcdf4c7072387dd8429653b78b2e93c1ef16ee2c0",
+          "byteCount": 10079
+        },
+        "original": {
+          "gitBlobSHA1": "36a98159d9c8351b6486564585e9ab8a4b530005",
+          "sha256": "6a9920747f41efccb05d5d9bcdf4c7072387dd8429653b78b2e93c1ef16ee2c0",
+          "byteCount": 10079
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "docs/ios/evidence/validation/production-launch-smoke-20261023.md",
+        "source": {
+          "gitBlobSHA1": "785ba80ff51f44bdde972496abc123cfa0c30c25",
+          "sha256": "49edb47202bf25ac2c8b1560adb2e9d5019a33b24549873d5fde1b6d8351ffd4",
+          "byteCount": 1454
+        },
+        "original": {
+          "gitBlobSHA1": "785ba80ff51f44bdde972496abc123cfa0c30c25",
+          "sha256": "49edb47202bf25ac2c8b1560adb2e9d5019a33b24549873d5fde1b6d8351ffd4",
+          "byteCount": 1454
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "docs/ios/evidence/validation/required-hosted-smoke.txt",
+        "source": {
+          "gitBlobSHA1": "2e7b1deac3d4e58f744030e0225d2c688af5af8d",
+          "sha256": "a012750ee5bc8fab53d7a8e10c7030f2a9d3d4603d9885060d9a4cdb45110e6d",
+          "byteCount": 244
+        },
+        "original": {
+          "gitBlobSHA1": "2e7b1deac3d4e58f744030e0225d2c688af5af8d",
+          "sha256": "a012750ee5bc8fab53d7a8e10c7030f2a9d3d4603d9885060d9a4cdb45110e6d",
+          "byteCount": 244
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "docs/ios/evidence/validation/wiring-proposal.md",
+        "source": {
+          "gitBlobSHA1": "cd66b1f6ad95753ec81fd203617eae453a7c1176",
+          "sha256": "a028c30b916b544a15be8c9ebc3ebdc52818a4352d1d7c8fa9f25267cec6f9c3",
+          "byteCount": 6007
+        },
+        "original": {
+          "gitBlobSHA1": "cd66b1f6ad95753ec81fd203617eae453a7c1176",
+          "sha256": "a028c30b916b544a15be8c9ebc3ebdc52818a4352d1d7c8fa9f25267cec6f9c3",
+          "byteCount": 6007
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "docs/ios/integration-ledger.md",
+        "source": {
+          "gitBlobSHA1": "8a76377902385d0e0dc3848c55ebcc812e41bbc4",
+          "sha256": "72eb2c7a3a39c3f210ce9efaf71fed0493bf50b987a26e2bd2725d4f2757b235",
+          "byteCount": 26025
+        },
+        "original": {
+          "gitBlobSHA1": "8a76377902385d0e0dc3848c55ebcc812e41bbc4",
+          "sha256": "72eb2c7a3a39c3f210ce9efaf71fed0493bf50b987a26e2bd2725d4f2757b235",
+          "byteCount": 26025
+        },
+        "byteEqual": true
+      },
+      {
+        "path": "project.yml",
+        "source": {
+          "gitBlobSHA1": "8f5a498b1d6191c222a3f1f606de30853a4bd112",
+          "sha256": "dbf32077fc3e739743816cdf42270b232e8b70aff6b37631fb496fcd008a81db",
+          "byteCount": 12189
+        },
+        "original": {
+          "gitBlobSHA1": "8f5a498b1d6191c222a3f1f606de30853a4bd112",
+          "sha256": "dbf32077fc3e739743816cdf42270b232e8b70aff6b37631fb496fcd008a81db",
+          "byteCount": 12189
+        },
+        "byteEqual": true
+      }
+    ]
+  },
+  "mainAdaptation": {
+    "changedPathsAfterOriginal": [
+      "M\tIOSAcceptanceTests/Resources/acceptance-resource-manifest.txt",
+      "A\tdocs/decisions/2026-10-23-ios-main-production-integration.md",
+      "A\tdocs/ios/evidence/main-production-20261023/README.md",
+      "M\tdocs/ios/integration-ledger.md"
+    ],
+    "explanation": "The original one-commit transplant is patch-equivalent to #209. The follow-up updates only the acceptance manifest bundle.js hash to main's retained #195 bundle and adds integration documentation. The final two-commit PR diff is intentionally not claimed patch-identical to #209.",
+    "commitCountAfterMainBase": 2,
+    "commitsAfterMainBase": [
+      "1c1685adb7a594f3ecaf81a16d61f5d41e032363 af1d895b37f5db1bdfebf539524dc0bf9e12145f",
+      "af1d895b37f5db1bdfebf539524dc0bf9e12145f cdb528d4a565cd15e31ddc1b6312b5a45b27236a"
+    ]
+  },
+  "retainedMainSubtrees": [
+    {
+      "path": "App",
+      "baseGitTreeSHA1": "9ebd4ca5cb1e712038ed1d5ebf6e5af4ed9900df",
+      "currentGitTreeSHA1": "9ebd4ca5cb1e712038ed1d5ebf6e5af4ed9900df",
+      "byteEqual": true
+    },
+    {
+      "path": "Packages/EditorKit/Sources",
+      "baseGitTreeSHA1": "72e8682716fb36b56f710251d796f1c74324362c",
+      "currentGitTreeSHA1": "72e8682716fb36b56f710251d796f1c74324362c",
+      "byteEqual": true
+    },
+    {
+      "path": "Packages/WorkspaceKit",
+      "baseGitTreeSHA1": "240898e0985c2ed45ae159a6b86ffb43f807c0dd",
+      "currentGitTreeSHA1": "240898e0985c2ed45ae159a6b86ffb43f807c0dd",
+      "byteEqual": true
+    },
+    {
+      "path": "preview-src",
+      "baseGitTreeSHA1": "0f21d6a5c7a883116aa5823e3ddb9202a8ef6bdf",
+      "currentGitTreeSHA1": "0f21d6a5c7a883116aa5823e3ddb9202a8ef6bdf",
+      "byteEqual": true
+    },
+    {
+      "path": "App/Resources/preview",
+      "baseGitTreeSHA1": "40eb6e393351181e0b325e733802439c6c6f1a72",
+      "currentGitTreeSHA1": "40eb6e393351181e0b325e733802439c6c6f1a72",
+      "byteEqual": true
+    }
+  ],
+  "dependencyManifestsAndPins": [
+    {
+      "path": "IOSAcceptanceTests/Package.resolved",
+      "base": {
+        "gitBlobSHA1": "e720391f0c68dd42fa802b382b9cd71b4a65b284",
+        "sha256": "46ae21d203a58c98fd0680b0fa2e8de82760d0715090c19cf6dc66bd44cb3a3e",
+        "byteCount": 375
+      },
+      "current": {
+        "gitBlobSHA1": "e720391f0c68dd42fa802b382b9cd71b4a65b284",
+        "sha256": "46ae21d203a58c98fd0680b0fa2e8de82760d0715090c19cf6dc66bd44cb3a3e",
+        "byteCount": 375
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "IOSAcceptanceTests/Package.swift",
+      "base": {
+        "gitBlobSHA1": "24fa4d2ed161273ab2b6bf97fb60f0face2dde9e",
+        "sha256": "1a1167cc39847fa318aeb97693e102110fc81e9e9b0b36d5fc4e5f7959013e7f",
+        "byteCount": 1263
+      },
+      "current": {
+        "gitBlobSHA1": "24fa4d2ed161273ab2b6bf97fb60f0face2dde9e",
+        "sha256": "1a1167cc39847fa318aeb97693e102110fc81e9e9b0b36d5fc4e5f7959013e7f",
+        "byteCount": 1263
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "Packages/EditorKit/Package.resolved",
+      "base": {
+        "gitBlobSHA1": "5ff77d47bb0dc80552a0e08e37786940bb358d8b",
+        "sha256": "f730ff556521022496521ce986dd1a2f5d41f2c2de3ddcd3fed43a44e9b6ae02",
+        "byteCount": 2055
+      },
+      "current": {
+        "gitBlobSHA1": "5ff77d47bb0dc80552a0e08e37786940bb358d8b",
+        "sha256": "f730ff556521022496521ce986dd1a2f5d41f2c2de3ddcd3fed43a44e9b6ae02",
+        "byteCount": 2055
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "Packages/EditorKit/Package.swift",
+      "base": {
+        "gitBlobSHA1": "bf6497cd9a44e8e0bb27d9ab471a6b362616c21f",
+        "sha256": "0ad4ac4684d049cec4f6b992799d4ea741eaf57506503b0a97ce029e9e11a841",
+        "byteCount": 902
+      },
+      "current": {
+        "gitBlobSHA1": "bf6497cd9a44e8e0bb27d9ab471a6b362616c21f",
+        "sha256": "0ad4ac4684d049cec4f6b992799d4ea741eaf57506503b0a97ce029e9e11a841",
+        "byteCount": 902
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "Packages/EditorKitIOS/Package.resolved",
+      "base": {
+        "gitBlobSHA1": "0bc7f1e1ef716172b5d22b77de5365aade75f331",
+        "sha256": "3fa6abb603cf8849f954e310cdb5a8954cdcc75dd31f1a227a5f3f3ac7127abf",
+        "byteCount": 375
+      },
+      "current": {
+        "gitBlobSHA1": "0bc7f1e1ef716172b5d22b77de5365aade75f331",
+        "sha256": "3fa6abb603cf8849f954e310cdb5a8954cdcc75dd31f1a227a5f3f3ac7127abf",
+        "byteCount": 375
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "Packages/EditorKitIOS/Package.swift",
+      "base": {
+        "gitBlobSHA1": "c32e9e73919787e17d4bdf1efebd724ef8c0e0f8",
+        "sha256": "311dc44460b357d7a3383a71c7867ffbbb7dfc5a4f0f549812631ce77ab47e0a",
+        "byteCount": 761
+      },
+      "current": {
+        "gitBlobSHA1": "c32e9e73919787e17d4bdf1efebd724ef8c0e0f8",
+        "sha256": "311dc44460b357d7a3383a71c7867ffbbb7dfc5a4f0f549812631ce77ab47e0a",
+        "byteCount": 761
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "Packages/MarkdownCore/Package.resolved",
+      "base": {
+        "gitBlobSHA1": "ba0e2108824fbd8419c4b6faf56839f042443777",
+        "sha256": "1559b4aef54e126f72dc1798de7fdaded1e73e2c8ed7abac24f8747c64512fa1",
+        "byteCount": 375
+      },
+      "current": {
+        "gitBlobSHA1": "ba0e2108824fbd8419c4b6faf56839f042443777",
+        "sha256": "1559b4aef54e126f72dc1798de7fdaded1e73e2c8ed7abac24f8747c64512fa1",
+        "byteCount": 375
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "Packages/MarkdownCore/Package.swift",
+      "base": {
+        "gitBlobSHA1": "64352428191f2ec60e6c192392423adaa5d20376",
+        "sha256": "f48f36e7802f1300a00f79787bdb5dcd41d0a4bd1b0b3ee7f698c53adb8ab398",
+        "byteCount": 684
+      },
+      "current": {
+        "gitBlobSHA1": "64352428191f2ec60e6c192392423adaa5d20376",
+        "sha256": "f48f36e7802f1300a00f79787bdb5dcd41d0a4bd1b0b3ee7f698c53adb8ab398",
+        "byteCount": 684
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "Packages/PreviewKit/Package.resolved",
+      "base": {
+        "gitBlobSHA1": "b6ea2571c312c331d31b932af7fefaaa8ed6a1e3",
+        "sha256": "07999ac7b74c5ba347a1512c857c20cc7d8dcc8c4d7fd03c911e3a7a1fc8567b",
+        "byteCount": 375
+      },
+      "current": {
+        "gitBlobSHA1": "b6ea2571c312c331d31b932af7fefaaa8ed6a1e3",
+        "sha256": "07999ac7b74c5ba347a1512c857c20cc7d8dcc8c4d7fd03c911e3a7a1fc8567b",
+        "byteCount": 375
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "Packages/PreviewKit/Package.swift",
+      "base": {
+        "gitBlobSHA1": "dda2f524518d9b11860973c365a401d8a75f4340",
+        "sha256": "dab2663999869fafa412effe795e7389c900581b228764cf98c35e1781ea53ca",
+        "byteCount": 1203
+      },
+      "current": {
+        "gitBlobSHA1": "dda2f524518d9b11860973c365a401d8a75f4340",
+        "sha256": "dab2663999869fafa412effe795e7389c900581b228764cf98c35e1781ea53ca",
+        "byteCount": 1203
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "Packages/SyntaxKit/Package.resolved",
+      "base": {
+        "gitBlobSHA1": "11ab0dbb7c206dce0f1a435954db54a921f74b8b",
+        "sha256": "0138fe19aacdfd38b27b546f0dd407fbf83bfadd43351ac3d33fcff511447abe",
+        "byteCount": 1232
+      },
+      "current": {
+        "gitBlobSHA1": "11ab0dbb7c206dce0f1a435954db54a921f74b8b",
+        "sha256": "0138fe19aacdfd38b27b546f0dd407fbf83bfadd43351ac3d33fcff511447abe",
+        "byteCount": 1232
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "Packages/SyntaxKit/Package.swift",
+      "base": {
+        "gitBlobSHA1": "67600f21beaf86e23caf7f887e0c4d24cb024dc7",
+        "sha256": "21f6b1c7689891ca2e087e6adf9ed1fee683f045391947647c726451e4a8e3d2",
+        "byteCount": 1722
+      },
+      "current": {
+        "gitBlobSHA1": "67600f21beaf86e23caf7f887e0c4d24cb024dc7",
+        "sha256": "21f6b1c7689891ca2e087e6adf9ed1fee683f045391947647c726451e4a8e3d2",
+        "byteCount": 1722
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "Packages/WorkspaceCore/Package.resolved",
+      "base": {
+        "gitBlobSHA1": "0582075bb382105b773491efd1be1e3c795d09ec",
+        "sha256": "33a099cdb5e4ccdf428d8568b95935e157f3c159fabfe40de1c243010b3e7967",
+        "byteCount": 375
+      },
+      "current": {
+        "gitBlobSHA1": "0582075bb382105b773491efd1be1e3c795d09ec",
+        "sha256": "33a099cdb5e4ccdf428d8568b95935e157f3c159fabfe40de1c243010b3e7967",
+        "byteCount": 375
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "Packages/WorkspaceCore/Package.swift",
+      "base": {
+        "gitBlobSHA1": "e7f67f6e46811861c0c78182030d778e59943601",
+        "sha256": "6e707eff61c122f575d84e1c388796236086746eded040bd41df246cb6a51622",
+        "byteCount": 674
+      },
+      "current": {
+        "gitBlobSHA1": "e7f67f6e46811861c0c78182030d778e59943601",
+        "sha256": "6e707eff61c122f575d84e1c388796236086746eded040bd41df246cb6a51622",
+        "byteCount": 674
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "Packages/WorkspaceKit/Package.resolved",
+      "base": {
+        "gitBlobSHA1": "42a3f994ef2ad479f7ba101e375f0d596ff24f77",
+        "sha256": "6e3b177e727b76d5e0a2e53af778fa84e318a7b6f3e00a42579baf889b2dc6fc",
+        "byteCount": 375
+      },
+      "current": {
+        "gitBlobSHA1": "42a3f994ef2ad479f7ba101e375f0d596ff24f77",
+        "sha256": "6e3b177e727b76d5e0a2e53af778fa84e318a7b6f3e00a42579baf889b2dc6fc",
+        "byteCount": 375
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "Packages/WorkspaceKit/Package.swift",
+      "base": {
+        "gitBlobSHA1": "c6bc20bba5ebd06703a0232ec9515a86cae58ae6",
+        "sha256": "ff489943ba40e371b6aafd2f9ccdd0eeedf2c77b74be1fa3b414e0c17adaeded",
+        "byteCount": 773
+      },
+      "current": {
+        "gitBlobSHA1": "c6bc20bba5ebd06703a0232ec9515a86cae58ae6",
+        "sha256": "ff489943ba40e371b6aafd2f9ccdd0eeedf2c77b74be1fa3b414e0c17adaeded",
+        "byteCount": 773
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "Packages/WorkspaceKitIOS/Package.resolved",
+      "base": {
+        "gitBlobSHA1": "6477146bd77fdc0a88bcd58be30e15154f1158d5",
+        "sha256": "ef7fa1320cdc78df5bf3ee8129077cb78b06b7525eaf2e0da6b7a4a22ac0b9d6",
+        "byteCount": 375
+      },
+      "current": {
+        "gitBlobSHA1": "6477146bd77fdc0a88bcd58be30e15154f1158d5",
+        "sha256": "ef7fa1320cdc78df5bf3ee8129077cb78b06b7525eaf2e0da6b7a4a22ac0b9d6",
+        "byteCount": 375
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "Packages/WorkspaceKitIOS/Package.swift",
+      "base": {
+        "gitBlobSHA1": "a16fd3d3633efea985467bd53a0c1732d393121a",
+        "sha256": "0d338cdb207cc8d36b7c7bf4f00308269af635632ba742d127110c60651a1e4c",
+        "byteCount": 910
+      },
+      "current": {
+        "gitBlobSHA1": "a16fd3d3633efea985467bd53a0c1732d393121a",
+        "sha256": "0d338cdb207cc8d36b7c7bf4f00308269af635632ba742d127110c60651a1e4c",
+        "byteCount": 910
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "preview-src/package-lock.json",
+      "base": {
+        "gitBlobSHA1": "3f7c11c0956a13a6c9a16d13b884bec3e170f0ee",
+        "sha256": "e084f475e485a8d68831ce8002a462f5c9e74f1e842d22af335a9e69193e191a",
+        "byteCount": 196311
+      },
+      "current": {
+        "gitBlobSHA1": "3f7c11c0956a13a6c9a16d13b884bec3e170f0ee",
+        "sha256": "e084f475e485a8d68831ce8002a462f5c9e74f1e842d22af335a9e69193e191a",
+        "byteCount": 196311
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "preview-src/package.json",
+      "base": {
+        "gitBlobSHA1": "0b3b3fbaaf804d6cd6f80d438efa4817f3b3e798",
+        "sha256": "67b0e2a3d449334314d6c79d9748e4bf8ff8417c83c9417339aa1e718e876c64",
+        "byteCount": 779
+      },
+      "current": {
+        "gitBlobSHA1": "0b3b3fbaaf804d6cd6f80d438efa4817f3b3e798",
+        "sha256": "67b0e2a3d449334314d6c79d9748e4bf8ff8417c83c9417339aa1e718e876c64",
+        "byteCount": 779
+      },
+      "byteEqual": true
+    }
+  ],
+  "bridgeDeclarations": [
+    {
+      "path": "Packages/PreviewKit/Sources/PreviewKit/BridgeMessage.swift",
+      "base": {
+        "gitBlobSHA1": "35c6806ccf6c270d17ac85dc5f1cc9e292aa68d4",
+        "sha256": "223bd321d08443d1ea7b6c043dfe40884df3b87d032cb32d37b947c9042721c8",
+        "byteCount": 8207
+      },
+      "current": {
+        "gitBlobSHA1": "35c6806ccf6c270d17ac85dc5f1cc9e292aa68d4",
+        "sha256": "223bd321d08443d1ea7b6c043dfe40884df3b87d032cb32d37b947c9042721c8",
+        "byteCount": 8207
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "Packages/PreviewKit/Sources/PreviewKit/ExportBridgeMessages.swift",
+      "base": {
+        "gitBlobSHA1": "7d494c22eff7fed9963cd90ae1110118db4fd7aa",
+        "sha256": "2dba08097099c24d1a787c676ea1dd01231865b2679c4756c5805ea886d8cb05",
+        "byteCount": 4839
+      },
+      "current": {
+        "gitBlobSHA1": "7d494c22eff7fed9963cd90ae1110118db4fd7aa",
+        "sha256": "2dba08097099c24d1a787c676ea1dd01231865b2679c4756c5805ea886d8cb05",
+        "byteCount": 4839
+      },
+      "byteEqual": true
+    },
+    {
+      "path": "preview-src/src/bridge.ts",
+      "base": {
+        "gitBlobSHA1": "77febbd7ad0b4095dbe4402ba2e91df0860851d4",
+        "sha256": "3cbd71baac6af0c62a640b1827823773a5a05f79ddcbbb4fb05508a0485d10a9",
+        "byteCount": 3506
+      },
+      "current": {
+        "gitBlobSHA1": "77febbd7ad0b4095dbe4402ba2e91df0860851d4",
+        "sha256": "3cbd71baac6af0c62a640b1827823773a5a05f79ddcbbb4fb05508a0485d10a9",
+        "byteCount": 3506
+      },
+      "byteEqual": true
+    }
+  ],
+  "frozenContracts": {
+    "inventory": {
+      "gitBlobSHA1": "81ae0d0df80afd9d329649abcb7f27e21ccd8c45",
+      "sha256": "1c49897a7d396061276795fdf499eb2857e998d031d295debd437110bdaffa91",
+      "byteCount": 8375
+    },
+    "version": "IOS-C0-v1",
+    "files": [
+      {
+        "path": "AppIOS/State/Contracts.swift",
+        "expectedSHA256": "d5146a1a803e2e890fed799d8f4020103f72fb22d1262e3861c8bb5e5bf82b56",
+        "base": {
+          "gitBlobSHA1": "73e1a011fd5db95d9323a39c5962d7f3d0e19d66",
+          "sha256": "d5146a1a803e2e890fed799d8f4020103f72fb22d1262e3861c8bb5e5bf82b56",
+          "byteCount": 1489
+        },
+        "current": {
+          "gitBlobSHA1": "73e1a011fd5db95d9323a39c5962d7f3d0e19d66",
+          "sha256": "d5146a1a803e2e890fed799d8f4020103f72fb22d1262e3861c8bb5e5bf82b56",
+          "byteCount": 1489
+        },
+        "freezeTag": {
+          "gitBlobSHA1": "73e1a011fd5db95d9323a39c5962d7f3d0e19d66",
+          "sha256": "d5146a1a803e2e890fed799d8f4020103f72fb22d1262e3861c8bb5e5bf82b56",
+          "byteCount": 1489
+        },
+        "inventoryMatches": true,
+        "baseByteEqual": true,
+        "freezeTagByteEqual": true
+      },
+      {
+        "path": "AppIOS/State/FeatureContracts.swift",
+        "expectedSHA256": "c6b19edb56e69d3ef64b7230ebbb9c1440ad7c2db09c9019435afa1bbfe78361",
+        "base": {
+          "gitBlobSHA1": "16311e34e29bc798af40576e9b3d7815c2bada4f",
+          "sha256": "c6b19edb56e69d3ef64b7230ebbb9c1440ad7c2db09c9019435afa1bbfe78361",
+          "byteCount": 2716
+        },
+        "current": {
+          "gitBlobSHA1": "16311e34e29bc798af40576e9b3d7815c2bada4f",
+          "sha256": "c6b19edb56e69d3ef64b7230ebbb9c1440ad7c2db09c9019435afa1bbfe78361",
+          "byteCount": 2716
+        },
+        "freezeTag": {
+          "gitBlobSHA1": "16311e34e29bc798af40576e9b3d7815c2bada4f",
+          "sha256": "c6b19edb56e69d3ef64b7230ebbb9c1440ad7c2db09c9019435afa1bbfe78361",
+          "byteCount": 2716
+        },
+        "inventoryMatches": true,
+        "baseByteEqual": true,
+        "freezeTagByteEqual": true
+      },
+      {
+        "path": "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift",
+        "expectedSHA256": "fc07a44c9743be3444bb47ddd15e9a12d1cf2b2de6602650558ef97966f0e567",
+        "base": {
+          "gitBlobSHA1": "25fcb8043d69f3c29be2a76ae83cfe5edc3932af",
+          "sha256": "fc07a44c9743be3444bb47ddd15e9a12d1cf2b2de6602650558ef97966f0e567",
+          "byteCount": 4626
+        },
+        "current": {
+          "gitBlobSHA1": "25fcb8043d69f3c29be2a76ae83cfe5edc3932af",
+          "sha256": "fc07a44c9743be3444bb47ddd15e9a12d1cf2b2de6602650558ef97966f0e567",
+          "byteCount": 4626
+        },
+        "freezeTag": {
+          "gitBlobSHA1": "25fcb8043d69f3c29be2a76ae83cfe5edc3932af",
+          "sha256": "fc07a44c9743be3444bb47ddd15e9a12d1cf2b2de6602650558ef97966f0e567",
+          "byteCount": 4626
+        },
+        "inventoryMatches": true,
+        "baseByteEqual": true,
+        "freezeTagByteEqual": true
+      },
+      {
+        "path": "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift",
+        "expectedSHA256": "f2bec4e93b0262d45ae4456b4b2c0cdb2a0cb0abe5176424ef0599ae4362d285",
+        "base": {
+          "gitBlobSHA1": "68fa9fdaabe296a23701eb25a60b76612a75d846",
+          "sha256": "f2bec4e93b0262d45ae4456b4b2c0cdb2a0cb0abe5176424ef0599ae4362d285",
+          "byteCount": 2101
+        },
+        "current": {
+          "gitBlobSHA1": "68fa9fdaabe296a23701eb25a60b76612a75d846",
+          "sha256": "f2bec4e93b0262d45ae4456b4b2c0cdb2a0cb0abe5176424ef0599ae4362d285",
+          "byteCount": 2101
+        },
+        "freezeTag": {
+          "gitBlobSHA1": "68fa9fdaabe296a23701eb25a60b76612a75d846",
+          "sha256": "f2bec4e93b0262d45ae4456b4b2c0cdb2a0cb0abe5176424ef0599ae4362d285",
+          "byteCount": 2101
+        },
+        "inventoryMatches": true,
+        "baseByteEqual": true,
+        "freezeTagByteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift",
+        "expectedSHA256": "5ec2bfc76bb6237f5ff019cc3381361f5219b2fa8e0f2d6eff8a43412113b593",
+        "base": {
+          "gitBlobSHA1": "f104a0efd20e01255b8a7e028a33831e5c8ffc81",
+          "sha256": "5ec2bfc76bb6237f5ff019cc3381361f5219b2fa8e0f2d6eff8a43412113b593",
+          "byteCount": 2295
+        },
+        "current": {
+          "gitBlobSHA1": "f104a0efd20e01255b8a7e028a33831e5c8ffc81",
+          "sha256": "5ec2bfc76bb6237f5ff019cc3381361f5219b2fa8e0f2d6eff8a43412113b593",
+          "byteCount": 2295
+        },
+        "freezeTag": {
+          "gitBlobSHA1": "f104a0efd20e01255b8a7e028a33831e5c8ffc81",
+          "sha256": "5ec2bfc76bb6237f5ff019cc3381361f5219b2fa8e0f2d6eff8a43412113b593",
+          "byteCount": 2295
+        },
+        "inventoryMatches": true,
+        "baseByteEqual": true,
+        "freezeTagByteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Sources/PreviewKit/PreviewContractExports.swift",
+        "expectedSHA256": "bea8b7f635a3705691f5c1016d08b2f016663b498409463d6b2f2453096f39fa",
+        "base": {
+          "gitBlobSHA1": "43b7d8431cc841693fcb09effdc7c3747b9abc75",
+          "sha256": "bea8b7f635a3705691f5c1016d08b2f016663b498409463d6b2f2453096f39fa",
+          "byteCount": 38
+        },
+        "current": {
+          "gitBlobSHA1": "43b7d8431cc841693fcb09effdc7c3747b9abc75",
+          "sha256": "bea8b7f635a3705691f5c1016d08b2f016663b498409463d6b2f2453096f39fa",
+          "byteCount": 38
+        },
+        "freezeTag": {
+          "gitBlobSHA1": "43b7d8431cc841693fcb09effdc7c3747b9abc75",
+          "sha256": "bea8b7f635a3705691f5c1016d08b2f016663b498409463d6b2f2453096f39fa",
+          "byteCount": 38
+        },
+        "inventoryMatches": true,
+        "baseByteEqual": true,
+        "freezeTagByteEqual": true
+      },
+      {
+        "path": "Packages/PreviewKit/Sources/PreviewKit/PreviewContracts.swift",
+        "expectedSHA256": "ffae81620f5ceb09ea28aa4bab49a4319dfd30a965bbb89ad7ead81fa2d0fdfe",
+        "base": {
+          "gitBlobSHA1": "1df37e35bf48994039c50e31e3e7305a5dd83b8d",
+          "sha256": "ffae81620f5ceb09ea28aa4bab49a4319dfd30a965bbb89ad7ead81fa2d0fdfe",
+          "byteCount": 968
+        },
+        "current": {
+          "gitBlobSHA1": "1df37e35bf48994039c50e31e3e7305a5dd83b8d",
+          "sha256": "ffae81620f5ceb09ea28aa4bab49a4319dfd30a965bbb89ad7ead81fa2d0fdfe",
+          "byteCount": 968
+        },
+        "freezeTag": {
+          "gitBlobSHA1": "1df37e35bf48994039c50e31e3e7305a5dd83b8d",
+          "sha256": "ffae81620f5ceb09ea28aa4bab49a4319dfd30a965bbb89ad7ead81fa2d0fdfe",
+          "byteCount": 968
+        },
+        "inventoryMatches": true,
+        "baseByteEqual": true,
+        "freezeTagByteEqual": true
+      },
+      {
+        "path": "Packages/SyntaxKit/Sources/SyntaxKit/Contracts.swift",
+        "expectedSHA256": "77ae739d3ad480b9380eb12f85cb171c2277576dd4c633ca215731b30f767174",
+        "base": {
+          "gitBlobSHA1": "06c283b1fb82688bc1b1aba87b52ce9913417f69",
+          "sha256": "77ae739d3ad480b9380eb12f85cb171c2277576dd4c633ca215731b30f767174",
+          "byteCount": 1366
+        },
+        "current": {
+          "gitBlobSHA1": "06c283b1fb82688bc1b1aba87b52ce9913417f69",
+          "sha256": "77ae739d3ad480b9380eb12f85cb171c2277576dd4c633ca215731b30f767174",
+          "byteCount": 1366
+        },
+        "freezeTag": {
+          "gitBlobSHA1": "06c283b1fb82688bc1b1aba87b52ce9913417f69",
+          "sha256": "77ae739d3ad480b9380eb12f85cb171c2277576dd4c633ca215731b30f767174",
+          "byteCount": 1366
+        },
+        "inventoryMatches": true,
+        "baseByteEqual": true,
+        "freezeTagByteEqual": true
+      },
+      {
+        "path": "Packages/SyntaxKit/Sources/SyntaxKit/MarkdownSyntaxToken.swift",
+        "expectedSHA256": "0be329653fb003ef5c1a9adac577d809a570779a8fe198a8f244032b51a7bed6",
+        "base": {
+          "gitBlobSHA1": "341587181fe73aef6037c413b6985a5ea4804c03",
+          "sha256": "0be329653fb003ef5c1a9adac577d809a570779a8fe198a8f244032b51a7bed6",
+          "byteCount": 1036
+        },
+        "current": {
+          "gitBlobSHA1": "341587181fe73aef6037c413b6985a5ea4804c03",
+          "sha256": "0be329653fb003ef5c1a9adac577d809a570779a8fe198a8f244032b51a7bed6",
+          "byteCount": 1036
+        },
+        "freezeTag": {
+          "gitBlobSHA1": "341587181fe73aef6037c413b6985a5ea4804c03",
+          "sha256": "0be329653fb003ef5c1a9adac577d809a570779a8fe198a8f244032b51a7bed6",
+          "byteCount": 1036
+        },
+        "inventoryMatches": true,
+        "baseByteEqual": true,
+        "freezeTagByteEqual": true
+      },
+      {
+        "path": "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift",
+        "expectedSHA256": "e56ba2961c82d2192994b96ef355813ca13aaec2598e2ff4ae7671a333ce0f8e",
+        "base": {
+          "gitBlobSHA1": "bdb83a8c2da58b51bc37040134b0bd81925f4daf",
+          "sha256": "e56ba2961c82d2192994b96ef355813ca13aaec2598e2ff4ae7671a333ce0f8e",
+          "byteCount": 2813
+        },
+        "current": {
+          "gitBlobSHA1": "bdb83a8c2da58b51bc37040134b0bd81925f4daf",
+          "sha256": "e56ba2961c82d2192994b96ef355813ca13aaec2598e2ff4ae7671a333ce0f8e",
+          "byteCount": 2813
+        },
+        "freezeTag": {
+          "gitBlobSHA1": "bdb83a8c2da58b51bc37040134b0bd81925f4daf",
+          "sha256": "e56ba2961c82d2192994b96ef355813ca13aaec2598e2ff4ae7671a333ce0f8e",
+          "byteCount": 2813
+        },
+        "inventoryMatches": true,
+        "baseByteEqual": true,
+        "freezeTagByteEqual": true
+      },
+      {
+        "path": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+        "expectedSHA256": "eec068b9deaf94912de7af2654b54f11650d0e2c8d76e8b7f9e2d3a43269eb14",
+        "base": {
+          "gitBlobSHA1": "7905639d5a46558e3564715bd680b3eacf0f6bc6",
+          "sha256": "eec068b9deaf94912de7af2654b54f11650d0e2c8d76e8b7f9e2d3a43269eb14",
+          "byteCount": 4414
+        },
+        "current": {
+          "gitBlobSHA1": "7905639d5a46558e3564715bd680b3eacf0f6bc6",
+          "sha256": "eec068b9deaf94912de7af2654b54f11650d0e2c8d76e8b7f9e2d3a43269eb14",
+          "byteCount": 4414
+        },
+        "freezeTag": {
+          "gitBlobSHA1": "7905639d5a46558e3564715bd680b3eacf0f6bc6",
+          "sha256": "eec068b9deaf94912de7af2654b54f11650d0e2c8d76e8b7f9e2d3a43269eb14",
+          "byteCount": 4414
+        },
+        "inventoryMatches": true,
+        "baseByteEqual": true,
+        "freezeTagByteEqual": true
+      },
+      {
+        "path": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+        "expectedSHA256": "beb9d47293b3aeb029de4fa9716d7d8b8af18f2971eec9495354936185c0c06b",
+        "base": {
+          "gitBlobSHA1": "a05d875382299d544f0e0860372458b64e729248",
+          "sha256": "beb9d47293b3aeb029de4fa9716d7d8b8af18f2971eec9495354936185c0c06b",
+          "byteCount": 5812
+        },
+        "current": {
+          "gitBlobSHA1": "a05d875382299d544f0e0860372458b64e729248",
+          "sha256": "beb9d47293b3aeb029de4fa9716d7d8b8af18f2971eec9495354936185c0c06b",
+          "byteCount": 5812
+        },
+        "freezeTag": {
+          "gitBlobSHA1": "a05d875382299d544f0e0860372458b64e729248",
+          "sha256": "beb9d47293b3aeb029de4fa9716d7d8b8af18f2971eec9495354936185c0c06b",
+          "byteCount": 5812
+        },
+        "inventoryMatches": true,
+        "baseByteEqual": true,
+        "freezeTagByteEqual": true
+      },
+      {
+        "path": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift",
+        "expectedSHA256": "259d40b8b25c997db2d0f44c34ef2c16517132dfbadd123178349070c53a2748",
+        "base": {
+          "gitBlobSHA1": "ab1ce920e2c0e1d0642337c0fea73d90cce17a73",
+          "sha256": "259d40b8b25c997db2d0f44c34ef2c16517132dfbadd123178349070c53a2748",
+          "byteCount": 3598
+        },
+        "current": {
+          "gitBlobSHA1": "ab1ce920e2c0e1d0642337c0fea73d90cce17a73",
+          "sha256": "259d40b8b25c997db2d0f44c34ef2c16517132dfbadd123178349070c53a2748",
+          "byteCount": 3598
+        },
+        "freezeTag": {
+          "gitBlobSHA1": "ab1ce920e2c0e1d0642337c0fea73d90cce17a73",
+          "sha256": "259d40b8b25c997db2d0f44c34ef2c16517132dfbadd123178349070c53a2748",
+          "byteCount": 3598
+        },
+        "inventoryMatches": true,
+        "baseByteEqual": true,
+        "freezeTagByteEqual": true
+      }
+    ],
+    "concreteDefinitions": [
+      {
+        "name": "IOSAppSceneControlling",
+        "expectedPath": "AppIOS/State/Contracts.swift",
+        "foundPaths": [
+          "AppIOS/State/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSAppSceneSnapshot",
+        "expectedPath": "AppIOS/State/Contracts.swift",
+        "foundPaths": [
+          "AppIOS/State/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSAssetCommitOutcome",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSAssetRecoveryReceipt",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSAssetRollbackOutcome",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSAssetStageFailure",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSAuthoringAction",
+        "expectedPath": "AppIOS/State/FeatureContracts.swift",
+        "foundPaths": [
+          "AppIOS/State/FeatureContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSAuthoringActionID",
+        "expectedPath": "AppIOS/State/FeatureContracts.swift",
+        "foundPaths": [
+          "AppIOS/State/FeatureContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSAuthoringActionPlacement",
+        "expectedPath": "AppIOS/State/FeatureContracts.swift",
+        "foundPaths": [
+          "AppIOS/State/FeatureContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSAuthoringActionProviding",
+        "expectedPath": "AppIOS/State/FeatureContracts.swift",
+        "foundPaths": [
+          "AppIOS/State/FeatureContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSAuthorizedEdit",
+        "expectedPath": "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift",
+        "foundPaths": [
+          "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSCoordinatedFileAccess",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSCoordinatedRead",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSCreatedLeaf",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSDocumentCloseOutcome",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSDocumentEvent",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSDocumentFailure",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSDocumentFlushOutcome",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSDocumentHandle",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSDocumentIdentity",
+        "expectedPath": "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift",
+        "foundPaths": [
+          "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSDocumentReloadOutcome",
+        "expectedPath": "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift",
+        "foundPaths": [
+          "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSDocumentReloadProposal",
+        "expectedPath": "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift",
+        "foundPaths": [
+          "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSDocumentReloadRefusal",
+        "expectedPath": "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift",
+        "foundPaths": [
+          "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSDocumentRevision",
+        "expectedPath": "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift",
+        "foundPaths": [
+          "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSDocumentState",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSDocumentStore",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSEditOutcome",
+        "expectedPath": "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift",
+        "foundPaths": [
+          "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSEditRefusal",
+        "expectedPath": "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift",
+        "foundPaths": [
+          "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSExternalResolution",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSFileAvailability",
+        "expectedPath": "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSFileLocation",
+        "expectedPath": "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSImageAssetRequest",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSImageInsertionContext",
+        "expectedPath": "AppIOS/State/FeatureContracts.swift",
+        "foundPaths": [
+          "AppIOS/State/FeatureContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSImageInsertionControlling",
+        "expectedPath": "AppIOS/State/FeatureContracts.swift",
+        "foundPaths": [
+          "AppIOS/State/FeatureContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSImageInsertionOutcome",
+        "expectedPath": "AppIOS/State/FeatureContracts.swift",
+        "foundPaths": [
+          "AppIOS/State/FeatureContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSKeyboardModifiers",
+        "expectedPath": "AppIOS/State/FeatureContracts.swift",
+        "foundPaths": [
+          "AppIOS/State/FeatureContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSObservation",
+        "expectedPath": "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift",
+        "foundPaths": [
+          "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSPreviewControlling",
+        "expectedPath": "Packages/PreviewKit/Sources/PreviewKit/PreviewContracts.swift",
+        "foundPaths": [
+          "Packages/PreviewKit/Sources/PreviewKit/PreviewContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSPreviewEvent",
+        "expectedPath": "Packages/PreviewKit/Sources/PreviewKit/PreviewContracts.swift",
+        "foundPaths": [
+          "Packages/PreviewKit/Sources/PreviewKit/PreviewContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSRecoveryReceipt",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSSaveAcknowledgement",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSSceneCapabilities",
+        "expectedPath": "AppIOS/State/Contracts.swift",
+        "foundPaths": [
+          "AppIOS/State/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSSourceEditorBinding",
+        "expectedPath": "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift",
+        "foundPaths": [
+          "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSSourceEditorControlling",
+        "expectedPath": "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift",
+        "foundPaths": [
+          "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSSourceEditorDocumentBinding",
+        "expectedPath": "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift",
+        "foundPaths": [
+          "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSSourceEditorEvent",
+        "expectedPath": "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift",
+        "foundPaths": [
+          "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSSourceEditorSnapshot",
+        "expectedPath": "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift",
+        "foundPaths": [
+          "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSStagedImageAsset",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSStoredDocumentSnapshot",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSWorkspaceAccessLease",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSWorkspaceAccessProviding",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSWorkspaceAssetWriting",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSWorkspaceEntry",
+        "expectedPath": "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSWorkspaceEvent",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSWorkspaceFailure",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSWorkspaceGrant",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSWorkspaceIdentity",
+        "expectedPath": "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSWorkspaceResourceIdentity",
+        "expectedPath": "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSWorkspaceScope",
+        "expectedPath": "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "IOSWorkspaceSnapshot",
+        "expectedPath": "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift",
+        "foundPaths": [
+          "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "MarkdownSyntaxToken",
+        "expectedPath": "Packages/SyntaxKit/Sources/SyntaxKit/MarkdownSyntaxToken.swift",
+        "foundPaths": [
+          "Packages/SyntaxKit/Sources/SyntaxKit/MarkdownSyntaxToken.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "MarkdownSyntaxTokenizing",
+        "expectedPath": "Packages/SyntaxKit/Sources/SyntaxKit/Contracts.swift",
+        "foundPaths": [
+          "Packages/SyntaxKit/Sources/SyntaxKit/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "PreviewAssetAccessChecking",
+        "expectedPath": "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift",
+        "foundPaths": [
+          "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "PreviewAssetAccessContext",
+        "expectedPath": "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift",
+        "foundPaths": [
+          "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "PreviewAssetReadFailure",
+        "expectedPath": "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift",
+        "foundPaths": [
+          "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "PreviewAssetReadRequest",
+        "expectedPath": "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift",
+        "foundPaths": [
+          "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "PreviewAssetReadResult",
+        "expectedPath": "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift",
+        "foundPaths": [
+          "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "PreviewAssetReading",
+        "expectedPath": "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift",
+        "foundPaths": [
+          "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "SyntaxFailure",
+        "expectedPath": "Packages/SyntaxKit/Sources/SyntaxKit/Contracts.swift",
+        "foundPaths": [
+          "Packages/SyntaxKit/Sources/SyntaxKit/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "SyntaxRequest",
+        "expectedPath": "Packages/SyntaxKit/Sources/SyntaxKit/Contracts.swift",
+        "foundPaths": [
+          "Packages/SyntaxKit/Sources/SyntaxKit/Contracts.swift"
+        ],
+        "matches": true
+      },
+      {
+        "name": "SyntaxResult",
+        "expectedPath": "Packages/SyntaxKit/Sources/SyntaxKit/Contracts.swift",
+        "foundPaths": [
+          "Packages/SyntaxKit/Sources/SyntaxKit/Contracts.swift"
+        ],
+        "matches": true
+      }
+    ],
+    "compatibilityAliasNote": "Packages/EditorKit/Sources/EditorKit/MarkdownSyntaxToken.swift retains the existing typealias to SyntaxKit.MarkdownSyntaxToken; no second concrete definition is counted."
+  },
+  "acceptanceResourceManifest": {
+    "before": {
+      "sourceSHA": "af1d895b37f5db1bdfebf539524dc0bf9e12145f",
+      "manifest": {
+        "gitBlobSHA1": "7ca90d5ef9d83a889a31ddb4da25c1662bd0f77a",
+        "sha256": "61cb24700b22fd3a4777e1b1491924a22ff4e311a046857e9dfe4d4baa86b5ca",
+        "byteCount": 3949
+      },
+      "total": 36,
+      "passed": 35,
+      "failed": 1,
+      "entries": [
+        {
+          "path": "App/Resources/preview/bundle.css",
+          "expectedSHA256": "fb2e4eaae1ce3e92ba6fc1e8863e5bbc5b6cbd0248d73029ee91be3544fd3ef6",
+          "actual": {
+            "gitBlobSHA1": "03c3a968d8ccbc80974404a634752f69536cdcac",
+            "sha256": "fb2e4eaae1ce3e92ba6fc1e8863e5bbc5b6cbd0248d73029ee91be3544fd3ef6",
+            "byteCount": 30668
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/bundle.js",
+          "expectedSHA256": "bba36d54b47bfe3a689c489f723ffc37a6051bf5f76a6f59128b44ee3ba55dce",
+          "actual": {
+            "gitBlobSHA1": "6a52a22bb1d18e923341ab5c0f95cdcc536a9605",
+            "sha256": "288338b6b287cc18e350759098e8e8694ee030797aabef1b41386866c7fdb760",
+            "byteCount": 797498
+          },
+          "matches": false
+        },
+        {
+          "path": "App/Resources/preview/font-manifest.json",
+          "expectedSHA256": "cb9aa207391a171bc683027ad6acb8bbacd7d9f7b29ba6112560849176961cc8",
+          "actual": {
+            "gitBlobSHA1": "7c6723a60027aa5353aa8b17c877088a45f3b710",
+            "sha256": "cb9aa207391a171bc683027ad6acb8bbacd7d9f7b29ba6112560849176961cc8",
+            "byteCount": 718
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/index.html",
+          "expectedSHA256": "0d13d50cad21da80a8642f8e45919aa79fbbd9b2ded1b1184ac907e6e4ca3547",
+          "actual": {
+            "gitBlobSHA1": "c14c91fbdf691801fe3a724a140919b3cc21302c",
+            "sha256": "0d13d50cad21da80a8642f8e45919aa79fbbd9b2ded1b1184ac907e6e4ca3547",
+            "byteCount": 503
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_AMS-Regular.woff2",
+          "expectedSHA256": "0cdd387c9590a1a9f9794560022dbb59654a7d86f187aa0c81495ad42d3a7308",
+          "actual": {
+            "gitBlobSHA1": "0acaaff03d4bb7606de02a827aeee338e5a86910",
+            "sha256": "0cdd387c9590a1a9f9794560022dbb59654a7d86f187aa0c81495ad42d3a7308",
+            "byteCount": 28076
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Caligraphic-Bold.woff2",
+          "expectedSHA256": "de7701e42cf1f4cf0b766c03fb27977207eee2f4fd5d76fa82188406da43ea4c",
+          "actual": {
+            "gitBlobSHA1": "f390922eceffe1f6dfb81a3dc086a92d98171b02",
+            "sha256": "de7701e42cf1f4cf0b766c03fb27977207eee2f4fd5d76fa82188406da43ea4c",
+            "byteCount": 6912
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Caligraphic-Regular.woff2",
+          "expectedSHA256": "5d53e70ad607c2352162dec9e0923fb54ecdafaccbf604cd8dcf7d00facb989b",
+          "actual": {
+            "gitBlobSHA1": "75344a1f98e37e2c631e178065854c3a81fb842f",
+            "sha256": "5d53e70ad607c2352162dec9e0923fb54ecdafaccbf604cd8dcf7d00facb989b",
+            "byteCount": 6908
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Fraktur-Bold.woff2",
+          "expectedSHA256": "74444efd593c005e3f4573b44524704c0af0a937fe911cca9e94068d0d140d3f",
+          "actual": {
+            "gitBlobSHA1": "395f28beac23c7b0f7f3a1e714bd8dac253dd3bc",
+            "sha256": "74444efd593c005e3f4573b44524704c0af0a937fe911cca9e94068d0d140d3f",
+            "byteCount": 11348
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Fraktur-Regular.woff2",
+          "expectedSHA256": "51814d270d06ff0255dba0799994fa4d8c84d11f09951d47595f4abb1f3602dc",
+          "actual": {
+            "gitBlobSHA1": "735f6948d63c8cc7f8233735bb9c8d843c83d804",
+            "sha256": "51814d270d06ff0255dba0799994fa4d8c84d11f09951d47595f4abb1f3602dc",
+            "byteCount": 11316
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Main-Bold.woff2",
+          "expectedSHA256": "0f60d1b897938ec918c8ce073092411baf9438f6739465693ff18b0f9d20b021",
+          "actual": {
+            "gitBlobSHA1": "ab2ad21da6fbe6c171bb869240954d0ead8f68fd",
+            "sha256": "0f60d1b897938ec918c8ce073092411baf9438f6739465693ff18b0f9d20b021",
+            "byteCount": 25324
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Main-BoldItalic.woff2",
+          "expectedSHA256": "99cd42a3c072d918f2f44984a807cf7aa16e13545fd0875fc07c6c65f99e715b",
+          "actual": {
+            "gitBlobSHA1": "5931794de4a2a485fa70099bf2659b145976d043",
+            "sha256": "99cd42a3c072d918f2f44984a807cf7aa16e13545fd0875fc07c6c65f99e715b",
+            "byteCount": 16780
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Main-Italic.woff2",
+          "expectedSHA256": "97479ca6cce906abc961ecac96faa5f9ca2e61b8e7670d475826bcdee9a7c267",
+          "actual": {
+            "gitBlobSHA1": "b50920e138807f385d0b0359f4f0f09891f18406",
+            "sha256": "97479ca6cce906abc961ecac96faa5f9ca2e61b8e7670d475826bcdee9a7c267",
+            "byteCount": 16988
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Main-Regular.woff2",
+          "expectedSHA256": "c2342cd8b869e01752a9321dc17213fc40d4d04c79688c1d43f2cf316abd7866",
+          "actual": {
+            "gitBlobSHA1": "eb24a7ba282b03d830fa6c63ee897d92a5188736",
+            "sha256": "c2342cd8b869e01752a9321dc17213fc40d4d04c79688c1d43f2cf316abd7866",
+            "byteCount": 26272
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Math-BoldItalic.woff2",
+          "expectedSHA256": "dc47344dbb6cb5b655c8460d561f4df5f501b90c804ad3c6cec65fe322351ab1",
+          "actual": {
+            "gitBlobSHA1": "29657023adc09956249f6295746c8ce4469b50d3",
+            "sha256": "dc47344dbb6cb5b655c8460d561f4df5f501b90c804ad3c6cec65fe322351ab1",
+            "byteCount": 16400
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Math-Italic.woff2",
+          "expectedSHA256": "7af58c5ec8f132a2ddde9027c6d7814decce4d3b822a11192a42a20e2e973264",
+          "actual": {
+            "gitBlobSHA1": "215c143fd7805a5c2b222bd7892a1a2b09610020",
+            "sha256": "7af58c5ec8f132a2ddde9027c6d7814decce4d3b822a11192a42a20e2e973264",
+            "byteCount": 16440
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_SansSerif-Bold.woff2",
+          "expectedSHA256": "e99ae51144bf1232efcc1bfe5add36262c6866b0faab24fa75740e1b98577a62",
+          "actual": {
+            "gitBlobSHA1": "cfaa3bda59246b49e94298478d6de3b3208066c8",
+            "sha256": "e99ae51144bf1232efcc1bfe5add36262c6866b0faab24fa75740e1b98577a62",
+            "byteCount": 12216
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_SansSerif-Italic.woff2",
+          "expectedSHA256": "00b26ac825e2095056396e0553b8ac26d3f8ad158c3826e28b4c45b385c4714a",
+          "actual": {
+            "gitBlobSHA1": "349c06dc609f896392fd5bc8b364d3bc3efc9330",
+            "sha256": "00b26ac825e2095056396e0553b8ac26d3f8ad158c3826e28b4c45b385c4714a",
+            "byteCount": 12028
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_SansSerif-Regular.woff2",
+          "expectedSHA256": "68e8c73ef42afd3ccec58bf0fba302cce448938e7fc020a5e31f8a952eee1342",
+          "actual": {
+            "gitBlobSHA1": "a90eea85f6f7bded69ff5d40114447a6d8b48cfe",
+            "sha256": "68e8c73ef42afd3ccec58bf0fba302cce448938e7fc020a5e31f8a952eee1342",
+            "byteCount": 10344
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Script-Regular.woff2",
+          "expectedSHA256": "036d4e95149b69ff9bcc0cd55771efeb25ffa3947293e69acd78d5ac328c684b",
+          "actual": {
+            "gitBlobSHA1": "b3048fc115681ee6c1bc86b0aa158cfbbf59daa3",
+            "sha256": "036d4e95149b69ff9bcc0cd55771efeb25ffa3947293e69acd78d5ac328c684b",
+            "byteCount": 9644
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Size1-Regular.woff2",
+          "expectedSHA256": "6b47c40166b6dbe21a5dfca7718413f2147fd2399be1ba605d8ad39cedf25dfe",
+          "actual": {
+            "gitBlobSHA1": "c5a8462fbfe2c39a7c1857b9e296e62500a8a8a5",
+            "sha256": "6b47c40166b6dbe21a5dfca7718413f2147fd2399be1ba605d8ad39cedf25dfe",
+            "byteCount": 5468
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Size2-Regular.woff2",
+          "expectedSHA256": "d04c54219f9eaec6d4d4fd42dfb28785975a4794d6b2fc71e566b9cd6db842dd",
+          "actual": {
+            "gitBlobSHA1": "e1bccfe2403a4ed770c1697ae7c15b9e1cd9bc4e",
+            "sha256": "d04c54219f9eaec6d4d4fd42dfb28785975a4794d6b2fc71e566b9cd6db842dd",
+            "byteCount": 5208
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Size3-Regular.woff2",
+          "expectedSHA256": "73d591271b1604960cb10bb90fee021670af7297017e0e98480b332d11f51995",
+          "actual": {
+            "gitBlobSHA1": "249a28662218a7a17ad8bd1fe072169ecb666a49",
+            "sha256": "73d591271b1604960cb10bb90fee021670af7297017e0e98480b332d11f51995",
+            "byteCount": 3624
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Size4-Regular.woff2",
+          "expectedSHA256": "a4af7d414440a1c1790825cfb700cf9cf43b0f2c4b04f0ebc523011ad9853ec0",
+          "actual": {
+            "gitBlobSHA1": "680c13085076a2f6c5a7e695935ec3f21cddb65f",
+            "sha256": "a4af7d414440a1c1790825cfb700cf9cf43b0f2c4b04f0ebc523011ad9853ec0",
+            "byteCount": 4928
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Typewriter-Regular.woff2",
+          "expectedSHA256": "71d517d67827787cfabdf186914cc3358eda539e37931941f2b2fd4a21f68c0b",
+          "actual": {
+            "gitBlobSHA1": "771f1af705f5cef5f578b3a1e7d8eff66f9b76b0",
+            "sha256": "71d517d67827787cfabdf186914cc3358eda539e37931941f2b2fd4a21f68c0b",
+            "byteCount": 13568
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/mermaid.js",
+          "expectedSHA256": "ec139a7aa8b89890120e172d5e68d474c07d8682db986e6b4934d1ce029532c9",
+          "actual": {
+            "gitBlobSHA1": "2c1bc307e94a6cfe553a8c11a74ea97550bae0f9",
+            "sha256": "ec139a7aa8b89890120e172d5e68d474c07d8682db986e6b4934d1ce029532c9",
+            "byteCount": 3456088
+          },
+          "matches": true
+        },
+        {
+          "path": "IOSAcceptanceTests/Resources/pixel.png",
+          "expectedSHA256": "b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640",
+          "actual": {
+            "gitBlobSHA1": "62a5f8f47fec02344e5bf9061888262f677cf5d6",
+            "sha256": "b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640",
+            "byteCount": 69
+          },
+          "matches": true
+        },
+        {
+          "path": "IOSAcceptanceTests/Resources/note.md",
+          "expectedSHA256": "60e410438885cd3bf00f40983ca3a4e0b56b6e3442bbce5d8959cd017b20131b",
+          "actual": {
+            "gitBlobSHA1": "5f8e9d17047858e01e700da9a40e3f6ce34492b1",
+            "sha256": "60e410438885cd3bf00f40983ca3a4e0b56b6e3442bbce5d8959cd017b20131b",
+            "byteCount": 29
+          },
+          "matches": true
+        },
+        {
+          "path": "Fixtures/kitchen-sink.md",
+          "expectedSHA256": "2bcac29f1eb115077722e1fab9b3db0df985479c898fc526a0dd2c42d3c140f6",
+          "actual": {
+            "gitBlobSHA1": "cd8ecee7597b46d4ed11ad83336cd26f0839b051",
+            "sha256": "2bcac29f1eb115077722e1fab9b3db0df985479c898fc526a0dd2c42d3c140f6",
+            "byteCount": 3429
+          },
+          "matches": true
+        },
+        {
+          "path": "Fixtures/kitchen-sink.mdx",
+          "expectedSHA256": "c68fce5f47e0bc250773eb6256169ec250131793812241b2a3bac4abc8c53c43",
+          "actual": {
+            "gitBlobSHA1": "bb432fa5dc40c466650a0d75e6ba0fa99e8c2cab",
+            "sha256": "c68fce5f47e0bc250773eb6256169ec250131793812241b2a3bac4abc8c53c43",
+            "byteCount": 2834
+          },
+          "matches": true
+        },
+        {
+          "path": "Fixtures/product-page.mdx",
+          "expectedSHA256": "69ccaa56cf84f8f5c64b966b65de21f8a862b3fb9b42f46da6ff8067cda44300",
+          "actual": {
+            "gitBlobSHA1": "ddf923ba61f87d60c2f23843d4eebb3b017dc8ae",
+            "sha256": "69ccaa56cf84f8f5c64b966b65de21f8a862b3fb9b42f46da6ff8067cda44300",
+            "byteCount": 999
+          },
+          "matches": true
+        },
+        {
+          "path": "Fixtures/math.md",
+          "expectedSHA256": "182c47c7c803d23e2d1def94c08becc08402da932ebbd178115a527465947762",
+          "actual": {
+            "gitBlobSHA1": "c3b824e7bcc63d4c11aea9f36cb5cc48ce5f6d9e",
+            "sha256": "182c47c7c803d23e2d1def94c08becc08402da932ebbd178115a527465947762",
+            "byteCount": 572
+          },
+          "matches": true
+        },
+        {
+          "path": "Fixtures/math-edge-cases.md",
+          "expectedSHA256": "36f724a6974af543b62e3f6a68a0b22869b3c216cb1bc31207307b16f63a2a07",
+          "actual": {
+            "gitBlobSHA1": "89593118ca8a5653fe1ec9ad384b764067612ee5",
+            "sha256": "36f724a6974af543b62e3f6a68a0b22869b3c216cb1bc31207307b16f63a2a07",
+            "byteCount": 421
+          },
+          "matches": true
+        },
+        {
+          "path": "Fixtures/broken-frontmatter.md",
+          "expectedSHA256": "93b07107ddbd68550d05fa06e3fe80f3de6049ffade9d6ae7721a6fd3e9461ae",
+          "actual": {
+            "gitBlobSHA1": "2e233b5f63a2c9bbe08505647bcdb3e3a6161ec4",
+            "sha256": "93b07107ddbd68550d05fa06e3fe80f3de6049ffade9d6ae7721a6fd3e9461ae",
+            "byteCount": 154
+          },
+          "matches": true
+        },
+        {
+          "path": "Fixtures/mdx-syntax-error.mdx",
+          "expectedSHA256": "e5d62b0c11546c71dffa036710d34ca639375f6ba09c8ee9635632aca414ea38",
+          "actual": {
+            "gitBlobSHA1": "f711986a7ecf0ddc956fa5c1aa3b5633cbf0609c",
+            "sha256": "e5d62b0c11546c71dffa036710d34ca639375f6ba09c8ee9635632aca414ea38",
+            "byteCount": 608
+          },
+          "matches": true
+        },
+        {
+          "path": "Fixtures/perf-100kb.md",
+          "expectedSHA256": "abf647e3d51a8c7828aa9fcd6ea8078b55e2c3bfe332a797198712ef66df3297",
+          "actual": {
+            "gitBlobSHA1": "999aa84dff6362f96de8d1359c26e52969a25f21",
+            "sha256": "abf647e3d51a8c7828aa9fcd6ea8078b55e2c3bfe332a797198712ef66df3297",
+            "byteCount": 91486
+          },
+          "matches": true
+        },
+        {
+          "path": "Fixtures/large-1mb.md",
+          "expectedSHA256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+          "actual": {
+            "gitBlobSHA1": "218653848952f14d8b98491568f81c9828984794",
+            "sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+            "byteCount": 1048962
+          },
+          "matches": true
+        }
+      ]
+    },
+    "after": {
+      "sourceSHA": "1c1685adb7a594f3ecaf81a16d61f5d41e032363",
+      "manifest": {
+        "gitBlobSHA1": "ad5017cebe9ecdb2a3546eebe6d630a168e92896",
+        "sha256": "861b0d4876b8a57ecf000487a2e11502821dc126bd0b65583e13f239f7dce8ce",
+        "byteCount": 3949
+      },
+      "total": 36,
+      "passed": 36,
+      "failed": 0,
+      "entries": [
+        {
+          "path": "App/Resources/preview/bundle.css",
+          "expectedSHA256": "fb2e4eaae1ce3e92ba6fc1e8863e5bbc5b6cbd0248d73029ee91be3544fd3ef6",
+          "actual": {
+            "gitBlobSHA1": "03c3a968d8ccbc80974404a634752f69536cdcac",
+            "sha256": "fb2e4eaae1ce3e92ba6fc1e8863e5bbc5b6cbd0248d73029ee91be3544fd3ef6",
+            "byteCount": 30668
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/bundle.js",
+          "expectedSHA256": "288338b6b287cc18e350759098e8e8694ee030797aabef1b41386866c7fdb760",
+          "actual": {
+            "gitBlobSHA1": "6a52a22bb1d18e923341ab5c0f95cdcc536a9605",
+            "sha256": "288338b6b287cc18e350759098e8e8694ee030797aabef1b41386866c7fdb760",
+            "byteCount": 797498
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/font-manifest.json",
+          "expectedSHA256": "cb9aa207391a171bc683027ad6acb8bbacd7d9f7b29ba6112560849176961cc8",
+          "actual": {
+            "gitBlobSHA1": "7c6723a60027aa5353aa8b17c877088a45f3b710",
+            "sha256": "cb9aa207391a171bc683027ad6acb8bbacd7d9f7b29ba6112560849176961cc8",
+            "byteCount": 718
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/index.html",
+          "expectedSHA256": "0d13d50cad21da80a8642f8e45919aa79fbbd9b2ded1b1184ac907e6e4ca3547",
+          "actual": {
+            "gitBlobSHA1": "c14c91fbdf691801fe3a724a140919b3cc21302c",
+            "sha256": "0d13d50cad21da80a8642f8e45919aa79fbbd9b2ded1b1184ac907e6e4ca3547",
+            "byteCount": 503
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_AMS-Regular.woff2",
+          "expectedSHA256": "0cdd387c9590a1a9f9794560022dbb59654a7d86f187aa0c81495ad42d3a7308",
+          "actual": {
+            "gitBlobSHA1": "0acaaff03d4bb7606de02a827aeee338e5a86910",
+            "sha256": "0cdd387c9590a1a9f9794560022dbb59654a7d86f187aa0c81495ad42d3a7308",
+            "byteCount": 28076
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Caligraphic-Bold.woff2",
+          "expectedSHA256": "de7701e42cf1f4cf0b766c03fb27977207eee2f4fd5d76fa82188406da43ea4c",
+          "actual": {
+            "gitBlobSHA1": "f390922eceffe1f6dfb81a3dc086a92d98171b02",
+            "sha256": "de7701e42cf1f4cf0b766c03fb27977207eee2f4fd5d76fa82188406da43ea4c",
+            "byteCount": 6912
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Caligraphic-Regular.woff2",
+          "expectedSHA256": "5d53e70ad607c2352162dec9e0923fb54ecdafaccbf604cd8dcf7d00facb989b",
+          "actual": {
+            "gitBlobSHA1": "75344a1f98e37e2c631e178065854c3a81fb842f",
+            "sha256": "5d53e70ad607c2352162dec9e0923fb54ecdafaccbf604cd8dcf7d00facb989b",
+            "byteCount": 6908
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Fraktur-Bold.woff2",
+          "expectedSHA256": "74444efd593c005e3f4573b44524704c0af0a937fe911cca9e94068d0d140d3f",
+          "actual": {
+            "gitBlobSHA1": "395f28beac23c7b0f7f3a1e714bd8dac253dd3bc",
+            "sha256": "74444efd593c005e3f4573b44524704c0af0a937fe911cca9e94068d0d140d3f",
+            "byteCount": 11348
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Fraktur-Regular.woff2",
+          "expectedSHA256": "51814d270d06ff0255dba0799994fa4d8c84d11f09951d47595f4abb1f3602dc",
+          "actual": {
+            "gitBlobSHA1": "735f6948d63c8cc7f8233735bb9c8d843c83d804",
+            "sha256": "51814d270d06ff0255dba0799994fa4d8c84d11f09951d47595f4abb1f3602dc",
+            "byteCount": 11316
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Main-Bold.woff2",
+          "expectedSHA256": "0f60d1b897938ec918c8ce073092411baf9438f6739465693ff18b0f9d20b021",
+          "actual": {
+            "gitBlobSHA1": "ab2ad21da6fbe6c171bb869240954d0ead8f68fd",
+            "sha256": "0f60d1b897938ec918c8ce073092411baf9438f6739465693ff18b0f9d20b021",
+            "byteCount": 25324
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Main-BoldItalic.woff2",
+          "expectedSHA256": "99cd42a3c072d918f2f44984a807cf7aa16e13545fd0875fc07c6c65f99e715b",
+          "actual": {
+            "gitBlobSHA1": "5931794de4a2a485fa70099bf2659b145976d043",
+            "sha256": "99cd42a3c072d918f2f44984a807cf7aa16e13545fd0875fc07c6c65f99e715b",
+            "byteCount": 16780
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Main-Italic.woff2",
+          "expectedSHA256": "97479ca6cce906abc961ecac96faa5f9ca2e61b8e7670d475826bcdee9a7c267",
+          "actual": {
+            "gitBlobSHA1": "b50920e138807f385d0b0359f4f0f09891f18406",
+            "sha256": "97479ca6cce906abc961ecac96faa5f9ca2e61b8e7670d475826bcdee9a7c267",
+            "byteCount": 16988
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Main-Regular.woff2",
+          "expectedSHA256": "c2342cd8b869e01752a9321dc17213fc40d4d04c79688c1d43f2cf316abd7866",
+          "actual": {
+            "gitBlobSHA1": "eb24a7ba282b03d830fa6c63ee897d92a5188736",
+            "sha256": "c2342cd8b869e01752a9321dc17213fc40d4d04c79688c1d43f2cf316abd7866",
+            "byteCount": 26272
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Math-BoldItalic.woff2",
+          "expectedSHA256": "dc47344dbb6cb5b655c8460d561f4df5f501b90c804ad3c6cec65fe322351ab1",
+          "actual": {
+            "gitBlobSHA1": "29657023adc09956249f6295746c8ce4469b50d3",
+            "sha256": "dc47344dbb6cb5b655c8460d561f4df5f501b90c804ad3c6cec65fe322351ab1",
+            "byteCount": 16400
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Math-Italic.woff2",
+          "expectedSHA256": "7af58c5ec8f132a2ddde9027c6d7814decce4d3b822a11192a42a20e2e973264",
+          "actual": {
+            "gitBlobSHA1": "215c143fd7805a5c2b222bd7892a1a2b09610020",
+            "sha256": "7af58c5ec8f132a2ddde9027c6d7814decce4d3b822a11192a42a20e2e973264",
+            "byteCount": 16440
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_SansSerif-Bold.woff2",
+          "expectedSHA256": "e99ae51144bf1232efcc1bfe5add36262c6866b0faab24fa75740e1b98577a62",
+          "actual": {
+            "gitBlobSHA1": "cfaa3bda59246b49e94298478d6de3b3208066c8",
+            "sha256": "e99ae51144bf1232efcc1bfe5add36262c6866b0faab24fa75740e1b98577a62",
+            "byteCount": 12216
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_SansSerif-Italic.woff2",
+          "expectedSHA256": "00b26ac825e2095056396e0553b8ac26d3f8ad158c3826e28b4c45b385c4714a",
+          "actual": {
+            "gitBlobSHA1": "349c06dc609f896392fd5bc8b364d3bc3efc9330",
+            "sha256": "00b26ac825e2095056396e0553b8ac26d3f8ad158c3826e28b4c45b385c4714a",
+            "byteCount": 12028
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_SansSerif-Regular.woff2",
+          "expectedSHA256": "68e8c73ef42afd3ccec58bf0fba302cce448938e7fc020a5e31f8a952eee1342",
+          "actual": {
+            "gitBlobSHA1": "a90eea85f6f7bded69ff5d40114447a6d8b48cfe",
+            "sha256": "68e8c73ef42afd3ccec58bf0fba302cce448938e7fc020a5e31f8a952eee1342",
+            "byteCount": 10344
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Script-Regular.woff2",
+          "expectedSHA256": "036d4e95149b69ff9bcc0cd55771efeb25ffa3947293e69acd78d5ac328c684b",
+          "actual": {
+            "gitBlobSHA1": "b3048fc115681ee6c1bc86b0aa158cfbbf59daa3",
+            "sha256": "036d4e95149b69ff9bcc0cd55771efeb25ffa3947293e69acd78d5ac328c684b",
+            "byteCount": 9644
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Size1-Regular.woff2",
+          "expectedSHA256": "6b47c40166b6dbe21a5dfca7718413f2147fd2399be1ba605d8ad39cedf25dfe",
+          "actual": {
+            "gitBlobSHA1": "c5a8462fbfe2c39a7c1857b9e296e62500a8a8a5",
+            "sha256": "6b47c40166b6dbe21a5dfca7718413f2147fd2399be1ba605d8ad39cedf25dfe",
+            "byteCount": 5468
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Size2-Regular.woff2",
+          "expectedSHA256": "d04c54219f9eaec6d4d4fd42dfb28785975a4794d6b2fc71e566b9cd6db842dd",
+          "actual": {
+            "gitBlobSHA1": "e1bccfe2403a4ed770c1697ae7c15b9e1cd9bc4e",
+            "sha256": "d04c54219f9eaec6d4d4fd42dfb28785975a4794d6b2fc71e566b9cd6db842dd",
+            "byteCount": 5208
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Size3-Regular.woff2",
+          "expectedSHA256": "73d591271b1604960cb10bb90fee021670af7297017e0e98480b332d11f51995",
+          "actual": {
+            "gitBlobSHA1": "249a28662218a7a17ad8bd1fe072169ecb666a49",
+            "sha256": "73d591271b1604960cb10bb90fee021670af7297017e0e98480b332d11f51995",
+            "byteCount": 3624
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Size4-Regular.woff2",
+          "expectedSHA256": "a4af7d414440a1c1790825cfb700cf9cf43b0f2c4b04f0ebc523011ad9853ec0",
+          "actual": {
+            "gitBlobSHA1": "680c13085076a2f6c5a7e695935ec3f21cddb65f",
+            "sha256": "a4af7d414440a1c1790825cfb700cf9cf43b0f2c4b04f0ebc523011ad9853ec0",
+            "byteCount": 4928
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/fonts/KaTeX_Typewriter-Regular.woff2",
+          "expectedSHA256": "71d517d67827787cfabdf186914cc3358eda539e37931941f2b2fd4a21f68c0b",
+          "actual": {
+            "gitBlobSHA1": "771f1af705f5cef5f578b3a1e7d8eff66f9b76b0",
+            "sha256": "71d517d67827787cfabdf186914cc3358eda539e37931941f2b2fd4a21f68c0b",
+            "byteCount": 13568
+          },
+          "matches": true
+        },
+        {
+          "path": "App/Resources/preview/mermaid.js",
+          "expectedSHA256": "ec139a7aa8b89890120e172d5e68d474c07d8682db986e6b4934d1ce029532c9",
+          "actual": {
+            "gitBlobSHA1": "2c1bc307e94a6cfe553a8c11a74ea97550bae0f9",
+            "sha256": "ec139a7aa8b89890120e172d5e68d474c07d8682db986e6b4934d1ce029532c9",
+            "byteCount": 3456088
+          },
+          "matches": true
+        },
+        {
+          "path": "IOSAcceptanceTests/Resources/pixel.png",
+          "expectedSHA256": "b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640",
+          "actual": {
+            "gitBlobSHA1": "62a5f8f47fec02344e5bf9061888262f677cf5d6",
+            "sha256": "b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640",
+            "byteCount": 69
+          },
+          "matches": true
+        },
+        {
+          "path": "IOSAcceptanceTests/Resources/note.md",
+          "expectedSHA256": "60e410438885cd3bf00f40983ca3a4e0b56b6e3442bbce5d8959cd017b20131b",
+          "actual": {
+            "gitBlobSHA1": "5f8e9d17047858e01e700da9a40e3f6ce34492b1",
+            "sha256": "60e410438885cd3bf00f40983ca3a4e0b56b6e3442bbce5d8959cd017b20131b",
+            "byteCount": 29
+          },
+          "matches": true
+        },
+        {
+          "path": "Fixtures/kitchen-sink.md",
+          "expectedSHA256": "2bcac29f1eb115077722e1fab9b3db0df985479c898fc526a0dd2c42d3c140f6",
+          "actual": {
+            "gitBlobSHA1": "cd8ecee7597b46d4ed11ad83336cd26f0839b051",
+            "sha256": "2bcac29f1eb115077722e1fab9b3db0df985479c898fc526a0dd2c42d3c140f6",
+            "byteCount": 3429
+          },
+          "matches": true
+        },
+        {
+          "path": "Fixtures/kitchen-sink.mdx",
+          "expectedSHA256": "c68fce5f47e0bc250773eb6256169ec250131793812241b2a3bac4abc8c53c43",
+          "actual": {
+            "gitBlobSHA1": "bb432fa5dc40c466650a0d75e6ba0fa99e8c2cab",
+            "sha256": "c68fce5f47e0bc250773eb6256169ec250131793812241b2a3bac4abc8c53c43",
+            "byteCount": 2834
+          },
+          "matches": true
+        },
+        {
+          "path": "Fixtures/product-page.mdx",
+          "expectedSHA256": "69ccaa56cf84f8f5c64b966b65de21f8a862b3fb9b42f46da6ff8067cda44300",
+          "actual": {
+            "gitBlobSHA1": "ddf923ba61f87d60c2f23843d4eebb3b017dc8ae",
+            "sha256": "69ccaa56cf84f8f5c64b966b65de21f8a862b3fb9b42f46da6ff8067cda44300",
+            "byteCount": 999
+          },
+          "matches": true
+        },
+        {
+          "path": "Fixtures/math.md",
+          "expectedSHA256": "182c47c7c803d23e2d1def94c08becc08402da932ebbd178115a527465947762",
+          "actual": {
+            "gitBlobSHA1": "c3b824e7bcc63d4c11aea9f36cb5cc48ce5f6d9e",
+            "sha256": "182c47c7c803d23e2d1def94c08becc08402da932ebbd178115a527465947762",
+            "byteCount": 572
+          },
+          "matches": true
+        },
+        {
+          "path": "Fixtures/math-edge-cases.md",
+          "expectedSHA256": "36f724a6974af543b62e3f6a68a0b22869b3c216cb1bc31207307b16f63a2a07",
+          "actual": {
+            "gitBlobSHA1": "89593118ca8a5653fe1ec9ad384b764067612ee5",
+            "sha256": "36f724a6974af543b62e3f6a68a0b22869b3c216cb1bc31207307b16f63a2a07",
+            "byteCount": 421
+          },
+          "matches": true
+        },
+        {
+          "path": "Fixtures/broken-frontmatter.md",
+          "expectedSHA256": "93b07107ddbd68550d05fa06e3fe80f3de6049ffade9d6ae7721a6fd3e9461ae",
+          "actual": {
+            "gitBlobSHA1": "2e233b5f63a2c9bbe08505647bcdb3e3a6161ec4",
+            "sha256": "93b07107ddbd68550d05fa06e3fe80f3de6049ffade9d6ae7721a6fd3e9461ae",
+            "byteCount": 154
+          },
+          "matches": true
+        },
+        {
+          "path": "Fixtures/mdx-syntax-error.mdx",
+          "expectedSHA256": "e5d62b0c11546c71dffa036710d34ca639375f6ba09c8ee9635632aca414ea38",
+          "actual": {
+            "gitBlobSHA1": "f711986a7ecf0ddc956fa5c1aa3b5633cbf0609c",
+            "sha256": "e5d62b0c11546c71dffa036710d34ca639375f6ba09c8ee9635632aca414ea38",
+            "byteCount": 608
+          },
+          "matches": true
+        },
+        {
+          "path": "Fixtures/perf-100kb.md",
+          "expectedSHA256": "abf647e3d51a8c7828aa9fcd6ea8078b55e2c3bfe332a797198712ef66df3297",
+          "actual": {
+            "gitBlobSHA1": "999aa84dff6362f96de8d1359c26e52969a25f21",
+            "sha256": "abf647e3d51a8c7828aa9fcd6ea8078b55e2c3bfe332a797198712ef66df3297",
+            "byteCount": 91486
+          },
+          "matches": true
+        },
+        {
+          "path": "Fixtures/large-1mb.md",
+          "expectedSHA256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+          "actual": {
+            "gitBlobSHA1": "218653848952f14d8b98491568f81c9828984794",
+            "sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+            "byteCount": 1048962
+          },
+          "matches": true
+        }
+      ]
+    }
+  },
+  "diffCheck": {
+    "command": [
+      "git",
+      "diff",
+      "--check",
+      "cdb528d4a565cd15e31ddc1b6312b5a45b27236a",
+      "1c1685adb7a594f3ecaf81a16d61f5d41e032363"
+    ],
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "checks": {
+    "headMatchesPinnedCurrent": true,
+    "workingTreeClean": true,
+    "sourcePatchIDsEqual": true,
+    "originalParentIsMainBase": true,
+    "originalHasOneCommitAfterBase": true,
+    "all63OriginalPostBlobsEqual": true,
+    "allMainSubtreesRetained": true,
+    "all20DependencyPinsRetained": true,
+    "allBridgeFilesRetained": true,
+    "all13FrozenFilesMatchInventoryBaseAndTag": true,
+    "all71ConcreteDefinitionsUnique": true,
+    "beforeWas35Passed1Failed": true,
+    "afterIs36Passed0Failed": true,
+    "diffCheckPassed": true
+  },
+  "allChecksPassed": true,
+  "notExecuted": [
+    "XcodeGen",
+    "xcodebuild",
+    "simctl",
+    "native XCTest",
+    "XCUITest",
+    "GitHub CI",
+    "owner-device acceptance",
+    "performance measurements"
+  ],
+  "reproduction": {
+    "scriptSHA256": "9030a4f8060a4473c3d0313b206f8c6b1972625a2eae8e9285a6932a55266f43",
+    "command": "python3 /private/tmp/plainsong-ios-main-production-20261023/audit/reproduce-static.py --repo /Users/davis._.su/.codex/worktrees/ios-main-production-20261023/blogeditor --output /private/tmp/plainsong-ios-main-production-20261023/audit/integration-static.json"
+  }
+}
