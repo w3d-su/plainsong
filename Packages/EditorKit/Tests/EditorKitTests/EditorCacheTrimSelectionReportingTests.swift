@@ -59,7 +59,6 @@ final class EditorCacheTrimSelectionReportingTests: XCTestCase {
         let coordinator = fixture.coordinator
         let length = try XCTUnwrap(MarkdownTextView.textStorage(of: editor)?.length)
         editor.textSelection = NSRange(location: 0, length: length)
-        let viewport = try XCTUnwrap(MarkdownTextView.visibleTextRange(of: editor))
         let trimmer = coordinator.textElementCacheTrimmer
         let initialTrimmedLength = trimmer.trimmedLength
         var schedules = 0
@@ -82,6 +81,13 @@ final class EditorCacheTrimSelectionReportingTests: XCTestCase {
         XCTAssertTrue(refused)
         XCTAssertEqual(releases, 0, "a selection covering the document must remain protected")
         XCTAssertEqual(trimmer.trimmedLength, initialTrimmedLength)
+        // Select All schedules native layout, which may finish during the settle
+        // await and change TextKit's prefetched viewport. Report that real change
+        // before measuring the selection-only transition below.
+        coordinator.reportVisibleRangeIfNeeded(in: editor)
+        let viewport = try XCTUnwrap(MarkdownTextView.visibleTextRange(of: editor))
+        XCTAssertEqual(publications.last, viewport)
+        let publicationsBeforeCollapse = publications
         let schedulesBeforeCollapse = schedules
 
         // No scroll or fresh visible-range report accompanies collapsing Select All.
@@ -92,7 +98,7 @@ final class EditorCacheTrimSelectionReportingTests: XCTestCase {
 
         XCTAssertGreaterThan(trimmer.trimmedLength, initialTrimmedLength)
         XCTAssertGreaterThan(releases, 0)
-        XCTAssertEqual(publications, [viewport])
+        XCTAssertEqual(publications, publicationsBeforeCollapse)
         XCTAssertEqual(editor.selectedRange(), NSRange(location: 0, length: 0))
     }
 
