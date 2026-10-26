@@ -37,7 +37,8 @@ The prototype has these controls:
 
 - **Fixture** creates a uniquely named app-private copy of the public fixture;
   **File** and **Folder** use the real open-in-place Files picker. **Recent**
-  resolves one app-private `.minimalBookmark` and refuses stale/denied grants.
+  resolves one app-private bookmark created with default options while its grant
+  is active, and refuses stale/denied grants.
   Folder view lists top-level Markdown files, excluding symlinks. Single-file
   access has no sibling enumeration or assets capability.
 - **Delay** enables a three-second presentation/save delay. Type N, press Save,
@@ -90,6 +91,8 @@ It stores no external URL or bookmark. It is intentionally synchronous for
 small public fixtures; typing latency, large files and production recovery
 queues are **unmeasured**. Background flush is best effort with a finite
 UIApplication background task; expiry leaves completion unconfirmed, never PASS.
+An already-active delayed save keeps that assertion until its captured write
+completes or expires; writer-busy is not a completed background flush.
 The fixture workflow does not require an iCloud entitlement: Files iCloud Drive
 selection uses the File Provider's grant; private ubiquity containers are outside
 scope. Actual grant lifetime, downloads and read-only behavior require devices.

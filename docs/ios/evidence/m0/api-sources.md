@@ -27,5 +27,14 @@ UIDocument contents snapshots cross queues under an NSLock; in-place provider
 grant behavior and safe-write original URL semantics still require device proof.
 
 No macOS security-scoped entitlement or `.withSecurityScope` bookmark option was
-copied into iOS. This prototype uses `.minimalBookmark`, explicit start/stop scope
-pairs and refuses stale resolution. No signing credentials or new dependencies.
+copied into iOS. The original 2026-10-08 source used `.minimalBookmark`.
+
+2026-10-26 review update: the installed iPhoneOS 27 `NSURL.h` describes the minimal
+option as retaining less information, while the macOS security-scope creation
+flag is explicitly unavailable on iOS. Recent now creates a default-options
+bookmark while its existing grant is active. Resolution uses
+`.withoutImplicitStartAccessing` (available since iOS 14.2), followed by the same
+explicit `AccessGrant` start/stop pair. This keeps complete default bookmark data
+without adding an implicit scope acquisition; it does not prove restoration on
+a real File Provider. Stale or denied grants remain visible failures. No signing
+credentials or new dependencies.
