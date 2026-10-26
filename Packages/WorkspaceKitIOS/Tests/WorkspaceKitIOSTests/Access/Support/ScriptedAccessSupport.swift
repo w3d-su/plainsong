@@ -39,9 +39,11 @@ final class ScriptedBookmarkPort: IOSBookmarkPort, @unchecked Sendable {
     private let lock = NSLock()
     var resolution = IOSBookmarkResolution(url: nil, isStale: false, failure: nil)
     var refreshed = Data("refreshed-bookmark".utf8)
+    var onBookmark: (@Sendable () throws -> Void)?
     private(set) var bookmarkCalls = 0
 
     func bookmark(for url: URL) throws -> Data {
+        try onBookmark?()
         lock.lock()
         defer { lock.unlock() }
         bookmarkCalls += 1

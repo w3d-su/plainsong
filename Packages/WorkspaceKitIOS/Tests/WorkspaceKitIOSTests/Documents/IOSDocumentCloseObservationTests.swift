@@ -22,18 +22,19 @@ final class IOSDocumentCloseObservationTests: XCTestCase {
         XCTAssertTrue(race.port.written.isEmpty)
     }
 
-    func testCloseStillRetainsAChangedCleanReadAsAnUnacknowledgedReloadProposal() async throws {
+    func testCloseDiscardsAChangedCleanReloadProposalWithoutWritingOrInstallingIt() async throws {
         let race = try await parkedObservation(externalText: "changed externally")
         let closing = await startCloseAndAssertPending(race)
         await race.harness.coordinator.unblockReads()
 
-        guard case .retained = try await closing.value else {
-            return XCTFail("Waiting for external bytes must not acknowledge a changed-source proposal")
+        guard case .closed = try await closing.value else {
+            return XCTFail("A clean reload proposal must not permanently prevent close")
         }
-        XCTAssertEqual(race.port.closeCalls, 0)
-        XCTAssertFalse(race.entry.closed)
-        XCTAssertFalse(race.entry.lease.isReleased)
-        XCTAssertEqual(race.entry.pendingProposal?.text, "changed externally")
+        XCTAssertEqual(race.port.closeCalls, 1)
+        XCTAssertTrue(race.entry.closed)
+        XCTAssertTrue(race.entry.lease.isReleased)
+        XCTAssertNil(race.entry.pendingProposal)
+        XCTAssertNil(race.entry.externalToken)
         XCTAssertEqual(race.handle.session.text, "baseline")
         XCTAssertFalse(race.handle.session.isDirty)
         XCTAssertTrue(race.port.written.isEmpty)

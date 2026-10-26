@@ -74,6 +74,9 @@ struct IOSUnpublishedLeaf: Error, Sendable {
 }
 
 enum IOSExternalWorkspaceNotice: Sendable {
+    case rootChanged
+    case rootDeleted
+    case rootMoved
     case changed(relativePath: String)
     case deleted(relativePath: String)
     case moved(from: String, to: String)
@@ -82,6 +85,12 @@ enum IOSExternalWorkspaceNotice: Sendable {
 
     var coalesceKey: String {
         switch self {
+        case .rootChanged:
+            "root-changed"
+        case .rootDeleted:
+            "root-deleted"
+        case .rootMoved:
+            "root-moved"
         case let .changed(path), let .deleted(path), let .availability(path, _):
             path
         case let .moved(from, _):

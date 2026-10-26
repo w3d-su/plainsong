@@ -4,6 +4,9 @@ import UIKit
 final class DocumentSession: NSObject {
     let editor: SourceEditor
     let probe: Probe
+    private let closeForReplacement: (SpikeDocument) async -> Bool
+    private let closeDiscardedCandidate: (SpikeDocument) async -> Bool
+    private var pendingCandidateClose: (document: SpikeDocument, grant: AccessGrant)?
     private(set) var document: SpikeDocument?
     private(set) var grant: AccessGrant?
     private(set) var ledger: SaveLedger?
@@ -25,9 +28,22 @@ final class DocumentSession: NSObject {
         ledger?.conflict ?? false
     }
 
-    init(editor: SourceEditor, probe: Probe) {
+    init(editor: SourceEditor, probe: Probe,
+         closeForReplacement: @escaping (SpikeDocument) async -> Bool = { document in
+             await withCheckedContinuation { continuation in
+                 document.close { continuation.resume(returning: $0) }
+             }
+         },
+         closeDiscardedCandidate: @escaping (SpikeDocument) async -> Bool = { document in
+             await withCheckedContinuation { continuation in
+                 document.close { continuation.resume(returning: $0) }
+             }
+         })
+    {
         self.editor = editor
         self.probe = probe
+        self.closeForReplacement = closeForReplacement
+        self.closeDiscardedCandidate = closeDiscardedCandidate
         super.init()
         editor.changed = { [weak self] in self?.sourceChanged() }
         editor.event = { [weak self] event in self?.record(event) }
@@ -81,37 +97,75 @@ final class DocumentSession: NSObject {
             return
         }
         opening = true
+        let openingTicket = editor.ticket()
+        let previousEditable = editor.textView.isEditable
+        var replaced = false
         editor.textView.isEditable = false
-        defer { opening = false; updated?() }
-        if let previous = document {
-            let closed = await withCheckedContinuation { continuation in
-                previous.close { continuation.resume(returning: $0) }
-            }
-            guard closed else {
-                report("Close failed; original document retained.", event: "close-failed")
+        defer {
+            opening = false
+            editor.textView.isEditable = (replaced || previousEditable) && ledger?.available == true && !conflict &&
+                !reloading &&
+                document?.documentState.contains(.closed) == false &&
+                document?.documentState.contains(.editingDisabled) == false
+            updated?()
+        }
+        // The current document and its grant remain owned until the replacement
+        // has loaded. A bad file must not retire a working editor session.
+        if let pending = pendingCandidateClose {
+            guard await closeDiscardedCandidate(pending.document) else {
+                report(
+                    "Candidate close is still pending. Original document retained.",
+                    event: "candidate-close-pending"
+                )
                 return
             }
-            document = nil
-            grant = nil
-            ledger = nil
+            pendingCandidateClose = nil
         }
         let candidate = SpikeDocument(fileURL: url)
         let success = await withCheckedContinuation { continuation in
             candidate.open { continuation.resume(returning: $0) }
         }
         guard success else {
-            report("Open failed/unavailable. No empty document substituted.", event: "open-failed")
+            report("Open failed/unavailable. Original document retained.", event: "open-failed")
             return
         }
+        guard replacementIsCurrent(openingTicket) else {
+            await closeCandidate(candidate, grant: selectedGrant)
+            report("Open superseded by composition or changed document state.", event: "open-refused-busy")
+            return
+        }
+        let previous = document
+        if let previous {
+            let closed = await closeForReplacement(previous)
+            guard closed else {
+                await closeCandidate(candidate, grant: selectedGrant)
+                report("Close failed; original document retained.", event: "close-failed")
+                return
+            }
+        }
+        let identity = UUID()
+        guard replacementIsCurrent(openingTicket), editor.attach(candidate.loadedSource, identity: identity) else {
+            // Composition can arrive while UIDocument.close is suspended. Keep
+            // the original ownership and reopen it before restoring editability.
+            await closeCandidate(candidate, grant: selectedGrant)
+            if let previous {
+                let reopened = await withCheckedContinuation { continuation in
+                    previous.open { continuation.resume(returning: $0) }
+                }
+                if !reopened {
+                    ledger?.available = false
+                }
+            }
+            report(
+                "Replacement refused after document state changed. Original source retained.",
+                event: "attach-failed"
+            )
+            return
+        }
+        replaced = true
         document = candidate
         grant = selectedGrant // Keep scope alive for the entire UIDocument lifetime.
-        let identity = UUID()
         ledger = SaveLedger(documentID: identity, source: candidate.loadedSource)
-        guard editor.attach(candidate.loadedSource, identity: identity) else {
-            ledger?.available = false
-            report("Attach refused during composition.", event: "attach-failed")
-            return
-        }
         candidate.requestAutosave = { [weak self, weak candidate] completion in
             guard let self, let candidate, document === candidate else { completion(false); return }
             // UIDocument.close invokes autosave while open-switch holds the busy
@@ -128,12 +182,27 @@ final class DocumentSession: NSObject {
         }
         candidate.editingAvailability = { [weak self, weak candidate] enabled in
             guard let self, let candidate, document === candidate else { return }
-            editor.textView.isEditable = enabled && !conflict && !reloading && ledger?.available == true
+            editor.textView.isEditable = enabled && !opening && !conflict && !reloading && ledger?.available == true
             record(enabled ? "document-enable-editing" : "document-disable-editing")
         }
         ledger?.available = !candidate.documentState.contains(.editingDisabled)
+        // A successful replacement establishes its own editing availability.
         editor.textView.isEditable = ledger?.available == true
         report("Opened in place. Single-file grant does not authorize siblings.", event: "open-succeeded")
+    }
+
+    private func replacementIsCurrent(_ ticket: PresentationTicket) -> Bool {
+        editor.documentID == ticket.documentID && editor.revision == ticket.revision &&
+            sameSource(editor.textView.text, ticket.source) && editor.textView.markedTextRange == nil &&
+            !dirty && !conflict && !reloading
+    }
+
+    private func closeCandidate(_ candidate: SpikeDocument, grant: AccessGrant) async {
+        candidate.requestAutosave = { $0(true) }
+        if await !closeDiscardedCandidate(candidate) {
+            pendingCandidateClose = (candidate, grant)
+            record("candidate-close-failed-retained")
+        }
     }
 
     func save(completion: @escaping @MainActor @Sendable (Bool) -> Void = { _ in }) {
@@ -222,7 +291,9 @@ final class DocumentSession: NSObject {
             ledger?.available = false
             _ = recover(reason: "provider-conflict")
         }
-        if document.documentState.contains(.savingError) || document.documentState.contains(.closed) {
+        if document.documentState.contains(.savingError) ||
+            (document.documentState.contains(.closed) && !opening)
+        {
             ledger?.available = false
             _ = recover(reason: "provider-unavailable")
         }

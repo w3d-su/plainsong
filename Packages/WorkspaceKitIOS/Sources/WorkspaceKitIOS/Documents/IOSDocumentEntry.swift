@@ -31,7 +31,7 @@ final class IOSDocumentEntry {
     var isRetiring = false
     var portClosed = false
     var closeTask: Task<IOSDocumentCloseOutcome, Error>?
-    var retirementTask: Task<Void, Error>?
+    var retirementTask: Task<IOSDocumentCloseOutcome, Error>?
     var externalReadTasks: [UUID: Task<Void, Never>] = [:]
     var lastPersistedText: String?
     var inFlightText: String?

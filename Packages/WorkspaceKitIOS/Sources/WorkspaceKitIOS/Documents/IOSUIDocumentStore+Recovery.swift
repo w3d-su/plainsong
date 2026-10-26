@@ -69,14 +69,14 @@ extension IOSUIDocumentStore {
         }
         let receipt = try await recovery.persist(record)
         entry.recoveryReceipt = receipt
+        emit(.recoveryPersisted(receipt))
         return receipt
     }
 
     public func close(_ identity: IOSDocumentIdentity) async throws -> IOSDocumentCloseOutcome {
         let entry = try requireEntry(identity)
         if let retirement = entry.retirementTask {
-            try await retirement.value
-            return .closed
+            return try await retirement.value
         }
         if let closing = entry.closeTask {
             return try await closing.value
