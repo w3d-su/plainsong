@@ -459,7 +459,11 @@ pending Mermaid wrappers. This preserves unchanged Mermaid SVG DOM, unchanged
 highlighted-code DOM, scroll position, and image loads.
 
 Frontmatter is **not** rendered as a table in the preview body; it is stripped (shown in
-the Frontmatter panel, §10). Optional toggle to show it as a styled block.
+the Frontmatter panel, §10). Optional toggle to show it as a styled block. A leading `---`
+with no closing fence is not frontmatter in the preview: `remark-frontmatter` runs only
+when the block closes (`src/frontmatter.ts`), because its concrete construct otherwise
+stops lists and block quotes from opening anywhere in the document. The `---` renders as
+a thematic break; the inspector still reports the missing closing delimiter (§10).
 
 ### 7.3 Swift ↔ JS bridge protocol
 
