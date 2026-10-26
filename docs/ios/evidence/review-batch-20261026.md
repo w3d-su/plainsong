@@ -1,5 +1,7 @@
 # iOS historical-PR review follow-up — 2026-10-26
 
+The later [round-two receipt](review-round2-20261026/README.md) adopts all eight new findings, including freshly regenerated lockfiles. The following record is historical for its stated source.
+
 The four delivery PRs had already reached main through the phase-A integration.
 This follow-up applies their remaining review repairs to current main while
 preserving later generation, observation, fixture and editor-delay work.

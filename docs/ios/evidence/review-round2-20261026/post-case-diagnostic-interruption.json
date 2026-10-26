@@ -1,0 +1,57 @@
+{
+  "time_utc": "2026-10-26T11:20:24.637972+00:00",
+  "signal": "SIGINT",
+  "target": {
+    "pid": 47786,
+    "ppid": 47500,
+    "argv": "/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/Resources/bin/simctl diagnose -l -b --timeout=600 --log-option=--last --log-option=2m --output=/tmp/plainsong-review-round2-221-evidence/native/evidence/047ac873321c-test-20261026-191735-46151/Results.xcresult/Staging/1_Test/Diagnostics/simctl_diagnostics --no-archive --udid=59CB04BD-26CC-4841-8D06-E75A2EDEBC66"
+  },
+  "parent": {
+    "pid": 47500,
+    "ppid": 46151,
+    "argv": "/Applications/Xcode-beta.app/Contents/Developer/usr/bin/xcodebuild -project Plainsong.xcodeproj -scheme PlainsongIOS -configuration Debug -sdk iphonesimulator -destination platform=iOS Simulator,id=59CB04BD-26CC-4841-8D06-E75A2EDEBC66 -derivedDataPath /private/tmp/plainsong-review-round2-221-evidence/native/dd/047ac873321c-test-20261026-191735-46151 -parallel-testing-enabled NO -resultBundlePath /private/tmp/plainsong-review-round2-221-evidence/native/evidence/047ac873321c-test-20261026-191735-46151/Results.xcresult -collect-test-diagnostics on-failure -test-timeouts-enabled YES -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180 CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO test-without-building"
+  },
+  "runner": {
+    "pid": 46151,
+    "ppid": 46150,
+    "argv": "/bin/bash Scripts/ios/run-ios-tests.sh /private/tmp/plainsong-review-round2-221-evidence/native"
+  },
+  "completed_functional_cases": {
+    "bundles": [
+      [
+        "PlainsongIOSTests.xctest",
+        "297",
+        "0"
+      ],
+      [
+        "MarkdownCoreTests.xctest",
+        "2",
+        "0"
+      ],
+      [
+        "SyntaxKitTests.xctest",
+        "12",
+        "0"
+      ],
+      [
+        "WorkspaceCoreTests.xctest",
+        "29",
+        "0"
+      ],
+      [
+        "EditorKitIOSTests.xctest",
+        "20",
+        "0"
+      ],
+      [
+        "WorkspaceKitIOSTests.xctest",
+        "156",
+        "0"
+      ]
+    ],
+    "passed": 516,
+    "failed": 0,
+    "skipped": 0
+  },
+  "reason": "Owned post-case simulator diagnostic; all six functional test bundles already completed. No test host, simulator or xcodebuild was signaled."
+}
