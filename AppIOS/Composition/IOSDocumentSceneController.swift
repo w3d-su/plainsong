@@ -159,7 +159,17 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     }
 
     func resolveExternal(_ choice: IOSExternalResolution) async throws {
-        guard !transitioning, let handle else { throw IOSDocumentFailure.unavailable }
+        guard let handle else { throw IOSDocumentFailure.unavailable }
+        // Reload installation already defers through the native relay while
+        // composing. Navigation and copy transitions still refuse marked text.
+        if case .reload = choice {
+            try beginTransition(allowMarkedText: true)
+        } else {
+            try beginTransition()
+        }
+        updateEditorAccess()
+        publish()
+        defer { finishTransition() }
         try await documents.resolveExternal(handle.identity, choice: choice)
     }
 
@@ -197,9 +207,11 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
         return observation
     }
 
-    func beginTransition() throws {
+    func beginTransition(allowMarkedText: Bool = false) throws {
         guard !transitioning, !isShuttingDown, !isDisposed else { throw IOSDocumentFailure.unavailable }
-        guard editor.captureSnapshot()?.hasMarkedText != true else { throw IOSDocumentFailure.sourceChanged }
+        guard allowMarkedText || editor.captureSnapshot()?.hasMarkedText != true else {
+            throw IOSDocumentFailure.sourceChanged
+        }
         recoveryEpoch &+= 1
         transitioning = true
     }

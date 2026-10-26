@@ -68,7 +68,8 @@ struct IOSProductionComposition {
                 guard let controller else { throw IOSDocumentFailure.unavailable }
                 try await controller.openPickedURL(url, scope: scope)
             },
-            shutdown: { [controller] in await controller.shutdown() }, recovery: recoveryUI
+            shutdown: { [controller] in await controller.shutdown() }, recovery: recoveryUI,
+            conflictCopy: IOSConflictCopyCoordinator(controller: controller)
         )
         recoveryUI.onRestored = { [weak scene = runtime.scene] in scene?.navigateToDocument() }
         recoveryUI.onPresent = { [weak runtime] in runtime?.prepareForReadOnlyPresentation() }
