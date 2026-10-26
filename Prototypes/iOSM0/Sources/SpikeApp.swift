@@ -85,7 +85,10 @@ final class SpikeViewController: UIViewController, UIDocumentPickerDelegate {
     }
 
     @objc private func fixture() {
-        guard let fixture = Bundle.main.url(forResource: "m0", withExtension: "md") else { return }
+        guard let fixture = Bundle.main.url(forResource: "m0", withExtension: "md") else {
+            session.report("Fixture resource missing. Install a corrected build.", event: "fixture-resource-missing")
+            return
+        }
         Task {
             do {
                 let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
