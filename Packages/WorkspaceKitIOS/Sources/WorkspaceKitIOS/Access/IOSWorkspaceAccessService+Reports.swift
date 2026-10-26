@@ -64,6 +64,17 @@ extension IOSWorkspaceAccessService {
         }
     }
 
+    func markUnusableBookmark(_ bookmark: Data, after error: Error) {
+        guard !(error is CancellationError) else { return }
+        switch IOSWorkspaceFailureMapping.map(error) {
+        case .permissionDenied, .invalidPath, .outsideGrant, .requiresDirectoryGrant, .notFound:
+            markBookmark(bookmark, status: .needsReselection)
+        default:
+            // A transient provider or coordination failure leaves the stored bytes retryable.
+            break
+        }
+    }
+
     func replaceBookmark(_ bookmark: Data, with refreshed: Data) {
         var items = ports.recents.load()
         var changed = false
@@ -126,17 +137,23 @@ extension IOSWorkspaceAccessService {
         }
         let grant = record.grant
         Task { @MainActor in
-            do {
-                _ = try await self.refresh(grant)
-            } catch {
-                guard self.currentGrant(for: grant.workspaceID)?.accessGeneration == grant.accessGeneration else {
-                    return
-                }
-                self.publish(.unavailable(
-                    workspaceID: grant.workspaceID,
-                    reason: IOSWorkspaceFailureMapping.map(error)
-                ))
-            }
+            await self.refreshRoot(grant)
+        }
+    }
+
+    func refreshRoot(_ grant: IOSWorkspaceGrant) async {
+        let requestID = UUID()
+        do {
+            _ = try await refresh(grant, requestID: requestID)
+        } catch {
+            guard !(error is CancellationError), !Task.isCancelled else { return }
+            let failure = IOSWorkspaceFailureMapping.map(error)
+            guard failure != .grantChanged,
+                  let record = records[grant.workspaceID], !record.revoked, !record.stopped,
+                  record.generation == grant.accessGeneration,
+                  record.latestRequestID == requestID
+            else { return }
+            publish(.unavailable(workspaceID: grant.workspaceID, reason: failure))
         }
     }
 
