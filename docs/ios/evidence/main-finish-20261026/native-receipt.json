@@ -266,8 +266,21 @@
       "delivery_member": "evidence/audit/mac-summary.json"
     },
     "skipped_cases": {
-      "EditorKit": [],
-      "PreviewKit": []
+      "EditorKit": [
+        "EditorKitTests.EditorLineNumberGutterCostProbeTests/testLineNumberCostOnLargeFixture",
+        "EditorKitTests.WYSIWYGActualIMEEventGateTests/testActualIMEEventPostingAccessIsGranted",
+        "EditorKitTests.WYSIWYGActualIMEEventGateTests/testActualPinyinEventStreamAtFoldBoundariesWhenEnabled",
+        "EditorKitTests.WYSIWYGActualIMEEventGateTests/testActualPinyinEventStreamAtImageBoundariesWhenEnabled",
+        "EditorKitTests.WYSIWYGActualIMEEventGateTests/testActualPinyinEventStreamAtLinkBoundariesWhenEnabled",
+        "EditorKitTests.WYSIWYGActualIMEEventGateTests/testActualZhuyinEventStreamAtFoldBoundaries",
+        "EditorKitTests.WYSIWYGActualIMEEventGateTests/testActualZhuyinEventStreamAtImageBoundaries",
+        "EditorKitTests.WYSIWYGActualIMEEventGateTests/testActualZhuyinEventStreamAtLinkBoundaries"
+      ],
+      "PreviewKit": [
+        "PreviewKitTests.PreviewRenderDispatchProbeTests/testIdleSubmissionMainThreadProbe",
+        "PreviewKitTests.PreviewRenderDispatchProbeTests/testTypingBurstProbe",
+        "PreviewKitTests.PreviewWebViewFootprintProbeTests/testIdleLivePreviewHelperFootprint"
+      ]
     },
     "F2_boundary": "F2 86 named tests and inventory36 pass. The scoped retained-evidence audit retains six PARTIAL and six OPEN markers; this is not full durable-evidence or performance acceptance."
   },
