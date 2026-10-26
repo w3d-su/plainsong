@@ -103,6 +103,39 @@ final class BackgroundTests: XCTestCase {
     }
 
     @MainActor
+    func testRecoveryFailureKeepsBackgroundAssertionForActiveCapture() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let assertion = BackgroundAssertionProbe()
+        var recoveryFails = false
+        let session = makeSession(assertion, persistRecovery: { snapshot in
+            if recoveryFails {
+                throw CocoaError(.fileWriteUnknown)
+            }
+            try RecoveryStore.applicationStore().persist(snapshot)
+        })
+        let url = try await open(session, in: directory)
+        edit("captured despite later recovery failure", in: session)
+        session.delaySave = true
+        let saved = expectation(description: "already-captured save completed")
+        session.save { success in
+            XCTAssertTrue(success)
+            saved.fulfill()
+        }
+        XCTAssertTrue(session.saving)
+        recoveryFails = true
+        session.background()
+        XCTAssertTrue(session.probe.events.contains { $0.event == "recovery-failed" })
+        XCTAssertEqual(assertion.started.count, 1)
+        XCTAssertTrue(assertion.ended.isEmpty)
+        await fulfillment(of: [saved], timeout: 6)
+        XCTAssertEqual(assertion.ended, assertion.started)
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "captured despite later recovery failure")
+        XCTAssertFalse(session.dirty)
+        try await close(session)
+    }
+
+    @MainActor
     func testNoWriterEndsBackgroundAssertionImmediately() async throws {
         let assertion = BackgroundAssertionProbe()
         let session = makeSession(assertion)
@@ -118,10 +151,14 @@ final class BackgroundTests: XCTestCase {
     }
 
     @MainActor
-    private func makeSession(_ assertion: BackgroundAssertionProbe) -> DocumentSession {
+    private func makeSession(_ assertion: BackgroundAssertionProbe,
+                             persistRecovery: @escaping (RecoveryEnvelope) throws -> Void = {
+                                 try RecoveryStore.applicationStore().persist($0)
+                             }) -> DocumentSession
+    {
         DocumentSession(editor: SourceEditor(), probe: Probe(),
                         beginBackgroundTask: { assertion.begin(expiration: $0) },
-                        endBackgroundTask: { assertion.end($0) })
+                        endBackgroundTask: { assertion.end($0) }, persistRecovery: persistRecovery)
     }
 
     private func temporaryDirectory() throws -> URL {

@@ -8,6 +8,7 @@ final class DocumentSession: NSObject {
     private let closeDiscardedCandidate: (SpikeDocument) async -> Bool
     private let beginBackgroundTask: (@escaping @MainActor @Sendable () -> Void) -> UIBackgroundTaskIdentifier
     private let endBackgroundTask: (UIBackgroundTaskIdentifier) -> Void
+    private let persistRecovery: (RecoveryEnvelope) throws -> Void
     private var pendingCandidateClose: (document: SpikeDocument, grant: AccessGrant)?
     private(set) var document: SpikeDocument?
     private(set) var grant: AccessGrant?
@@ -48,6 +49,9 @@ final class DocumentSession: NSObject {
          },
          endBackgroundTask: @escaping (UIBackgroundTaskIdentifier) -> Void = {
              UIApplication.shared.endBackgroundTask($0)
+         },
+         persistRecovery: @escaping (RecoveryEnvelope) throws -> Void = {
+             try RecoveryStore.applicationStore().persist($0)
          })
     {
         self.editor = editor
@@ -56,6 +60,7 @@ final class DocumentSession: NSObject {
         self.closeDiscardedCandidate = closeDiscardedCandidate
         self.beginBackgroundTask = beginBackgroundTask
         self.endBackgroundTask = endBackgroundTask
+        self.persistRecovery = persistRecovery
         super.init()
         editor.changed = { [weak self] in self?.sourceChanged() }
         editor.event = { [weak self] event in self?.record(event) }
@@ -91,7 +96,7 @@ final class DocumentSession: NSObject {
         do {
             let snapshot = RecoveryEnvelope(documentID: editor.documentID, revision: editor.revision,
                                             source: editor.textView.text, reason: reason, time: Date())
-            try RecoveryStore.applicationStore().persist(snapshot)
+            try persistRecovery(snapshot)
             record("recovery-readback-verified")
             return true
         } catch {
@@ -328,7 +333,7 @@ final class DocumentSession: NSObject {
             report("Background time expired; save completion remains unconfirmed.", event: "background-expired")
             finishBackground()
         }
-        guard recover(reason: "background") else { finishBackground(); return }
+        let recoveryPersisted = recover(reason: "background")
         record("background-flush-request")
         if let capture = ledger?.active {
             // A writer-busy response is not a completed flush. Its original
@@ -336,6 +341,7 @@ final class DocumentSession: NSObject {
             backgroundCaptureID = capture.operationID
             return
         }
+        guard recoveryPersisted else { finishBackground(); return }
         save { [weak self] _ in
             guard let self, backgroundGeneration == generation else { return }
             finishBackground()
