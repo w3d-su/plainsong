@@ -53,13 +53,27 @@ extension AppState {
     }
 
     /// `Command-Shift-F`: toggle Search/Files, focusing the query whenever Search is opened.
+    /// A key window whose sidebar is hidden shows neither, so the press opens Search there.
     func toggleWorkspaceSearch() {
         guard canUseWorkspaceSearch else { return }
-        if workspaceSearchUI.mode == .search {
+        if workspaceSearchUI.mode == .search, !isWorkspaceSidebarHiddenInKeyWindow {
             selectWorkspaceSidebarMode(.files)
         } else {
             focusWorkspaceSearch()
         }
+    }
+
+    /// Records whether `window`'s split-view sidebar is hidden. The `HStack` shell never hides it.
+    func setWorkspaceSidebarHidden(_ isHidden: Bool, in window: NSWindow) {
+        if isHidden {
+            workspaceSidebarHiddenWindows.add(window)
+        } else {
+            workspaceSidebarHiddenWindows.remove(window)
+        }
+    }
+
+    var isWorkspaceSidebarHiddenInKeyWindow: Bool {
+        workspaceSidebarHiddenWindows.allObjects.contains { isWorkspaceSearchFocusKeyWindow($0) }
     }
 
     /// Marks a focus request as consumed after the **key** window's owned Search `NSTextField`

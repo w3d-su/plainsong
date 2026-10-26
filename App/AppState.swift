@@ -171,6 +171,8 @@ final class AppState: ObservableObject {
     @Published var workspaceSearchFocusKeyEpoch: UInt64 = 0
     /// When non-`nil`, replaces `NSWindow.isKeyWindow` for search focus eligibility (tests).
     var workspaceSearchFocusKeyWindowCheck: ((NSWindow) -> Bool)?
+    /// Windows whose split-view sidebar is hidden, so ⇧⌘F there opens Search instead of Files.
+    let workspaceSidebarHiddenWindows = NSHashTable<NSWindow>.weakObjects()
     let editorFindHost = EditorFindHost()
     @Published var editorNavigationCommand: EditorNavigationCommand?
     @Published var showAllFiles = false

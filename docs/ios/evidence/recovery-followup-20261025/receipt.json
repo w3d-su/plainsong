@@ -1,0 +1,24 @@
+{
+  "compiler": "Apple Swift version 6.4 (swiftlang-6.4.0.20.104 clang-2100.3.20.102)\nTarget: arm64-apple-macosx27.0.0\n",
+  "public_emit": {
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "public_client": {
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "internal_emit": {
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "internal_client": {
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "/private/tmp/plainsong-review-followup-20261025/access-probe/Client.swift:2:46: error: 'openDestinationFolder' is inaccessible due to 'internal' protection level\n1 | import AccessProbe\n2 | func use(_ service: AccessService) { service.openDestinationFolder() }\n  |                                              `- error: 'openDestinationFolder' is inaccessible due to 'internal' protection level\n3 | \n\nAccessProbe.AccessService.openDestinationFolder:2:15: note: 'openDestinationFolder()' declared here\n1 | class AccessService {\n2 | internal func openDestinationFolder()}\n  |               `- note: 'openDestinationFolder()' declared here\n3 | \n"
+  },
+  "passed": true
+}

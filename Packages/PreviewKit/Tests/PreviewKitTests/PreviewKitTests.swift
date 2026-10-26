@@ -74,8 +74,9 @@ final class PreviewKitTests: XCTestCase {
     @MainActor
     func testRenderingLowerVersionDocumentAfterHigherVersionStillUpdates() async throws {
         let controller = try PreviewController(previewIndexURL: previewIndexFixtureURL())
+        defer { controller.invalidate() }
 
-        try await waitUntil("preview bridge ready") {
+        try await PreviewHostedTestWait.until("preview bridge ready") {
             controller.isReady
         }
 
@@ -87,8 +88,11 @@ final class PreviewKitTests: XCTestCase {
                 fileURL: nil
             )
         )
-        try await waitUntil("first document visible") {
-            let text = try await controller.webView.evaluateJavaScript("document.body.innerText") as? String
+        try await PreviewHostedTestWait.until("first document visible") {
+            let text = try await PreviewHostedTestWait.javascript(
+                "document.body.innerText",
+                in: controller.webView
+            ) as? String
             return text?.contains("First document") == true
         }
 
@@ -101,8 +105,11 @@ final class PreviewKitTests: XCTestCase {
                 fileURL: nil
             )
         )
-        try await waitUntil("second document visible despite lower version") {
-            let text = try await controller.webView.evaluateJavaScript("document.body.innerText") as? String
+        try await PreviewHostedTestWait.until("second document visible despite lower version") {
+            let text = try await PreviewHostedTestWait.javascript(
+                "document.body.innerText",
+                in: controller.webView
+            ) as? String
             return text?.contains("Second document") == true && text?.contains("First document") != true
         }
     }
@@ -130,6 +137,7 @@ final class PreviewKitTests: XCTestCase {
     @MainActor
     func testPreviewControllerUsesTransparentWebViewBackground() {
         let controller = PreviewController()
+        defer { controller.invalidate() }
 
         #if os(macOS)
             XCTAssertEqual(controller.webView.layer?.backgroundColor, NSColor.clear.cgColor)
@@ -142,8 +150,9 @@ final class PreviewKitTests: XCTestCase {
     @MainActor
     func testPreviewControllerLoadsPreviewBundleAndRendersMarkdown() async throws {
         let controller = try PreviewController(previewIndexURL: previewIndexFixtureURL())
+        defer { controller.invalidate() }
 
-        try await waitUntil("preview bridge ready") {
+        try await PreviewHostedTestWait.until("preview bridge ready") {
             controller.isReady
         }
 
@@ -160,8 +169,11 @@ final class PreviewKitTests: XCTestCase {
             )
         )
 
-        try await waitUntil("rendered markdown visible") {
-            let text = try await controller.webView.evaluateJavaScript("document.body.innerText") as? String
+        try await PreviewHostedTestWait.until("rendered markdown visible") {
+            let text = try await PreviewHostedTestWait.javascript(
+                "document.body.innerText",
+                in: controller.webView
+            ) as? String
             return text?.contains("Preview smoke") == true && text?.contains("task") == true
         }
     }
@@ -180,10 +192,11 @@ final class PreviewKitTests: XCTestCase {
         try Self.onePixelPNGData.write(to: imageDirectory.appendingPathComponent("spaced pixel.png"))
 
         let controller = try PreviewController(previewIndexURL: previewIndexFixtureURL())
+        defer { controller.invalidate() }
         controller.installAssetReader(DirectPreviewAssetReader())
         controller.setWorkspaceAssetRoot(workspaceRoot)
 
-        try await waitUntil("preview bridge ready") {
+        try await PreviewHostedTestWait.until("preview bridge ready") {
             controller.isReady
         }
 
@@ -202,9 +215,10 @@ final class PreviewKitTests: XCTestCase {
             )
         )
 
-        try await waitUntil("workspace image loaded") {
-            let naturalWidths = try await controller.webView.evaluateJavaScript(
-                "Array.from(document.querySelectorAll('img')).map((image) => image.naturalWidth)"
+        try await PreviewHostedTestWait.until("workspace image loaded") {
+            let naturalWidths = try await PreviewHostedTestWait.javascript(
+                "Array.from(document.querySelectorAll('img')).map((image) => image.naturalWidth)",
+                in: controller.webView
             ) as? [Int]
             return naturalWidths == [1, 1]
         }
@@ -392,20 +406,4 @@ final class PreviewKitTests: XCTestCase {
     private nonisolated static let onePixelPNGData = Data(base64Encoded: """
     iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR42mP8z8BQDwAFgwJ/lD3G7wAAAABJRU5ErkJggg==
     """)!
-
-    @MainActor
-    private func waitUntil(
-        _ description: String,
-        timeoutNanoseconds: UInt64 = 5_000_000_000,
-        condition: @escaping @MainActor () async throws -> Bool
-    ) async throws {
-        let start = DispatchTime.now().uptimeNanoseconds
-        while DispatchTime.now().uptimeNanoseconds - start < timeoutNanoseconds {
-            if try await condition() {
-                return
-            }
-            try await Task.sleep(nanoseconds: 50_000_000)
-        }
-        XCTFail("Timed out waiting for \(description)")
-    }
 }

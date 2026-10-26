@@ -189,6 +189,9 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 - Descriptor-backed parent capture and document/image authority fall back to `O_SEARCH`
   when directory read access is denied. A single-file Powerbox grant permits parent lookup
   without directory enumeration; ordinary read descriptors retain permission-loss behavior.
+- An explicitly selected iOS single-file Markdown/MDX document that is downloading or
+  offline retains its current file grant and Files snapshot for Refresh and retry.
+  Availability is reported separately from document type; actual revocation still fences access.
 - Saves stage their temporary file beside the document and publish it with
   `renameatx_np`. A file-only grant (Open panel or Finder "Open With") refuses that sibling
   with `EPERM`; only then does the transaction stage in Foundation's item-replacement
@@ -199,7 +202,8 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   the emptied directory is removed. `Scripts/check-single-file-save-sandbox.sh` exercises
   this in a signed sandboxed probe under a LaunchServices file-only grant.
 - Window chrome: a native `NavigationSplitView` with a resizable, collapsible sidebar
-  (Files / Search navigators) on macOS 27+, a fixed-width sidebar in an `HStack` before
+  (Files / Search navigators; ⇧⌘F in a window whose sidebar is hidden reveals it in
+  Search) on macOS 27+, a fixed-width sidebar in an `HStack` before
   (R17), then the document column and a right inspector for frontmatter and file details.
   Inspector intent and width are per-window scene state; visibility is derived
   (`docs/window-state-gates.md` §10.1). The `HStack` shell's window minimum is 780 pt
@@ -395,6 +399,9 @@ republishes only when its value changes literally.
   keeps it. After a WebContent termination a live controller reloads the page and
   re-submits its newest render under a new render ID, giving up after three terminations
   without a completed render (each later render retries once); export controllers fail.
+  Only iOS arms the one-shot 2.5 s silent-initial-page retry; macOS retains its normal
+  initial load. A retry with no navigation token probes the current page when ready
+  arrives, and accepts only a protocol match from the current page generation.
 - **Security:** strict CSP (`default-src 'none'; script-src 'self'; style-src 'self'
   'unsafe-inline'; img-src asset: data: https:`), `isElementFullscreenEnabled` off, and
   no remote loads by default. The preview JS removes remote image `src` values unless
@@ -412,6 +419,8 @@ republishes only when its value changes literally.
 - Link clicks: intercepted in Swift. `http(s)` → `NSWorkspace.open` (external browser).
   Relative `.md`/`.mdx` → open that file in the editor. `#anchor` stays in JavaScript
   and scrolls the preview to a generated heading ID (Unicode and duplicate headings supported).
+  On iOS, PreviewKit also owns external browser opening; production scene observation
+  must not open its informational external-link event a second time.
 
 ### 7.2 JS pipeline (preview-src)
 
@@ -451,7 +460,11 @@ pending Mermaid wrappers. This preserves unchanged Mermaid SVG DOM, unchanged
 highlighted-code DOM, scroll position, and image loads.
 
 Frontmatter is **not** rendered as a table in the preview body; it is stripped (shown in
-the Frontmatter panel, §10). Optional toggle to show it as a styled block.
+the Frontmatter panel, §10). Optional toggle to show it as a styled block. A leading `---`
+with no closing fence is not frontmatter in the preview: `remark-frontmatter` runs only
+when the block closes (`src/frontmatter.ts`), because its concrete construct otherwise
+stops lists and block quotes from opening anywhere in the document. The `---` renders as
+a thematic break; the inspector still reports the missing closing delimiter (§10).
 
 ### 7.3 Swift ↔ JS bridge protocol
 

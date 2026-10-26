@@ -7,9 +7,14 @@ import XCTest
 
 @MainActor
 final class ExportHTMLHostedTests: XCTestCase {
+    private var support: ExportHTMLTestSupport {
+        ExportHTMLTestSupport(owner: self)
+    }
+
     func testSuccessfulMarkdownExportIsAStaticDocument() async throws {
-        let controller = try makeController()
-        let renderID = try await render(
+        let controller = try support.makeController()
+        defer { controller.invalidate() }
+        let renderID = try await support.render(
             controller,
             text: """
             ---
@@ -52,8 +57,9 @@ final class ExportHTMLHostedTests: XCTestCase {
     }
 
     func testMDXPlaceholdersExportWithoutComponentExecution() async throws {
-        let controller = try makeController()
-        let renderID = try await render(
+        let controller = try support.makeController()
+        defer { controller.invalidate() }
+        let renderID = try await support.render(
             controller,
             text: """
             import Button from "./Button"
@@ -78,8 +84,9 @@ final class ExportHTMLHostedTests: XCTestCase {
     }
 
     func testMDXSyntaxErrorFailsInsteadOfExportingLastGoodDOM() async throws {
-        let controller = try makeController()
-        let goodRenderID = try await render(
+        let controller = try support.makeController()
+        defer { controller.invalidate() }
+        let goodRenderID = try await support.render(
             controller,
             text: "# Good MDX\n",
             fileKind: .mdx,
@@ -90,7 +97,7 @@ final class ExportHTMLHostedTests: XCTestCase {
             return XCTFail("Expected a successful baseline export, got \(good)")
         }
 
-        let failedRenderID = try await render(
+        let failedRenderID = try await support.render(
             controller,
             text: "<Component unclosed",
             fileKind: .mdx,
@@ -105,8 +112,9 @@ final class ExportHTMLHostedTests: XCTestCase {
     }
 
     func testStaleRenderIDFailsWithoutEvaluatingOuterHTML() async throws {
-        let controller = try makeController()
-        _ = try await render(controller, text: "# Current\n", fileKind: .markdown, version: 15)
+        let controller = try support.makeController()
+        defer { controller.invalidate() }
+        _ = try await support.render(controller, text: "# Current\n", fileKind: .markdown, version: 15)
 
         let result = await controller.exportHTML(matchingRenderID: 99)
         guard case let .failed(reason, _, _) = result else {
@@ -116,8 +124,9 @@ final class ExportHTMLHostedTests: XCTestCase {
     }
 
     func testNewerRenderFailsAPendingExport() async throws {
-        let controller = try makeController()
-        let firstRenderID = try await render(
+        let controller = try support.makeController()
+        defer { controller.invalidate() }
+        let firstRenderID = try await support.render(
             controller,
             text: "# First\n",
             fileKind: .markdown,
@@ -146,51 +155,5 @@ final class ExportHTMLHostedTests: XCTestCase {
         XCTAssertEqual(exportID, 7)
         XCTAssertEqual(renderID, firstRenderID)
         XCTAssertNil(controller.pendingHTMLExport)
-    }
-
-    func makeController() throws -> PreviewController {
-        let controller = try PreviewController(previewIndexURL: previewIndexFixtureURL())
-        addTeardownBlock { @MainActor [weak controller] in controller?.invalidate() }
-        return controller
-    }
-
-    func render(
-        _ controller: PreviewController,
-        text: String,
-        fileKind: FileKind,
-        version: Int
-    ) async throws -> Int {
-        try await waitUntil("preview bridge ready") {
-            controller.isReady
-        }
-
-        let renderID = controller.renderForTesting(
-            DocumentTextChange(
-                text: text,
-                version: version,
-                fileKind: fileKind,
-                fileURL: nil
-            )
-        )
-        try await waitUntil("render \(renderID) completed") {
-            controller.scrollDeliveryState.completedRenderID == renderID
-        }
-        return renderID
-    }
-
-    func previewIndexFixtureURL() throws -> URL {
-        try PreviewBundleFixture.indexURL()
-    }
-
-    func waitUntil(
-        _ description: String,
-        timeoutNanoseconds: UInt64 = 5_000_000_000,
-        condition: @escaping @MainActor () async throws -> Bool
-    ) async throws {
-        try await PreviewHostedTestWait.until(
-            description,
-            timeoutNanoseconds: timeoutNanoseconds,
-            condition: condition
-        )
     }
 }
