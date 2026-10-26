@@ -4,6 +4,33 @@ Created 2026-10-08. Contract: **IOS-C0-v1 declarations implemented**. Live main:
 
 The C0 tag preserves declarations and an unavailable scaffold. **The current branch contains the production composition candidate described below; full v1 acceptance remains OPEN. Older dated sections retain their original source and acceptance boundaries.**
 
+## Main completion candidate — 2026-10-26
+
+This section supersedes current-status claims below and preserves their historical receipts.
+Live main `e09801309e855dce6ee903101ac2180e164daef2` contains #210 and #211.
+Merged #217 and #218 targeted the former stack branches, so their actual missing
+patches were transplanted into [#219](https://github.com/w3d-su/plainsong/pull/219)
+directly against main. No divergent history or duplicate #209 transplant was merged.
+
+Implementation `565a7b15b47e66de9dc08d114e4dc117c033ebe1` adds conflict Save a Copy, Recent file/folder restore and
+explicit reselection, plus the reviewed pending-cloud Recent retry fix. Frozen13,
+71 declarations, main's Mac/Preview fixes and dependency pins remain unchanged.
+New complete modules566/566 (199 required), Preview197/197 plus a second complete
+197/197, iPhone+iPad UI3/3 each and components29/29 share fingerprint
+`3ac1cda78e689a2608c262edd0e766e12887f84fa9914405fed2f2ebad758218`. Tooling44/44 and local Mac package/build regression pass.
+The new unsigned Release IPA and independent actual-ZIP audit use that same source;
+CI for the later docs publication head is tracked separately. [Evidence](evidence/main-finish-20261026/README.md).
+
+All final native runners completed without intervention. The tests-only complete
+negative run's eight expected failures, the pre-fix modules554/554, old b138
+post-case diagnostic intervention and original kits remain retained with their
+own sources. No historical count or CI result is relabelled as new execution.
+
+The pre-composition M0 owner reports retain their accepted original scope. Signing
+and installing this formal-App artifact, Files/iCloud, physical Chinese IME/Undo,
+recovery/conflict/background, physical iPad/minimumOS26, VoiceOver/keyboard and
+measured performance remain OPEN. No v1 acceptance, approval or self-merge is claimed.
+
 ## Main-based production integration — 2026-10-23
 
 This section supersedes earlier current-status snapshots while retaining their
