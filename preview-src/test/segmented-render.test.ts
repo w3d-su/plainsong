@@ -218,6 +218,17 @@ describe("segmented preview render", () => {
     }
   });
 
+  it.each(["md", "mdx"] as const)("segments %s with an unclosed frontmatter opener", async (kind) => {
+    const renderer = new SegmentedRenderer(kind, finest);
+    const text = "---\n# Title\n\n- a\n- b\n\n> quote\n\n" +
+      Array.from({ length: 20 }, (_, index) => `## Section ${index}\n\nParagraph ${index}.`).join("\n\n");
+    const html = await renderer.render(text);
+    expect(html).toBe(await (kind === "md" ? renderMarkdown(text) : renderMdx(text)));
+    expect(html).toContain("<ul");
+    expect(html).toContain("<blockquote");
+    expect(renderer.assembledSegmentCount).toBeGreaterThan(1);
+  });
+
   it.each(["md", "mdx"] as const)("does not cut %s frontmatter that follows a BOM", async (kind) => {
     // micromark skips one leading BOM before the opening fence. The blank line inside the
     // YAML sits past the default maximum segment length, so a cut there would be taken.
