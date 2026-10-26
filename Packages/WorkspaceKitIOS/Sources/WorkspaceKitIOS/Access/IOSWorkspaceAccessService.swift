@@ -11,7 +11,7 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
     var records: [IOSWorkspaceIdentity: IOSWorkspaceScopeRecord] = [:]
     var observations: [UUID: IOSWorkspaceObservation] = [:]
     var ownedAssets: [UUID: IOSOwnedAssetRecord] = [:]
-    var pendingNotices: [String: IOSQueuedWorkspaceNotice] = [:]
+    var pendingNotices: [IOSQueuedWorkspaceNotice.CoalescingKey: IOSQueuedWorkspaceNotice] = [:]
     var persistedLeaves: [UUID: IOSPersistedLeaf] = [:]
     var noticeFlushScheduled = false
     public var includesHiddenEntries = false

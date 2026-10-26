@@ -74,6 +74,15 @@ struct IOSUnpublishedLeaf: Error, Sendable {
 }
 
 enum IOSExternalWorkspaceNotice: Sendable {
+    /// Root notices must not share a pending slot with any child path spelling.
+    enum CoalescingKey: Hashable, Sendable {
+        case rootChanged
+        case rootDeleted
+        case rootMoved
+        case offlineRoot
+        case relativePath(WorkspacePathByteKey)
+    }
+
     case rootChanged
     case rootDeleted
     case rootMoved
@@ -83,32 +92,44 @@ enum IOSExternalWorkspaceNotice: Sendable {
     case availability(relativePath: String, IOSFileAvailability)
     case offlineRoot
 
-    var coalesceKey: String {
+    var coalesceKey: CoalescingKey {
         switch self {
         case .rootChanged:
-            "root-changed"
+            .rootChanged
         case .rootDeleted:
-            "root-deleted"
+            .rootDeleted
         case .rootMoved:
-            "root-moved"
+            .rootMoved
         case let .changed(path), let .deleted(path), let .availability(path, _):
-            path
+            .relativePath(WorkspacePathByteKey(path))
         case let .moved(from, _):
-            from
+            .relativePath(WorkspacePathByteKey(from))
         case .offlineRoot:
-            "offline"
+            .offlineRoot
         }
     }
 }
 
 struct IOSQueuedWorkspaceNotice: Sendable {
+    struct CoalescingKey: Hashable, Sendable {
+        let workspaceID: IOSWorkspaceIdentity
+        let generation: UInt64
+        let rootToken: UUID
+        let notice: IOSExternalWorkspaceNotice.CoalescingKey
+    }
+
     var workspaceID: IOSWorkspaceIdentity
     var generation: UInt64
     var rootToken: UUID
     var notice: IOSExternalWorkspaceNotice
 
-    var coalesceKey: String {
-        "\(workspaceID.rawValue.uuidString)|\(generation)|\(rootToken.uuidString)|\(notice.coalesceKey)"
+    var coalesceKey: CoalescingKey {
+        CoalescingKey(
+            workspaceID: workspaceID,
+            generation: generation,
+            rootToken: rootToken,
+            notice: notice.coalesceKey
+        )
     }
 }
 

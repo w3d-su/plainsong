@@ -4,12 +4,14 @@ import UIKit
 final class DocumentSession: NSObject {
     let editor: SourceEditor
     let probe: Probe
+    private let makeDocument: (URL) -> SpikeDocument
     private let closeForReplacement: (SpikeDocument) async -> Bool
     private let closeDiscardedCandidate: (SpikeDocument) async -> Bool
     private let beginBackgroundTask: (@escaping @MainActor @Sendable () -> Void) -> UIBackgroundTaskIdentifier
     private let endBackgroundTask: (UIBackgroundTaskIdentifier) -> Void
     private let persistRecovery: (RecoveryEnvelope) throws -> Void
     private var pendingCandidateClose: (document: SpikeDocument, grant: AccessGrant)?
+    private var replacementCandidate: ReplacementCandidate?
     private(set) var document: SpikeDocument?
     private(set) var grant: AccessGrant?
     private(set) var ledger: SaveLedger?
@@ -34,6 +36,7 @@ final class DocumentSession: NSObject {
     }
 
     init(editor: SourceEditor, probe: Probe,
+         makeDocument: @escaping (URL) -> SpikeDocument = { SpikeDocument(fileURL: $0) },
          closeForReplacement: @escaping (SpikeDocument) async -> Bool = { document in
              await withCheckedContinuation { continuation in
                  document.close { continuation.resume(returning: $0) }
@@ -56,6 +59,7 @@ final class DocumentSession: NSObject {
     {
         self.editor = editor
         self.probe = probe
+        self.makeDocument = makeDocument
         self.closeForReplacement = closeForReplacement
         self.closeDiscardedCandidate = closeDiscardedCandidate
         self.beginBackgroundTask = beginBackgroundTask
@@ -119,6 +123,7 @@ final class DocumentSession: NSObject {
         var replaced = false
         editor.textView.isEditable = false
         defer {
+            replacementCandidate = nil
             opening = false
             editor.textView.isEditable = (replaced || previousEditable) && ledger?.available == true && !conflict &&
                 !reloading &&
@@ -138,7 +143,9 @@ final class DocumentSession: NSObject {
             }
             pendingCandidateClose = nil
         }
-        let candidate = SpikeDocument(fileURL: url)
+        let candidate = makeDocument(url)
+        let staged = ReplacementCandidate(document: candidate, expectedURL: url)
+        replacementCandidate = staged
         let success = await withCheckedContinuation { continuation in
             candidate.open { continuation.resume(returning: $0) }
         }
@@ -146,7 +153,8 @@ final class DocumentSession: NSObject {
             report("Open failed/unavailable. Original document retained.", event: "open-failed")
             return
         }
-        guard replacementIsCurrent(openingTicket) else {
+        staged.didOpen()
+        guard replacementIsCurrent(openingTicket), staged.isCurrent else {
             await closeCandidate(candidate, grant: selectedGrant)
             report("Open superseded by composition or changed document state.", event: "open-refused-busy")
             return
@@ -161,7 +169,9 @@ final class DocumentSession: NSObject {
             }
         }
         let identity = UUID()
-        guard replacementIsCurrent(openingTicket), editor.attach(candidate.loadedSource, identity: identity) else {
+        guard replacementIsCurrent(openingTicket), staged.isCurrent,
+              editor.attach(candidate.loadedSource, identity: identity)
+        else {
             // Composition can arrive while UIDocument.close is suspended. Keep
             // the original ownership and reopen it before restoring editability.
             await closeCandidate(candidate, grant: selectedGrant)
@@ -180,6 +190,7 @@ final class DocumentSession: NSObject {
             return
         }
         replaced = true
+        replacementCandidate = nil
         document = candidate
         grant = selectedGrant // Keep scope alive for the entire UIDocument lifetime.
         ledger = SaveLedger(documentID: identity, source: candidate.loadedSource)
@@ -308,6 +319,10 @@ final class DocumentSession: NSObject {
     }
 
     @objc private func documentStateChanged(_ notification: Notification) {
+        if let replacementCandidate, notification.object as? SpikeDocument === replacementCandidate.document {
+            replacementCandidate.observeState()
+            return
+        }
         guard let document, notification.object as? SpikeDocument === document else { return }
         if document.documentState.contains(.inConflict) {
             ledger?.conflict = true

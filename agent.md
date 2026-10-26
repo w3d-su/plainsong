@@ -192,6 +192,11 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 - An explicitly selected iOS single-file Markdown/MDX document that is downloading or
   offline retains its current file grant and Files snapshot for Refresh and retry.
   Availability is reported separately from document type; actual revocation still fences access.
+- An iOS external reload rechecks its store's current proposal and lifecycle immediately
+  before native installation, including proposals deferred before close. Closing holds
+  the proposal without retiring its operation; failed close can resume it. Root watcher
+  coalescing keeps root notices separate from byte-preserved child paths. The M0 prototype
+  observes preopened replacement candidates and refuses changed candidates before attach.
 - Saves stage their temporary file beside the document and publish it with
   `renameatx_np`. A file-only grant (Open panel or Finder "Open With") refuses that sibling
   with `EPERM`; only then does the transaction stage in Foundation's item-replacement
