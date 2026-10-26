@@ -7,6 +7,7 @@ import WorkspaceCore
 /// state; the shell never reads or mutates files itself.
 struct IOSWorkspaceBrowserView: View {
     @ObservedObject var scene: IOSShellSceneState
+    var recovery: IOSRecoveryController?
 
     var body: some View {
         Group {
@@ -21,6 +22,9 @@ struct IOSWorkspaceBrowserView: View {
         .navigationTitle("Files")
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
+                if let recovery {
+                    IOSRecoveryEntry(controller: recovery)
+                }
                 if let openWorkspace = scene.surfaces.openWorkspace {
                     Button {
                         openWorkspace()

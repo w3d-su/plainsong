@@ -46,7 +46,7 @@ private struct IOSProductionSceneView: View {
     }
 
     var body: some View {
-        IOSShellRootView(scene: runtime.scene)
+        IOSShellRootView(scene: runtime.scene, recovery: runtime.recovery)
             .background {
                 IOSWindowSceneDisconnectAnchor { runtime.observeSceneDisconnection($0) }
                     .frame(width: 0, height: 0)

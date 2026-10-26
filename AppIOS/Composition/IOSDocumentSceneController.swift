@@ -15,6 +15,9 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     let editor: any IOSSourceEditorBinding
     let preview: any IOSPreviewControlling
     let assetContext: (IOSWorkspaceGrant) -> PreviewAssetAccessContext?
+    /// Production injects the non-persisting destination path; protocol doubles
+    /// may use ordinary open without extending the frozen access contract.
+    let openDestinationFolder: @MainActor (URL) async throws -> IOSWorkspaceGrant
     var openExternalURL: ((URL) -> Void)?
     var onNavigationFailure: ((String) -> Void)?
 
@@ -26,6 +29,7 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     var isShuttingDown = false
     var isDisposed = false
     var transitioning = false
+    var recoveryEpoch: UInt64 = 0
     var grantIsCurrent = false
     var workspaceSnapshot: IOSWorkspaceSnapshot?
     var unavailableReason: String?
@@ -45,13 +49,17 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
         preview: any IOSPreviewControlling,
         assets: any IOSWorkspaceAssetWriting,
         admission: IOSSceneWriterAdmission? = nil,
-        assetContext: @escaping (IOSWorkspaceGrant) -> PreviewAssetAccessContext?
+        assetContext: @escaping (IOSWorkspaceGrant) -> PreviewAssetAccessContext?,
+        openDestinationFolder: (@MainActor (URL) async throws -> IOSWorkspaceGrant)? = nil
     ) {
         self.documents = documents
         self.workspace = workspace
         self.editor = editor
         self.preview = preview
         self.assetContext = assetContext
+        self.openDestinationFolder = openDestinationFolder ?? { url in
+            try await workspace.open(selectedURL: url, scope: .directory)
+        }
         self.admission = admission ?? IOSSceneWriterAdmission()
         capabilities = IOSSceneCapabilities(
             editor: editor, documents: documents, workspace: workspace, preview: preview, assets: assets
@@ -192,6 +200,7 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     func beginTransition() throws {
         guard !transitioning, !isShuttingDown, !isDisposed else { throw IOSDocumentFailure.unavailable }
         guard editor.captureSnapshot()?.hasMarkedText != true else { throw IOSDocumentFailure.sourceChanged }
+        recoveryEpoch &+= 1
         transitioning = true
     }
 
@@ -292,6 +301,26 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
         if let grant {
             _ = workspace.invalidate(grant.workspaceID)
         }
+    }
+
+    /// Composition may replace authority only inside an admitted transition
+    /// after the old writer safely closed. No await between proof and adoption.
+    func adoptCurrentGrant(_ grant: IOSWorkspaceGrant, snapshot: IOSWorkspaceSnapshot) throws {
+        guard transitioning, !isShuttingDown, !isDisposed,
+              handle == nil, bindingID == nil, ownedTicket == nil, admission.active == nil,
+              snapshot.workspaceID == grant.workspaceID, snapshot.accessGeneration == grant.accessGeneration
+        else { throw IOSDocumentFailure.documentChanged }
+        // Retiring the old scope can synchronously notify observers that revoke
+        // this provisional scope. Prove authority after those callbacks, then
+        // hold the proof through adoption so release-time revocation is observed
+        // against the newly installed currentGrant.
+        releaseCurrentGrant()
+        let proof = try workspace.acquireLease(for: grant)
+        defer { proof.release() }
+        currentGrant = grant
+        grantIsCurrent = true
+        workspaceSnapshot = snapshot
+        clearUnavailableReasonForCurrentGrant()
     }
 
     func clearInstallation() {

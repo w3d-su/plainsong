@@ -25,9 +25,9 @@ struct IOSProductionComposition {
 
     /// The real providers share one access service and one UIDocument-backed store.
     /// M0 owner prerequisites and candidate readiness are recorded in the ledger.
-    static func makeProduction() throws -> IOSProductionRuntime {
+    static func makeProduction(recoveryDirectory: URL? = nil) throws -> IOSProductionRuntime {
         let access = IOSWorkspaceAccessFactory.makeProduction()
-        let recovery = try FileManager.default.url(
+        let recovery = try recoveryDirectory ?? FileManager.default.url(
             for: .applicationSupportDirectory, in: .userDomainMask,
             appropriateFor: nil, create: true
         ).appendingPathComponent("Plainsong/Recovery", isDirectory: true)
@@ -37,10 +37,23 @@ struct IOSProductionComposition {
         preview.installAssetReader(access)
         let controller = IOSDocumentSceneController(
             documents: documents, workspace: access, editor: editor, preview: preview,
-            assets: access, admission: .process, assetContext: { [weak access] in access?.previewContext(for: $0) }
+            assets: access, admission: .process,
+            assetContext: { [weak access] in access?.previewContext(for: $0) },
+            openDestinationFolder: { try await access.openDestinationFolder(selectedURL: $0) }
         )
         // PreviewController already opens HTTP(S) through PreviewPlatform.
         // Its event is informational here; a second scene opener duplicates it.
+        let recoveryUI = IOSRecoveryController(
+            list: { await documents.recoveryList() },
+            load: { try await documents.loadRecovery(recordID: $0) },
+            capture: { try controller.captureRecoveryRestore($0) },
+            restore: { capture, folder, isCurrent in
+                try await controller.restoreRecovery(
+                    capture, in: folder,
+                    loadRecord: { try await documents.loadRecovery(recordID: $0) }, isCurrent: isCurrent
+                )
+            }
+        )
         let runtime = try IOSProductionRuntime(
             controller: controller, editor: editor, preview: preview,
             currentGrant: { [weak controller] in
@@ -55,8 +68,10 @@ struct IOSProductionComposition {
                 guard let controller else { throw IOSDocumentFailure.unavailable }
                 try await controller.openPickedURL(url, scope: scope)
             },
-            shutdown: { [controller] in await controller.shutdown() }
+            shutdown: { [controller] in await controller.shutdown() }, recovery: recoveryUI
         )
+        recoveryUI.onRestored = { [weak scene = runtime.scene] in scene?.navigateToDocument() }
+        recoveryUI.onPresent = { [weak runtime] in runtime?.prepareForReadOnlyPresentation() }
         controller.onNavigationFailure = { [weak scene = runtime.scene] message in
             scene?.presentedError = IOSShellError(title: "Link Could Not Be Opened", message: message)
         }

@@ -37,6 +37,7 @@ final class IOSProductionRuntime: ObservableObject {
     let scene: IOSShellSceneState
     let authoring = IOSAuthoringController()
     let images: IOSImageInsertionController
+    let recovery: IOSRecoveryController?
 
     @Published var showOpenChoices = false
     @Published var pickerRequest: IOSProductionPickerRequest?
@@ -65,7 +66,8 @@ final class IOSProductionRuntime: ObservableObject {
         currentGrant: @escaping () -> IOSWorkspaceGrant?,
         refreshWorkspace: @escaping @MainActor () async throws -> Void,
         openPickedURL: @escaping @MainActor (URL, IOSWorkspaceScope) async throws -> Void,
-        shutdown: @escaping @MainActor () async -> Bool
+        shutdown: @escaping @MainActor () async -> Bool,
+        recovery: IOSRecoveryController? = nil
     ) throws {
         guard let assets = controller.capabilities.assets else {
             throw IOSDocumentFailure.unavailable
@@ -77,6 +79,7 @@ final class IOSProductionRuntime: ObservableObject {
         self.refreshWorkspace = refreshWorkspace
         self.openPickedURL = openPickedURL
         shutdownProvider = shutdown
+        self.recovery = recovery
         images = IOSImageInsertionController(writer: assets)
         scene = IOSShellSceneState(facade: controller)
         installSurfaces()
@@ -128,6 +131,7 @@ final class IOSProductionRuntime: ObservableObject {
     }
 
     func shutdown() async -> Bool {
+        recovery?.dismiss()
         if isShutDown {
             return true
         }
@@ -155,6 +159,16 @@ final class IOSProductionRuntime: ObservableObject {
         pickerRequest = IOSProductionPickerRequest(scope: scope)
     }
 
+    /// A read-only modal owns no source command route. Retire a yielded focus
+    /// claim before releasing the route, without changing native text or Undo.
+    func prepareForReadOnlyPresentation() {
+        pendingFocus = nil
+        focusTask?.cancel()
+        focusTask = nil
+        scene.releaseCommandFocus()
+        retireAuthoringCapture()
+    }
+
     @discardableResult
     func completePicker(_ request: IOSProductionPickerRequest, urls: [URL]) -> Task<Void, Never>? {
         guard pickerRequest?.id == request.id else { return nil }
@@ -167,6 +181,7 @@ final class IOSProductionRuntime: ObservableObject {
     }
 
     func openURL(_ url: URL) async {
+        recovery?.dismiss()
         // An OS delivery supersedes a still-presented picker. Retire its
         // issuance before any await so its delayed delegate cannot replace it.
         pickerRequest = nil
