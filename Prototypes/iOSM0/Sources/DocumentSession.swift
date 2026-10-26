@@ -181,6 +181,17 @@ final class DocumentSession: NSObject {
                 }
                 if !reopened {
                     ledger?.available = false
+                } else if let baseline = ledger?.savedSource, !sameSource(previous.loadedSource, baseline) {
+                    // Opening again can load newer bytes while the retained editor
+                    // still owns its earlier source and native history.
+                    ledger?.conflict = true
+                    ledger?.available = false
+                    guard recover(reason: "rollback-external-conflict") else { return }
+                    report(
+                        "Original changed while closed. Local contents retained; save a copy before reopening.",
+                        event: "rollback-external-conflict"
+                    )
+                    return
                 }
             }
             report(

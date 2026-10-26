@@ -23,7 +23,11 @@ final class IOSDeferredReloadClosePort: IOSDocumentFilePort {
     }
 
     func emitExternalChange() {
-        handler?(.externalChange)
+        emit(.externalChange)
+    }
+
+    func emit(_ event: IOSDocumentFileEvent) {
+        handler?(event)
     }
 
     func open() async throws -> IOSDocumentFileOpenResult {
@@ -87,7 +91,9 @@ final class IOSDeferredReloadCloseFixture {
     let location: IOSFileLocation
     private(set) var handle: IOSDocumentHandle?
 
-    init() {
+    init(coordinatedAccess: (any IOSCoordinatedFileAccess)? = nil,
+         recovery: (any IOSRecoveryPersisting)? = nil)
+    {
         let grant = IOSWorkspaceGrant(
             workspaceID: IOSWorkspaceIdentity(rawValue: UUID()), rootURL: directory,
             accessGeneration: 1, scope: .directory
@@ -100,23 +106,28 @@ final class IOSDeferredReloadCloseFixture {
         lease = IOSSceneControllerLease(grant: grant)
         let port = port
         store = IOSUIDocumentStore(
-            coordinatedAccess: IOSDeferredReloadCloseAccess(),
-            recovery: IOSDocumentRecoveryStore(directory: directory.appendingPathComponent("recovery")),
+            coordinatedAccess: coordinatedAccess ?? IOSDeferredReloadCloseAccess(),
+            recovery: recovery ?? IOSDocumentRecoveryStore(directory: directory.appendingPathComponent("recovery")),
             timing: IOSDocumentTiming(autosaveDelayNanoseconds: 60_000_000_000, backgroundFlushNanoseconds: 40_000_000),
             filePortFactory: { _ in port }
         )
         relay = IOSDocumentReloadRelay(documents: store, editor: editor)
     }
 
-    func openWithDeferredReload() async throws -> IOSDocumentHandle {
+    func open() async throws -> IOSDocumentHandle {
         let handle = try await store.open(location, lease: lease)
         self.handle = handle
         editor.attach(IOSSourceEditorDocumentBinding(
             bindingID: editor.binding.bindingID, identity: handle.identity, session: handle.session,
             accessGeneration: 1, canWrite: true
         ))
-        editor.hasMarkedText = true
         relay.attach(documentID: handle.identity, bindingID: editor.binding.bindingID, accessGeneration: 1)
+        return handle
+    }
+
+    func openWithDeferredReload() async throws -> IOSDocumentHandle {
+        let handle = try await open()
+        editor.hasMarkedText = true
         port.emitExternalChange()
         return handle
     }

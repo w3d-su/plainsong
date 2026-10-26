@@ -10,11 +10,12 @@ extension IOSUIDocumentStore {
                 startExternalRead(entry)
             }
             refreshWritableState(entry)
-            // A failed provider close leaves this document installed. Deliver a
-            // held proposal only after acknowledgements may rebase it again.
-            if !entry.fenced, !entry.isRetiring, !entry.portClosed,
-               let proposal = entry.pendingProposal,
-               guardCurrentAuthority(entry, generation: proposal.accessGeneration)
+            // A retained conflict can still own an explicit Reload. Resume that
+            // request after closing, but never revive an automatic proposal over
+            // a later provider fence. Live admission also rejects changed source.
+            if let proposal = entry.pendingProposal,
+               !entry.fenced || entry.explicitReloadOperationID == proposal.operationID,
+               reloadAdmission(for: proposal) == .installable
             {
                 emit(.externalReloadRequested(proposal))
             }
@@ -55,6 +56,7 @@ extension IOSUIDocumentStore {
         }
         entry.externalToken = nil
         entry.pendingProposal = nil
+        entry.explicitReloadOperationID = nil
         entry.hasDeferredExternalChange = false
         publishClosed(entry, superseded: false)
         return .closed
@@ -123,6 +125,7 @@ extension IOSUIDocumentStore {
         entry.autosaveTask?.cancel()
         entry.externalToken = nil
         entry.pendingProposal = nil
+        entry.explicitReloadOperationID = nil
         refreshWritableState(entry)
         let task = Task { @MainActor in try await self.performRetirement(entry) }
         entry.retirementTask = task

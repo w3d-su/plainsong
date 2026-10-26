@@ -46,6 +46,8 @@ final class IOSDocumentEntry {
     var externalToken: UUID?
     var hasDeferredExternalChange = false
     var pendingProposal: IOSDocumentReloadProposal?
+    var explicitReloadOperationID: UUID?
+    var providerAvailabilityGeneration: UInt64 = 0
     var recoveryReceipt: IOSRecoveryReceipt?
     var lastAcknowledgement: IOSSaveAcknowledgement?
 

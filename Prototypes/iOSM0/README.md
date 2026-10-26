@@ -89,6 +89,10 @@ At the write hook original bytes must match the captured saved baseline;
 unreadable/missing/externally changed bytes cause failure. Provider behavior of
 this hook remains a real-device gate. Clean reload has final identity/revision/
 composition checks; dirty reload records recovery and blocks overwriting.
+If a rejected replacement reopens the original document, its loaded bytes must
+match the retained saved baseline exactly. A changed original keeps the editor
+identity, source, selection and Undo history, records recovery and fences editing
+and saving rather than presenting stale source as a writable clean document.
 
 Recovery is an atomic app-private write followed by decoding and equality
 verification. It contains source, document identity, revision, reason and time.

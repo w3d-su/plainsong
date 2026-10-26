@@ -197,6 +197,10 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   the proposal without retiring its operation; failed close can resume it. Root watcher
   coalescing keeps root notices separate from byte-preserved child paths. The M0 prototype
   observes preopened replacement candidates and refuses changed candidates before attach.
+  Explicit conflict reloads held by a retained close resume only for their current
+  operation and authority; a later provider-loss event invalidates the proposal. M0
+  rollback compares reopened bytes with the saved baseline before restoring editing,
+  retaining local source under a conflict fence if the original changed while closed.
 - Saves stage their temporary file beside the document and publish it with
   `renameatx_np`. A file-only grant (Open panel or Finder "Open With") refuses that sibling
   with `EPERM`; only then does the transaction stage in Foundation's item-replacement
