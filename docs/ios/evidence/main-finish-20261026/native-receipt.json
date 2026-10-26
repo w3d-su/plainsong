@@ -282,7 +282,7 @@
         "PreviewKitTests.PreviewWebViewFootprintProbeTests/testIdleLivePreviewHelperFootprint"
       ]
     },
-    "F2_boundary": "F2 86 named tests and inventory36 pass. The scoped retained-evidence audit retains six PARTIAL and six OPEN markers; this is not full durable-evidence or performance acceptance."
+    "F2_boundary": "F2's 86 named unittest cases and 36-file tooling inventory pass. The scoped retained-evidence audit emits one PARTIAL summary reporting runs=6 and preserves six OPEN gate markers. This does not establish full durable-evidence or performance acceptance."
   },
   "tooling": {
     "executed": 44,
