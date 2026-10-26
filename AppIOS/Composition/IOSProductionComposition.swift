@@ -71,6 +71,14 @@ struct IOSProductionComposition {
             shutdown: { [controller] in await controller.shutdown() }, recovery: recoveryUI,
             conflictCopy: IOSConflictCopyCoordinator(controller: controller)
         )
+        runtime.recentPresentation.install(
+            access: access,
+            openRecent: { [weak controller] recordID in
+                guard let controller else { throw IOSDocumentFailure.unavailable }
+                try await controller.openRecent(recordID: recordID, using: access)
+            },
+            reselectionScope: { [weak controller] in controller?.currentGrant?.scope ?? .singleFile }
+        )
         recoveryUI.onRestored = { [weak scene = runtime.scene] in scene?.navigateToDocument() }
         recoveryUI.onPresent = { [weak runtime] in runtime?.prepareForReadOnlyPresentation() }
         controller.onNavigationFailure = { [weak scene = runtime.scene] message in

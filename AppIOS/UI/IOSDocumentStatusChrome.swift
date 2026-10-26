@@ -123,8 +123,11 @@ struct IOSDocumentStateBanner: View {
                     }
                 }
                 Spacer()
-                Button("Try Again") {
-                    scene.retryOpenUnavailableDocument()
+                if scene.surfaces.reselectUnavailableWorkspace != nil {
+                    Button("Choose File or Folder Again") {
+                        scene.reselectUnavailableDocument()
+                    }
+                    .accessibilityIdentifier("plainsong.ios.document.choose-again")
                 }
                 if let copy = scene.surfaces.resolveConflictCopy {
                     Button("Save a Copy", action: copy)
