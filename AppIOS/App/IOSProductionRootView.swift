@@ -38,11 +38,14 @@ private final class IOSProductionLaunch: ObservableObject {
 private struct IOSProductionSceneView: View {
     @ObservedObject var runtime: IOSProductionRuntime
     @ObservedObject var authoring: IOSAuthoringController
+    @ObservedObject var recents: IOSRecentPresentationController
     @Environment(\.scenePhase) private var scenePhase
+    @State private var presentedRecentID: UUID?
 
     init(runtime: IOSProductionRuntime) {
         self.runtime = runtime
         _authoring = ObservedObject(wrappedValue: runtime.authoring)
+        _recents = ObservedObject(wrappedValue: runtime.recentPresentation)
     }
 
     var body: some View {
@@ -64,6 +67,26 @@ private struct IOSProductionSceneView: View {
             .sheet(item: $runtime.pickerRequest) { request in
                 IOSProductionDocumentPicker(request: request) { urls in
                     runtime.completePicker(request, urls: urls)
+                }
+            }
+            .sheet(isPresented: $recents.isPresented, onDismiss: {
+                recents.didDismiss(presentedRecentID)
+                presentedRecentID = nil
+            }) {
+                if let presenter = recents.presenter, let id = recents.presentationID {
+                    NavigationStack {
+                        IOSRecentAccessList(presenter: presenter)
+                            .onAppear {
+                                if recents.didAppear(id) {
+                                    presentedRecentID = id
+                                }
+                            }
+                            .toolbar {
+                                ToolbarItem(placement: .topBarTrailing) {
+                                    Button("Done") { recents.isPresented = false }
+                                }
+                            }
+                    }
                 }
             }
             .sheet(item: $authoring.linkDraft) { draft in
