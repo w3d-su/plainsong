@@ -241,6 +241,51 @@ extension WorkspaceSearchHostedActivationTests {
         #endif
     }
 
+    /// Width of the sidebar column inside the window's content, 0 when collapsed or hidden.
+    func visibleSidebarWidth(in window: NSWindow) -> CGFloat {
+        var views: [NSView] = []
+        collect(NSView.self, from: window.contentView, into: &views)
+        guard let probe = views.first(where: { $0.identifier?.rawValue == "plainsong.layout.sidebar" }),
+              probe.window === window,
+              !probe.isHiddenOrHasHiddenAncestor
+        else {
+            return 0
+        }
+        let frame = probe.convert(probe.bounds, to: nil)
+        let contentWidth = window.contentView?.bounds.width ?? 0
+        return max(0, min(frame.maxX, contentWidth) - max(frame.minX, 0))
+    }
+
+    func sidebarSplitViewController(in window: NSWindow) -> NSSplitViewController? {
+        var splitViews: [NSSplitView] = []
+        collect(NSSplitView.self, from: window.contentView, into: &splitViews)
+        return splitViews.lazy.compactMap { $0.delegate as? NSSplitViewController }.first
+    }
+
+    /// Collapses the sidebar without animation (a locked screen never runs one) and waits
+    /// until the window records it as hidden.
+    func hideSidebar(in window: NSWindow, appState: AppState) async throws {
+        let splitViewController = try XCTUnwrap(sidebarSplitViewController(in: window))
+        let sidebarItem = try XCTUnwrap(splitViewController.splitViewItems.first { $0.behavior == .sidebar })
+        sidebarItem.isCollapsed = true
+        try await waitUntil("the sidebar hides") { self.visibleSidebarWidth(in: window) < 1 }
+        try await waitUntil("the window records its hidden sidebar") {
+            appState.isWorkspaceSidebarHiddenInKeyWindow
+        }
+    }
+
+    func assertSearchRevealedAndFocused(in window: NSWindow, appState: AppState) async throws {
+        let request = appState.workspaceSearchUI.focusRequestID
+        try await waitUntil("⇧⌘F reveals the sidebar") { self.visibleSidebarWidth(in: window) > 100 }
+        try await waitUntil("⇧⌘F focuses the revealed query field") {
+            appState.workspaceSearchUI.focusAppliedID == request
+                && WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: window)
+        }
+        try await waitUntil("the window records its shown sidebar") {
+            !appState.isWorkspaceSidebarHiddenInKeyWindow
+        }
+    }
+
     func debugSelectedRangeLabel(in window: NSWindow) -> String? {
         var views: [NSView] = []
         collect(NSView.self, from: window.contentView, into: &views)

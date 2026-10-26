@@ -5,7 +5,7 @@
 > notarization scripted later; direct distribution first, App Store optional. This document
 > turns that into ordered work packages with gates. Owner decisions are marked **[owner]**.
 
-Created 2026-07-02. Current state (2026-10-21): MIT `LICENSE` committed; packaging
+Created 2026-07-02. Current state (@@DATE@@): MIT `LICENSE` committed; packaging
 (`make release`, P3) and unsigned release CI (`release.yml`, P4) landed; v0.1.0-alpha.1 is
 published. The `v0.1.0-alpha.2` tag completed the first end-to-end P4 CI run and created a
 draft prerelease with the build-67 unsigned DMG and filename-only `.sha256`; that GitHub
@@ -28,9 +28,23 @@ checks (universal arm64 + x86_64, valid ad-hoc signature, sandbox entitlements p
 which Xcode adds for the ad-hoc "Sign to Run Locally" identity and is not in
 `App/Plainsong.entitlements`; it is harmless for an unsigned alpha but must be absent from a
 Developer ID build (P1). `PLAINSONG_UNSIGNED=1 make release` was also run locally before the
-tag, from `main` at `15913f8` (build 159, one commit before the tag, without #154). `MARKETING_VERSION` stays `0.1.0` and the build number stays the commit count
+tag, from `main` at `15913f8` (build 159, one commit before the tag, without #154).
+**v0.1.0-alpha.5 was published @@DATE@@** as a GitHub prerelease, built by Release
+workflow run @@RUN_ID@@ from `main` at `@@TAG_SHA@@` (build @@BUILD@@). It is a privacy fix
+(the live preview no longer requests remote images while Allow Remote Images is off, #193)
+and a performance release (EditorKit line numbers, cache-trim revalidation, lazy Mermaid and
+woff2-only KaTeX, single-flight preview renders, workspace scan pruning) with no new
+features. It is the first release built by #192's stripped-executable pipeline. Its asset
+`Plainsong-0.1.0-@@BUILD@@-unsigned.dmg` (SHA-256 `@@DMG_SHA256@@`) passed the alpha.3
+checks (universal arm64 + x86_64, valid ad-hoc signature, sandbox entitlements present;
+`CFBundleVersion` @@BUILD@@). The private `plainsong-dsym` workflow artifact holds the
+matching dSYM. Before the tag, `PLAINSONG_UNSIGNED=1 make release` ran locally from `main`
+at `1428bf1` (build 178). That run produced a 9,583,665-byte DMG (alpha.4: 12,797,391), a
+19,831,696-byte universal executable (32.2 MiB before #192), and an 18.5 MB dSYM zip whose
+per-architecture UUIDs matched the executable. Its entitlements no longer carried
+`com.apple.security.get-task-allow`, which alpha.4's did. `MARKETING_VERSION` stays `0.1.0` and the build number stays the commit count
 (P0.5): the prerelease label lives only in the tag name. Alpha.3 was already published, so
-alpha.4's auto-generated changelog compares against alpha.3. Per-DMG
+alpha.4's auto-generated changelog compares against alpha.3, and alpha.5's against alpha.4. Per-DMG
 clean-machine spot-checking remains good practice and is not a release blocker after R14/P5
 closed with alpha.1. Developer ID signing and notarization remain deferred with P1/P2. The
 app builds and runs locally with the sandbox and `com.apple.security.network.client`

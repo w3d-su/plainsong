@@ -1,7 +1,7 @@
 import rehypeKatex from "rehype-katex";
 import rehypeSanitize from "rehype-sanitize";
 import rehypeStringify from "rehype-stringify";
-import remarkFrontmatter from "remark-frontmatter";
+import { remarkClosedFrontmatter } from "./frontmatter";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import remarkMdx from "remark-mdx";
@@ -156,7 +156,7 @@ function createMarkdownProcessor(options: SegmentHoleOptions) {
   return unified()
     .use(remarkParse)
     .use(remarkGfm)
-    .use(remarkFrontmatter, ["yaml"])
+    .use(remarkClosedFrontmatter)
     .use(stripFrontmatter)
     .use(remarkMath)
     .use(remarkSegmentBoundary, options)
@@ -176,7 +176,7 @@ function createMdxProcessor(options: SegmentHoleOptions) {
     .use(remarkParse)
     .use(remarkMdx)
     .use(remarkGfm)
-    .use(remarkFrontmatter, ["yaml"])
+    .use(remarkClosedFrontmatter)
     .use(stripFrontmatter)
     .use(remarkMath)
     .use(remarkSegmentBoundary, options)

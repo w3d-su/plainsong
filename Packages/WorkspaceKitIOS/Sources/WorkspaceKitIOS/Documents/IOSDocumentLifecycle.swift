@@ -5,15 +5,25 @@ extension IOSUIDocumentStore {
     func performClose(_ entry: IOSDocumentEntry) async throws -> IOSDocumentCloseOutcome {
         defer {
             entry.isClosing = false
+            if entry.hasDeferredExternalChange {
+                // Install an observation token before autosave admission is reconsidered.
+                startExternalRead(entry)
+            }
             refreshWritableState(entry)
             resumeAutosaveAfterClose(entry)
         }
+        let generation = entry.accessGeneration
         if entry.session?.isDirty == true, !writeBarrier(entry, allowsClosing: true), entry.allowsProviderWrite {
             _ = try? await saveSnapshot(entry, allowsClosing: true)
         }
         await entry.queue.drain()
-        if entry.session?.isDirty == true || entry.fenced
+        // A provider's own save notification can already be reading the durable
+        // baseline. Let those issued observations finish before deciding whether
+        // close must retain the writer; cancellation is not proof of clean bytes.
+        await drainExternalReadsForClose(entry)
+        if entry.session?.isDirty == true || entry.fenced || entry.hasDeferredExternalChange
             || entry.externalToken != nil || entry.pendingProposal != nil
+            || !guardCurrentAuthority(entry, generation: generation)
         {
             return await retainDraft(entry)
         }
@@ -27,15 +37,36 @@ extension IOSUIDocumentStore {
             throw IOSDocumentFailure.closeFailed
         }
         // Closing a provider is asynchronous. A newer source cannot be retired by its result.
-        if session.version != version || session.isDirty || entry.fenced
+        if session.version != version || session.isDirty || entry.fenced || entry.hasDeferredExternalChange
             || entry.externalToken != nil || entry.pendingProposal != nil
+            || !guardCurrentAuthority(entry, generation: generation)
         {
             let retained = await retainDraft(entry)
-            await reopenRetainedDraft(entry)
+            await reopenRetainedDraft(entry, generation: generation)
             return retained
         }
         publishClosed(entry, superseded: false)
         return .closed
+    }
+
+    func drainExternalReadsForClose(_ entry: IOSDocumentEntry) async {
+        while true {
+            let reads = Array(entry.externalReadTasks.values)
+            if !reads.isEmpty {
+                for read in reads {
+                    await read.value
+                }
+                continue
+            }
+            // A deferred self-notice can be verified after the writer drains. Do not
+            // replace an unresolved read, proposal or conflict merely to finish close.
+            guard entry.hasDeferredExternalChange, entry.externalToken == nil,
+                  entry.pendingProposal == nil, !entry.fenced
+            else { return }
+            startExternalRead(entry, allowsClosingObservation: true)
+            // Revocation or a closed provider keeps the deferred barrier intact.
+            guard !entry.externalReadTasks.isEmpty else { return }
+        }
     }
 
     func retainDraft(_ entry: IOSDocumentEntry) async -> IOSDocumentCloseOutcome {
@@ -48,11 +79,15 @@ extension IOSUIDocumentStore {
         }
     }
 
-    func reopenRetainedDraft(_ entry: IOSDocumentEntry) async {
-        guard entry.portClosed, !entry.lease.isReleased else { return }
+    func reopenRetainedDraft(_ entry: IOSDocumentEntry, generation: UInt64) async {
+        guard entry.portClosed, guardCurrentAuthority(entry, generation: generation) else { return }
         do {
             let opened = try await entry.filePort.open()
             entry.portClosed = false
+            guard guardCurrentAuthority(entry, generation: generation) else {
+                fenceUnavailable(entry, .documentChanged)
+                return
+            }
             guard let diskText = IOSDocumentTextCodec.decode(opened.data) else {
                 throw IOSDocumentFailure.access(.unsupportedType)
             }

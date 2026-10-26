@@ -53,9 +53,9 @@ Whole renders. These cases render the whole document, as before:
 - A document whose only segment is the whole text, including any document under 2 KiB.
 - A parse error in the last segment, so the MDX error banner keeps the whole render's
   error and line.
-- An opening `---` frontmatter fence that never closes. micromark-extension-frontmatter
-  then leaves the parser unable to open lists or block quotes anywhere in the document.
-  This is a pre-existing upstream quirk, reproduced on purpose so that output matches.
+After #220, both whole and segmented processors use `remarkClosedFrontmatter`. An
+unclosed leading `---` renders as a thematic break and no longer requires a whole render.
+Closed frontmatter remains protected from cuts, including after a leading BOM.
 
 `test/segmented-render.test.ts` compares segmented and whole output, string for string,
 over random documents and random edits for both pipelines. Two cut settings are used:
