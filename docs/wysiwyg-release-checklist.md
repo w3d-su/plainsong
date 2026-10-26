@@ -1,10 +1,13 @@
 # User-Facing WYSIWYG Release Checklist
 
-> **Status: COMPLETE, pending the maintainer's dogfood sign-off in D.4. WYSIWYG left
-> Experimental on YYYY-MM-DD** (`docs/decisions/YYYY-MM-DD-wysiwyg-leaves-experimental.md`):
-> it is a normal layout choice, on by default, and the Settings switch remains its kill switch.
-> This document defines every gate that had to be green before that promotion. Every gate was
-> re-verified against `origin/main` on 2026-10-24 (`docs/wysiwyg-promotion-audit.md`).
+> **Status: PROMOTION PREPARED, NOT SIGNED OFF. Every gate except the D.4 promotion box is
+> checked**, and every automated gate was re-verified against `origin/main` on 2026-10-24
+> (`docs/wysiwyg-promotion-audit.md`). The promotion makes WYSIWYG a normal layout choice, on
+> by default, with the Settings switch as its kill switch. It waits for the click-layout fix
+> and the owner's dogfood and actual-IME rerun (`docs/wysiwyg-dogfood-checklist.md`; B1, B2,
+> I5 and L5 need that rerun). Check D.4 only with that evidence and the dated Decision Log
+> entry, and in the same change set this line to "COMPLETE: WYSIWYG left Experimental on
+> <date>" (`docs/decisions/<date>-wysiwyg-leaves-experimental.md`).
 >
 > This checklist started as a specification and now records implementation evidence as gates
 > turn green. The zero-width mechanism and B1-B13 rerun gates are green as of 2026-06-26, the
@@ -307,14 +310,17 @@ turned this into a **three-state** cycle per `agent.md` §13.
 ### D.4 Experimental vs stable labeling
 
 - [x] Until **every** gate in this document is green, WYSIWYG ships (if at all) behind an
-  **Experimental** Settings toggle and is **off by default**. Evidence:
-  `AppStateTests.testSettingsPreferencesPersistThroughUserDefaults` verifies the preference default
-  and persistence.
+  **Experimental** Settings toggle and is **off by default**. Evidence: on `main` until the
+  promotion merges, `AppStateTests.testSettingsPreferencesPersistThroughUserDefaults` asserts
+  the `false` default and its persistence. The promotion flips that assertion to `true`, so it
+  merges only together with the checked promotion box below.
 - [x] The Experimental label is manually verified in Settings UI and user-facing docs/README.
-  Evidence: 2026-06-27 Settings UI sign-off verified `WYSIWYG mode (Experimental)` with value `0`
-  by default, and README states WYSIWYG is Experimental/off by default.
-- [x] Promotion from experimental to stable (on by default / no experimental label) requires
+  Evidence (before the promotion): 2026-06-27 Settings UI sign-off verified
+  `WYSIWYG mode (Experimental)` with value `0` by default, and README states WYSIWYG is
+  Experimental/off by default. The promotion removes the label (box below).
+- [ ] Promotion from experimental to stable (on by default / no experimental label) requires
   this checklist fully green and a Decision Log entry recording the promotion.
+  Check this box only once every placeholder in its evidence is filled.
   Evidence: every gate re-verified against `origin/main` `1428bf1` on 2026-10-24
   (`docs/wysiwyg-promotion-audit.md`, `docs/perf/2026-10-24-wysiwyg-promotion-gates.md`); the
   click-layout fix **<PR link>**; owner dogfood and actual-IME sign-off
@@ -374,8 +380,8 @@ checked:
   A complete), `docs/codex-handoff.md`, README/Settings copy, and `agent.md` Decision Log all
   synchronized with the shipped behavior.
 
-Since the D.4 promotion, the user-facing WYSIWYG surface is the WYSIWYG layout mode, on by
-default behind its Settings kill switch (using `.inlineFoldRevealWithLinkFolding`, with the
+Once the D.4 promotion merges, the user-facing WYSIWYG surface is the WYSIWYG layout mode, on
+by default behind its Settings kill switch (using `.inlineFoldRevealWithLinkFolding`, with the
 folder-scoped thumbnail loader supplied only under the same App gates). Each deferred construct
 in §E still needs its own gate pass.
 

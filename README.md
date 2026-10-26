@@ -13,7 +13,7 @@ sanitizer/asset/SVG policy. PR #26 landed Settings/themes and closed #16. The
 live MDX completion-popup checklist blockers; `docs/m5-checklist.md` now passes.
 
 Phase 2 WYSIWYG is a layout choice beside source-only and source+preview: pick it in the toolbar
-or cycle layouts from the **View** menu (`⌘⇧P`). It passed every gate in
+or cycle layouts from the **View** menu (`⌘⇧P`). Its release gates are in
 [`docs/wysiwyg-release-checklist.md`](docs/wysiwyg-release-checklist.md). Turning off **Settings ▸
 Editor ▸ WYSIWYG mode** (on by default) removes it from the layouts, and it falls back to
 source-only if the editor mechanism is unavailable, without altering source text. It folds inline Markdown,
