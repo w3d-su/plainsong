@@ -126,6 +126,10 @@ struct IOSDocumentStateBanner: View {
                 Button("Try Again") {
                     scene.retryOpenUnavailableDocument()
                 }
+                if let copy = scene.surfaces.resolveConflictCopy {
+                    Button("Save a Copy", action: copy)
+                        .accessibilityHint("Save the retained text to a different folder without closing this document")
+                }
             }
         case .ready, .noDocument, .closed:
             EmptyView()

@@ -48,6 +48,11 @@ private struct IOSProductionSceneView: View {
     var body: some View {
         IOSShellRootView(scene: runtime.scene, recovery: runtime.recovery)
             .background {
+                if let conflictCopy = runtime.conflictCopy {
+                    IOSConflictCopyPresenter(coordinator: conflictCopy)
+                }
+            }
+            .background {
                 IOSWindowSceneDisconnectAnchor { runtime.observeSceneDisconnection($0) }
                     .frame(width: 0, height: 0)
             }

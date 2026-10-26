@@ -37,6 +37,46 @@ final class IOSShellChromeTests: XCTestCase {
         XCTAssertTrue(scene.chrome.hasDocument)
     }
 
+    func testSaveEligibilityRequiresBothStoreAndEditorWritableAuthority() {
+        let editor = FakeEditorBinding()
+        let facade = FakeSceneFacade(
+            snapshot: ShellFixtures.sceneSnapshot(document: ShellFixtures.storedDocument(isDirty: true)),
+            capabilities: IOSSceneCapabilities(
+                editor: editor, documents: nil, workspace: nil, preview: nil, assets: nil
+            )
+        )
+        let scene = IOSShellSceneState(facade: facade)
+        scene.startObserving()
+        defer { scene.stopObserving() }
+        XCTAssertTrue(scene.chrome.canSave)
+
+        // An external observation or a read-only provider can retain ready
+        // status while fencing writes. A stale writable editor cannot win.
+        let blockedStates: [IOSDocumentState] = [
+            .ready(canWrite: false, accessGeneration: 1),
+            .saving(canWrite: false, accessGeneration: 1, operationID: UUID()),
+        ]
+        for state in blockedStates {
+            facade.emit(ShellFixtures.sceneSnapshot(
+                document: ShellFixtures.storedDocument(state: state, isDirty: true)
+            ))
+            XCTAssertEqual(scene.chrome.status, .ready)
+            XCTAssertTrue(scene.chrome.isDirty)
+            XCTAssertFalse(scene.chrome.editorCanWrite)
+            XCTAssertFalse(scene.chrome.canSave)
+        }
+
+        editor.canWrite = false
+        editor.emitSnapshot()
+        facade.emit(ShellFixtures.sceneSnapshot(document: ShellFixtures.storedDocument(isDirty: true)))
+        XCTAssertFalse(scene.chrome.canSave, "A writable store cannot authorize a read-only editor binding")
+        editor.canWrite = true
+        editor.emitSnapshot()
+        XCTAssertTrue(scene.chrome.canSave)
+        facade.emit(ShellFixtures.sceneSnapshot(document: ShellFixtures.storedDocument(isDirty: false)))
+        XCTAssertFalse(scene.chrome.canSave, "An already saved document has no enabled Save action")
+    }
+
     func testUnavailableDocumentExposesReasonNotASource() {
         let facade = FakeSceneFacade(
             snapshot: ShellFixtures.sceneSnapshot(
