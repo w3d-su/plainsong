@@ -90,7 +90,7 @@ supported. Live fixture coverage: `Fixtures/math.md`.
   editor; the preview pane renders everything.
 - **Very large documents (about 1 MiB):** typing and scrolling work but are not instant.
   The preview re-renders the whole document after each typing pause (one render at a
-  time), and a click in Experimental WYSIWYG lays out the whole document.
+  time).
 - **Sidebar:** The sidebar is fixed-width on macOS 14–26. On macOS 27+ it is resizable
   (220–320 pt) and collapsible with ⌃⌘S.
 - **No auto-update:** alpha builds are manual downloads.
