@@ -89,8 +89,8 @@ supported. Live fixture coverage: `Fixtures/math.md`.
   single-file images, tables, code fences, and Mermaid/math stay as raw Markdown in the
   editor; the preview pane renders everything.
 - **Very large documents (about 1 MiB):** typing and scrolling work but are not instant.
-  The preview re-renders the whole document after each typing pause (one render at a
-  time).
+  After each typing pause the preview re-renders only the blocks you changed; a document
+  with link reference definitions or footnotes still re-renders whole.
 - **Sidebar:** The sidebar is fixed-width on macOS 14–26. On macOS 27+ it is resizable
   (220–320 pt) and collapsible with ⌃⌘S.
 - **No auto-update:** alpha builds are manual downloads.
