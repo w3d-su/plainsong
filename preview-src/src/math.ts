@@ -1,6 +1,11 @@
 import type { VFile } from "vfile";
 import type { VFileMessage } from "vfile-message";
 import type { TreeNode } from "./mdx-placeholders";
+import {
+  holeMarker,
+  requireWholeDocument,
+  type SegmentHoleOptions,
+} from "./segment-holes";
 
 // Shared KaTeX settings for both pipelines (docs/math plan §3.4):
 // - trust:false keeps \url, \href, \includegraphics and \html* disabled.
@@ -47,10 +52,10 @@ interface MathFileData extends Record<string, unknown> {
 //
 // `$$` flow math gives its `code` no position (only the `pre` has one); the
 // pre's position is copied onto the code so the VFile message's `place` is set.
-export function rehypeMathBlocks() {
+export function rehypeMathBlocks(options?: SegmentHoleOptions) {
   return (tree: TreeNode, file: VFile) => {
     const provenance: MathProvenance[] = [];
-    wrapMathNodes(tree, provenance);
+    wrapMathNodes(tree, provenance, options?.holes ?? false);
     (file.data as MathFileData).mathProvenance = provenance;
   };
 }
@@ -60,7 +65,7 @@ export function rehypeMathBlocks() {
 // color-only) while the rendered output keeps the full selectable source. A
 // message without a resolvable place falls back to the remaining unhinted
 // `.katex-error` elements.
-export function rehypeMathDiagnostics() {
+export function rehypeMathDiagnostics(options?: SegmentHoleOptions) {
   return (tree: TreeNode, file: VFile) => {
     const messages = file.messages.filter((message) => message.source === "rehype-katex");
     if (messages.length === 0) return;
@@ -82,6 +87,8 @@ export function rehypeMathDiagnostics() {
       }
     }
 
+    // Orphans pair with unhinted errors anywhere in the document, in order.
+    if (orphans.length > 0) requireWholeDocument(file, options, "unplaced KaTeX message");
     annotateOrphanErrors(tree, orphans, hinted);
   };
 }
@@ -91,7 +98,7 @@ interface MathWrapper {
   node: TreeNode;
 }
 
-function wrapMathNodes(parent: TreeNode, provenance: MathProvenance[]): void {
+function wrapMathNodes(parent: TreeNode, provenance: MathProvenance[], holes: boolean): void {
   const children = parent.children;
   if (!children) return;
 
@@ -106,16 +113,18 @@ function wrapMathNodes(parent: TreeNode, provenance: MathProvenance[]): void {
       }
       children[index] = wrapNode(child, "div", mathBlockClass, provenance, {
         withEndLine: true,
+        holes,
       });
       continue;
     }
     if (isInlineMathCode(child)) {
       children[index] = wrapNode(child, "span", mathInlineClass, provenance, {
         withEndLine: false,
+        holes,
       });
       continue;
     }
-    wrapMathNodes(child, provenance);
+    wrapMathNodes(child, provenance, holes);
   }
 }
 
@@ -124,7 +133,7 @@ function wrapNode(
   tagName: string,
   className: string,
   provenance: MathProvenance[],
-  options: { withEndLine: boolean },
+  options: { withEndLine: boolean; holes: boolean },
 ): TreeNode {
   const index = provenance.length;
   provenance.push({ index, offset: node.position?.start?.offset });
@@ -135,8 +144,9 @@ function wrapNode(
   };
   const startLine = node.position?.start?.line;
   const endLine = node.position?.end?.line;
-  if (startLine !== undefined) properties.dataLine = String(startLine);
-  if (options.withEndLine && endLine !== undefined) properties.dataLineEnd = String(endLine);
+  const line = (value: number) => (options.holes ? holeMarker("L", value) : String(value));
+  if (startLine !== undefined) properties.dataLine = line(startLine);
+  if (options.withEndLine && endLine !== undefined) properties.dataLineEnd = line(endLine);
 
   return {
     type: "element",

@@ -435,6 +435,12 @@ Two unified pipelines selected by `fileKind`:
 - `mdx`: same + `remark-mdx`; a custom remark plugin transforms `mdxJsxFlowElement` /
   `mdxJsxTextElement` / `mdxjsEsm` nodes into placeholder HTML (§9) instead of compiling.
 
+Both run through `SegmentedRenderer`. It cuts the text at verified block boundaries and
+re-renders only changed segments, returning the exact whole-render string. A cut inside an
+open construct retries past where it closes. Definitions, footnotes and documents that do
+not parse render whole, with no segment pass while that holds; ESM after an import merges
+segments (`docs/decisions/2026-10-24-preview-segmented-render.md`).
+
 Post-render in browser: `highlight.js` handles non-Mermaid code fences. A fence with no
 info string auto-detects its language only up to 4,000 UTF-16 units
 (`AUTO_DETECT_MAX_LENGTH`); a longer bare fence renders as plain text, because
@@ -622,7 +628,8 @@ attempt without a Decision Log entry.
 
 Techniques: tree-sitter incremental edits (`InputEdit`), visible-range-first
 highlighting, a line-number gutter that draws only the visible viewport fragments from an
-incrementally edited line index, morphdom patching, render-version dropping, LRU sessions,
+incrementally edited line index, segment-cached preview renders, morphdom patching,
+render-version dropping, LRU sessions,
 and bounded success-only Mermaid memoization by exact fence source + Mermaid-fence ordinal
 within a theme generation. The ordinal prevents duplicate Mermaid-generated SVG IDs when equal
 source appears more than once; inserting or removing a fence intentionally invalidates

@@ -1,24 +1,48 @@
+import type { VFile } from "vfile";
 import type { TreeNode } from "./mdx-placeholders";
+import { holeMarker, type SegmentHoleOptions } from "./segment-holes";
 
-const headingIDPrefix = "plainsong-heading-";
+export const headingIDPrefix = "plainsong-heading-";
 
-export function rehypeHeadingAnchors() {
-  return (tree: TreeNode) => {
-    const used = new Set<string>();
+export interface HeadingSlugFileData extends Record<string, unknown> {
+  /** Segment mode: base slugs of the generated heading IDs, in document order. */
+  headingSlugs?: string[];
+}
+
+/** Hands out unique slugs in document order; a repeated base gets `-1`, `-2`, …. */
+export class HeadingSlugAllocator {
+  private readonly used = new Set<string>();
+
+  next(base: string): string {
+    let slug = base;
+    let suffix = 0;
+    while (this.used.has(slug)) slug = `${base}-${++suffix}`;
+    this.used.add(slug);
+    return slug;
+  }
+}
+
+export function rehypeHeadingAnchors(options?: SegmentHoleOptions) {
+  return (tree: TreeNode, file: VFile) => {
+    const slugs = new HeadingSlugAllocator();
+    const segmentSlugs: string[] = [];
     function visit(node: TreeNode): void {
       if (node.type === "element" && /^h[1-6]$/u.test(node.tagName ?? "") && !node.properties?.id) {
         const base = headingSlug(textContent(node)) || "section";
-        let slug = base;
-        let suffix = 0;
-        while (used.has(slug)) slug = `${base}-${++suffix}`;
-        used.add(slug);
         node.properties ??= {};
-        // Namespace generated IDs so heading text cannot clobber DOM/window properties.
-        node.properties.id = headingIDPrefix + slug;
+        if (options?.holes) {
+          // Deduplication depends on every earlier heading; assembly allocates it.
+          node.properties.id = holeMarker("H", segmentSlugs.length);
+          segmentSlugs.push(base);
+        } else {
+          // Namespace generated IDs so heading text cannot clobber DOM/window properties.
+          node.properties.id = headingIDPrefix + slugs.next(base);
+        }
       }
       for (const child of node.children ?? []) visit(child);
     }
     visit(tree);
+    if (options?.holes) (file.data as HeadingSlugFileData).headingSlugs = segmentSlugs;
   };
 }
 
