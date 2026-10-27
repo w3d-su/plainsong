@@ -81,7 +81,7 @@ blogeditor/
 ├── Makefile                  # bootstrap / generate / build / test / preview-bundle
 ├── App/                      # Thin app target (SwiftUI)
 │   ├── PlainsongApp.swift   # @main, WindowGroup, Settings scene
-│   ├── AppState.swift        # open workspaces, recent items
+│   ├── AppState.swift        # façade over WindowState (per window), WorkspaceRootContext (per root), AppDocumentRegistry (per file + app-global); one shared instance until Windows PR C
 │   ├── Views/                # SwiftUI views: WorkspaceWindow (split view), WorkspaceSidebar, WorkspaceDetail, DocumentJumpBar, WorkspaceInspector, WorkspaceToolbar, WorkspaceStatusBar
 │   └── Resources/            # Assets, preview dist bundle (generated), themes
 ├── Packages/
@@ -154,6 +154,15 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   versions, handles bridge messages.
 - `CompletionEngine` (MarkdownCore) — pure function: `(text, cursorOffset, context) -> [Completion]`.
 - `SyncMap` (MarkdownCore) — source line → preview anchor id mapping helpers.
+- `WindowState` (App) — one window's document, layout, navigation, Find host, sidebar tree
+  and search, completion metadata, prompts, errors, and export bookkeeping.
+- `WorkspaceRootContext` (App) — one workspace root's scan snapshot, authority, generation,
+  security scope, watcher, deferred refresh, and image-placement fence.
+- `AppDocumentRegistry` (App) — per-file and app-global state that the cross-window
+  invariants (`docs/window-state-gates.md` §3.4) must see: writers, bindings, external-change
+  state, quarantine, session cache and LRU, recovery stores, notices, recents, preferences,
+  services, and the one Replace authority generation. `AppState` forwards all three under
+  the old property names (§3.2 there) until the B2/C migration.
 
 ### Concurrency rules
 

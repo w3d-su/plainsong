@@ -21,8 +21,9 @@ struct EditorFindCachedSelection: Equatable {
 @MainActor
 final class EditorFindHost {
     let controller = EditorFindController()
-    /// Monotonic Replace authority generation and its diagnostics (Replace PR E).
-    let replaceAuthority = EditorReplaceAuthorityState()
+    /// Monotonic Replace authority generation and its diagnostics (Replace PR E). App-global:
+    /// the registry owns it and injects it (`docs/window-state-gates.md` §3.2).
+    let replaceAuthority: EditorReplaceAuthorityState
     let replaceBatch = EditorReplaceBatchRuntime()
     let replaceMarkedTextOwners = EditorReplaceMarkedTextOwners()
     var ui = EditorFindUIState()
@@ -107,7 +108,8 @@ final class EditorFindHost {
         #endif
     }
 
-    init() {
+    init(replaceAuthority: EditorReplaceAuthorityState) {
+        self.replaceAuthority = replaceAuthority
         // An authority advance supersedes every plan; a preparing one stops at once instead
         // of draining to a refusal behind a still-visible progress label. One trace entry
         // per advance, with the advancing call site attributed.

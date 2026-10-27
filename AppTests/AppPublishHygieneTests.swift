@@ -17,7 +17,7 @@ final class AppPublishHygieneTests: XCTestCase {
         XCTAssertEqual(appState.completionWorkspace.currentFileHeadingAnchors, ["#title"])
 
         var publishCount = 0
-        let probe = appState.$completionWorkspace.dropFirst().sink { _ in publishCount += 1 }
+        let probe = appState.windowState.$completionWorkspace.dropFirst().sink { _ in publishCount += 1 }
         defer { probe.cancel() }
 
         appState.replaceDocumentText("# Title\n\nBody, edited")
