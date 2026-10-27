@@ -555,10 +555,13 @@ sandbox + network-client entitlements); its auto-generated changelog compares ag
 `v0.1.0-alpha.4` was published as a GitHub prerelease on 2026-10-21 (Release run 39605975561,
 `main` at `60e5ac1`, build 160, `Plainsong-0.1.0-160-unsigned.dmg`); it is a
 fix and performance release and its changelog compares against alpha.3.
-`v0.1.0-alpha.5` was published as a GitHub prerelease on @@DATE@@ (Release run @@RUN_ID@@,
-`main` at `@@TAG_SHA@@`, build @@BUILD@@, `Plainsong-0.1.0-@@BUILD@@-unsigned.dmg`); it is a
-privacy fix (#193) plus performance release, the first with a stripped executable and a
-private dSYM artifact (#192), and its changelog compares against alpha.4.
+`v0.1.0-alpha.5` was published as a GitHub prerelease on 2026-10-28 (Release run 40542268140,
+`main` at `a210f85`, build 189, `Plainsong-0.1.0-189-unsigned.dmg`); it is a
+privacy fix (#193) plus performance release (including segment-cached preview renders, #215,
+and viewport-only WYSIWYG click hit-testing, #214) that also completes Workspace Search
+(#216), the first with a stripped executable and a private dSYM artifact (#192), and its
+changelog compares against alpha.4. Its tag was moved from an unpublished build-178 draft at
+`1428bf1` to `a210f85` before publication.
 Per-DMG clean-machine spot-checking remains good practice and is not a release
 blocker (artifact family already passed P5 with alpha.1). P1/P2 signing and notarization remain
 deferred until Apple Developer Program membership.
