@@ -536,6 +536,15 @@ implementation, or green CI is not a decision.
 | WD8 | Closing a window whose document cannot be saved safely | Refuse every blocked close; retain protected state after close; hybrid | **Hybrid (§6.2): refuse transient/quarantine states; retain stable blocked sessions only with proof** | Switching documents already keeps dirty/conflicted sessions warm and restores prompts (`App/AppState+Workspace.swift:496-499`). Closing can do likewise; last-root release must preserve authority and fences. An unseen protected session still participates in termination. W0 proves interception; absent retention proof, refuse. |
 | WD9 | Layout mode and Find query scope | Per window, new windows inherit the last persisted layout; global | **Per window** | M2's "layout restored on relaunch" moves into the WD5 records. |
 
+### 9.1 Recorded decisions
+
+Only a row here is a decision. Every WD not listed is still open.
+
+| # | Decision (owner, date) | Record |
+|---|---|---|
+| WD4 | Tabs are in scope for this line. PR F enables native window tabs with `.automatic` tabbing and ⌘T. Until F, PR C disallows tabbing, so no tab can mirror another window. (Owner, 2026-10-28: the recommended default.) | `docs/decisions/2026-10-28-windows-wd4-tabs-in-scope.md` |
+| WD9 | Layout mode and the Find query are per window. A new window starts with the last persisted layout. (Owner, 2026-10-28: the recommended default.) | `docs/decisions/2026-10-28-windows-wd9-per-window-layout-and-find.md` |
+
 ## 10. Review-sized PR split
 
 Each PR branches from then-current `origin/main` and targets `main`; the maintainer
