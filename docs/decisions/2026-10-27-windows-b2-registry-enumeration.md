@@ -43,6 +43,26 @@ window and test fixtures are connected.
 The per-file save and autosave gate consults every connected window's prompts (§3.4 I3) through
 `isSaveBlockedByWindowPrompt(at:)`. In a single window it reads the same prompts as before.
 
+**How B2 reads I2 (owner decision, 2026-10-28).** I2 as first written said that after B2
+nothing outside `WindowState` reads `currentDocument`. The code splits those reads into two
+kinds:
+- About 25 inventory and membership uses. These are what I2 protects, and B2 moved them all to
+  the enumerator.
+- 164 remaining hits that read the shared window's own document: Find, editing, `canSave`,
+  export, prompts, and document switching in about 30 `AppState` extensions, plus 14 view reads
+  and the forwarder and construction code.
+
+Meeting the literal gate in B2 would mean either moving that window-scoped logic onto
+`WindowState` or renaming the property only to satisfy the grep. Moving the logic is PR C's
+per-window restructure, done without C's routing, and the rename proves nothing. The owner
+chose this reading:
+- B2's gate is that `sessionCache` is registry-only, and that no `currentDocument` hit
+  outside `WindowState` builds or checks an inventory. The PR classifies each remaining hit as
+  "window-scoped; C retargets".
+- The zero-hit form moves to C, as W2's last bullet. C's §10 row now names it.
+
+Rejected: the literal reading (B).
+
 **Open for later PRs.** The Save Copy owner walk fails closed on a candidate with no binding or
 proof. Every window's document is a candidate, as the shared window's always was. So an untitled,
 record-less document in another window refuses every Save Copy and export. This can't happen
@@ -64,5 +84,5 @@ inventory added would miss windows again, and I2 asks for one enumerator); a reg
 the windows' documents (rejected: a window owns its document, and the registry only asks it
 which one it shows); dropping untitled, record-less window documents from the Save Copy walk
 now (rejected for B2: it weakens a fail-closed ownership check without a second window to test
-it against); moving the window-scoped reads onto `WindowState` (C's per-window restructure; see
-the PR for the I2 wording decision).
+it against); moving the window-scoped reads onto `WindowState`, or renaming them, to meet the
+literal I2 gate in B2 (rejected by the owner; see "How B2 reads I2" above).
