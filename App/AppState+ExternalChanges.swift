@@ -283,9 +283,7 @@ extension AppState {
         removesEditorBindingRegistration: Bool = true
     ) {
         let sessionIdentity = ObjectIdentifier(session)
-        var stateKeys = Set(sessionCache.compactMap { key, cachedSession in
-            cachedSession === session ? key : nil
-        })
+        var stateKeys = Set(registry.warmSessionURLs(for: session))
         if let stateURL = sessionStateURL(for: session) {
             stateKeys.insert(stateURL)
         }
@@ -317,9 +315,7 @@ extension AppState {
         at key: URL,
         removing session: DocumentSession
     ) {
-        if sessionCache[key] === session {
-            sessionCache[key] = nil
-        }
+        registry.removeWarmSession(session, at: key)
         guard !workspaceMutationManagedSessions().contains(where: { candidate in
             guard candidate !== session,
                   let candidateStateURL = sessionStateURL(for: candidate)
@@ -775,22 +771,6 @@ private extension AppState {
         externalChangePrompt = nil
     }
 
-    func isAddressableExternalResolutionSession(
-        _ session: DocumentSession,
-        canonicalURL: URL
-    ) -> Bool {
-        guard let stateURL = sessionStateURL(for: session),
-              exactFileURLSpellingMatches(stateURL, canonicalURL)
-        else {
-            return false
-        }
-        return session === currentDocument ||
-            sessionCache.values.contains(where: { $0 === session }) ||
-            retiredEditorDocumentSessions.values.contains(where: { $0.session === session }) ||
-            editorDocumentBindingSessions.values.contains(where: { $0 === session }) ||
-            editorBindingInstallations.values.contains(where: { $0 === session })
-    }
-
     func handleExternalDiskInspection(
         _ outcome: WorkspaceCoherentFileReadOutcome,
         payload: ExternalReloadApplicationPayload?,
@@ -968,5 +948,26 @@ private extension AppState {
         } else {
             lastKnownDiskModificationDates[url] = nil
         }
+    }
+}
+
+@MainActor
+extension AppState {
+    /// Internal, not private, so the B2 registry tests can show it accepts a session that only a
+    /// second window shows (`docs/window-state-gates.md` §2.3).
+    func isAddressableExternalResolutionSession(
+        _ session: DocumentSession,
+        canonicalURL: URL
+    ) -> Bool {
+        guard let stateURL = sessionStateURL(for: session),
+              exactFileURLSpellingMatches(stateURL, canonicalURL)
+        else {
+            return false
+        }
+        return registry.isShownByAnyWindow(session) ||
+            registry.isWarmSession(session) ||
+            retiredEditorDocumentSessions.values.contains(where: { $0.session === session }) ||
+            editorDocumentBindingSessions.values.contains(where: { $0 === session }) ||
+            editorBindingInstallations.values.contains(where: { $0 === session })
     }
 }

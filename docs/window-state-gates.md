@@ -119,6 +119,11 @@ Additional consumers of `currentDocument` / `sessionCache` that I2 must migrate:
 | `releaseUnreferencedSessionOwnership` | `App/AppState+SessionOwnership.swift:95-117` | Check all windows and retained owners before releasing proof. |
 | Search dirty overlays and relevant-edit membership | `App/AppState+CompletionWorkspace.swift:172-180`, `App/AppState+WorkspaceReload.swift:62` | Registry candidates filtered to the query's root; refresh each affected window's search. |
 
+B2 moved every consumer in both tables onto the registry, keeping each consumer's sources,
+order, and filters (W1 bullet 3 evidence). The inventories use `AppDocumentRegistry.sessions(from:)`;
+the membership checks use `isShownByAnyWindow` and the warm-cache predicates. Root filtering,
+per-window search refresh, and scoped release stay with D1.
+
 ### 2.4 Packages
 
 | Package | Single-window assumption | Evidence |
@@ -194,6 +199,7 @@ is added to `AppState` itself.
 | `fileStore`, `coherentFileReader`, `externalReloadApplicationPreparer`, `lastOpenedFileStore`, `recentItemStore`, `directoryScanner`, `workspaceSearchStreamProvider`, `workspaceSearchLimits`, `workspaceSearchDebounceNanoseconds`, `fileOperations`, `workspaceMutationOperationRecoveryStore`, `workspaceMutationTextRecoveryStore`, `reportedTrashBookmarkAccess`, `editorImageThumbnailAdapter`, `anchoredFileSaveOverride` | App-global | Injected services and a test seam. |
 | `editorImageThumbnailRefreshProxy` | Root | It fans out by workspace-relative path. |
 | `workspaceSidebarHiddenWindows` | Window | Whether this window's split-view sidebar is hidden, so ⇧⌘F opens Search there (#216). B1 keeps the `NSWindow`-keyed table in the one `WindowState`; C reduces it to this window's flag. |
+| `registeredWindows` (B2) | App-global | Each connected `WindowState`, weakly. Every registry inventory includes each window's `shownSession` (§3.4 I2). `AppState.connect(_:)` adds a window after wiring its hooks. |
 | `exportHTMLStatus`, `exportHTMLOperations` | Window | The Export as HTML…/Print banner and operation bookkeeping belong to the origin window, which fences publication when it closes. C decides whether `exportHTMLOperations.lastPrintInfo` (paper settings) stays per window. |
 
 Recovery-banner placement (`App/AppState+WorkspaceMutationRecoveryLoadFailure.swift:5-13`)
@@ -635,8 +641,8 @@ recorded in the closing commit.
 
 - [x] Every AppState property follows §3.2; forwarding preserves all 16 `didSet { noteEditorReplaceAuthorityInputDidChange() }` hooks (`App/WindowState.swift:30`, `:67`, `:71`, `:78`; `App/AppDocumentRegistry.swift:67-162`). *PR checklist + named stale-plan hosted tests for each moved input.*
 - [ ] I2 grep gate: `git grep -n -w -E 'currentDocument|sessionCache' -- App Packages` has no currentDocument reads outside WindowState and no sessionCache reads outside the registry. Review every hit, including extensions and forwarding APIs; attach the command/output and classification in the PR. *Source audit.*
-- [ ] Registry enumeration covers all §2.3 consumers, including pruning, autosave/addressability, untitled ownership, and search. Register a session only in a second WindowState and prove each operation sees it with its documented filters/extras. *Named hosted tests.*
-- [ ] Existing package, AppTests, and PerformanceTests pass with mechanical renames only. *Exact-head CI run with named jobs/suites.*
+- [x] Registry enumeration covers all §2.3 consumers, including pruning, autosave/addressability, untitled ownership, and search. Register a session only in a second WindowState and prove each operation sees it with its documented filters/extras. *Named hosted tests.*
+- [x] Existing package, AppTests, and PerformanceTests pass with mechanical renames only. *Exact-head CI run with named jobs/suites.*
 - [x] No new keystroke publish; unchanged typing test within noise. *Perf measurement.*
 - [x] AppState and new files meet SwiftLint's 1000-line error and ~400-line guidance. *`make lint` output + recorded source line counts.*
 - Evidence (B1):
@@ -644,8 +650,20 @@ recorded in the closing commit.
   - Bullet 5: `docs/perf/2026-10-27-windows-b1-typing-ab.md`. Over 200 body edits, `AppState` sent one `objectWillChange` on both `main` and B1: the session's own `isDirty` flip. `WindowStatePartitionPublishAppTests/testBodyEditsPublishOnlyTheSessionsOwnChanges` keeps that. In six interleaved Debug pairs at load 17.6–22.9, the app-backed hosted typing medians were 7.63 / 7.93 / 6.95 ms on B1 against 8.64 / 7.71 / 7.73 ms on `main` (ordinary / pair / marked text). Paired differences changed sign, and every sample was under 16 ms.
   - Bullet 6: line counts at the B1 head: `App/AppState.swift` 366 (993 before), `App/WindowState.swift` 124, `App/WorkspaceRootContext.swift` 69, `App/AppDocumentRegistry.swift` 271, `App/UnwiredContainerHook.swift` 27, `App/AppState+WindowStateForwarding.swift` 153, `App/AppState+WorkspaceRootForwarding.swift` 88, `App/AppState+RegistryForwarding.swift` 210, `App/AppState+SessionRegistryForwarding.swift` 168, `App/AppStateSupportingTypes.swift` 261, `App/AppState+DocumentCommands.swift` 149. The new tests are 172, 275, 199, and 121 lines. `make lint` with the pinned SwiftFormat 0.62.1 reports "0/1043 files require formatting" and "0 serious". No suppression was added.
   - Bullet 2 stays open for B2. B1 runs the command and classifies every hit in its PR. Consumers still read through the façade, which B2 migrates. The `-E '\b…\b'` form this bullet first gave matches nothing with macOS git 2.56: its POSIX ERE has no `\b`, so the gate would pass vacuously. Use `-w` or `-P`.
-  - Bullet 3 stays open for B2.
-  - Bullet 4 stays open until the exact-head CI run of the PR that closes it.
+- Evidence (B2):
+  - Bullet 3: every §2.3 consumer takes its sessions from `AppDocumentRegistry.sessions(from:)` or its window and warm-cache predicates (`App/AppDocumentRegistry+Sessions.swift`). `WindowStateRegistryAppTests` connects a second `WindowState` and shows it a session that no cache, retirement, binding, or recovery holds. Each test then hides that session again as a control. The fifteen named tests:
+    - `testOwnershipInventoriesIncludeASessionOnlyASecondWindowShows`: mutation-managed, Save Copy, and termination inventories, LRU protection, and addressability.
+    - `testAnUntitledDocumentInASecondWindowIsOwned`: untitled ownership.
+    - `testAutosaveFlushSavesADirtySessionOnlyASecondWindowShows` and `testAutosaveOfAHiddenSessionIsRefused`.
+    - `testAWindowPromptBlocksOnlyItsFilesSaveInEveryWindow`.
+    - `testPruningKeepsStateForASessionOnlyASecondWindowShows`.
+    - `testExternalConflictAndProofReleaseSeeASecondWindowsSession`.
+    - `testSearchOverlaysIncludeASecondWindowsDirtySession`.
+    - `testClosingTheWorkspaceKeepsStateForASecondWindowsSession`.
+    - `testTerminationRefusesForASecondWindowsUnsavableSession`.
+    - The W3 tests below.
+  - Making the enumerator see only the first window fails 14 of the 15; the remaining one is itself a control.
+  - Bullet 4: B1's exact-head CI run on `11f5ce8` passed the `packages`, `hosted (app)`, `hosted (ui-performance)`, `preview`, and `build-and-test` jobs (GitHub Actions run 40435132020). B2's only test edits are the mechanical `appState.sessionCache` → `appState.registry.sessionCache` rename and the inventory's new `registeredWindows` entry. Its own CI run re-checks this.
 
 ### W2 — Two windows never mirror each other's document
 
@@ -657,15 +675,25 @@ recorded in the closing commit.
 
 ### W3 — Ownership refusals are cross-window
 
-- [ ] Save Copy from window 1 onto the file current in window 2 is refused, including a hard link and a case alias. *Named hosted test.*
-- [ ] An export destination owned by window 2 is refused (`validateExportArtifactDestinationOwnership`, through both its Save Copy and mutation inventories). *Named hosted test.*
-- [ ] A mutation destination owned by a window-2 session is refused (`validateWorkspaceMutationDestinationOwnership`). *Named hosted test.*
-- [ ] The retained-authority collision and physical-duplicate checks see window-2 sessions. *Named hosted test.*
+- [x] Save Copy from window 1 onto the file current in window 2 is refused, including a hard link and a case alias. *Named hosted test.*
+- [x] An export destination owned by window 2 is refused (`validateExportArtifactDestinationOwnership`, through both its Save Copy and mutation inventories). *Named hosted test.*
+- [x] A mutation destination owned by a window-2 session is refused (`validateWorkspaceMutationDestinationOwnership`). *Named hosted test.*
+- [x] The retained-authority collision and physical-duplicate checks see window-2 sessions. *Named hosted test.*
 - [ ] Termination refuses for a blocked background-window session and focuses it; an unseen warm blocked session presents its error/prompt in the home/frontmost workspace window. *Named hosted tests.*
 - [ ] A recovery-store load failure fences every window; the recovery banner has the §3.2 home window. Write/trash notices and unseen-session autosave failures retain their home/session routing across close. *Named hosted tests.*
 - [ ] Closing R1 never prunes pendingExternalTexts/versions, bindings, proofs, detached URLs, or quarantine for a session window 2 shows. *Named hosted test.*
-- [ ] A prompt shown in window 2 blocks that file's Save/autosave from any window or background task; window 1's prompt cannot block an unrelated file. *Named hosted tests.*
-- Evidence: _open_
+- [x] A prompt shown in window 2 blocks that file's Save/autosave from any window or background task; window 1's prompt cannot block an unrelated file. *Named hosted tests.*
+- Evidence (B2): "Window 2" is a second, connected `WindowState`, a registry fixture. User window creation stays guarded until C. The tests below are in `WindowStateRegistryAppTests`, and each hides window 2's session as a control.
+  - Bullet 1: `testSaveCopyOntoASecondWindowsFileIsRefused` covers the file itself, a hard link, and a case alias on a case-insensitive volume. The alias is skipped on a case-sensitive one. Once window 2 stops showing the file, the hard link is writable.
+  - Bullet 2: `testExportOntoASecondWindowsFileIsRefused`. The Save Copy walk refuses a hard link, and the mutation inventory refuses the file's own path.
+  - Bullet 3: `testMutationDestinationOwnedByASecondWindowsSessionIsRefused`.
+  - Bullet 4: `testRetainedAuthorityCollisionAndPhysicalDuplicateSeeASecondWindowsSession`.
+  - Bullet 8: `testAWindowPromptBlocksOnlyItsFilesSaveInEveryWindow`, through `isSaveBlockedByWindowPrompt(at:)` (§3.4 I3).
+  - Open:
+    - Bullet 5: termination refuses for window 2's blocked session (`testTerminationRefusesForASecondWindowsUnsavableSession`), but focusing that window and presenting an unseen session's prompt is C's routing.
+    - Bullet 6: the load-failure fence is app-global, but the home-window banner and notice routing are C.
+    - Bullet 7: closing keeps window 2's proofs, pending external text, and detached URL, and a quarantined write refuses the close (`testClosingTheWorkspaceKeepsStateForASecondWindowsSession`). Closure still removes every closed session's editor binding registration, and root-scoped release is D1.
+  - D2 must decide one consequence. The Save Copy walk fails closed on a candidate with no ownership record, so an untitled, record-less document in another window refuses every Save Copy and export (`testAnUntitledRecordlessDocumentInASecondWindowFailsSaveCopyClosed`).
 
 ### W4 — One writer per file across windows
 

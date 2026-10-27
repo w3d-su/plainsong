@@ -86,11 +86,6 @@ extension AppState {
         _modify { yield &registry.retiredEditorDocumentSessions }
     }
 
-    var sessionCache: [URL: DocumentSession] {
-        get { registry.sessionCache }
-        _modify { yield &registry.sessionCache }
-    }
-
     var sessionLifecycleGenerations: [ObjectIdentifier: UInt64] {
         get { registry.sessionLifecycleGenerations }
         _modify { yield &registry.sessionLifecycleGenerations }

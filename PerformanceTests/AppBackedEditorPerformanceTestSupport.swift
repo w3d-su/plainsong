@@ -87,7 +87,7 @@ extension AppBackedEditorPerformanceTests {
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] = AnchoredWorkspaceSessionFileBinding(
             location: location, identity: read.metadata.identity, sha256Digest: read.sha256Digest
         )
-        appState.sessionCache[documentURL.standardizedFileURL] = session
+        appState.registry.sessionCache[documentURL.standardizedFileURL] = session
         appState.recordKnownDiskText(source, for: documentURL)
         let binding = appState.editorDocumentBinding(for: session)
         let editor = MarkdownEditorView(

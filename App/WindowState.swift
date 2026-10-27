@@ -110,6 +110,18 @@ final class WindowState: ObservableObject {
         workspaceSearchTask?.cancel()
     }
 
+    /// The session this window shows, for registry inventories (`docs/window-state-gates.md`
+    /// §3.4 I2).
+    var shownSession: DocumentSession {
+        currentDocument
+    }
+
+    /// The files whose saving this window's external-change or missing-file prompt blocks
+    /// (§3.4 I3).
+    var saveBlockingPromptURLs: [URL] {
+        [externalChangePrompt?.fileURL, missingFilePrompt?.fileURL].compactMap(\.self)
+    }
+
     func noteEditorReplaceAuthorityInputDidChange(fileID: StaticString = #fileID, line: UInt = #line) {
         onEditorReplaceAuthorityInputChange(fileID, line)
     }

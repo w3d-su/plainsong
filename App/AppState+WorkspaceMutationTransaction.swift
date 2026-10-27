@@ -318,7 +318,9 @@ extension AppState {
         _ records: [WorkspaceSessionRelocationRecord]
     ) {
         for record in records {
-            removeExactURLValue(in: &sessionCache, at: record.oldURL)
+            if let key = registry.warmSessionURLs.first(where: { exactFileURLSpellingMatches($0, record.oldURL) }) {
+                registry.setWarmSession(nil, at: key)
+            }
             removeExactURLValue(in: &retiredEditorDocumentSessions, at: record.oldURL)
             removeExactURLValue(in: &lastKnownDiskHashes, at: record.oldURL)
             removeExactURLValue(in: &lastKnownDiskModificationDates, at: record.oldURL)
@@ -365,7 +367,7 @@ extension AppState {
 
     func restoreWorkspaceSessionOwners(_ record: WorkspaceSessionRelocationRecord) {
         if record.wasCached {
-            sessionCache[record.newURL] = record.session
+            registry.setWarmSession(record.session, at: record.newURL)
         }
         if let retirement = record.retirement {
             retiredEditorDocumentSessions[record.newURL] = RetiredEditorDocumentSession(

@@ -153,11 +153,11 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
         try appState.activateFileSession(url: fixture.url("8.md"))
         XCTAssertEqual(attempts.count, 8)
         XCTAssertTrue(attempts.values.allSatisfy { $0 == 1 })
-        XCTAssertEqual(appState.sessionCache.count, 9)
-        XCTAssertEqual(Set(appState.sessionPolicy.warmURLsInLeastRecentOrder), Set(appState.sessionCache.keys))
+        XCTAssertEqual(appState.registry.sessionCache.count, 9)
+        XCTAssertEqual(Set(appState.sessionPolicy.warmURLsInLeastRecentOrder), Set(appState.registry.sessionCache.keys))
         XCTAssertEqual(appState.presentedError?.title, "Could Not Save Warm File")
         for (index, session) in sessions.enumerated() {
-            XCTAssertTrue(try appState.sessionCache[XCTUnwrap(session.fileURL)] === session)
+            XCTAssertTrue(try appState.registry.sessionCache[XCTUnwrap(session.fileURL)] === session)
             XCTAssertTrue(session.isDirty)
             XCTAssertEqual(session.text, "unsaved \(index)")
             XCTAssertEqual(try String(contentsOf: fixture.url("\(index).md"), encoding: .utf8), "disk \(index)")
@@ -166,7 +166,7 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
         // The next independent pass may retry after storage recovers and restore the normal limit.
         appState.anchoredFileSaveOverride = nil
         appState.reconcileSessionPolicyAfterEditorLeaseChange()
-        XCTAssertEqual(appState.sessionCache.count, 8)
+        XCTAssertEqual(appState.registry.sessionCache.count, 8)
         XCTAssertEqual(appState.sessionPolicy.warmURLsInLeastRecentOrder.count, 8)
         XCTAssertEqual(sessions.filter { !$0.isDirty }.count, 1)
     }
@@ -191,9 +191,9 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
         }
         try appState.activateFileSession(url: fixture.url("2.md"))
         XCTAssertEqual(attempts, 1)
-        XCTAssertEqual(appState.sessionCache.count, 2)
-        XCTAssertTrue(try appState.sessionCache[XCTUnwrap(dirty.fileURL)] === dirty)
-        XCTAssertNil(appState.sessionCache[fixture.url("1.md")])
+        XCTAssertEqual(appState.registry.sessionCache.count, 2)
+        XCTAssertTrue(try appState.registry.sessionCache[XCTUnwrap(dirty.fileURL)] === dirty)
+        XCTAssertNil(appState.registry.sessionCache[fixture.url("1.md")])
         XCTAssertTrue(dirty.isDirty)
     }
 
@@ -221,7 +221,7 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
             fileKind: .markdown
         )
         appState.retainUnanchoredManagedSessionOwnership(for: replacement)
-        appState.sessionCache[originalURL] = replacement
+        appState.registry.sessionCache[originalURL] = replacement
         _ = appState.sessionPolicy.access(originalURL, isDirty: false)
 
         let recoveryID = UUID()
@@ -247,7 +247,7 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
 
         try appState.saveDetachedCurrentDocument(to: saveCopyURL)
 
-        XCTAssertTrue(appState.sessionCache[originalURL] === replacement)
+        XCTAssertTrue(appState.registry.sessionCache[originalURL] === replacement)
         XCTAssertEqual(appState.sessionPolicy.dirtyState(for: originalURL), false)
         XCTAssertTrue(appState.sessionPolicy.warmURLsInLeastRecentOrder.contains(originalURL))
         XCTAssertTrue(appState.detachedSessionURLs.contains(originalURL))
@@ -265,7 +265,7 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
             try String(contentsOf: saveCopyURL, encoding: .utf8),
             "Unsaved recovery text"
         )
-        XCTAssertTrue(appState.sessionCache[saveCopyURL] === recovery)
+        XCTAssertTrue(appState.registry.sessionCache[saveCopyURL] === recovery)
         XCTAssertNil(appState.workspaceMutationTextRecoveryContexts[recoveryIdentity])
         XCTAssertNil(appState.workspaceMutationTextRecoverySessions[recoveryID])
     }
@@ -304,7 +304,7 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
                 persistedRevision: recovery.version
             )
         appState.workspaceMutationTextRecoverySessions[recoveryID] = recovery
-        appState.sessionCache[originalURL] = replacement
+        appState.registry.sessionCache[originalURL] = replacement
         _ = appState.sessionPolicy.access(originalURL, isDirty: false)
         appState.lastKnownDiskHashes[originalURL] = "replacement-known-hash"
         appState.pendingExternalTexts[originalURL] = "replacement external text"
@@ -319,7 +319,7 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
 
         appState.clearSessionState(for: recovery, fallbackURL: originalURL)
 
-        XCTAssertTrue(appState.sessionCache[originalURL] === replacement)
+        XCTAssertTrue(appState.registry.sessionCache[originalURL] === replacement)
         XCTAssertEqual(appState.sessionPolicy.dirtyState(for: originalURL), false)
         XCTAssertEqual(
             appState.lastKnownDiskHashes[originalURL],

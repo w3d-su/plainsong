@@ -133,14 +133,9 @@ final class AppState: ObservableObject {
     /// directly on a container advances the Replace authority generation and records
     /// Export as HTML… context changes exactly as the stored properties did.
     private func connectContainers() {
-        windowState.onEditorReplaceAuthorityInputChange = { [weak self] fileID, line in
-            self?.noteEditorReplaceAuthorityInputDidChange(fileID: fileID, line: line)
-        }
+        connect(windowState)
         registry.onEditorReplaceAuthorityInputChange = { [weak self] fileID, line in
             self?.noteEditorReplaceAuthorityInputDidChange(fileID: fileID, line: line)
-        }
-        windowState.onExportHTMLContextChange = { [weak self] reason, _, _ in
-            self?.noteExportHTMLContextChange(reason)
         }
         workspaceRootContext.onExportHTMLContextChange = { [weak self] reason, _, _ in
             self?.noteExportHTMLContextChange(reason)
@@ -153,6 +148,19 @@ final class AppState: ObservableObject {
                 self?.objectWillChange.send()
             },
         ]
+    }
+
+    /// Connects `window`'s hooks to this state, then adds it to every registry inventory
+    /// (`docs/window-state-gates.md` §3.4 I2). A window must be connected before it can
+    /// receive input; until PR C only the shared window and test fixtures are connected.
+    func connect(_ window: WindowState) {
+        window.onEditorReplaceAuthorityInputChange = { [weak self] fileID, line in
+            self?.noteEditorReplaceAuthorityInputDidChange(fileID: fileID, line: line)
+        }
+        window.onExportHTMLContextChange = { [weak self] reason, _, _ in
+            self?.noteExportHTMLContextChange(reason)
+        }
+        registry.register(window)
     }
 }
 

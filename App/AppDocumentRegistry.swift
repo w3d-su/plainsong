@@ -106,7 +106,11 @@ final class AppDocumentRegistry: ObservableObject {
     var sessionStatisticsTasks: [ObjectIdentifier: SessionBackgroundTask] = [:]
     let shouldRestoreLastOpenedFile: Bool
     var didAttemptRestore = false
+    /// Warm sessions by state URL. Read and written only through the registry's session API
+    /// (`AppDocumentRegistry+Sessions.swift`), so every inventory sees it (§3.4 I2).
     var sessionCache: [URL: DocumentSession] = [:]
+    /// Every connected window, weakly. Inventories include each window's document.
+    var registeredWindows: [RegisteredWindowState] = []
     var sessionLifecycleGenerations: [ObjectIdentifier: UInt64] = [:]
     var sessionPolicy = WorkspaceSessionLRUPolicy(limit: 8)
     var lastKnownDiskHashes: [URL: String] = [:]
