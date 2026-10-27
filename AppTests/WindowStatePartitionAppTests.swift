@@ -75,10 +75,13 @@ final class WindowStatePartitionAppTests: XCTestCase {
     // MARK: - W1 bullet 1: all 16 Replace authority inputs
 
     /// Each §3.2 authority input, written through the façade or directly on its container,
-    /// advances the app-global generation and makes a plan captured before it stale.
+    /// advances the app-global generation and makes a plan captured before it stale. No
+    /// write reaches `UnwiredContainerHook`: `AppState` connected every container hook.
     func testEveryAuthorityInputRefusesAStalePlanThroughFacadeAndContainer() throws {
         let fixture = try WindowStatePartitionFixture.make(testCase: self)
         let appState = fixture.appState
+        let recorder = UnwiredContainerHookRecorder()
+        defer { recorder.stop() }
         let cases = try fixture.authorityInputMutations()
         XCTAssertEqual(Set(cases.map(\.input)).count, 16)
         XCTAssertEqual(cases.count, 32, "Each input through the façade and through its container")
@@ -104,6 +107,7 @@ final class WindowStatePartitionAppTests: XCTestCase {
                 label
             )
         }
+        XCTAssertEqual(recorder.reports, [])
     }
 
     /// §3.2 `editorFindHost` row: the window's Find host uses the registry's app-global

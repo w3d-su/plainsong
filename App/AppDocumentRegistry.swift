@@ -15,8 +15,15 @@ import WorkspaceKit
 @MainActor
 final class AppDocumentRegistry: ObservableObject {
     /// Set by `AppState.init`. Receives the hooked property's own `#fileID`/`#line`, so the
-    /// Replace authority trace still names the input that changed.
-    var onEditorReplaceAuthorityInputChange: @MainActor (StaticString, UInt) -> Void = { _, _ in }
+    /// Replace authority trace still names the input that changed. Until then a call goes
+    /// to `UnwiredContainerHook`.
+    var onEditorReplaceAuthorityInputChange: @MainActor (StaticString, UInt) -> Void = { fileID, line in
+        UnwiredContainerHook.report(
+            "AppDocumentRegistry.onEditorReplaceAuthorityInputChange",
+            fileID: fileID,
+            line: line
+        )
+    }
 
     /// One monotonic generation for every window's Find host (§3.2 `editorFindHost` row).
     let replaceAuthority = EditorReplaceAuthorityState()

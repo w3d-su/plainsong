@@ -139,10 +139,10 @@ final class AppState: ObservableObject {
         registry.onEditorReplaceAuthorityInputChange = { [weak self] fileID, line in
             self?.noteEditorReplaceAuthorityInputDidChange(fileID: fileID, line: line)
         }
-        windowState.onExportHTMLContextChange = { [weak self] reason in
+        windowState.onExportHTMLContextChange = { [weak self] reason, _, _ in
             self?.noteExportHTMLContextChange(reason)
         }
-        workspaceRootContext.onExportHTMLContextChange = { [weak self] reason in
+        workspaceRootContext.onExportHTMLContextChange = { [weak self] reason, _, _ in
             self?.noteExportHTMLContextChange(reason)
         }
         containerChangeCancellables = [

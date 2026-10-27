@@ -13,22 +13,29 @@ import WorkspaceKit
 @MainActor
 final class WindowState: ObservableObject {
     /// Set by `AppState.init`. Receives the hooked property's own `#fileID`/`#line`, so the
-    /// Replace authority trace still names the input that changed.
-    var onEditorReplaceAuthorityInputChange: @MainActor (StaticString, UInt) -> Void = { _, _ in }
-    /// Set by `AppState.init`; records an Export as HTML… context change.
-    var onExportHTMLContextChange: @MainActor (ExportHTMLStopReason) -> Void = { _ in }
+    /// Replace authority trace still names the input that changed. Until then a call goes
+    /// to `UnwiredContainerHook`.
+    var onEditorReplaceAuthorityInputChange: @MainActor (StaticString, UInt) -> Void = { fileID, line in
+        UnwiredContainerHook.report("WindowState.onEditorReplaceAuthorityInputChange", fileID: fileID, line: line)
+    }
+
+    /// Set by `AppState.init`; records an Export as HTML… context change. Until then a call
+    /// goes to `UnwiredContainerHook`.
+    var onExportHTMLContextChange: @MainActor (ExportHTMLStopReason, StaticString, UInt) -> Void = { _, fileID, line in
+        UnwiredContainerHook.report("WindowState.onExportHTMLContextChange", fileID: fileID, line: line)
+    }
 
     @Published var currentDocument: DocumentSession {
         didSet {
             noteEditorReplaceAuthorityInputDidChange()
-            if oldValue !== currentDocument { onExportHTMLContextChange(.documentChanged) }
+            if oldValue !== currentDocument { noteExportHTMLContextChange(.documentChanged) }
         }
     }
 
     @Published var layoutMode: EditorLayoutMode
     @Published var workspaceRootURL: URL? {
         didSet {
-            if oldValue != workspaceRootURL { onExportHTMLContextChange(.workspaceChanged) }
+            if oldValue != workspaceRootURL { noteExportHTMLContextChange(.workspaceChanged) }
         }
     }
 
@@ -105,5 +112,13 @@ final class WindowState: ObservableObject {
 
     func noteEditorReplaceAuthorityInputDidChange(fileID: StaticString = #fileID, line: UInt = #line) {
         onEditorReplaceAuthorityInputChange(fileID, line)
+    }
+
+    func noteExportHTMLContextChange(
+        _ reason: ExportHTMLStopReason,
+        fileID: StaticString = #fileID,
+        line: UInt = #line
+    ) {
+        onExportHTMLContextChange(reason, fileID, line)
     }
 }

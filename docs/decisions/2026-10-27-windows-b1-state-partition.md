@@ -25,6 +25,18 @@ context hooks (`currentDocument`, `workspaceRootURL`, `workspaceAccess`) and the
 `EditorReplaceAuthorityState` and injects it into the window's `EditorFindHost`, keeping the
 generation app-global (§3.2).
 
+An unconnected container hook fails loudly instead of open. Each of the four callbacks
+(`WindowState.onEditorReplaceAuthorityInputChange` and `.onExportHTMLContextChange`,
+`AppDocumentRegistry.onEditorReplaceAuthorityInputChange`, and
+`WorkspaceRootContext.onExportHTMLContextChange`) defaults to `UnwiredContainerHook.report`.
+In Debug builds that is an `assertionFailure` naming the callback and the hooked property's
+`#fileID`/`#line`. The export hooks now pass their line too. In Release, `assertionFailure`
+does nothing, so the call stays the silent no-op it was. B1 cannot reach it: only
+`AppState.init` builds the containers, and it connects every hook before one can fire. But
+once PR C creates more `WindowState`s, an unconnected one would skip the Replace authority
+advance, and a stale Replace plan could commit. `UnwiredContainerHook.reportOverrideForTesting`
+lets tests record a report instead of trapping.
+
 `AppState` re-sends `WindowState.objectWillChange` and `AppDocumentRegistry.objectWillChange`
 synchronously, so a moved `@Published` property still publishes `AppState.objectWillChange`
 once, before the change. `WorkspaceRootContext` publishes nothing and is not observable.
@@ -46,7 +58,10 @@ the §3.2 inventory through `Mirror`. Through the façade and through the contai
 of the 16 authority inputs advances the generation and leaves a stale plan refused at commit.
 They also cover the export-context hooks, publish order and count, container release and task
 cancellation, and recovery-store loading. Removing one registry `didSet`, or the registry
-publish relay, fails them.
+publish relay, fails them. `WindowStatePartitionWiringAppTests` writes every hooked input on
+bare, never-connected containers and requires one report per input, each naming its own line.
+It writes the same inputs on an `AppState`'s containers and requires no report. The 32-case
+stale-plan test requires no report too.
 
 Alternatives: plain `get`/`set` forwarding (rejected: every subscript write copies the
 whole collection, including on the editor-publication path); moving consumers onto the
@@ -55,4 +70,9 @@ views observe the containers directly (rejected: it changes the subscriber surfa
 PR C's job); a per-window Replace authority generation (rejected by §3.2: fences are
 app-global); `@Observable` containers (rejected: they change when and how often SwiftUI
 updates, so B1 would no longer be behavior-neutral); moving the layout-mode extension instead
-of the document commands (rejected: it would conflict with #213).
+of the document commands (rejected: it would conflict with #213); `preconditionFailure` for an
+unconnected hook (rejected: it would stop Release builds too, which must keep the no-op); passing
+the callbacks into each container's `init` (would make connecting a compile-time
+requirement, but `AppState` cannot form its `[weak self]` callbacks before the containers it
+stores exist, so it needs an intermediate box: left for PR C, which creates the next
+containers).

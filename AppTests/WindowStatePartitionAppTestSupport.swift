@@ -72,6 +72,40 @@ struct WindowStatePartitionAuthorityMutation {
     let apply: @MainActor (AppState) -> Void
 }
 
+/// One write of a hooked input, applied directly to a container: an `AppState`'s own or a
+/// bare one that was never connected.
+struct WindowStatePartitionInputWrite<Container> {
+    let input: String
+    let apply: @MainActor (Container) -> Void
+}
+
+/// Collects `UnwiredContainerHook` reports instead of letting them stop the test, until `stop()`.
+@MainActor
+final class UnwiredContainerHookRecorder {
+    struct Report: Equatable {
+        let hook: String
+        let fileID: String
+        let line: UInt
+    }
+
+    private(set) var reports: [Report] = []
+
+    init() {
+        precondition(UnwiredContainerHook.reportOverrideForTesting == nil, "One recorder at a time")
+        UnwiredContainerHook.reportOverrideForTesting = { [weak self] hook, fileID, line in
+            self?.reports.append(Report(hook: "\(hook)", fileID: "\(fileID)", line: line))
+        }
+    }
+
+    func stop() {
+        UnwiredContainerHook.reportOverrideForTesting = nil
+    }
+
+    func reports(for hook: String) -> [Report] {
+        reports.filter { $0.hook == hook }
+    }
+}
+
 /// A file-backed current document on a real file, plus the anchored location the external
 /// reload and inspection task values need.
 @MainActor
@@ -98,88 +132,117 @@ struct WindowStatePartitionFixture {
     /// The 16 `didSet { noteEditorReplaceAuthorityInputDidChange() }` inputs, each once
     /// through the façade and once on its container.
     func authorityInputMutations() throws -> [WindowStatePartitionAuthorityMutation] {
-        let session = appState.currentDocument
-        let sessionID = ObjectIdentifier(session)
+        let facade = try facadeAuthorityWrites()
+        let container = windowAuthorityWrites().map { write in
+            WindowStatePartitionAuthorityMutation(input: write.input, path: "container") {
+                write.apply($0.windowState)
+            }
+        } + registryAuthorityWrites().map { write in
+            WindowStatePartitionAuthorityMutation(input: write.input, path: "container") {
+                write.apply($0.registry)
+            }
+        }
+        precondition(facade.map(\.input) == container.map(\.input))
+        return zip(facade, container).flatMap { [$0, $1] }
+    }
+
+    /// The four Replace authority inputs `WindowState` hooks, written on the container.
+    func windowAuthorityWrites() -> [WindowStatePartitionInputWrite<WindowState>] {
+        let url = location.fileURL
+        return [
+            .init(input: "currentDocument") { $0.currentDocument = DocumentSession(text: "container") },
+            .init(input: "externalChangePrompt") { $0.externalChangePrompt = .init(fileURL: url) },
+            .init(input: "missingFilePrompt") { $0.missingFilePrompt = .init(fileURL: url) },
+            .init(input: "editorFocusRequestID") { $0.editorFocusRequestID += 1 },
+        ]
+    }
+
+    /// The twelve Replace authority inputs `AppDocumentRegistry` hooks, written on the
+    /// container. The keys belong to a session the façade writes never use.
+    func registryAuthorityWrites() -> [WindowStatePartitionInputWrite<AppDocumentRegistry>] {
         let other = DocumentSession(text: "other")
         let otherID = ObjectIdentifier(other)
         let url = location.fileURL
-        let installation = EditorDocumentBindingInstallation(
-            bindingID: EditorDocumentBindingID(),
-            installationID: EditorDocumentBindingInstallationID()
-        )
+        let installation = makeInstallation()
+        let write = makeIndeterminateWrite()
+        let reload = reloadTask(for: other)
+        let inspection = inspectionTask(for: other)
+        return [
+            .init(input: "editorBindingInstallations") { $0.editorBindingInstallations[installation] = other },
+            .init(input: "pendingEditorSourceInstallations") {
+                $0.pendingEditorSourceInstallations[installation] = other
+            },
+            .init(input: "deferredExternalChangeResolutions") {
+                $0.deferredExternalChangeResolutions[url] = .keepMine
+            },
+            .init(input: "externalReloadTasks") { $0.externalReloadTasks[otherID] = reload },
+            .init(input: "externalDiskInspectionTasks") { $0.externalDiskInspectionTasks[otherID] = inspection },
+            // A subscript write fires `didSet` even when it stores no new value.
+            .init(input: "pendingExternalReloadApplications") {
+                $0.pendingExternalReloadApplications[otherID] = nil
+            },
+            .init(input: "pendingExternalTexts") { $0.pendingExternalTexts[url] = "disk again" },
+            .init(input: "pendingExternalFileVersions") { $0.pendingExternalFileVersions[url] = nil },
+            .init(input: "detachedSessionURLs") { _ = $0.detachedSessionURLs.remove(url) },
+            .init(input: "indeterminateSessionWrites") { $0.indeterminateSessionWrites[otherID] = write },
+            .init(input: "workspaceMutationWriteFences") { _ = $0.workspaceMutationWriteFences.insert(otherID) },
+            .init(input: "indeterminateWorkspaceMutationSessions") {
+                _ = $0.indeterminateWorkspaceMutationSessions.insert(otherID)
+            },
+        ]
+    }
+
+    /// The same 16 inputs, written through `AppState`'s façade on its current session.
+    private func facadeAuthorityWrites() throws -> [WindowStatePartitionAuthorityMutation] {
+        let session = appState.currentDocument
+        let sessionID = ObjectIdentifier(session)
+        let url = location.fileURL
+        let installation = makeInstallation()
         let version = try ObservedRetainedFileVersion(
             location: location,
             result: MarkdownFileStore().loadResult(at: location)
         )
-        let write = WorkspaceIndeterminateFileWrite(
-            reason: .durabilityFailed,
-            preparedMetadata: nil,
-            recoveryArtifact: .none
-        )
+        let write = makeIndeterminateWrite()
         let reload = reloadTask(for: session)
-        let otherReload = reloadTask(for: other)
         let inspection = inspectionTask(for: session)
-        let otherInspection = inspectionTask(for: other)
-        func pair(
+        func facade(
             _ input: String,
-            facade: @escaping @MainActor (AppState) -> Void,
-            container: @escaping @MainActor (AppState) -> Void
-        ) -> [WindowStatePartitionAuthorityMutation] {
-            [.init(input: input, path: "façade", apply: facade),
-             .init(input: input, path: "container", apply: container)]
+            _ apply: @escaping @MainActor (AppState) -> Void
+        ) -> WindowStatePartitionAuthorityMutation {
+            .init(input: input, path: "façade", apply: apply)
         }
         return [
-            pair("currentDocument",
-                 facade: { $0.currentDocument = DocumentSession(text: "façade") },
-                 container: { $0.windowState.currentDocument = DocumentSession(text: "container") }),
-            pair("externalChangePrompt",
-                 facade: { $0.externalChangePrompt = .init(fileURL: url) },
-                 container: { $0.windowState.externalChangePrompt = .init(fileURL: url) }),
-            pair("missingFilePrompt",
-                 facade: { $0.missingFilePrompt = .init(fileURL: url) },
-                 container: { $0.windowState.missingFilePrompt = .init(fileURL: url) }),
+            facade("currentDocument") { $0.currentDocument = DocumentSession(text: "façade") },
+            facade("externalChangePrompt") { $0.externalChangePrompt = .init(fileURL: url) },
+            facade("missingFilePrompt") { $0.missingFilePrompt = .init(fileURL: url) },
             // `private(set)` on the façade; `requestEditorFocus()` is its writer.
-            pair("editorFocusRequestID",
-                 facade: { $0.requestEditorFocus() },
-                 container: { $0.windowState.editorFocusRequestID += 1 }),
-            pair("editorBindingInstallations",
-                 facade: { $0.editorBindingInstallations[installation] = session },
-                 container: { $0.registry.editorBindingInstallations[installation] = other }),
-            pair("pendingEditorSourceInstallations",
-                 facade: { $0.pendingEditorSourceInstallations[installation] = session },
-                 container: { $0.registry.pendingEditorSourceInstallations[installation] = other }),
-            pair("deferredExternalChangeResolutions",
-                 facade: { $0.deferredExternalChangeResolutions[url] = .reload },
-                 container: { $0.registry.deferredExternalChangeResolutions[url] = .keepMine }),
-            pair("externalReloadTasks",
-                 facade: { $0.externalReloadTasks[sessionID] = reload },
-                 container: { $0.registry.externalReloadTasks[otherID] = otherReload }),
-            pair("externalDiskInspectionTasks",
-                 facade: { $0.externalDiskInspectionTasks[sessionID] = inspection },
-                 container: { $0.registry.externalDiskInspectionTasks[otherID] = otherInspection }),
-            // A subscript write fires `didSet` even when it stores no new value.
-            pair("pendingExternalReloadApplications",
-                 facade: { $0.pendingExternalReloadApplications[sessionID] = nil },
-                 container: { $0.registry.pendingExternalReloadApplications[otherID] = nil }),
-            pair("pendingExternalTexts",
-                 facade: { $0.pendingExternalTexts[url] = "disk" },
-                 container: { $0.registry.pendingExternalTexts[url] = "disk again" }),
-            pair("pendingExternalFileVersions",
-                 facade: { $0.pendingExternalFileVersions[url] = version },
-                 container: { $0.registry.pendingExternalFileVersions[url] = nil }),
-            pair("detachedSessionURLs",
-                 facade: { _ = $0.detachedSessionURLs.insert(url) },
-                 container: { _ = $0.registry.detachedSessionURLs.remove(url) }),
-            pair("indeterminateSessionWrites",
-                 facade: { $0.indeterminateSessionWrites[sessionID] = write },
-                 container: { $0.registry.indeterminateSessionWrites[otherID] = write }),
-            pair("workspaceMutationWriteFences",
-                 facade: { _ = $0.workspaceMutationWriteFences.insert(sessionID) },
-                 container: { _ = $0.registry.workspaceMutationWriteFences.insert(otherID) }),
-            pair("indeterminateWorkspaceMutationSessions",
-                 facade: { _ = $0.indeterminateWorkspaceMutationSessions.insert(sessionID) },
-                 container: { _ = $0.registry.indeterminateWorkspaceMutationSessions.insert(otherID) }),
-        ].flatMap { $0 }
+            facade("editorFocusRequestID") { $0.requestEditorFocus() },
+            facade("editorBindingInstallations") { $0.editorBindingInstallations[installation] = session },
+            facade("pendingEditorSourceInstallations") { $0.pendingEditorSourceInstallations[installation] = session },
+            facade("deferredExternalChangeResolutions") { $0.deferredExternalChangeResolutions[url] = .reload },
+            facade("externalReloadTasks") { $0.externalReloadTasks[sessionID] = reload },
+            facade("externalDiskInspectionTasks") { $0.externalDiskInspectionTasks[sessionID] = inspection },
+            facade("pendingExternalReloadApplications") { $0.pendingExternalReloadApplications[sessionID] = nil },
+            facade("pendingExternalTexts") { $0.pendingExternalTexts[url] = "disk" },
+            facade("pendingExternalFileVersions") { $0.pendingExternalFileVersions[url] = version },
+            facade("detachedSessionURLs") { _ = $0.detachedSessionURLs.insert(url) },
+            facade("indeterminateSessionWrites") { $0.indeterminateSessionWrites[sessionID] = write },
+            facade("workspaceMutationWriteFences") { _ = $0.workspaceMutationWriteFences.insert(sessionID) },
+            facade("indeterminateWorkspaceMutationSessions") {
+                _ = $0.indeterminateWorkspaceMutationSessions.insert(sessionID)
+            },
+        ]
+    }
+
+    private func makeInstallation() -> EditorDocumentBindingInstallation {
+        EditorDocumentBindingInstallation(
+            bindingID: EditorDocumentBindingID(),
+            installationID: EditorDocumentBindingInstallationID()
+        )
+    }
+
+    private func makeIndeterminateWrite() -> WorkspaceIndeterminateFileWrite {
+        WorkspaceIndeterminateFileWrite(reason: .durabilityFailed, preparedMetadata: nil, recoveryArtifact: .none)
     }
 
     private func reloadTask(for session: DocumentSession) -> ExternalReloadTask {

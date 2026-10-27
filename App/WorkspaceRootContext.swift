@@ -11,8 +11,11 @@ import WorkspaceKit
 /// windows that share a root is PR D1.
 @MainActor
 final class WorkspaceRootContext {
-    /// Set by `AppState.init`; records an Export as HTML… context change.
-    var onExportHTMLContextChange: @MainActor (ExportHTMLStopReason) -> Void = { _ in }
+    /// Set by `AppState.init`; records an Export as HTML… context change. Until then a call
+    /// goes to `UnwiredContainerHook`.
+    var onExportHTMLContextChange: @MainActor (ExportHTMLStopReason, StaticString, UInt) -> Void = { _, fileID, line in
+        UnwiredContainerHook.report("WorkspaceRootContext.onExportHTMLContextChange", fileID: fileID, line: line)
+    }
 
     var workspaceSnapshot: WorkspaceFileSnapshot?
     var workspaceSearchRootAuthority: WorkspaceFileSystemRootAuthority?
@@ -30,7 +33,7 @@ final class WorkspaceRootContext {
     var workspaceReloadPostPrepareHook: (@MainActor () throws -> Void)?
     var workspaceAccess: SecurityScopedResourceAccess? {
         didSet {
-            if oldValue !== workspaceAccess { onExportHTMLContextChange(.workspaceChanged) }
+            if oldValue !== workspaceAccess { noteExportHTMLContextChange(.workspaceChanged) }
         }
     }
 
@@ -54,5 +57,13 @@ final class WorkspaceRootContext {
     deinit {
         workspaceReloadTask?.cancel()
         workspaceWatcher?.stop()
+    }
+
+    func noteExportHTMLContextChange(
+        _ reason: ExportHTMLStopReason,
+        fileID: StaticString = #fileID,
+        line: UInt = #line
+    ) {
+        onExportHTMLContextChange(reason, fileID, line)
     }
 }
