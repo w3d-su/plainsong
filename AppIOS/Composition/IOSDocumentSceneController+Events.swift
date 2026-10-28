@@ -97,7 +97,7 @@ extension IOSDocumentSceneController {
             guard !Task.isCancelled, let self, self.handle?.identity == handle.identity,
                   self.bindingID == bindingID, handle.session.version == revision.version else { return }
             let context = grantIsCurrent ? currentGrant
-                .flatMap { $0.scope == .directory ? assetContext($0) : nil } : nil
+                .flatMap { $0.scope == .directory ? self.assetContext($0) : nil } : nil
             renderedRevision = revision
             preview.render(handle.session.snapshot, identity: handle.identity, assetAccess: context)
         }

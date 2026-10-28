@@ -12,6 +12,22 @@ struct IOSDocumentScreen: View {
         VStack(spacing: 0) {
             if scene.chrome.hasDocument {
                 IOSDocumentStatusChrome(chrome: scene.chrome)
+                if let status = scene.exportStatus {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                            .accessibilityHidden(true)
+                        Text(status)
+                            .font(.callout)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(status)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(.thinMaterial)
+                }
                 IOSDocumentStateBanner(chrome: scene.chrome, scene: scene)
                 contentArea
             } else {
@@ -25,6 +41,9 @@ struct IOSDocumentScreen: View {
                     IOSPaneToggle(scene: scene)
                 }
                 IOSAuthoringToolbarItems(scene: scene, router: router)
+                ToolbarItem(placement: .topBarLeading) {
+                    IOSSettingsLink()
+                }
             }
         }
         .sheet(item: Binding(
@@ -90,6 +109,8 @@ struct IOSDocumentScreen: View {
                 return scene.surfaces.makeAuthoringPanel?(.findReplace, context)
             case .imagePicker:
                 return scene.surfaces.makeImagePicker?(context)
+            case .workspaceSearch:
+                return AnyView(IOSWorkspaceSearchSheet(scene: scene))
             }
         }()
 

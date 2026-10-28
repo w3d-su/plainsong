@@ -5,6 +5,7 @@ import PreviewKit
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
+import WorkspaceCore
 import WorkspaceKitIOS
 
 private struct IOSProductionFocus: Equatable {
@@ -40,6 +41,10 @@ final class IOSProductionRuntime: ObservableObject {
     let recovery: IOSRecoveryController?
     let conflictCopy: IOSConflictCopyCoordinator?
     let recentPresentation = IOSRecentPresentationController()
+    let exporter = IOSDocumentExportController()
+    let typewriter = IOSTypewriterSync()
+    var previewThemeName = "system"
+    var typewriterRequested = false
 
     @Published var showOpenChoices = false
     @Published var pickerRequest: IOSProductionPickerRequest?
@@ -57,6 +62,7 @@ final class IOSProductionRuntime: ObservableObject {
     private var pendingFocus: IOSProductionFocus?
     private var focusTask: Task<Void, Never>?
     private let shutdownProvider: @MainActor () async -> Bool
+    private let readWorkspaceDocument: (@MainActor (IOSFileLocation) async throws -> String)?
     private var shutdownTask: Task<Bool, Never>?
     private var isShutDown = false
     private var isShuttingDown = false
@@ -72,7 +78,8 @@ final class IOSProductionRuntime: ObservableObject {
         openPickedURL: @escaping @MainActor (URL, IOSWorkspaceScope) async throws -> Void,
         shutdown: @escaping @MainActor () async -> Bool,
         recovery: IOSRecoveryController? = nil,
-        conflictCopy: IOSConflictCopyCoordinator? = nil
+        conflictCopy: IOSConflictCopyCoordinator? = nil,
+        readWorkspaceDocument: (@MainActor (IOSFileLocation) async throws -> String)? = nil
     ) throws {
         guard let assets = controller.capabilities.assets else {
             throw IOSDocumentFailure.unavailable
@@ -86,10 +93,37 @@ final class IOSProductionRuntime: ObservableObject {
         shutdownProvider = shutdown
         self.recovery = recovery
         self.conflictCopy = conflictCopy
+        self.readWorkspaceDocument = readWorkspaceDocument
         images = IOSImageInsertionController(writer: assets)
         scene = IOSShellSceneState(facade: controller)
         installSurfaces()
+        installTypewriter()
         recentPresentation.bind(to: self)
+    }
+
+    private func installTypewriter() {
+        editor.onViewportLine = { [weak self] line in
+            self?.typewriter.editorViewportChanged(to: line)
+        }
+        typewriter.scrollPreview = { [weak self] line in
+            self?.preview.scrollToLine(line, animated: false)
+        }
+        typewriter.scrollEditor = { [weak self] line in
+            self?.editor.scrollToSourceLine(line)
+        }
+        preview.onPreviewScrolled = { [weak self] line in
+            self?.typewriter.previewScrolled(to: line)
+        }
+        scene.onLayoutChange = { [weak self] layout in
+            self?.applyTypewriter(layout: layout)
+        }
+    }
+
+    func applyTypewriter(layout: IOSContentLayout) {
+        typewriter.setEnabled(
+            typewriterRequested && layout.showsPreview,
+            editorLine: editor.topVisibleSourceLine()
+        )
     }
 
     func startObserving() {
@@ -299,7 +333,9 @@ final class IOSProductionRuntime: ObservableObject {
             firstRequest = false
         }
     }
+}
 
+extension IOSProductionRuntime {
     private func installSurfaces() {
         scene.surfaces = IOSShellFeatureSurfaces(
             authoring: authoring,
@@ -319,6 +355,7 @@ final class IOSProductionRuntime: ObservableObject {
                 self?.imagePanel(context: context)
             },
             currentGrant: currentGrant,
+            readWorkspaceDocument: readWorkspaceDocument,
             resolveConflictCopy: conflictCopy == nil ? nil : { [weak self] in self?.requestConflictCopy() },
             refreshWorkspace: { [weak self] in
                 guard let self else { return }
@@ -328,7 +365,8 @@ final class IOSProductionRuntime: ObservableObject {
                     catch { self.show(error, title: "Couldn't Refresh") }
                 }
             },
-            openWorkspace: { [weak self] in self?.showOpenChoices = true }
+            openWorkspace: { [weak self] in self?.showOpenChoices = true },
+            exportDocument: { [weak self] kind in self?.beginExport(kind) }
         )
     }
 
@@ -412,9 +450,7 @@ final class IOSProductionRuntime: ObservableObject {
     private func show(_ error: Error, title: String) {
         scene.presentedError = IOSShellError(title: title, message: IOSOperationFeedback.message(for: error))
     }
-}
 
-extension IOSProductionRuntime {
     /// A read-only modal owns no source command route. Retire a yielded focus
     /// claim before releasing the route, without changing native text or Undo.
     func prepareForReadOnlyPresentation() {
@@ -446,13 +482,16 @@ private struct IOSProductionFeatureSheet<Content: View>: View {
     var body: some View {
         NavigationStack {
             ScrollView { content.padding() }
+                .scrollDismissesKeyboard(.interactively)
                 .navigationTitle(title)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Done") { scene.dismissPresentation() }
+                            .frame(minHeight: 44)
                     }
                 }
         }
         .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }

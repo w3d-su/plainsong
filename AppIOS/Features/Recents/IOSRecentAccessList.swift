@@ -21,12 +21,15 @@ struct IOSRecentAccessList: View {
                     .disabled(presenter.isBusy || row.status != .available)
                     .accessibilityIdentifier("plainsong.ios.recent.open.\(row.id.uuidString)")
                     Text(row.detail).font(.caption).foregroundStyle(.secondary)
-                    HStack {
-                        Button("Choose Again") { presenter.chooseAgain(recordID: row.id) }
-                            .disabled(presenter.isBusy)
-                        Spacer()
-                        Button("Remove Record", role: .destructive) { presenter.removeRecord(recordID: row.id) }
-                            .accessibilityHint("Remove this recent item from the list. The file or folder is kept.")
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 12) {
+                            chooseAgainButton(row)
+                            removeRecordButton(row)
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            chooseAgainButton(row)
+                            removeRecordButton(row)
+                        }
                     }
                     if presenter.openingRecordID == row.id {
                         ProgressView("Opening…")
@@ -39,5 +42,18 @@ struct IOSRecentAccessList: View {
         .navigationTitle("Recent Files and Folders")
         .onAppear { presenter.reload() }
         .onDisappear { presenter.cancelPendingOpen() }
+    }
+
+    private func chooseAgainButton(_ row: IOSRecentAccessRow) -> some View {
+        Button("Choose Again") { presenter.chooseAgain(recordID: row.id) }
+            .disabled(presenter.isBusy)
+            .frame(minHeight: 44)
+            .accessibilityLabel("Choose \(row.displayName) again")
+    }
+
+    private func removeRecordButton(_ row: IOSRecentAccessRow) -> some View {
+        Button("Remove Record", role: .destructive) { presenter.removeRecord(recordID: row.id) }
+            .frame(minHeight: 44)
+            .accessibilityHint("Remove this recent item from the list. The file or folder is kept.")
     }
 }

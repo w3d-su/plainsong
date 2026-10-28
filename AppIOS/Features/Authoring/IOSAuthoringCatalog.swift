@@ -33,6 +33,7 @@ enum IOSAuthoringCatalog {
         action(.previousMatch, "Find Previous", .find, "g", [.shift, .command]),
         action(.useSelectionForFind, "Use Selection for Find", .find, "e", .command),
         action(.singleReplace, "Replace", .find, nil, []),
+        action(.replaceAll, "Replace All", .find, nil, []),
     ]
 
     static func title(for id: IOSAuthoringActionID) -> String {

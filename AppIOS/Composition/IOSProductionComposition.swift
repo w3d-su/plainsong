@@ -4,6 +4,7 @@ import PreviewKit
 import PreviewKitContracts
 import SyntaxKit
 import UIKit
+import WorkspaceCore
 import WorkspaceKitIOS
 
 /// C0 remains an unavailable sentinel for contract regressions. The production
@@ -54,6 +55,33 @@ struct IOSProductionComposition {
                 )
             }
         )
+        let readWorkspaceDocument: @MainActor (IOSFileLocation) async throws -> String = { [
+            weak controller,
+            weak access
+        ] location in
+            guard let controller, let access, controller.grantIsCurrent, let grant = controller.currentGrant,
+                  grant.scope == .directory,
+                  location.workspaceID == grant.workspaceID,
+                  location.accessGeneration == grant.accessGeneration
+            else { throw IOSWorkspaceFailure.grantChanged }
+            let lease = try access.acquireLease(for: grant)
+            defer { lease.release() }
+            let payload: Data
+            do {
+                payload = try await access.read(
+                    location,
+                    lease: lease,
+                    operationID: UUID(),
+                    maximumByteCount: IOSWorkspaceSearchLimits.maximumFileBytes
+                ).data
+            } catch let failure as IOSWorkspaceFailure where failure == .tooLarge {
+                throw IOSWorkspaceSearchReadError.tooLarge
+            }
+            guard let decoded = String(data: payload, encoding: .utf8), Data(decoded.utf8) == payload else {
+                throw IOSWorkspaceSearchReadError.unsupportedEncoding
+            }
+            return decoded
+        }
         let runtime = try IOSProductionRuntime(
             controller: controller, editor: editor, preview: preview,
             currentGrant: { [weak controller] in
@@ -69,7 +97,8 @@ struct IOSProductionComposition {
                 try await controller.openPickedURL(url, scope: scope)
             },
             shutdown: { [controller] in await controller.shutdown() }, recovery: recoveryUI,
-            conflictCopy: IOSConflictCopyCoordinator(controller: controller)
+            conflictCopy: IOSConflictCopyCoordinator(controller: controller),
+            readWorkspaceDocument: readWorkspaceDocument
         )
         runtime.recentPresentation.install(
             access: access,

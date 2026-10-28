@@ -177,7 +177,11 @@ extension IOSSourceEditorController {
         guard isValid(result) else { return false }
         isMutating = true
         defer { isMutating = false }
-        return IOSNativeTextMutation.replace(result, in: textView, actionName: actionName)
+        let applied = IOSNativeTextMutation.replace(result, in: textView, actionName: actionName)
+        if applied {
+            noteLineReplacement(range: result.replacementRange, replacement: result.replacementString)
+        }
+        return applied
     }
 
     private func isValid(_ result: MarkdownEditResult) -> Bool {
@@ -203,12 +207,17 @@ extension IOSSourceEditorController {
         installation.session.replaceTextFromAuthorizedEditor(current, refreshStatistics: false)
         let version = installation.session.version
         let session = installation.session
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
             let statistics = await Task.detached(priority: .utility) {
                 TextStatistics(text: current)
             }.value
             guard session.version == version, ExactSourceFragment.matches(session.text, current) else { return }
+            guard session.statistics != statistics else { return }
             session.applyStatistics(statistics)
+            // Chrome reads the editor snapshot, which was emitted before this count finished.
+            if self?.installation?.session === session {
+                self?.emitSnapshot()
+            }
         }
     }
 

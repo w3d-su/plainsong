@@ -17,14 +17,16 @@ struct IOSDocumentStatusChrome: View {
                     Text(chrome.documentTitle)
                         .font(.headline)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                         .accessibilityIdentifier("plainsong.ios.editor.fileName")
-                        .accessibilityLabel("Current file")
+                        .accessibilityLabel(fileAccessibilityLabel)
+                        .accessibilityAddTraits(.isHeader)
 
                     if chrome.isDirty {
                         Circle()
                             .fill(.orange)
-                            .frame(width: 7, height: 7)
-                            .accessibilityLabel("Edited")
+                            .frame(width: 8, height: 8)
+                            .accessibilityHidden(true)
                     }
                 }
 
@@ -32,9 +34,20 @@ struct IOSDocumentStatusChrome: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                if let statistics = chrome.statistics {
+                    Text(IOSDocumentStatisticsPresentation.counts(statistics))
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
+                        .accessibilityLabel(IOSDocumentStatisticsPresentation.accessibilitySummary(statistics))
+                        .accessibilityIdentifier("plainsong.ios.editor.statistics")
+                }
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
             if !chrome.editorCanWrite, chrome.status == .ready {
                 Text("Read Only")
@@ -65,6 +78,12 @@ struct IOSDocumentStatusChrome: View {
         .background(.bar)
     }
 
+    private var fileAccessibilityLabel: String {
+        chrome.isDirty
+            ? "Current file, \(chrome.documentTitle), edited"
+            : "Current file, \(chrome.documentTitle)"
+    }
+
     private var statusLine: String {
         switch chrome.status {
         case .noDocument: "No file"
@@ -88,50 +107,100 @@ struct IOSDocumentStateBanner: View {
     var body: some View {
         switch chrome.status {
         case .opening:
-            banner(tint: .blue) {
-                ProgressView().controlSize(.small)
-                Text("Opening document…").font(.callout)
-                Spacer()
+            banner(tint: .blue, showsActions: false) {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityLabel("Opening")
+                Text("Opening document…")
+                    .font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
+            } actions: {
+                EmptyView()
             }
         case .conflict:
             banner(tint: .orange) {
                 Image(systemName: "exclamationmark.triangle")
                     .foregroundStyle(.orange)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("File changed outside this editor").font(.callout.weight(.medium))
+                    Text("File changed outside this editor")
+                        .font(.callout.weight(.medium))
+                        .fixedSize(horizontal: false, vertical: true)
                     if let detail = chrome.statusDetail {
-                        Text(detail).font(.caption).foregroundStyle(.secondary)
+                        Text(detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                Spacer()
-                Button("Reload") {
-                    scene.resolveExternal(.reload)
-                }
-                .accessibilityHint("Replace editor contents with the file on disk")
-                if let copy = scene.surfaces.resolveConflictCopy {
-                    Button("Save a Copy", action: copy)
+            } actions: {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) {
+                        bannerButton("Reload", hint: "Replace editor contents with the file on disk") {
+                            scene.resolveExternal(.reload)
+                        }
+                        if let copy = scene.surfaces.resolveConflictCopy {
+                            bannerButton("Save a Copy", action: copy)
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        bannerButton("Reload", hint: "Replace editor contents with the file on disk") {
+                            scene.resolveExternal(.reload)
+                        }
+                        if let copy = scene.surfaces.resolveConflictCopy {
+                            bannerButton("Save a Copy", action: copy)
+                        }
+                    }
                 }
             }
         case .unavailable:
             banner(tint: .red) {
                 Image(systemName: "exclamationmark.octagon")
                     .foregroundStyle(.red)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Document unavailable").font(.callout.weight(.medium))
+                    Text("Document unavailable")
+                        .font(.callout.weight(.medium))
+                        .fixedSize(horizontal: false, vertical: true)
                     if let detail = chrome.statusDetail {
-                        Text(detail).font(.caption).foregroundStyle(.secondary)
+                        Text(detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                Spacer()
-                if scene.surfaces.reselectUnavailableWorkspace != nil {
-                    Button("Choose File or Folder Again") {
-                        scene.reselectUnavailableDocument()
+            } actions: {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) {
+                        if scene.surfaces.reselectUnavailableWorkspace != nil {
+                            bannerButton("Choose File or Folder Again") {
+                                scene.reselectUnavailableDocument()
+                            }
+                            .accessibilityIdentifier("plainsong.ios.document.choose-again")
+                        }
+                        if let copy = scene.surfaces.resolveConflictCopy {
+                            bannerButton(
+                                "Save a Copy",
+                                hint: "Save the retained text to a different folder without closing this document",
+                                action: copy
+                            )
+                        }
                     }
-                    .accessibilityIdentifier("plainsong.ios.document.choose-again")
-                }
-                if let copy = scene.surfaces.resolveConflictCopy {
-                    Button("Save a Copy", action: copy)
-                        .accessibilityHint("Save the retained text to a different folder without closing this document")
+                    VStack(alignment: .leading, spacing: 8) {
+                        if scene.surfaces.reselectUnavailableWorkspace != nil {
+                            bannerButton("Choose File or Folder Again") {
+                                scene.reselectUnavailableDocument()
+                            }
+                            .accessibilityIdentifier("plainsong.ios.document.choose-again")
+                        }
+                        if let copy = scene.surfaces.resolveConflictCopy {
+                            bannerButton(
+                                "Save a Copy",
+                                hint: "Save the retained text to a different folder without closing this document",
+                                action: copy
+                            )
+                        }
+                    }
                 }
             }
         case .ready, .noDocument, .closed:
@@ -140,15 +209,49 @@ struct IOSDocumentStateBanner: View {
     }
 
     private func banner(
-        tint _: Color,
-        @ViewBuilder content: () -> some View
+        tint: Color,
+        showsActions: Bool = true,
+        @ViewBuilder message: () -> some View,
+        @ViewBuilder actions: () -> some View
     ) -> some View {
-        HStack(spacing: 10) { content() }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.yellow.opacity(0.16))
-            .accessibilityElement(children: .contain)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                message()
+                Spacer(minLength: 0)
+            }
+            if showsActions {
+                actions()
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(tint.opacity(0.16))
+        .accessibilityElement(children: .contain)
+    }
+
+    private func bannerButton(
+        _ title: String,
+        hint: String? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(title, action: action)
+            .buttonStyle(.bordered)
+            .fixedSize(horizontal: true, vertical: false)
+            .frame(minHeight: 44)
+            .modifier(BannerHint(hint: hint))
+    }
+}
+
+private struct BannerHint: ViewModifier {
+    let hint: String?
+
+    func body(content: Content) -> some View {
+        if let hint, !hint.isEmpty {
+            content.accessibilityHint(hint)
+        } else {
+            content
+        }
     }
 }
 

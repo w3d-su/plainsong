@@ -4,9 +4,18 @@ public extension IOSSourceEditorController {
     func textViewDidChange(_ textView: UITextView) {
         guard textView === self.textView, !isReconciling, !isMutating else { return }
         noteMarkedTextTransition()
+        if textView.markedTextRange != nil {
+            rebuildLineIndex()
+        } else if let pending = pendingLineEdit {
+            pendingLineEdit = nil
+            noteLineReplacement(range: pending.range, replacement: pending.replacement)
+        } else {
+            rebuildLineIndex()
+        }
         publishCurrentText()
         scheduleHighlight()
         emitSnapshot()
+        noteViewportLine()
     }
 
     func textViewDidChangeSelection(_ textView: UITextView) {
@@ -17,6 +26,7 @@ public extension IOSSourceEditorController {
             lastSelection = range
             return
         }
+        self.textView.setNeedsLineNumberDisplay()
         guard range != lastSelection else { return }
         lastSelection = range
         selectionGeneration &+= 1
@@ -32,11 +42,17 @@ public extension IOSSourceEditorController {
         if isMutating || isReconciling {
             return true
         }
-        return !consumeReplacement(text, range: range)
+        let allow = !consumeReplacement(text, range: range)
+        if allow {
+            pendingLineEdit = (range: range, replacement: text)
+        }
+        return allow
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         guard scrollView === textView, textView.viewportOverride == nil, !isReconciling else { return }
+        textView.setNeedsLineNumberDisplay()
+        noteViewportLine()
         let viewport = IOSViewport.visibleUTF16Range(in: textView)
         guard viewport != lastSelectionViewport else { return }
         lastSelectionViewport = viewport

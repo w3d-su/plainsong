@@ -1,6 +1,5 @@
 import Foundation
 import MarkdownCore
-import Photos
 import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
@@ -9,7 +8,9 @@ struct IOSImagePhotoPicker: UIViewControllerRepresentable {
     let onResults: ([PHPickerResult]) -> Void
 
     func makeUIViewController(context: Context) -> PHPickerViewController {
-        var configuration = PHPickerConfiguration(photoLibrary: .shared())
+        // The default picker returns the selected image without opening
+        // PHPhotoLibrary, so presentation does not require photo-library permission.
+        var configuration = PHPickerConfiguration()
         configuration.selectionLimit = 1
         configuration.filter = .images
         // Keep the original HEIC payload. This lane transcodes and then checks the PNG bytes.
@@ -85,6 +86,7 @@ struct IOSImageFilePicker: UIViewControllerRepresentable {
 }
 
 enum IOSImagePhotoPayloadLoader {
+    @MainActor
     static func load(_ result: PHPickerResult) async -> Result<IOSImagePickedPayload, IOSImagePickFailure> {
         let provider = result.itemProvider
         guard let identifier = preferredIdentifier(in: provider) else {
@@ -123,6 +125,7 @@ enum IOSImagePhotoPayloadLoader {
         return nil
     }
 
+    @MainActor
     private static func dataRepresentation(_ provider: NSItemProvider, identifier: String) async throws -> Data {
         try await withCheckedThrowingContinuation { continuation in
             let box = ResumeOnce()

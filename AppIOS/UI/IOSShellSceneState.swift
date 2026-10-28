@@ -19,11 +19,16 @@ final class IOSShellSceneState: ObservableObject {
     @Published private(set) var chrome: IOSShellChromeSnapshot
     @Published private(set) var workspaceSnapshot: IOSWorkspaceSnapshot?
     @Published private(set) var layout: IOSContentLayout
+    /// Fires only after init, when the panes actually change visibility.
+    var onLayoutChange: ((IOSContentLayout) -> Void)?
     @Published var preferredPane: IOSEditorPane = .source
     @Published private(set) var presentation: IOSShellPresentation?
     @Published var navigationPath: [IOSShellRoute] = []
     @Published var selectedEntryID: IOSWorkspaceEntry.ID?
     @Published var presentedError: IOSShellError?
+    /// Non-nil while an export is preparing a file. The shell does not export.
+    @Published var exportStatus: String?
+    let workspaceSearch = IOSWorkspaceSearchController()
 
     /// Latest observed editor snapshot. Read at action time, never published
     /// per keystroke — chrome carries the deduplicated projection instead.
@@ -73,6 +78,7 @@ final class IOSShellSceneState: ObservableObject {
         editorObservation = nil
         observedEditorID = nil
         isObserving = false
+        workspaceSearch.cancel()
     }
 
     private func apply(sceneSnapshot snapshot: IOSAppSceneSnapshot) {
@@ -80,6 +86,9 @@ final class IOSShellSceneState: ObservableObject {
         sceneSnapshot = snapshot
         if !IOSShellWorkspaceProjection.matches(workspaceSnapshot, snapshot.workspace) {
             workspaceSnapshot = snapshot.workspace
+            if presentation == .workspaceSearch {
+                workspaceSearch.scheduleSearch(environment: workspaceSearchEnvironment())
+            }
         }
         let identity = snapshot.document?.revision.documentID
         if previousIdentity != identity {
@@ -115,7 +124,14 @@ final class IOSShellSceneState: ObservableObject {
     private func handle(editorEvent event: IOSSourceEditorEvent) {
         switch event {
         case let .snapshotChanged(snapshot):
+            let previousVersion = editorSnapshot?.revision.version
             editorSnapshot = snapshot
+            if presentation == .workspaceSearch,
+               workspaceSearch.hasQuery,
+               snapshot.revision.version != previousVersion
+            {
+                workspaceSearch.scheduleSearch(environment: workspaceSearchEnvironment())
+            }
         case let .detached(_, bindingID):
             if editorSnapshot?.bindingID == bindingID {
                 editorSnapshot = nil
@@ -143,9 +159,7 @@ final class IOSShellSceneState: ObservableObject {
             contentWidth: contentWidth,
             preferredPane: preferredPane
         )
-        if next != layout {
-            layout = next
-        }
+        setLayout(next)
     }
 
     /// The preferred single pane changed (segmented control / toggle button).
@@ -154,8 +168,14 @@ final class IOSShellSceneState: ObservableObject {
     func showPane(_ pane: IOSEditorPane) {
         preferredPane = pane
         if case .single = layout {
-            layout = .single(pane)
+            setLayout(.single(pane))
         }
+    }
+
+    private func setLayout(_ next: IOSContentLayout) {
+        guard next != layout else { return }
+        layout = next
+        onLayoutChange?(next)
     }
 
     // MARK: Hosted views
@@ -339,5 +359,117 @@ final class IOSShellSceneState: ObservableObject {
 
     func dismissError() {
         presentedError = nil
+    }
+}
+
+extension IOSShellSceneState {
+    func presentWorkspaceSearch() {
+        guard chrome.hasWorkspace else { return }
+        present(.workspaceSearch)
+    }
+
+    func refreshWorkspaceSearch() {
+        workspaceSearch.scheduleSearch(environment: workspaceSearchEnvironment(), immediate: true)
+    }
+
+    func updateWorkspaceSearchQuery(_ query: String) {
+        workspaceSearch.scheduleSearch(query: query, environment: workspaceSearchEnvironment())
+    }
+
+    func updateWorkspaceSearchCase(_ value: TextSearchCaseSensitivity) {
+        workspaceSearch.scheduleSearch(
+            caseSensitivity: value,
+            environment: workspaceSearchEnvironment(),
+            immediate: true
+        )
+    }
+
+    func updateWorkspaceSearchWholeWord(_ value: Bool) {
+        workspaceSearch.scheduleSearch(
+            wholeWord: value,
+            environment: workspaceSearchEnvironment(),
+            immediate: true
+        )
+    }
+
+    func openWorkspaceSearchHit(_ hit: IOSWorkspaceSearchHit, in section: IOSWorkspaceSearchSection) {
+        let location = section.location
+        Task { @MainActor in
+            await self.activateWorkspaceSearch(hit, location: location)
+        }
+    }
+
+    private func activateWorkspaceSearch(_ hit: IOSWorkspaceSearchHit, location: IOSFileLocation) async {
+        let alreadyOpen = sceneSnapshot.document.map { sameWorkspacePath($0.location, location) } ?? false
+        if !alreadyOpen {
+            do {
+                try await facade.openSelectedURL(location.fileURL, scope: .singleFile)
+            } catch is CancellationError {
+                return
+            } catch {
+                presentedError = IOSShellError(
+                    title: "Couldn't Open Match",
+                    message: IOSOperationFeedback.message(for: error)
+                )
+                return
+            }
+        }
+        guard let stored = sceneSnapshot.document, sameWorkspacePath(stored.location, location),
+              let editor = currentEditor, let snapshot = editor.captureSnapshot(),
+              snapshot.revision.documentID == stored.revision.documentID
+        else {
+            workspaceSearch.report("The match could not be selected.")
+            return
+        }
+        let source = snapshot.document.text as NSString
+        guard NSMaxRange(hit.range) <= source.length, source.substring(with: hit.range) == hit.matchedText else {
+            workspaceSearch.report("The file changed before the match could be selected.")
+            return
+        }
+        guard editor.reveal(hit.range, expected: snapshot.revision) else {
+            workspaceSearch.report("The match could not be selected.")
+            return
+        }
+        dismissPresentation()
+        navigateToDocument()
+    }
+
+    func workspaceSearchEnvironment() -> IOSWorkspaceSearchEnvironment {
+        let grant = surfaces.currentGrant?()
+        let tree = workspaceSnapshot
+        let scope: IOSWorkspaceScope? = {
+            guard let grant, let tree,
+                  grant.workspaceID == tree.workspaceID,
+                  grant.accessGeneration == tree.accessGeneration
+            else { return nil }
+            return grant.scope
+        }()
+        let open: IOSWorkspaceSearchOpenDocument? = {
+            guard let stored = sceneSnapshot.document, let tree,
+                  stored.location.workspaceID == tree.workspaceID
+            else { return nil }
+            let text: String = if let editor = editorSnapshot,
+                                  editor.revision.documentID == stored.revision.documentID
+            {
+                editor.document.text
+            } else {
+                stored.document.text
+            }
+            return IOSWorkspaceSearchOpenDocument(
+                workspaceID: stored.location.workspaceID,
+                relativePath: stored.location.relativePath,
+                text: text
+            )
+        }()
+        return IOSWorkspaceSearchEnvironment(
+            scope: scope,
+            entries: tree?.entries ?? [],
+            openDocument: open,
+            read: surfaces.readWorkspaceDocument ?? { _ in throw IOSWorkspaceFailure.unavailable }
+        )
+    }
+
+    private func sameWorkspacePath(_ lhs: IOSFileLocation, _ rhs: IOSFileLocation) -> Bool {
+        lhs.workspaceID == rhs.workspaceID && lhs.relativePath.utf8.elementsEqual(rhs.relativePath.utf8)
     }
 }
