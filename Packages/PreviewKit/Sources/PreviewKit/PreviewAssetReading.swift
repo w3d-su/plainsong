@@ -1,6 +1,6 @@
 import Foundation
 
-/// Opaque authority copied from 06 by 13; no WorkspaceKitIOS dependency in PreviewKit.
+/// Opaque authority passed by composition; no WorkspaceKitIOS dependency in PreviewKit.
 public struct PreviewAssetAccessContext: Sendable {
     public let allowedRoot: URL
     public let rootToken: UUID
@@ -52,13 +52,13 @@ public enum PreviewAssetReadFailure: Error, Equatable, Sendable {
     case providerFailed
 }
 
-/// 06 holds a lease through the read and returns the actual coordinated location.
+/// Holds a lease through the read and returns the actual coordinated location.
 /// Throws PreviewAssetReadFailure or CancellationError, never empty bytes as failure.
 public protocol PreviewAssetReading: Sendable {
     func read(_ request: PreviewAssetReadRequest) async throws -> PreviewAssetReadResult
 }
 
-/// 07 synchronously checks before every WebKit callback, including didFinish.
+/// Synchronously checks before every WebKit callback, including didFinish.
 /// MainActor serializes root switches/revocation against this final check and send.
 @MainActor
 public protocol PreviewAssetAccessChecking: AnyObject {

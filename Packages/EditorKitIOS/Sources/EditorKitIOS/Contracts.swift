@@ -93,7 +93,7 @@ public protocol IOSSourceEditorControlling: AnyObject {
     func redo()
 }
 
-/// 13 attaches the exact session owned by 05. Only 04 publishes native writes.
+/// Binds the exact stored session; only the native editor publishes source writes.
 @MainActor
 public struct IOSSourceEditorDocumentBinding {
     public let bindingID: UUID
@@ -128,7 +128,7 @@ public protocol IOSSourceEditorBinding: IOSSourceEditorControlling {
     func attach(_ binding: IOSSourceEditorDocumentBinding)
     func detach(expected identity: IOSDocumentIdentity, bindingID: UUID)
     func updateAccess(for identity: IOSDocumentIdentity, bindingID: UUID, generation: UInt64, canWrite: Bool)
-    /// 13 changes command ownership only for the expected installed binding.
+    /// Changes command ownership only for the expected installed binding.
     func updateCommandFocus(for identity: IOSDocumentIdentity, bindingID: UUID, isFocused: Bool)
     /// No user edit/Undo; marked text or a busy native writer returns deferred.
     func installExternalReload(_ proposal: IOSDocumentReloadProposal) -> IOSDocumentReloadOutcome

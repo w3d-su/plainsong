@@ -1,6 +1,6 @@
 import Foundation
 
-/// Semantic kinds shared by the existing Mac parser and the future iOS provider.
+/// Semantic kinds shared by syntax providers across platforms.
 /// Ranges are absolute UTF-16 offsets in the complete source, never UTF-8 bytes.
 public struct MarkdownSyntaxToken: Equatable, Sendable {
     public enum Kind: Equatable, Sendable {

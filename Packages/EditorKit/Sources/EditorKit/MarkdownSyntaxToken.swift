@@ -1,4 +1,4 @@
 import SyntaxKit
 
-/// Compatibility name, not a second declaration. Parser/fold extraction belongs to 02.
+/// Compatibility name, not a second declaration.
 typealias MarkdownSyntaxToken = SyntaxKit.MarkdownSyntaxToken
