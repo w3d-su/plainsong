@@ -1,5 +1,7 @@
 # Plainsong
 
+English | [繁體中文](README.zh-Hant.md)
+
 A native macOS Markdown/MDX editor, built with Swift (SwiftUI shell + AppKit/TextKit 2
 editor core) — in the spirit of Typora, tuned for blog authoring workflows
 (Astro/Next.js content folders, YAML frontmatter, CJK-friendly).
