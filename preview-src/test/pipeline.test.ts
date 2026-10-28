@@ -17,6 +17,13 @@ describe("markdown preview pipeline", () => {
     expect(html).toContain('<p data-line="3">Paragraph</p>');
     expect(html).toContain('data-line="5"');
   });
+
+  it("keeps a workspace SVG as an image instead of inlining it", async () => {
+    const html = await renderMarkdown("![Logo](images/logo.svg)\n");
+    expect(html).toContain("images/logo.svg");
+    expect(html).toContain("<img");
+    expect(html).not.toContain("<svg");
+  });
 });
 
 describe("mdx preview pipeline", () => {

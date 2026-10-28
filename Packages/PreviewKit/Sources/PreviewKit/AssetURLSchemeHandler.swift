@@ -11,10 +11,30 @@ enum AssetURLPolicyError: Error, Equatable {
 struct AssetURLPolicyResult: Equatable {
     let mimeType: String
     let data: Data
+    /// Set only for an admitted SVG. Raster responses stay header-less.
+    let contentSecurityPolicy: String?
+
+    init(mimeType: String, data: Data, contentSecurityPolicy: String? = nil) {
+        self.mimeType = mimeType
+        self.data = data
+        self.contentSecurityPolicy = contentSecurityPolicy
+    }
 }
 
 enum AssetURLPolicy {
     static let maxAssetBytes = MarkdownImageAssetPolicy.maximumFileSizeBytes
+
+    static func isSVG(_ fileURL: URL) -> Bool {
+        fileURL.pathExtension.lowercased() == "svg"
+    }
+
+    /// Raster files keep the 10 MiB cap. SVG is capped before it is parsed.
+    static func maximumPreviewByteCount(for fileURL: URL) -> Int64 {
+        if isSVG(fileURL) {
+            return Int64(SVGImageValidator.maximumByteCount)
+        }
+        return maxAssetBytes
+    }
 
     static func loadAsset(at fileURL: URL) throws -> AssetURLPolicyResult {
         let mimeType = try mimeType(for: fileURL)
@@ -158,7 +178,7 @@ final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler, @unchecked Send
                 requestID: capture.requestID,
                 resolvedURL: resolved,
                 access: capture.access,
-                maximumByteCount: Int(exactly: AssetURLPolicy.maxAssetBytes) ?? .max
+                maximumByteCount: Int(exactly: AssetURLPolicy.maximumPreviewByteCount(for: resolved)) ?? .max
             )
             do {
                 try Task.checkCancellation()
@@ -228,11 +248,9 @@ final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler, @unchecked Send
         taskID: ObjectIdentifier
     ) {
         guard state.permission(for: capture, taskID: taskID).acceptsDelivery else { return }
-        let response = URLResponse(
+        let response = AssetDeliveryResponse.make(
             url: task.requestURL ?? displayURL,
-            mimeType: asset.mimeType,
-            expectedContentLength: asset.data.count,
-            textEncodingName: nil
+            asset: asset
         )
         task.receive(response: response)
         guard state.permission(for: capture, taskID: taskID).acceptsDelivery else { return }
@@ -316,35 +334,6 @@ private extension PreviewAssetReadFailure {
         default:
             .providerFailed
         }
-    }
-}
-
-/// Filesystem work for a preview asset read. This type is not the URL-scheme
-/// handler, so symlink resolution and file metadata stay off the main actor.
-private enum AssetFilesystemPreparation {
-    struct ContainedAsset: Sendable {
-        let asset: AssetURLPolicyResult
-        let fileURL: URL
-    }
-
-    static func resolvedAssetURL(_ requestURL: URL, allowedRoot: URL) throws -> URL {
-        let resolved = try AssetURLResolver(allowedRoot: allowedRoot).resolve(requestURL)
-        _ = try AssetURLPolicy.mimeType(for: resolved)
-        if let fileSize = try? resolved.resourceValues(forKeys: [.fileSizeKey]).fileSize,
-           Int64(fileSize) > AssetURLPolicy.maxAssetBytes
-        {
-            throw AssetURLPolicyError.fileTooLarge(
-                actualBytes: Int64(fileSize),
-                maxBytes: AssetURLPolicy.maxAssetBytes
-            )
-        }
-        return resolved
-    }
-
-    static func containedAsset(_ bytes: Data, fileURL: URL, root: URL) throws -> ContainedAsset {
-        let contained = try AssetContainment.fileURL(fileURL, isContainedIn: root)
-        let asset = try AssetURLPolicy.deliveredAsset(data: bytes, fileURL: contained)
-        return ContainedAsset(asset: asset, fileURL: contained)
     }
 }
 

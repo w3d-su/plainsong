@@ -1,4 +1,5 @@
 import Foundation
+import MarkdownCore
 @testable import PreviewKit
 import XCTest
 
@@ -159,15 +160,44 @@ final class PreviewAssetFenceTests: XCTestCase {
         XCTAssertTrue(wrong.data.isEmpty)
     }
 
-    func testSVGIsRejectedBeforeTheReader() async throws {
+    func testAdmittedSVGIsServedUnchangedAndRejectedSVGIsNot() async throws {
         let root = try makeRoot()
         let handler = makeHandler(root: root, generation: 1)
-        let task = makeTask(handler, path: "vector.svg")
+        let admitted = Data(
+            #"<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"><rect width="2" height="2"/></svg>"#
+                .utf8
+        )
+        let task = makeTask(handler, path: "mark.svg")
         handler.handler.start(task)
-        try? await Task.sleep(nanoseconds: 100_000_000)
-        XCTAssertEqual(handler.reader.readCount, 0)
-        XCTAssertEqual(task.failures, 1)
-        XCTAssertTrue(task.data.isEmpty)
+        await PreviewAssetTestSupport.waitUntil("svg read") { handler.reader.hasWaiter() }
+        let delivered = expectation(description: "svg delivered")
+        task.onTerminal = { delivered.fulfill() }
+        handler.reader.resumeFirst(bytes: admitted)
+        await fulfillment(of: [delivered], timeout: 2)
+        XCTAssertEqual(task.data, admitted)
+        XCTAssertEqual(task.finished, 1)
+        XCTAssertEqual(task.failures, 0)
+        let response = try XCTUnwrap(task.response as? HTTPURLResponse)
+        XCTAssertEqual(response.mimeType, "image/svg+xml")
+        XCTAssertEqual(response.value(forHTTPHeaderField: "Content-Type"), "image/svg+xml")
+        XCTAssertEqual(
+            response.value(forHTTPHeaderField: "Content-Security-Policy"),
+            SVGImageValidator.contentSecurityPolicy
+        )
+
+        let rejected = makeTask(handler, path: "script.svg")
+        handler.handler.start(rejected)
+        await PreviewAssetTestSupport.waitUntil("script svg read") { handler.reader.hasWaiter() }
+        let failed = expectation(description: "script svg rejected")
+        rejected.onTerminal = { failed.fulfill() }
+        handler.reader.resumeFirst(
+            bytes: Data(#"<svg xmlns="http://www.w3.org/2000/svg"><script/></svg>"#.utf8)
+        )
+        await fulfillment(of: [failed], timeout: 2)
+        XCTAssertTrue(rejected.data.isEmpty)
+        XCTAssertEqual(rejected.responseCount, 0)
+        XCTAssertEqual(rejected.finished, 0)
+        XCTAssertEqual(rejected.failures, 1)
     }
 
     func testPrefixSiblingFileURLIsOutsideTheRoot() throws {

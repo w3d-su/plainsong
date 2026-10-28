@@ -91,6 +91,7 @@ final class GatePreviewAssetReader: PreviewAssetReading, @unchecked Sendable {
 final class RecordingSchemeTask: PreviewAssetSchemeTask {
     let requestURL: URL?
     private(set) var data = Data()
+    private(set) var response: URLResponse?
     private(set) var responseCount = 0
     private(set) var finished = 0
     private(set) var failures = 0
@@ -100,8 +101,9 @@ final class RecordingSchemeTask: PreviewAssetSchemeTask {
         requestURL = url
     }
 
-    func receive(response _: URLResponse) {
+    func receive(response: URLResponse) {
         responseCount += 1
+        self.response = response
     }
 
     func receive(data: Data) {

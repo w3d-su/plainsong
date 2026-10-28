@@ -438,9 +438,14 @@ republishes only when its value changes literally.
   against the current file's directory / workspace root. Render payloads carry an opaque
   `assetRootID`; local image URLs include it as a query token so a root change invalidates
   retained image loads, and delayed requests with an obsolete token are rejected. The handler enforces path containment
-  (reject `..` and symlink escapes outside the workspace), and serves only PNG, JPEG,
-  GIF, or WebP assets up to 10 MiB. SVG and other active/ambiguous formats are rejected
-  until a separate sanitization policy exists.
+  (reject `..` and symlink escapes outside the workspace). It serves PNG, JPEG, GIF, or
+  WebP up to 10 MiB, and UTF-8 `.svg` up to 1 MiB when `SVGImageValidator` admits it:
+  no DOCTYPE, no script, foreign content, event handlers, or external references, at most
+  50,000 elements and depth 256. An admitted SVG is served byte-for-byte as
+  `image/svg+xml` with response `Content-Security-Policy: default-src 'none'; style-src
+  'unsafe-inline'`. Validation runs off the main actor. `data:image/svg+xml` and inline
+  `<svg>` stay blocked. HTML and PDF export do not embed SVG yet. Other active or
+  ambiguous formats are rejected.
 - Link clicks: intercepted in Swift. `http(s)` → `NSWorkspace.open` (external browser).
   Relative `.md`/`.mdx` → open that file in the editor. `#anchor` stays in JavaScript
   and scrolls the preview to a generated heading ID (Unicode and duplicate headings supported).

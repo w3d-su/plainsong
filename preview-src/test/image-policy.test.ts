@@ -22,6 +22,18 @@ describe("preview image source policy", () => {
     }
   });
 
+  it("rewrites workspace SVG through asset URLs and keeps asset SVG", () => {
+    expect(imageSourcePolicy("../images/logo.svg", "content/posts", false)).toEqual({
+      action: "rewrite",
+      src: "asset://content/images/logo.svg",
+    });
+    expect(imageSourcePolicy("asset://content/images/logo.svg", null, false)).toEqual({ action: "keep" });
+    expect(imageSourcePolicy("asset://content/images/logo.svg", null, false, "root-1")).toEqual({
+      action: "rewrite",
+      src: "asset://content/images/logo.svg?plainsong-root=root-1",
+    });
+  });
+
   it("blocks non-raster data sources", () => {
     for (const source of [
       "data:image/svg+xml;base64,AAA=",
