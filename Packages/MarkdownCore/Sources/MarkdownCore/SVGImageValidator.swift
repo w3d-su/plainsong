@@ -27,7 +27,12 @@ public enum SVGImageValidator {
     public static let maximumByteCount = 1_048_576
     public static let maximumElementCount = 50000
     public static let maximumDepth = 256
-    public static let mimeType = "image/svg+xml"
+    /// The charset pins WebKit to UTF-8 (RFC 7303: the HTTP charset overrides the XML
+    /// declaration), so it decodes the same characters the validator parsed.
+    public static let mimeType = "image/svg+xml; charset=utf-8"
+    /// Backstop for document mode only. WebKit builds an SVG image from the bytes and is
+    /// not expected to apply response headers in image mode; navigation and the page CSP
+    /// already keep `asset://` SVG out of document mode.
     public static let contentSecurityPolicy = "default-src 'none'; style-src 'unsafe-inline'"
     public static let namespace = "http://www.w3.org/2000/svg"
 
@@ -82,7 +87,13 @@ public enum SVGImageValidator {
         return key
     }
 
-    fileprivate static func attributeRejection(_ attributes: [String: String]) -> SVGImageRejection? {
+    /// SMIL value attributes. An animation can set `fill` or `style` to `url(https:…)`.
+    private static let smilValueAttributes: Set<String> = ["by", "from", "to", "values"]
+
+    fileprivate static func attributeRejection(
+        _ attributes: [String: String],
+        isSMIL: Bool
+    ) -> SVGImageRejection? {
         for (key, value) in attributes {
             let name = localName(of: key).lowercased()
             if isEventHandler(name) {
@@ -91,7 +102,8 @@ public enum SVGImageValidator {
             if name == "href" || name == "src", !isSameDocumentFragment(value) {
                 return .externalReference(name)
             }
-            if cssValuedAttributes.contains(name), cssContainsDisallowedReference(value) {
+            let carriesCSS = cssValuedAttributes.contains(name) || (isSMIL && smilValueAttributes.contains(name))
+            if carriesCSS, cssContainsDisallowedReference(value) {
                 return .externalStyle
             }
         }
@@ -109,24 +121,6 @@ public enum SVGImageValidator {
         return false
     }
 
-    fileprivate static func cssContainsDisallowedReference(_ css: String) -> Bool {
-        let text = css.lowercased()
-        if text.contains("@import") {
-            return true
-        }
-        var remainder = text[...]
-        while let range = remainder.range(of: "url(") {
-            let after = range.upperBound
-            guard let close = remainder[after...].firstIndex(of: ")") else { return true }
-            let raw = remainder[after ..< close].trimmingCharacters(in: .whitespacesAndNewlines)
-            guard let reference = unquotedCSSReference(raw), isFragmentToken(reference) else {
-                return true
-            }
-            remainder = remainder[remainder.index(after: close)...]
-        }
-        return false
-    }
-
     private static func isEventHandler(_ name: String) -> Bool {
         guard name.count > 2, name.hasPrefix("on") else { return false }
         let third = name[name.index(name.startIndex, offsetBy: 2)]
@@ -137,22 +131,13 @@ public enum SVGImageValidator {
         isFragmentToken(value.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
-    private static func isFragmentToken(_ value: some StringProtocol) -> Bool {
+    static func isFragmentToken(_ value: some StringProtocol) -> Bool {
         guard value.count >= 2, value.first == "#" else { return false }
         return value.dropFirst().allSatisfy { character in
             character != "#" && character != "(" && character != ")" && character != "\\" &&
                 character != "/" && character != ":" && character != "\"" && character != "'" &&
                 !character.isWhitespace
         }
-    }
-
-    private static func unquotedCSSReference(_ raw: String) -> String? {
-        guard let first = raw.first, first == "\"" || first == "'" else {
-            if raw.contains("\"") || raw.contains("'") { return nil }
-            return String(raw)
-        }
-        guard raw.last == first, raw.count >= 2 else { return nil }
-        return String(raw.dropFirst().dropLast().trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
     /// DOCTYPE is rejected before `XMLParser` runs, so an internal subset is never expanded.
@@ -170,13 +155,11 @@ public enum SVGImageValidator {
             guard index < source.endIndex else { break }
             guard hasPrefix(source, from: index, "<") else { return .malformed }
             if hasPrefix(source, from: index, "<?") {
-                guard let end = endOfProcessingInstruction(source, from: index) else { return .malformed }
-                let target = processingInstructionTarget(source, from: index)
-                if target != "xml" || !allowsXMLDeclaration {
-                    return .processingInstruction(target)
+                switch xmlDeclaration(in: source, from: index, allowed: allowsXMLDeclaration) {
+                case let .reject(rejection): return rejection
+                case let .end(end): index = end
                 }
                 allowsXMLDeclaration = false
-                index = end
                 continue
             }
             allowsXMLDeclaration = false
@@ -197,6 +180,40 @@ public enum SVGImageValidator {
             break
         }
         return sawElement ? nil : .malformed
+    }
+
+    /// Only a leading `<?xml …?>` declaring UTF-8 (or nothing) is allowed. XMLParser decodes
+    /// by the declared encoding and WebKit by the response charset; UTF-8 keeps both on the
+    /// bytes already checked as UTF-8.
+    private static func xmlDeclaration(
+        in source: String,
+        from index: String.Index,
+        allowed: Bool
+    ) -> XMLDeclarationScan {
+        guard let end = endOfProcessingInstruction(source, from: index) else { return .reject(.malformed) }
+        let target = processingInstructionTarget(source, from: index)
+        guard target == "xml", allowed else { return .reject(.processingInstruction(target)) }
+        if let encoding = declaredEncoding(in: source[index ..< end]), encoding != "utf-8" {
+            return .reject(.invalidEncoding)
+        }
+        return .end(end)
+    }
+
+    private enum XMLDeclarationScan {
+        case end(String.Index)
+        case reject(SVGImageRejection)
+    }
+
+    /// The `encoding` pseudo-attribute of an XML declaration, lowercased, or nil when absent.
+    static func declaredEncoding(in declaration: Substring) -> String? {
+        let lowered = declaration.lowercased()
+        guard let name = lowered.range(of: "encoding") else { return nil }
+        var rest = lowered[name.upperBound...].drop(while: \.isWhitespace)
+        guard rest.first == "=" else { return "" }
+        rest = rest.dropFirst().drop(while: \.isWhitespace)
+        guard let quote = rest.first, quote == "\"" || quote == "'" else { return "" }
+        let value = rest.dropFirst().prefix { $0 != quote }
+        return String(value)
     }
 
     private static func hasPrefix(_ source: String, from index: String.Index, _ prefix: String) -> Bool {
@@ -227,7 +244,7 @@ private final class SVGDocumentProbe: NSObject, XMLParserDelegate {
     private(set) var sawRoot = false
     private var elementCount = 0
     private var depth = 0
-    private var styleDepth = 0
+    private var inStyle = false
     private var styleText = ""
 
     func parser(
@@ -248,56 +265,64 @@ private final class SVGDocumentProbe: NSObject, XMLParserDelegate {
             reject(.tooDeep(depth), parser: parser)
             return
         }
-        let name = elementName.lowercased()
         if !sawRoot {
             sawRoot = true
-            if name != "svg" || namespaceURI != SVGImageValidator.namespace {
+            // XML names are case-sensitive: `<SVG>` is not the SVG root.
+            if elementName != "svg" || namespaceURI != SVGImageValidator.namespace {
                 reject(.rootIsNotSVG, parser: parser)
                 return
             }
+        }
+        let name = elementName.lowercased()
+        // `<style>` holds text only. A child element (a nested `<style>` included) would
+        // split its CSS into pieces the end-of-element check never sees together.
+        if inStyle {
+            reject(.externalStyle, parser: parser)
+            return
         }
         if SVGImageValidator.forbiddenElements.contains(name) {
             reject(.forbiddenElement(name), parser: parser)
             return
         }
-        if SVGImageValidator.smilElements.contains(name), SVGImageValidator.targetsHref(attributes) {
+        let isSMIL = SVGImageValidator.smilElements.contains(name)
+        if isSMIL, SVGImageValidator.targetsHref(attributes) {
             reject(.smilHrefTarget, parser: parser)
             return
         }
-        if let attributeRejection = SVGImageValidator.attributeRejection(attributes) {
+        if let attributeRejection = SVGImageValidator.attributeRejection(attributes, isSMIL: isSMIL) {
             reject(attributeRejection, parser: parser)
             return
         }
         if name == "style" {
-            styleDepth += 1
+            inStyle = true
             styleText = ""
         }
     }
 
     func parser(
         _ parser: XMLParser,
-        didEndElement elementName: String,
+        didEndElement _: String,
         namespaceURI _: String?,
         qualifiedName _: String?
     ) {
         guard rejection == nil else { return }
-        if elementName.lowercased() == "style", styleDepth > 0 {
+        if inStyle {
             if SVGImageValidator.cssContainsDisallowedReference(styleText) {
                 reject(.externalStyle, parser: parser)
                 return
             }
-            styleDepth -= 1
+            inStyle = false
             styleText = ""
         }
         depth = max(0, depth - 1)
     }
 
     func parser(_: XMLParser, foundCharacters string: String) {
-        if styleDepth > 0 { styleText += string }
+        if inStyle { styleText += string }
     }
 
     func parser(_ parser: XMLParser, foundCDATA block: Data) {
-        guard styleDepth > 0 else { return }
+        guard inStyle else { return }
         guard let text = String(data: block, encoding: .utf8) else {
             reject(.invalidEncoding, parser: parser)
             return

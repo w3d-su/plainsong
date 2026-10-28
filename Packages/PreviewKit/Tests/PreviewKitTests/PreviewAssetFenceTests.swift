@@ -179,7 +179,9 @@ final class PreviewAssetFenceTests: XCTestCase {
         XCTAssertEqual(task.failures, 0)
         let response = try XCTUnwrap(task.response as? HTTPURLResponse)
         XCTAssertEqual(response.mimeType, "image/svg+xml")
-        XCTAssertEqual(response.value(forHTTPHeaderField: "Content-Type"), "image/svg+xml")
+        XCTAssertEqual(response.textEncodingName, "utf-8")
+        XCTAssertEqual(response.value(forHTTPHeaderField: "Content-Type"), "image/svg+xml; charset=utf-8")
+        XCTAssertEqual(response.value(forHTTPHeaderField: "X-Content-Type-Options"), "nosniff")
         XCTAssertEqual(
             response.value(forHTTPHeaderField: "Content-Security-Policy"),
             SVGImageValidator.contentSecurityPolicy

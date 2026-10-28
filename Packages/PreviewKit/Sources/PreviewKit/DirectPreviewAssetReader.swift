@@ -40,33 +40,34 @@ struct DirectPreviewAssetReader: PreviewAssetReading {
         )
     }
 
-    /// SVG stays out of `loadAsset` so export remains raster-only. The scheme handler validates the bytes.
-    private static func svgBytes(at url: URL, maximumByteCount: Int) throws -> Data {
+    /// SVG stays out of `loadAsset` so export remains raster-only. The scheme handler
+    /// validates the bytes. The open never blocks (`O_NONBLOCK`, so a FIFO named `x.svg`
+    /// cannot stall the read), the descriptor must be a regular file, and at most one
+    /// byte past the cap is read, so a file that grows after the size check stays bounded.
+    static func svgBytes(at url: URL, maximumByteCount: Int) throws -> Data {
+        let descriptor = url.withUnsafeFileSystemRepresentation { path -> Int32 in
+            guard let path else { return -1 }
+            return open(path, O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC)
+        }
+        guard descriptor >= 0 else { throw PreviewAssetReadFailure.providerFailed }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        var status = stat()
+        guard fstat(descriptor, &status) == 0 else { throw PreviewAssetReadFailure.providerFailed }
+        guard status.st_mode & S_IFMT == S_IFREG else { throw PreviewAssetReadFailure.unsupportedType }
+        guard status.st_size <= off_t(maximumByteCount) else { throw PreviewAssetReadFailure.tooLarge }
+        let data: Data
         do {
-            let values = try url.resourceValues(forKeys: [.fileSizeKey])
-            guard let fileSize = values.fileSize else {
-                throw PreviewAssetReadFailure.providerFailed
-            }
-            if fileSize > maximumByteCount {
-                throw PreviewAssetReadFailure.tooLarge
-            }
-            let data = try Data(contentsOf: url)
-            guard data.count <= maximumByteCount else {
-                throw PreviewAssetReadFailure.tooLarge
-            }
-            return data
-        } catch let failure as PreviewAssetReadFailure {
-            throw failure
-        } catch is CancellationError {
-            throw CancellationError()
+            data = try handle.read(upToCount: maximumByteCount + 1) ?? Data()
         } catch {
             throw PreviewAssetReadFailure.providerFailed
         }
+        guard data.count <= maximumByteCount else { throw PreviewAssetReadFailure.tooLarge }
+        return data
     }
 
     private static func failure(for error: AssetURLPolicyError) -> PreviewAssetReadFailure {
         switch error {
-        case .unsupportedType:
+        case .unsupportedType, .rejectedSVG, .kindChangedDuringRead:
             .unsupportedType
         case .fileTooLarge:
             .tooLarge

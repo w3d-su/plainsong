@@ -2,20 +2,24 @@ import Foundation
 import MarkdownCore
 
 enum AssetDeliveryResponse {
-    static func make(url: URL, asset: AssetURLPolicyResult) -> URLResponse {
-        if let policy = asset.contentSecurityPolicy,
-           let response = HTTPURLResponse(
-               url: url,
-               statusCode: 200,
-               httpVersion: "HTTP/1.1",
-               headerFields: [
-                   "Content-Type": asset.mimeType,
-                   "Content-Length": String(asset.data.count),
-                   "Content-Security-Policy": policy,
-               ]
-           )
-        {
-            return response
+    typealias HTTPResponseFactory = (URL, [String: String]) -> HTTPURLResponse?
+
+    /// Nil only when an asset that needs headers (an admitted SVG) cannot get them. The
+    /// caller fails the task: an SVG is never served without its CSP and `nosniff`.
+    static func make(
+        url: URL,
+        asset: AssetURLPolicyResult,
+        httpResponse: HTTPResponseFactory = { url, headers in
+            HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: headers)
+        }
+    ) -> URLResponse? {
+        if let policy = asset.contentSecurityPolicy {
+            return httpResponse(url, [
+                "Content-Type": asset.mimeType,
+                "Content-Length": String(asset.data.count),
+                "Content-Security-Policy": policy,
+                "X-Content-Type-Options": "nosniff",
+            ])
         }
         return URLResponse(
             url: url,
@@ -23,40 +27,6 @@ enum AssetDeliveryResponse {
             expectedContentLength: asset.data.count,
             textEncodingName: nil
         )
-    }
-}
-
-/// Filesystem work for a preview asset read. This type is not the URL-scheme
-/// handler, so symlink resolution and file metadata stay off the main actor.
-enum AssetFilesystemPreparation {
-    struct ContainedAsset: Sendable {
-        let asset: AssetURLPolicyResult
-        let fileURL: URL
-    }
-
-    static func resolvedAssetURL(_ requestURL: URL, allowedRoot: URL) throws -> URL {
-        let resolved = try AssetURLResolver(allowedRoot: allowedRoot).resolve(requestURL)
-        // SVG is not a raster type. Containment already ran; structural validation
-        // waits for the bytes, off the main actor.
-        if !AssetURLPolicy.isSVG(resolved) {
-            _ = try AssetURLPolicy.mimeType(for: resolved)
-        }
-        let maximum = AssetURLPolicy.maximumPreviewByteCount(for: resolved)
-        if let fileSize = try? resolved.resourceValues(forKeys: [.fileSizeKey]).fileSize,
-           Int64(fileSize) > maximum
-        {
-            throw AssetURLPolicyError.fileTooLarge(
-                actualBytes: Int64(fileSize),
-                maxBytes: maximum
-            )
-        }
-        return resolved
-    }
-
-    static func containedAsset(_ bytes: Data, fileURL: URL, root: URL) throws -> ContainedAsset {
-        let contained = try AssetContainment.fileURL(fileURL, isContainedIn: root)
-        let asset = try AssetURLPolicy.deliveredPreviewAsset(data: bytes, fileURL: contained)
-        return ContainedAsset(asset: asset, fileURL: contained)
     }
 }
 
@@ -79,8 +49,8 @@ extension AssetURLPolicy {
                 actualBytes: Int64(byteCount),
                 maxBytes: Int64(maximumByteCount)
             )
-        case .reject:
-            throw AssetURLPolicyError.unsupportedType(fileURL.pathExtension.lowercased())
+        case let .reject(rejection):
+            throw AssetURLPolicyError.rejectedSVG(rejection)
         }
     }
 }

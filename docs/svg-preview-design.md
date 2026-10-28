@@ -1,9 +1,10 @@
 # SVG Images in Preview and Export — Design Draft
 
-> **Status: DRAFT, 2026-10-29. Spec only; no code, no checked gate.** Nothing here changes
-> current behavior until the owner approves the [owner] items and a Decision Log entry
-> lands with the first implementation PR (agent.md §18). Current rule: SVG is rejected
-> (agent.md §7.1, Decision Log 2026-06-24, risk R4/R5).
+> **Status: PR B implemented (2026-10-29); PR C (export) not started.** Workspace SVG is
+> shown in the preview in image mode after `SVGImageValidator`
+> ([decision](decisions/2026-10-29-svg-image-mode.md), agent.md §7.1). The current
+> rules live in that decision; this document keeps the design rationale. Export still
+> omits SVG.
 
 ## 1. Problem
 
@@ -78,7 +79,8 @@ checks the original bytes, off the main actor:
 
 Accepted files are served **byte-for-byte unchanged** with `Content-Type:
 image/svg+xml` and a response CSP of `default-src 'none'; style-src 'unsafe-inline'`.
-Rejected files fail like an unsupported image today, with a reason the preview can show.
+Rejected files fail like an unsupported image today. The validator's reason is kept
+in process (`AssetURLPolicyError.rejectedSVG`); showing it in the preview is not built yet.
 
 Accept/reject keeps the served bytes auditable: there is no sanitized output that could
 differ from what the user sees in the source, and no mutation-XSS class of bugs.
@@ -139,6 +141,10 @@ DOM, so they inherit the result. Export CSP already allows `data:` images.
 
 ## 8. Owner decisions
 
-- SVG byte cap (1 MiB proposed) and element/depth caps.
-- `data:image/svg+xml` stays blocked in v1?
-- Whether remote SVG should be blocked explicitly if S0 shows it renders today.
+- Decided in PR B: SVG byte cap 1 MiB, 50,000 elements, depth 256 (S6 may still tune
+  them); `data:image/svg+xml` stays blocked in v1.
+- Pending: remote `https:` SVG. Recommended for v1: leave it unblocked and documented
+  (remote images are opt-in and render in the same image mode; the S0 remote probe saw
+  four `CONNECT`s and no successful decode). An `.svg` extension filter would not work;
+  a real control is a separate gate that proxies remote images through a native scheme
+  and validates or rejects SVG by MIME type.

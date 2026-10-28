@@ -7,24 +7,47 @@
 
 Workspace `.svg` files may be shown in the preview, but only as images (`img` sourced from
 `asset://`). `SVGImageValidator` in MarkdownCore accepts or rejects the original bytes.
-It does not rewrite them. An admitted file is at most 1 MiB of UTF-8, has an `svg` root
-in the SVG namespace, and contains no DOCTYPE, script, foreign content (`foreignObject`,
-`iframe`, `object`, `embed`, `handler`, `listener`), event-handler attributes, external
-`href` / `xlink:href` / `src`, SMIL animation of those references, processing
-instructions, or CSS `@import` / `url(` other than a same-document `url(#id)`. The same
-`url(` rule applies to the CSS-valued presentation attributes already treated as URL
-sinks by export (`fill`, `stroke`, `clip-path`, `filter`, `mask`, markers, `cursor`),
-because `fill="url(https://…)"` is the same load as a `style` attribute. Caps are 50,000
-elements and depth 256.
+It does not rewrite them. An admitted file is at most 1 MiB of valid UTF-8 (an XML
+declaration may only declare `UTF-8`), has a root element named exactly `svg` in the SVG
+namespace, and contains no DOCTYPE, script, foreign content (`foreignObject`, `iframe`,
+`object`, `embed`, `handler`, `listener`), event-handler attributes, external `href` /
+`xlink:href` / `src`, SMIL animation of those references, processing instructions, or
+CSS `@import`, `image-set(`, `cross-fade(`, `src(` or `url(` other than a same-document
+`url(#id)`. CSS escapes are decoded before that scan (`u\72l(` is `url(`), so escaped
+CJK font names stay admitted. A `<style>` element holds text only: any child element,
+a nested `<style>` included, rejects. The same CSS rule applies to the CSS-valued
+presentation attributes already treated as URL sinks by export (`fill`, `stroke`,
+`clip-path`, `filter`, `mask`, markers, `cursor`, `style`), because
+`fill="url(https://…)"` is the same load as a `style` attribute, and to the SMIL value
+attributes `from`, `to`, `by` and `values`. Caps are 50,000 elements and depth 256.
 
-PreviewKit serves the admitted bytes with `Content-Type: image/svg+xml` and
-`Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'`. Validation runs
-off the main actor. Path containment is unchanged.
+PreviewKit serves the admitted bytes with `Content-Type: image/svg+xml; charset=utf-8`,
+`X-Content-Type-Options: nosniff` and `Content-Security-Policy: default-src 'none';
+style-src 'unsafe-inline'`. If that header response cannot be built, the request fails;
+an SVG is never served without it. The charset pins WebKit to UTF-8 (the HTTP charset
+overrides the XML declaration), and the declaration rule pins `XMLParser` to it, so both
+see the same characters. Validation runs off the main actor. Path containment is
+unchanged. The reader's coordinated file and the requested file must agree on being SVG,
+since one chose the byte cap and the other chooses the validator. The Mac reader opens
+an SVG without blocking, requires a regular file, and reads at most one byte past the cap.
+
+The response CSP is a backstop for document mode, not the image-mode barrier. WebKit
+builds an SVG image from the bytes, and the S0 probe shows the isolation without that
+header: it serves eleven well-formed, painted hostile samples (script, `onload`,
+`foreignObject`, `<image href>`, `<use href>`, `@import`, `url(https:)` in style, an
+escaped `url(`, a `fill` URL and a SMIL `values` URL) with no validator and no CSP,
+and records zero bridge messages and zero proxy connections, while a page script and a
+page image prove both observers work. Document mode is already closed by the navigation
+policy and the page CSP (`default-src 'none'`).
 
 `data:image/svg+xml` and inline `<svg>` stay blocked. HTML/PDF export still omits SVG
 (`AssetURLPolicy.loadAsset` remains the raster export gate). WYSIWYG does not thumbnail
-SVG. Remote `https:` SVG is not specially blocked or validated; S0 records whether
-WebKit requests it when Allow Remote Images is on.
+SVG. Remote `https:` SVG is not specially blocked or validated (owner decision pending).
+With Allow Remote Images off it is never requested; with it on, the S0 remote probe saw
+four `CONNECT` requests to the remote host and no successful decode. It would render in
+the same image mode as any remote image. Filtering by `.svg` would not help (`a.png` can
+answer `image/svg+xml`); a real control is a separate gate that proxies remote images
+through a native scheme, checks the MIME type, and validates or rejects SVG.
 
 ## Why
 

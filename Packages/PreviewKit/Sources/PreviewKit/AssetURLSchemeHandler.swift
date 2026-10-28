@@ -6,6 +6,11 @@ enum AssetURLPolicyError: Error, Equatable {
     case unsupportedType(String)
     case missingFileSize
     case fileTooLarge(actualBytes: Int64, maxBytes: Int64)
+    /// Keeps the validator's reason in process; the scheme failure is still `unsupportedType`.
+    case rejectedSVG(SVGImageRejection)
+    /// The reader's coordinated file and the requested file disagree on being SVG, so the
+    /// byte cap and the validator decision would have come from different files.
+    case kindChangedDuringRead
 }
 
 struct AssetURLPolicyResult: Equatable {
@@ -197,6 +202,7 @@ final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler, @unchecked Send
                 let prepared = try AssetFilesystemPreparation.containedAsset(
                     result.bytes,
                     fileURL: result.coordinatedURL,
+                    requestedURL: resolved,
                     root: root
                 )
                 try Task.checkCancellation()
@@ -248,10 +254,14 @@ final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler, @unchecked Send
         taskID: ObjectIdentifier
     ) {
         guard state.permission(for: capture, taskID: taskID).acceptsDelivery else { return }
-        let response = AssetDeliveryResponse.make(
+        guard let response = AssetDeliveryResponse.make(
             url: task.requestURL ?? displayURL,
             asset: asset
-        )
+        ) else {
+            // An SVG never goes out without its headers.
+            failCurrentSync(task, failure: .providerFailed, capture: capture, taskID: taskID)
+            return
+        }
         task.receive(response: response)
         guard state.permission(for: capture, taskID: taskID).acceptsDelivery else { return }
         task.receive(data: asset.data)
@@ -325,7 +335,7 @@ private extension PreviewAssetReadFailure {
             failure
         case let policy as AssetURLPolicyError:
             switch policy {
-            case .unsupportedType: .unsupportedType
+            case .unsupportedType, .rejectedSVG, .kindChangedDuringRead: .unsupportedType
             case .fileTooLarge: .tooLarge
             case .missingFileSize: .providerFailed
             }
