@@ -81,7 +81,7 @@ extension AppBackedEditorPerformanceTests {
         try source.write(to: documentURL, atomically: true, encoding: .utf8)
 
         let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
-        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let appState = AppState(shownSession: session, shouldRestoreLastOpenedFile: false)
         let location = try authority.location(relativePath: fileName)
         let read = try MarkdownFileStore().loadResult(at: location)
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] = AnchoredWorkspaceSessionFileBinding(

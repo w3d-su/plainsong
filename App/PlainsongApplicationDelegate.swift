@@ -12,7 +12,6 @@ final class PlainsongApplicationDelegate: NSObject, NSApplicationDelegate {
 
     weak var appState: AppState? {
         didSet {
-            PlainsongAppServices.appState = appState
             #if DEBUG
                 handleDebugFixtureRequestIfNeeded()
             #endif

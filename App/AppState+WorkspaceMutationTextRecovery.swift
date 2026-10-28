@@ -261,7 +261,7 @@ extension AppState {
     }
 
     func restoreWorkspaceMutationTextRecoveryIfNeeded() {
-        let currentIdentity = ObjectIdentifier(currentDocument)
+        let currentIdentity = ObjectIdentifier(shownSession)
         guard workspaceMutationRecoveryIDBySession[currentIdentity] == nil,
               workspaceMutationTextRecoveryContexts[currentIdentity] == nil,
               let record = pendingWorkspaceMutationTextRecoveryRecords.first
@@ -301,7 +301,7 @@ extension AppState {
         do {
             try validateWorkspaceMutationRecoveryStoresLoaded()
         } catch {
-            present(error, title: "Could Not Quit")
+            presentOnHome(error, title: "Could Not Quit")
             return false
         }
         let sessions = workspaceMutationTerminationSessions()
@@ -312,7 +312,8 @@ extension AppState {
                         ?? pending.fileURL
                         ?? URL(fileURLWithPath: "/")
                 ),
-                title: "Could Not Quit"
+                title: "Could Not Quit",
+                for: pending
             )
             return false
         }
@@ -334,16 +335,16 @@ extension AppState {
                 }
             }
         } catch {
-            present(error, title: "Could Not Preserve Recovery Copy")
+            presentOnHome(error, title: "Could Not Preserve Recovery Copy")
             return false
         }
 
         guard workspaceMutationNamespaceDepth == 0 else {
-            present(
+            presentOnHome(
                 AppStateError.workspaceMutationInProgress(
                     workspaceRootURL
-                        ?? sessionStateURL(for: currentDocument)
-                        ?? currentDocument.fileURL
+                        ?? sessionStateURL(for: shownSession)
+                        ?? shownSession.fileURL
                         ?? URL(fileURLWithPath: "/")
                 ),
                 title: "Could Not Quit"
@@ -351,7 +352,7 @@ extension AppState {
             return false
         }
         guard workspaceMutationRecoveries.isEmpty else {
-            present(
+            presentOnHome(
                 WorkspaceMutationError.indeterminateSession(
                     workspaceMutationRecoveries.values.first?.sourceURL
                         ?? URL(fileURLWithPath: "/")
@@ -378,7 +379,8 @@ extension AppState {
                                 ?? session.fileURL
                                 ?? URL(fileURLWithPath: "/")
                         ),
-                        title: "Could Not Quit"
+                        title: "Could Not Quit",
+                        for: session
                     )
                     return false
                 }
@@ -391,7 +393,8 @@ extension AppState {
                             ?? session.fileURL
                             ?? URL(fileURLWithPath: "/")
                     ),
-                    title: "Could Not Quit"
+                    title: "Could Not Quit",
+                    for: session
                 )
                 return false
             }
@@ -404,8 +407,8 @@ extension AppState {
             present(
                 AppStateError.workspaceMutationInProgress(
                     workspaceRootURL
-                        ?? sessionStateURL(for: currentDocument)
-                        ?? currentDocument.fileURL
+                        ?? sessionStateURL(for: shownSession)
+                        ?? shownSession.fileURL
                         ?? URL(fileURLWithPath: "/")
                 ),
                 title: "Could Not Quit"

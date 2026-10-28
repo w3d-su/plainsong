@@ -30,12 +30,12 @@ final class WorkspaceScanPruningAppTests: XCTestCase {
         try await appState.reloadWorkspaceTree(root: root, selectFirstIfNeeded: true)
         let readme = try XCTUnwrap(node("node_modules/pkg/README.md", in: appState))
         XCTAssertTrue(appState.selectWorkspaceNode(id: readme.id))
-        XCTAssertEqual(appState.currentDocument.fileURL?.lastPathComponent, "README.md")
+        XCTAssertEqual(appState.shownSession.fileURL?.lastPathComponent, "README.md")
 
         appState.showAllFiles = false
         try await appState.reloadWorkspaceTree(root: root, selectFirstIfNeeded: false)
 
-        XCTAssertEqual(appState.currentDocument.fileURL?.lastPathComponent, "README.md")
+        XCTAssertEqual(appState.shownSession.fileURL?.lastPathComponent, "README.md")
         XCTAssertNil(appState.missingFilePrompt, "the open document must not look missing")
         XCTAssertNotNil(node("node_modules/pkg/README.md", in: appState))
         XCTAssertNil(node("node_modules/other/README.md", in: appState), "only the open file's chain is scanned")

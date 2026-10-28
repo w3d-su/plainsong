@@ -229,6 +229,8 @@ enum AppStateError: LocalizedError {
     case workspaceMutationRecoveryUnavailable(URL)
     case unsavedChangesPreventTermination(URL)
     case recoveryDestinationConflictsOriginal(URL)
+    /// A production extra scene refuses every file and root open until PR D2.
+    case windowFileOpenRefused
 
     var errorDescription: String? {
         switch self {
@@ -256,6 +258,8 @@ enum AppStateError: LocalizedError {
         case let .recoveryDestinationConflictsOriginal(url):
             "Choose a different name or folder for the recovery copy; " +
                 "\(url.lastPathComponent) may belong to another file."
+        case .windowFileOpenRefused:
+            "This window cannot open files. Use the existing window."
         }
     }
 }

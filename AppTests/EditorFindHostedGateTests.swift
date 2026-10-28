@@ -22,7 +22,7 @@ final class EditorFindHostedGateTests: XCTestCase {
 
         appState.openExternalFile(fixture.root)
         try await waitUntil("workspace document opens") {
-            appState.currentDocument.fileURL?.lastPathComponent == "post.md"
+            appState.shownSession.fileURL?.lastPathComponent == "post.md"
         }
 
         let host = makeWorkspaceHost(appState: appState)
@@ -39,7 +39,7 @@ final class EditorFindHostedGateTests: XCTestCase {
         appState.refreshWorkspaceAfterFileSystemChange()
 
         try await waitUntil("clean external reload reaches the hosted editor and find counter") {
-            appState.currentDocument.text == "hit one hit two hit three"
+            appState.shownSession.text == "hit one hit two hit three"
                 && appState.editorFindHost.controller.session?.total == 3
                 && self.findQueryField(in: host.window) != nil
         }
@@ -71,7 +71,7 @@ final class EditorFindHostedGateTests: XCTestCase {
         appState.preferences.setTypewriterSyncEnabled(false)
         appState.openExternalFile(fixture.root)
         try await waitUntil("workspace document opens in source and preview") {
-            appState.currentDocument.fileURL?.lastPathComponent == "post.md"
+            appState.shownSession.fileURL?.lastPathComponent == "post.md"
                 && appState.isPreviewVisible
         }
         XCTAssertFalse(appState.preferences.typewriterSyncEnabled)
@@ -96,7 +96,7 @@ final class EditorFindHostedGateTests: XCTestCase {
         ) as? Bool
         XCTAssertEqual(targetStartsOffscreen, true)
 
-        let sourceBefore = appState.currentDocument.text
+        let sourceBefore = appState.shownSession.text
         openFindBar(appState, query: document.needle)
         let expectedRange = (document.source as NSString).range(of: document.needle)
 
@@ -119,8 +119,8 @@ final class EditorFindHostedGateTests: XCTestCase {
             return value as? Bool == true
         }
 
-        XCTAssertEqual(appState.currentDocument.text, sourceBefore)
-        XCTAssertEqual(appState.currentDocument.text.utf8.elementsEqual(sourceBefore.utf8), true)
+        XCTAssertEqual(appState.shownSession.text, sourceBefore)
+        XCTAssertEqual(appState.shownSession.text.utf8.elementsEqual(sourceBefore.utf8), true)
         XCTAssertTrue(appState.isPreviewVisible)
     }
 
@@ -131,7 +131,7 @@ final class EditorFindHostedGateTests: XCTestCase {
         appState.setLayoutMode(.sourcePreview)
         appState.openExternalFile(fixture.root)
         try await waitUntil("workspace document opens in source and preview") {
-            appState.currentDocument.fileURL?.lastPathComponent == "post.md"
+            appState.shownSession.fileURL?.lastPathComponent == "post.md"
                 && appState.isPreviewVisible
         }
 
@@ -145,7 +145,7 @@ final class EditorFindHostedGateTests: XCTestCase {
             return value as? Bool == true
         }
 
-        let sourceBefore = appState.currentDocument.text
+        let sourceBefore = appState.shownSession.text
         openFindBar(appState, query: document.needle)
         try await waitUntil("first find match is selected") {
             EditorSelectionProbe.appliedEditorSelection(in: host.window)?.range == document.firstRange
@@ -213,8 +213,8 @@ final class EditorFindHostedGateTests: XCTestCase {
             return value as? Bool == true
         }
 
-        XCTAssertEqual(appState.currentDocument.text, sourceBefore)
-        XCTAssertEqual(appState.currentDocument.text.utf8.elementsEqual(sourceBefore.utf8), true)
+        XCTAssertEqual(appState.shownSession.text, sourceBefore)
+        XCTAssertEqual(appState.shownSession.text.utf8.elementsEqual(sourceBefore.utf8), true)
     }
 
     func testHostedMarkedTextCommandsStayInFindFieldAndDoNotMutateDocument() async throws {
@@ -231,7 +231,7 @@ final class EditorFindHostedGateTests: XCTestCase {
         XCTAssertTrue(host.window.makeFirstResponder(field))
         let fieldEditor = try XCTUnwrap(field.currentEditor() as? NSTextView)
         let coordinator = try XCTUnwrap(field.delegate as? EditorFindQueryField.Coordinator)
-        let sourceBefore = appState.currentDocument.text
+        let sourceBefore = appState.shownSession.text
 
         fieldEditor.setMarkedText(
             "ㄅ",
@@ -251,7 +251,7 @@ final class EditorFindHostedGateTests: XCTestCase {
         ))
 
         XCTAssertTrue(appState.editorFindHost.ui.isBarVisible)
-        XCTAssertEqual(appState.currentDocument.text, sourceBefore)
+        XCTAssertEqual(appState.shownSession.text, sourceBefore)
         XCTAssertTrue(fieldEditor.hasMarkedText())
         fieldEditor.unmarkText()
     }

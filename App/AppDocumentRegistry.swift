@@ -29,6 +29,9 @@ final class AppDocumentRegistry: ObservableObject {
     let replaceAuthority = EditorReplaceAuthorityState()
 
     var isSaving = false // Synchronous save guard; unpublished, since no view can observe `true`.
+    /// Save enablement only. Fences and quarantine stay off `objectWillChange` so they
+    /// do not wake every window; menus re-read `canSave` from this after the change.
+    let menuEnablementDidChange = PassthroughSubject<Void, Never>()
     @Published var recentItemURLs: [URL] = []
     @Published var workspaceMutationReconciliationPrompt:
         WorkspaceMutationReconciliationPrompt?
@@ -145,7 +148,10 @@ final class AppDocumentRegistry: ObservableObject {
         [ObjectIdentifier: RetainedEditorImageAssetDocumentAuthority] = [:]
     /// A typed indeterminate commit must be reconciled before this session can write again.
     var indeterminateSessionWrites: [ObjectIdentifier: WorkspaceIndeterminateFileWrite] = [:] {
-        didSet { noteEditorReplaceAuthorityInputDidChange() }
+        didSet {
+            noteEditorReplaceAuthorityInputDidChange()
+            noteMenuEnablementDidChange()
+        }
     }
 
     /// Retains the exact authority location and prepared-byte digest for safe reconciliation.
@@ -153,7 +159,10 @@ final class AppDocumentRegistry: ObservableObject {
     /// Sessions whose retained namespace is being mutated. Save/autosave must not enter while
     /// their authority is between the old and new lexical locations.
     var workspaceMutationWriteFences: Set<ObjectIdentifier> = [] {
-        didSet { noteEditorReplaceAuthorityInputDidChange() }
+        didSet {
+            noteEditorReplaceAuthorityInputDidChange()
+            noteMenuEnablementDidChange()
+        }
     }
 
     /// A namespace mutation fences image placement across the workspace, including mutations
@@ -163,7 +172,10 @@ final class AppDocumentRegistry: ObservableObject {
     /// affected sessions quarantined until operation-level recovery proves one exact outcome
     /// or the user explicitly promotes the editor source to detached recovery.
     var indeterminateWorkspaceMutationSessions: Set<ObjectIdentifier> = [] {
-        didSet { noteEditorReplaceAuthorityInputDidChange() }
+        didSet {
+            noteEditorReplaceAuthorityInputDidChange()
+            noteMenuEnablementDidChange()
+        }
     }
 
     var workspaceMutationRecoveries: [UUID: WorkspaceMutationRecoveryContext] = [:]
@@ -271,5 +283,9 @@ final class AppDocumentRegistry: ObservableObject {
 
     func noteEditorReplaceAuthorityInputDidChange(fileID: StaticString = #fileID, line: UInt = #line) {
         onEditorReplaceAuthorityInputChange(fileID, line)
+    }
+
+    func noteMenuEnablementDidChange() {
+        menuEnablementDidChange.send()
     }
 }

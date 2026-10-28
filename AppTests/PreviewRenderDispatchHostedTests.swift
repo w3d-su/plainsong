@@ -19,7 +19,7 @@ extension EditorFindHostedGateTests {
         appState.setLayoutMode(.sourcePreview)
         appState.openExternalFile(fixture.root)
         try await waitUntil("workspace opens a.md with an installed capture") {
-            appState.currentDocument.fileURL?.lastPathComponent == "a.md"
+            appState.shownSession.fileURL?.lastPathComponent == "a.md"
                 && appState.workspaceInstalledCaptureGeneration == appState.workspaceGeneration
         }
         let host = makeWorkspaceHost(appState: appState)
@@ -46,7 +46,7 @@ extension EditorFindHostedGateTests {
         XCTAssertEqual(afterReshow, afterSwitch)
 
         // Editing still renders through the debounced observer.
-        appState.currentDocument.replaceText("# Beta edited")
+        appState.shownSession.replaceText("# Beta edited")
         try await waitForPreviewText("Beta edited", in: controller)
         let afterEdit = try await settledRenderID(of: controller)
         XCTAssertEqual(afterEdit, afterReshow + 1)

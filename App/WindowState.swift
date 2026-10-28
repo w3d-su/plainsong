@@ -94,12 +94,12 @@ final class WindowState: ObservableObject {
 
     /// `replaceAuthority` is the registry's app-global generation (§3.2 `editorFindHost` row).
     init(
-        currentDocument: DocumentSession,
+        shownSession: DocumentSession,
         layoutMode: EditorLayoutMode,
         wysiwygFallbackMessage: String?,
         replaceAuthority: EditorReplaceAuthorityState
     ) {
-        self.currentDocument = currentDocument
+        currentDocument = shownSession
         self.layoutMode = layoutMode
         self.wysiwygFallbackMessage = wysiwygFallbackMessage
         editorFindHost = EditorFindHost(replaceAuthority: replaceAuthority)
@@ -113,7 +113,8 @@ final class WindowState: ObservableObject {
     /// The session this window shows, for registry inventories (`docs/window-state-gates.md`
     /// §3.4 I2).
     var shownSession: DocumentSession {
-        currentDocument
+        get { currentDocument }
+        set { currentDocument = newValue }
     }
 
     /// The files whose saving this window's external-change or missing-file prompt blocks

@@ -82,10 +82,10 @@ final class EditorFindSpikeTests: XCTestCase {
         // it out of any window so it cannot join an ambient responder chain either.
 
         var fired: [String] = []
-        EditorFindActionHooks.showFind = { fired.append("show") }
-        EditorFindActionHooks.findNext = { fired.append("next") }
-        EditorFindActionHooks.findPrevious = { fired.append("previous") }
-        EditorFindActionHooks.useSelectionForFind = { fired.append("useSelection") }
+        EditorFindActionHooks.showFind = { _ in fired.append("show") }
+        EditorFindActionHooks.findNext = { _ in fired.append("next") }
+        EditorFindActionHooks.findPrevious = { _ in fired.append("previous") }
+        EditorFindActionHooks.useSelectionForFind = { _ in fired.append("useSelection") }
         defer {
             EditorFindActionHooks.showFind = nil
             EditorFindActionHooks.findNext = nil
@@ -106,10 +106,10 @@ final class EditorFindSpikeTests: XCTestCase {
         // This is the signal App's chrome fallback depends on, so the test has to establish
         // that no editor is reachable rather than inherit whatever an earlier test focused.
         var fired: [String] = []
-        EditorFindActionHooks.showFind = { fired.append("show") }
-        EditorFindActionHooks.findNext = { fired.append("next") }
-        EditorFindActionHooks.findPrevious = { fired.append("previous") }
-        EditorFindActionHooks.useSelectionForFind = { fired.append("useSelection") }
+        EditorFindActionHooks.showFind = { _ in fired.append("show") }
+        EditorFindActionHooks.findNext = { _ in fired.append("next") }
+        EditorFindActionHooks.findPrevious = { _ in fired.append("previous") }
+        EditorFindActionHooks.useSelectionForFind = { _ in fired.append("useSelection") }
         defer {
             EditorFindActionHooks.showFind = nil
             EditorFindActionHooks.findNext = nil

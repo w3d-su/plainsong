@@ -14,8 +14,8 @@ struct EditorWorkspace: View {
         VStack(spacing: 0) {
             DocumentJumpBar(
                 rootURL: appState.workspaceRootURL,
-                fileURL: appState.currentDocument.fileURL,
-                fileKind: appState.currentDocument.fileKind,
+                fileURL: appState.shownSession.fileURL,
+                fileKind: appState.shownSession.fileKind,
                 isSaving: appState.isSaving,
                 workspaceTree: { [appState] in appState.workspaceTree },
                 openNode: { [appState] in appState.selectWorkspaceNode(id: $0) }
@@ -43,7 +43,7 @@ struct EditorWorkspace: View {
 
             HStack(spacing: 0) {
                 DocumentEditor(
-                    session: appState.currentDocument,
+                    session: appState.shownSession,
                     isPreviewVisible: appState.isPreviewVisible,
                     usesWYSIWYGPresentation: appState.shouldUseWYSIWYGPresentation,
                     scrollCoordinator: scrollCoordinator
@@ -58,7 +58,7 @@ struct EditorWorkspace: View {
                     Divider()
 
                     PreviewPane(
-                        session: appState.currentDocument,
+                        session: appState.shownSession,
                         controller: preview.controller { [appState, scrollCoordinator] controller in
                             Self.configure(controller, appState: appState, scrollCoordinator: scrollCoordinator)
                         }
@@ -71,7 +71,7 @@ struct EditorWorkspace: View {
 
             Divider()
 
-            WorkspaceStatusBar(statistics: appState.currentDocument.statistics)
+            WorkspaceStatusBar(statistics: appState.shownSession.statistics)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

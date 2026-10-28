@@ -61,9 +61,9 @@ final class PlainsongMenuKeyBindingTests: XCTestCase {
     func testActionTogglesSearchFilesSearchAndFocusesEachOpen() {
         let appState = AppState(shouldRestoreLastOpenedFile: false)
         appState.workspaceRootURL = URL(fileURLWithPath: "/tmp/plainsong-workspace-search-key-test")
-        let previousAppState = PlainsongAppServices.appState
-        PlainsongAppServices.appState = appState
-        defer { PlainsongAppServices.appState = previousAppState }
+        let previousAppState = KeyWindowRouter.shared.testingPin
+        KeyWindowRouter.shared.testingPin = appState
+        defer { KeyWindowRouter.shared.testingPin = previousAppState }
         let before = appState.workspaceSearchUI.focusRequestID
 
         XCTAssertTrue(PlainsongWorkspaceSearchKeyAction.performIfAvailable())
@@ -81,9 +81,9 @@ final class PlainsongMenuKeyBindingTests: XCTestCase {
 
     func testActionNoOpsWhenSearchUnavailable() {
         let appState = AppState(shouldRestoreLastOpenedFile: false)
-        let previousAppState = PlainsongAppServices.appState
-        PlainsongAppServices.appState = appState
-        defer { PlainsongAppServices.appState = previousAppState }
+        let previousAppState = KeyWindowRouter.shared.testingPin
+        KeyWindowRouter.shared.testingPin = appState
+        defer { KeyWindowRouter.shared.testingPin = previousAppState }
         let before = appState.workspaceSearchUI.focusRequestID
 
         XCTAssertFalse(PlainsongWorkspaceSearchKeyAction.performIfAvailable())
@@ -93,9 +93,9 @@ final class PlainsongMenuKeyBindingTests: XCTestCase {
 
     func testHotKeyConsumesUnavailableSearchWithoutChangingState() {
         let appState = AppState(shouldRestoreLastOpenedFile: false)
-        let previousAppState = PlainsongAppServices.appState
-        PlainsongAppServices.appState = appState
-        defer { PlainsongAppServices.appState = previousAppState }
+        let previousAppState = KeyWindowRouter.shared.testingPin
+        KeyWindowRouter.shared.testingPin = appState
+        defer { KeyWindowRouter.shared.testingPin = previousAppState }
 
         XCTAssertEqual(PlainsongWorkspaceSearchHotKey.handlePress(), noErr)
         XCTAssertEqual(appState.workspaceSearchUI.mode, .files)

@@ -12,7 +12,7 @@ final class EditorFindFocusReceiptTests: XCTestCase {
     private func makeAppState(text: String = "alpha beta alpha gamma") -> AppState {
         let url = URL(fileURLWithPath: "/tmp/plainsong-find-review-\(UUID().uuidString).md")
         let session = DocumentSession(text: text, url: url, fileKind: .markdown)
-        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let appState = AppState(shownSession: session, shouldRestoreLastOpenedFile: false)
         appState.editorFindHost.controller.debounceNanoseconds = 0
         appState.editorFindHost.commandContextOverride = true
         return appState
@@ -344,7 +344,7 @@ final class EditorFindFocusReceiptTests: XCTestCase {
             ("Escape / Done", { (state: AppState) in state.closeEditorFindBar() }),
             ("workspace close", { (state: AppState) in state.notifyEditorFindWorkspaceDidClose() }),
             ("no document remains", { (state: AppState) in
-                state.currentDocument = DocumentSession()
+                state.shownSession = DocumentSession()
                 state.notifyEditorFindDocumentDidSwitch()
             }),
         ] {

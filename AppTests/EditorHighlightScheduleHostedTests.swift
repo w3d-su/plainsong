@@ -35,12 +35,12 @@ extension EditorFindHostedGateTests {
                 default:
                     editor.undoManager?.redo()
                 }
-                XCTAssertEqual(hosted.appState.currentDocument.text, step == "undo" ? source : edited)
+                XCTAssertEqual(hosted.appState.shownSession.text, step == "undo" ? source : edited)
                 let applied = await poll(timeout: 3) { coordinator.lastAppliedHighlightRevision != before }
                 await settleHighlight(coordinator)
                 let plan = try XCTUnwrap(coordinator.lastAppliedHighlightFoldPlan)
                 let expected = try MarkdownSyntaxParser().visibleTokensAndFoldPlan(
-                    in: hosted.appState.currentDocument.text, fileKind: .markdown,
+                    in: hosted.appState.shownSession.text, fileKind: .markdown,
                     visibleRange: plan.visibleRange, selection: editor.selectedRange(),
                     linkFoldingEnabled: plan.linkFoldingEnabled
                 ).foldPlan
@@ -91,7 +91,7 @@ extension EditorFindHostedGateTests {
         appState.preferences.setShowsLineNumbers(showsLineNumbers)
         appState.openExternalFile(fixture.root)
         try await waitUntil("workspace document opens") {
-            appState.currentDocument.fileURL?.lastPathComponent == "post.md"
+            appState.shownSession.fileURL?.lastPathComponent == "post.md"
         }
         let group = makeHostedWorkspaceGroup(fixture: fixture)
         let window = mountDesignatedKeyWorkspace(in: group, appState: appState, width: windowWidth)
@@ -130,7 +130,7 @@ extension EditorFindHostedGateTests {
         openFindBar(hosted.appState, query: "ordinary prose")
         try await focusEditorOnCurrentMatch(hosted, window: hosted.window)
         try await waitUntil("initial styling and Replace authority are ready") {
-            hosted.appState.editorReplaceAuthorizationDecision(for: hosted.appState.currentDocument) == .allowed
+            hosted.appState.editorReplaceAuthorizationDecision(for: hosted.appState.shownSession) == .allowed
         }
         let controller = hosted.appState.editorFindHost.controller
         controller.debounceNanoseconds = EditorFindController(documentBinding: controller.documentBinding)
@@ -139,11 +139,11 @@ extension EditorFindHostedGateTests {
         editor.textSelection = NSRange(location: 0, length: 0)
         var samples: [Double] = []
         for _ in 0 ..< 30 {
-            let revision = hosted.appState.currentDocument.version
+            let revision = hosted.appState.shownSession.version
             let start = DispatchTime.now().uptimeNanoseconds
             editor.insertText("a", replacementRange: editor.selectedRange())
             samples.append(Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000)
-            XCTAssertEqual(hosted.appState.currentDocument.version, revision + 1)
+            XCTAssertEqual(hosted.appState.shownSession.version, revision + 1)
             // Let the real debounce, selection reveal and parse run between inputs, while
             // only the synchronous native input is timed.
             try await Task.sleep(nanoseconds: 20_000_000)
@@ -160,7 +160,7 @@ extension EditorFindHostedGateTests {
         if environment["CI"] != "true", environment["GITHUB_ACTIONS"] != "true" {
             XCTAssertLessThan(maximum, 16, "native input including debounce scheduling: \(samples)")
         }
-        XCTAssertEqual(MarkdownTextView.textStorage(of: editor)?.string, hosted.appState.currentDocument.text)
+        XCTAssertEqual(MarkdownTextView.textStorage(of: editor)?.string, hosted.appState.shownSession.text)
     }
 
     /// Waits until no highlight has applied for 150 ms, so the next edit starts from rest.

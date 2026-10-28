@@ -72,7 +72,7 @@ final class AppPublishHygieneTests: XCTestCase {
 
     func testIdenticalFindChromePublishesNothing() {
         let appState = AppState(
-            currentDocument: DocumentSession(text: "alpha", fileKind: .markdown),
+            shownSession: DocumentSession(text: "alpha", fileKind: .markdown),
             shouldRestoreLastOpenedFile: false
         )
         var publishCount = 0
@@ -214,7 +214,7 @@ final class AppPublishHygieneTests: XCTestCase {
         let location = try authority.location(relativePath: "post.md")
         let loaded = try MarkdownFileStore().loadResult(at: location)
         let session = DocumentSession(text: postText, url: post, fileKind: .markdown)
-        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let appState = AppState(shownSession: session, shouldRestoreLastOpenedFile: false)
         appState.workspaceRootURL = root
         appState.workspaceSnapshot = WorkspaceFileSnapshot(entries: ["post.md", "sibling.md"].map {
             WorkspaceFileSnapshot.Entry(

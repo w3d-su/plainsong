@@ -82,8 +82,8 @@ extension AppState {
         let rootAuthority = workspaceSearchRootAuthority
         let captureGeneration = workspaceInstalledCaptureGeneration
         let workspaceGeneration = expectedWorkspaceGeneration ?? workspaceGeneration
-        let fileURL = currentDocument.fileURL
-        let text = currentDocument.text
+        let fileURL = shownSession.fileURL
+        let text = shownSession.text
         let currentFileLocation = completionCurrentFileLocation(rootAuthority: rootAuthority)
         let baseLookup = completionWorkspaceBaseLookup(
             captureGeneration: captureGeneration,
@@ -139,11 +139,11 @@ extension AppState {
     private func completionCurrentFileLocation(
         rootAuthority: WorkspaceFileSystemRootAuthority?
     ) -> WorkspaceFileSystemLocation? {
-        if let retainedLocation = retainedAnchoredSessionLocation(for: currentDocument) {
+        if let retainedLocation = retainedAnchoredSessionLocation(for: shownSession) {
             guard retainedLocation.rootAuthority == rootAuthority else { return nil }
             return retainedLocation
         }
-        guard let rootAuthority, let fileURL = currentDocument.fileURL,
+        guard let rootAuthority, let fileURL = shownSession.fileURL,
               let relativePath = try? rootAuthority.relativePath(forFileURL: fileURL)
         else {
             return nil

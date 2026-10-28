@@ -104,13 +104,13 @@ extension EditorFindHostedGateTests {
         app.handleEditorFindQueryTextChange("hit")
         try await waitUntil("the retained set is back") { app.editorFindHost.controller.session?.total == 2 }
         _ = try replacementFieldEditor(in: window)
-        let source = app.currentDocument.text
+        let source = app.shownSession.text
         let undo = editor.undoManager?.canUndo
         for step in [EditorFindCommandDelivery.performFindNext, EditorFindCommandDelivery.performFindPrevious,
                      EditorFindCommandDelivery.performFindNext]
         {
             XCTAssertTrue(step())
-            XCTAssertEqual(app.currentDocument.text, source, "⌘G / ⇧⌘G never mutate")
+            XCTAssertEqual(app.shownSession.text, source, "⌘G / ⇧⌘G never mutate")
         }
         try await waitUntil("Find navigation still applies") {
             self.appliedRange(in: window) == app.editorFindHost.controller.session?.currentMatch?.range

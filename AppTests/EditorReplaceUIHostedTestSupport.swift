@@ -57,12 +57,12 @@ extension EditorFindHostedGateTests {
         }
     }
 
-    /// The menu dispatchers read `PlainsongAppServices.appState`; point it at the fixture.
+    /// Menu and Find fallbacks read the router pin; point it at the fixture.
     func routeMenuCommands(to appState: AppState) {
-        let previous = PlainsongAppServices.appState
-        PlainsongAppServices.appState = appState
+        let previous = KeyWindowRouter.shared.testingPin
+        KeyWindowRouter.shared.testingPin = appState
         addTeardownBlock { @MainActor in
-            PlainsongAppServices.appState = previous
+            KeyWindowRouter.shared.testingPin = previous
         }
     }
 
@@ -197,7 +197,7 @@ extension EditorFindHostedGateTests {
         // must already be stopped so no real FSEvent can still hop in behind the press.
         try await waitForHostedReplaceObservationQuiescence(hosted)
         try await waitUntil("authorization is .allowed and the fixture watcher is stopped") {
-            appState.editorReplaceAuthorizationDecision(for: appState.currentDocument) == .allowed
+            appState.editorReplaceAuthorizationDecision(for: appState.shownSession) == .allowed
                 && (appState.workspaceWatcher?.isStopped ?? true)
         }
         try await start()

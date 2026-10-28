@@ -26,7 +26,7 @@ extension EditorFindHostedGateTests {
         )
         // The synchronous call returned only after the commit check, writer activation, and
         // native insert: the App source already holds the replacement.
-        XCTAssertEqual(appState.currentDocument.text, "HIT one hit two")
+        XCTAssertEqual(appState.shownSession.text, "HIT one hit two")
         XCTAssertEqual(MarkdownTextView.textStorage(of: editor)?.string, "HIT one hit two")
         XCTAssertTrue(editor.undoManager?.canUndo == true)
     }
@@ -37,7 +37,7 @@ extension EditorFindHostedGateTests {
     func testHostedReplaceRefusesPendingDiskInspectionWithZeroEffect() async throws {
         let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two", query: "hit")
         let appState = hosted.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let identity = ObjectIdentifier(session)
         let editor = try hostedEditor(hosted)
         appState.workspaceWatcher?.stop()
@@ -69,7 +69,7 @@ extension EditorFindHostedGateTests {
         let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two", query: "hit")
         let appState = hosted.appState
         let editor = try hostedEditor(hosted)
-        let session = appState.currentDocument
+        let session = appState.shownSession
         appState.editorFindHost.replaceAuthority.willCheckCommitForTesting = {
             appState.workspaceMutationWriteFences.insert(ObjectIdentifier(session))
         }
@@ -103,7 +103,7 @@ extension EditorFindHostedGateTests {
             "a fence set and cleared before commit still supersedes the validated command"
         )
         appState.editorFindHost.replaceAuthority.willCheckCommitForTesting = nil
-        XCTAssertEqual(appState.currentDocument.text, "hit one hit two")
+        XCTAssertEqual(appState.shownSession.text, "hit one hit two")
     }
 
     /// R7 bullet 6: a plan made before a fence appears is dropped before any undo group, even
@@ -112,7 +112,7 @@ extension EditorFindHostedGateTests {
         let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two", query: "hit")
         let appState = hosted.appState
         let editor = try hostedEditor(hosted)
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let plan = try appState.makeEditorReplacePlan(replacement: "HIT").get()
         let generation = appState.editorReplaceAuthorityGeneration
 
@@ -154,7 +154,7 @@ extension EditorFindHostedGateTests {
         guard case .delivered(.replaced) = appState.performEditorReplace(replacement: "HIT") else {
             return XCTFail("The find-field fallback must reach the key window's editor")
         }
-        XCTAssertEqual(appState.currentDocument.text, "HIT one hit two")
+        XCTAssertEqual(appState.shownSession.text, "HIT one hit two")
         XCTAssertTrue(isFindFieldFirstResponder(in: hosted.window), "Replace does not steal focus")
     }
 
@@ -188,7 +188,7 @@ extension EditorFindHostedGateTests {
         guard case .delivered(.replaced) = appState.performEditorReplace(replacement: "HIT") else {
             return XCTFail("Chrome focus in the key window must reach its installed editor")
         }
-        XCTAssertEqual(appState.currentDocument.text, "HIT one hit two")
+        XCTAssertEqual(appState.shownSession.text, "HIT one hit two")
     }
 
     /// Two windows share one `AppState`. Only the key window's installation is reached; with no
@@ -196,7 +196,7 @@ extension EditorFindHostedGateTests {
     func testHostedReplaceReachesOnlyTheKeyWindowsInstallation() async throws {
         let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two", query: "hit")
         let appState = hosted.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let other = mountDesignatedKeyWorkspace(in: hosted.group, appState: appState, originX: 40)
         try await waitUntil("the second window installs the same document") {
             self.editorTextView(in: other) != nil
@@ -245,7 +245,7 @@ extension EditorFindHostedGateTests {
         let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two", query: "hit")
         let appState = hosted.appState
         let editor = try hostedEditor(hosted)
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let controller = appState.editorFindHost.controller
         // An App-side source change neither the installed view nor Find has observed yet.
         session.replaceText("hit zero hit one hit two", refreshStatistics: false)

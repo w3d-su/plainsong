@@ -81,7 +81,7 @@ blogeditor/
 ├── Makefile                  # bootstrap / generate / build / test / preview-bundle
 ├── App/                      # Thin app target (SwiftUI)
 │   ├── PlainsongApp.swift   # @main, WindowGroup, Settings scene
-│   ├── AppState.swift        # façade over WindowState (per window), WorkspaceRootContext (per root), AppDocumentRegistry (per file + app-global); one shared instance until Windows PR C
+│   ├── AppState.swift        # one façade per workspace window: WindowState + WorkspaceRootContext, sharing AppDocumentRegistry; KeyWindowRouter picks the key façade
 │   ├── Views/                # SwiftUI views: WorkspaceWindow (split view), WorkspaceSidebar, WorkspaceDetail, DocumentJumpBar, WorkspaceInspector, WorkspaceToolbar, WorkspaceStatusBar
 │   └── Resources/            # Assets, preview dist bundle (generated), themes
 ├── Packages/
@@ -140,10 +140,11 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
    preview via the JS bridge. JS renders HTML, patches DOM with morphdom, reports back
    `renderComplete(version)`.
 5. Scroll sync uses line ↔ DOM node mapping (§8).
-6. Autosave: debounced 1 s after last edit + on window resign, where one app-global flush
-   saves every connected window's document, warm session and retired session that may
-   autosave; atomic write via `Data.write(.atomic)`; file watcher suppresses
-   self-triggered events by comparing content hash.
+6. Autosave: debounced 1 s after last edit + on window resign. `KeyWindowRouter` flushes
+   the façade that resigned. The flush itself is app-global: it saves every connected
+   window's document, warm session and retired session that may autosave. Writes use
+   `Data.write(.atomic)`. The file watcher suppresses self-triggered events by comparing
+   content hash.
 
 ### Key types (initial sketch — keep names)
 
@@ -165,8 +166,10 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   services, and the one Replace authority generation. Its `sessions(from:)` enumerator over
   every connected window (`AppState.connect(_:)`), the warm cache, and the documented extras
   is the only session inventory, and only the registry touches the warm cache (§3.4 I2).
-  `AppState` forwards all three containers' remaining properties under the old names
-  until PR C.
+  `AppState` forwards the containers' remaining properties under the old names.
+  `KeyWindowRouter` (App) maps each workspace window to its façade. Menus, Find, and the
+  Carbon ⇧⌘F hot key ask it for the key façade when the command runs. A key
+  non-workspace window has no target, so commands do not fall back to a main window.
 
 ### Concurrency rules
 
@@ -250,9 +253,11 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 - An active workspace search refreshes for document edits only after a 500 ms typing
   pause, and only while the Search navigator shows (an edit made while Files shows
   refreshes when Search shows again); typing never resets the search state.
-- Multiple workspace windows are structurally allowed, one preview per editor pane, but
-  Phase 1 currently shares one App-scoped `AppState` across the `WindowGroup`. Separate
-  windows mirror the same workspace/current document until window-scoped state is built.
+- Each workspace window has its own `AppState` façade, `WindowState`, and
+  `WorkspaceRootContext`, and they share one `AppDocumentRegistry`. One preview is
+  created per visible document pane. A scene after the first refuses file and root opens
+  until PR D2, and native tabbing stays off until PR F. Same-file focus (WD1), shared-root
+  release (WD2), and a user-facing New Window (D2) are not implemented yet.
 - Tabs: native window tabs (`NSWindow.tabbingMode`) deferred; Phase 1 uses sidebar
   selection to switch the single editor pane (like Typora). Files selections defer out of
   the native List update, read and verify the file off the main actor, and commit only the

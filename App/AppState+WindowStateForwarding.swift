@@ -14,9 +14,9 @@ import WorkspaceKit
 /// container's `didSet` and `@Published` run exactly once per mutation, as before.
 @MainActor
 extension AppState {
-    var currentDocument: DocumentSession {
-        get { windowState.currentDocument }
-        _modify { yield &windowState.currentDocument }
+    var shownSession: DocumentSession {
+        get { windowState.shownSession }
+        set { windowState.shownSession = newValue }
     }
 
     var workspaceRootURL: URL? {

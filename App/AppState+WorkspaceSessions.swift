@@ -418,7 +418,7 @@ extension AppState {
     }
 
     func nodeForCurrentDocument(in tree: WorkspaceFileTree) -> WorkspaceFileNode? {
-        guard let location = retainedManagedSessionLocation(for: currentDocument),
+        guard let location = retainedManagedSessionLocation(for: shownSession),
               let authority = workspaceSearchRootAuthority,
               workspaceInstalledCaptureGeneration == workspaceGeneration,
               location.rootAuthority == authority

@@ -6,10 +6,10 @@ import SwiftUI
 import UniformTypeIdentifiers
 import WorkspaceKit
 
-/// Top-level app state. Windows PR B1 (`docs/window-state-gates.md` §3.2, §10) keeps its
-/// storage in three scoped containers and this type as a forwarding façade over them:
-/// `WindowState` (the window), `WorkspaceRootContext` (its workspace root), and
-/// `AppDocumentRegistry` (per-file and app-global). Every window still shares one instance.
+/// Top-level app state. Windows PR C gives each workspace window one façade over its own
+/// `WindowState` and `WorkspaceRootContext`, all sharing one `AppDocumentRegistry`
+/// (`docs/window-state-gates.md` §10 row C). Menus, Find, and external opens resolve the
+/// façade through `KeyWindowRouter` instead of a process-wide `AppState`.
 @MainActor
 final class AppState: ObservableObject {
     typealias UserVisibleError = AppStateUserVisibleError
@@ -56,8 +56,25 @@ final class AppState: ObservableObject {
         set { registry.isWYSIWYGMechanismHealthy = newValue }
     }
 
+    /// Layout writes live in `AppState+LayoutMode.swift`. The setters stay file-private.
+    func storeLayoutMode(_ mode: EditorLayoutMode) {
+        layoutMode = mode
+    }
+
+    func storeWYSIWYGFallbackMessage(_ message: String?) {
+        wysiwygFallbackMessage = message
+    }
+
+    func storeEditorFocusRequestID(_ identifier: Int) {
+        editorFocusRequestID = identifier
+    }
+
+    func storeWYSIWYGMechanismHealthy(_ isHealthy: Bool) {
+        isWYSIWYGMechanismHealthy = isHealthy
+    }
+
     init(
-        currentDocument: DocumentSession = DocumentSession(),
+        shownSession: DocumentSession = DocumentSession(),
         fileStore: MarkdownFileStore = MarkdownFileStore(),
         coherentFileReader: any WorkspaceCoherentFileReading = WorkspaceCoherentFileReader(),
         externalReloadApplicationPreparer: any ExternalReloadApplicationPreparing =
@@ -116,26 +133,56 @@ final class AppState: ObservableObject {
             preferences: preferences
         )
         windowState = WindowState(
-            currentDocument: currentDocument,
+            shownSession: shownSession,
             layoutMode: restoredLayout.mode,
             wysiwygFallbackMessage: restoredLayout.fallbackMessage,
             replaceAuthority: registry.replaceAuthority
         )
-        connectContainers()
-        preferences.onChange = { [weak self] in
-            self?.handlePreferencesChanged()
-        }
+        finishConnecting(registerWindow: true, admitsFileOperations: true)
+    }
+
+    /// A later workspace scene on an existing registry. An admitted sibling registers its
+    /// window. A refused one is wired but not registered, so its empty document cannot make
+    /// Save Copy fail closed (`docs/decisions/2026-10-27-windows-b2-registry-enumeration.md`).
+    init(sharing registry: AppDocumentRegistry, admitsFileOperations: Bool) {
+        self.registry = registry
+        workspaceRootContext = WorkspaceRootContext()
+        let restoredLayout = Self.restoreLayoutMode(
+            from: registry.userDefaults,
+            isExperimentalWYSIWYGEnabled: registry.preferences.experimentalWYSIWYGEnabled
+        )
+        windowState = WindowState(
+            shownSession: DocumentSession(),
+            layoutMode: restoredLayout.mode,
+            wysiwygFallbackMessage: restoredLayout.fallbackMessage,
+            replaceAuthority: registry.replaceAuthority
+        )
+        finishConnecting(registerWindow: admitsFileOperations, admitsFileOperations: admitsFileOperations)
+    }
+
+    func makeSiblingFacade(admitsFileOperations: Bool) -> AppState {
+        AppState(sharing: registry, admitsFileOperations: admitsFileOperations)
+    }
+
+    private func finishConnecting(registerWindow: Bool, admitsFileOperations: Bool) {
+        connectContainers(registerWindow: registerWindow)
+        WindowOpenAdmission.set(windowState, admits: admitsFileOperations)
+        KeyWindowRouter.shared.track(self)
+        installSharedRegistryHook()
+        installPreferencesFanoutIfNeeded()
         observeCurrentDocument()
-        retainUnanchoredManagedSessionOwnership(for: currentDocument)
+        if admitsFileOperations {
+            retainUnanchoredManagedSessionOwnership(for: shownSession)
+        }
     }
 
     /// Each container's `didSet` hooks call back here, so a write through the façade or
     /// directly on a container advances the Replace authority generation and records
     /// Export as HTML… context changes exactly as the stored properties did.
-    private func connectContainers() {
-        connect(windowState)
-        registry.onEditorReplaceAuthorityInputChange = { [weak self] fileID, line in
-            self?.noteEditorReplaceAuthorityInputDidChange(fileID: fileID, line: line)
+    private func connectContainers(registerWindow: Bool) {
+        wire(windowState)
+        if registerWindow {
+            registry.register(windowState)
         }
         workspaceRootContext.onExportHTMLContextChange = { [weak self] reason, _, _ in
             self?.noteExportHTMLContextChange(reason)
@@ -150,169 +197,45 @@ final class AppState: ObservableObject {
         ]
     }
 
-    /// Connects `window`'s hooks to this state, then adds it to every registry inventory
-    /// (`docs/window-state-gates.md` §3.4 I2). A window must be connected before it can
-    /// receive input; until PR C only the shared window and test fixtures are connected.
-    func connect(_ window: WindowState) {
+    /// One registry callback fans out to every façade. The generation advances once.
+    private func installSharedRegistryHook() {
+        registry.onEditorReplaceAuthorityInputChange = { [weak registry] fileID, line in
+            guard let registry else { return }
+            let peers = KeyWindowRouter.shared.facades(in: registry)
+            guard let first = peers.first else { return }
+            first.noteEditorReplaceAuthorityInputDidChange(fileID: fileID, line: line)
+            for peer in peers.dropFirst() {
+                peer.scheduleStaleEditorReplaceBlockedStatusCheck()
+            }
+        }
+    }
+
+    /// The registry owns the one preferences callback. Siblings must not replace it.
+    private func installPreferencesFanoutIfNeeded() {
+        guard registry.preferences.onChange == nil else { return }
+        registry.preferences.onChange = { [weak registry] in
+            guard let registry else { return }
+            for facade in KeyWindowRouter.shared.facades(in: registry) {
+                facade.handlePreferencesChanged()
+            }
+        }
+    }
+
+    private func wire(_ window: WindowState) {
         window.onEditorReplaceAuthorityInputChange = { [weak self] fileID, line in
             self?.noteEditorReplaceAuthorityInputDidChange(fileID: fileID, line: line)
         }
         window.onExportHTMLContextChange = { [weak self] reason, _, _ in
             self?.noteExportHTMLContextChange(reason)
         }
+    }
+
+    /// Connects `window`'s hooks to this state, then adds it to every registry inventory
+    /// (`docs/window-state-gates.md` §3.4 I2). A window must be connected before it can
+    /// receive input.
+    func connect(_ window: WindowState) {
+        wire(window)
         registry.register(window)
-    }
-}
-
-extension AppState {
-    var isPreviewVisible: Bool {
-        layoutMode.showsPreview
-    }
-
-    func requestEditorFocus() {
-        editorFocusRequestID += 1
-    }
-
-    var isExperimentalWYSIWYGAvailable: Bool {
-        preferences.experimentalWYSIWYGEnabled && isWYSIWYGMechanismHealthy
-    }
-
-    var shouldUseWYSIWYGPresentation: Bool {
-        layoutMode.usesWYSIWYGPresentation && isExperimentalWYSIWYGAvailable
-    }
-
-    var layoutModeCommandTitle: String {
-        switch layoutMode {
-        case .sourcePreview:
-            "Show Source Only"
-        case .sourceOnly:
-            isExperimentalWYSIWYGAvailable ? "Show WYSIWYG (Experimental)" : "Show Preview"
-        case .wysiwyg:
-            "Show Source + Preview"
-        }
-    }
-
-    var layoutModeToolbarTitle: String {
-        switch layoutMode {
-        case .sourcePreview:
-            "Source Only"
-        case .sourceOnly:
-            isExperimentalWYSIWYGAvailable ? "WYSIWYG" : "Preview"
-        case .wysiwyg:
-            "Source + Preview"
-        }
-    }
-
-    var layoutModeToolbarSystemImage: String {
-        switch layoutMode {
-        case .sourcePreview:
-            "doc.text"
-        case .sourceOnly:
-            isExperimentalWYSIWYGAvailable ? "textformat" : "sidebar.right"
-        case .wysiwyg:
-            "sidebar.right"
-        }
-    }
-
-    var layoutModeToolbarHelp: String {
-        isExperimentalWYSIWYGAvailable
-            ? "Cycle layout: source + preview, source only, WYSIWYG (Experimental)"
-            : "Toggle layout between source + preview and source only"
-    }
-
-    func cycleLayoutMode() {
-        setLayoutMode(layoutMode.next(isWYSIWYGAvailable: isExperimentalWYSIWYGAvailable))
-    }
-
-    func togglePreview() {
-        cycleLayoutMode()
-    }
-
-    func setPreviewVisible(_ isVisible: Bool) {
-        setLayoutMode(isVisible ? .sourcePreview : .sourceOnly)
-    }
-
-    func setLayoutMode(_ requestedMode: EditorLayoutMode) {
-        let resolvedMode = resolveLayoutModeForCurrentAvailability(requestedMode)
-        // The request was honored as-is (no WYSIWYG downgrade), so any earlier
-        // fallback notice is stale — clear it once the user lands where they asked.
-        if resolvedMode == requestedMode {
-            dismissWYSIWYGFallbackMessage()
-        }
-        guard layoutMode != resolvedMode else {
-            persistLayoutMode(resolvedMode)
-            return
-        }
-
-        layoutMode = resolvedMode
-        persistLayoutMode(resolvedMode)
-    }
-
-    func dismissWYSIWYGFallbackMessage() {
-        guard wysiwygFallbackMessage != nil else { return }
-        wysiwygFallbackMessage = nil
-    }
-
-    func handleWYSIWYGMechanismFailure(_ reason: String) {
-        guard isWYSIWYGMechanismHealthy || layoutMode == .wysiwyg else { return }
-
-        isWYSIWYGMechanismHealthy = false
-        recoverFromUnavailableWYSIWYG(reason: reason)
-    }
-
-    func observeCurrentDocument() {
-        documentChangeCancellable?.cancel()
-        documentChangeCancellable = currentDocument.objectWillChange.sink { [weak self] _ in
-            self?.objectWillChange.send()
-        }
-    }
-
-    private func handlePreferencesChanged() {
-        reconcileLayoutModeAvailability()
-        objectWillChange.send()
-        scheduleAutosave()
-    }
-
-    private func reconcileLayoutModeAvailability() {
-        guard layoutMode == .wysiwyg, !isExperimentalWYSIWYGAvailable else { return }
-
-        let reason = preferences.experimentalWYSIWYGEnabled
-            ? "WYSIWYG editor mechanism is unhealthy"
-            : "Experimental WYSIWYG is disabled"
-        recoverFromUnavailableWYSIWYG(reason: reason)
-    }
-
-    private func resolveLayoutModeForCurrentAvailability(_ requestedMode: EditorLayoutMode) -> EditorLayoutMode {
-        guard requestedMode == .wysiwyg, !isExperimentalWYSIWYGAvailable else {
-            return requestedMode
-        }
-
-        let reason = preferences.experimentalWYSIWYGEnabled
-            ? "WYSIWYG editor mechanism is unhealthy"
-            : "Experimental WYSIWYG is disabled"
-        recordWYSIWYGFallback(reason: reason)
-        return .sourceOnly
-    }
-
-    private func recoverFromUnavailableWYSIWYG(reason: String) {
-        recordWYSIWYGFallback(reason: reason)
-        guard layoutMode != .sourceOnly else {
-            persistLayoutMode(.sourceOnly)
-            return
-        }
-
-        layoutMode = .sourceOnly
-        persistLayoutMode(.sourceOnly)
-    }
-
-    private func recordWYSIWYGFallback(reason: String) {
-        let message = "\(reason); falling back to source-only layout without changing source text."
-        wysiwygFallbackMessage = message
-        NSLog("[Plainsong] %@", message)
-    }
-
-    private func persistLayoutMode(_ mode: EditorLayoutMode) {
-        userDefaults.set(mode.rawValue, forKey: Self.layoutModeDefaultsKey)
     }
 }
 

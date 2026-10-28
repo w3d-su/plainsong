@@ -127,7 +127,7 @@ extension AppState {
     }
 
     var editorImageAssetInserter: EditorImageAssetInserter? {
-        let sessionIdentity = ObjectIdentifier(currentDocument)
+        let sessionIdentity = ObjectIdentifier(shownSession)
         guard workspaceRootURL != nil,
               !hasWorkspaceMutationRecoveryLoadFailure,
               workspaceMutationNamespaceDepth == 0,
@@ -137,7 +137,7 @@ extension AppState {
               !indeterminateWorkspaceMutationSessions.contains(sessionIdentity),
               let installedRootAuthority = workspaceSearchRootAuthority,
               let retainedProof = retainedEditorImageAssetDocumentProof(
-                  for: currentDocument
+                  for: shownSession
               ),
               retainedProof.location.rootAuthority == installedRootAuthority,
               let retainedAuthority = editorImageAssetDocumentAuthorities[sessionIdentity],
@@ -153,7 +153,7 @@ extension AppState {
         // authority here; descriptor construction preceded the coherent read adopted as binding.
         return { [
             weak self,
-            weak session = currentDocument,
+            weak session = shownSession,
             location = retainedAuthority.location,
             identity = retainedAuthority.identity,
             authority = retainedAuthority.authority

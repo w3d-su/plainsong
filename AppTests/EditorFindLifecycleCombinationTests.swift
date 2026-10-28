@@ -61,7 +61,7 @@ final class EditorFindLifecycleCombinationTests: XCTestCase {
 
         appState.openExternalFile(root)
         try await waitUntil("post selected") {
-            appState.currentDocument.fileURL?.standardizedFileURL == post.standardizedFileURL
+            appState.shownSession.fileURL?.standardizedFileURL == post.standardizedFileURL
         }
         openFindBar(appState, query: "hit")
         try await waitUntil("initial session") {
@@ -73,7 +73,7 @@ final class EditorFindLifecycleCombinationTests: XCTestCase {
         appState.refreshWorkspaceAfterFileSystemChange()
 
         try await waitUntil("clean reload adopted") {
-            appState.currentDocument.text == "hit one hit two hit three"
+            appState.shownSession.text == "hit one hit two hit three"
         }
         try await waitUntil("find recounts against reloaded content") {
             appState.editorFindHost.controller.session?.total == 3
@@ -100,7 +100,7 @@ final class EditorFindLifecycleCombinationTests: XCTestCase {
 
         appState.openExternalFile(root)
         try await waitUntil("post selected") {
-            appState.currentDocument.fileURL?.standardizedFileURL == post.standardizedFileURL
+            appState.shownSession.fileURL?.standardizedFileURL == post.standardizedFileURL
         }
         appState.replaceDocumentText("hit local hit local")
         openFindBar(appState, query: "hit")
@@ -116,7 +116,7 @@ final class EditorFindLifecycleCombinationTests: XCTestCase {
 
         appState.keepMineForExternallyChangedFile()
         try await waitUntil("prompt resolved") { appState.externalChangePrompt == nil }
-        XCTAssertEqual(appState.currentDocument.text, "hit local hit local")
+        XCTAssertEqual(appState.shownSession.text, "hit local hit local")
         try await waitUntil("find still counts the retained local source") {
             appState.editorFindHost.controller.session?.total == 2
         }
@@ -137,7 +137,7 @@ final class EditorFindLifecycleCombinationTests: XCTestCase {
 
         appState.openExternalFile(root)
         try await waitUntil("post selected") {
-            appState.currentDocument.fileURL?.standardizedFileURL == post.standardizedFileURL
+            appState.shownSession.fileURL?.standardizedFileURL == post.standardizedFileURL
         }
         openFindBar(appState, query: "hit")
         try await waitUntil("session ready") {
@@ -152,7 +152,7 @@ final class EditorFindLifecycleCombinationTests: XCTestCase {
 
         let renamed = root.appendingPathComponent("renamed.md").standardizedFileURL
         try await waitUntil("session relocated") {
-            appState.currentDocument.fileURL?.standardizedFileURL == renamed
+            appState.shownSession.fileURL?.standardizedFileURL == renamed
         }
         try await waitUntil("find identity tracks the new URL") {
             self.findIdentity(appState) != originalIdentity
@@ -181,7 +181,7 @@ final class EditorFindLifecycleCombinationTests: XCTestCase {
             fileKind: .markdown,
             isDirty: true
         )
-        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let appState = AppState(shownSession: session, shouldRestoreLastOpenedFile: false)
         appState.missingFilePrompt = AppState.MissingFilePrompt(fileURL: sourceURL)
         openFindBar(appState, query: "hit")
         try await waitUntil("session ready") {
@@ -191,7 +191,7 @@ final class EditorFindLifecycleCombinationTests: XCTestCase {
 
         try appState.saveDetachedCurrentDocument(to: destinationURL)
 
-        XCTAssertEqual(appState.currentDocument.fileURL?.standardizedFileURL, destinationURL)
+        XCTAssertEqual(appState.shownSession.fileURL?.standardizedFileURL, destinationURL)
         try await waitUntil("find identity tracks the Save Copy destination") {
             self.findIdentity(appState) != originalIdentity
         }
@@ -218,7 +218,7 @@ final class EditorFindLifecycleCombinationTests: XCTestCase {
             fileKind: .markdown,
             isDirty: true
         )
-        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let appState = AppState(shownSession: session, shouldRestoreLastOpenedFile: false)
         appState.workspaceRootURL = root
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
@@ -262,7 +262,7 @@ final class EditorFindLifecycleCombinationTests: XCTestCase {
         XCTAssertThrowsError(try appState.saveDetachedCurrentDocument(to: destinationURL))
 
         // The session is rehomed to the quarantined destination; Find must follow it.
-        XCTAssertEqual(appState.currentDocument.fileURL?.standardizedFileURL, destinationURL)
+        XCTAssertEqual(appState.shownSession.fileURL?.standardizedFileURL, destinationURL)
         XCTAssertEqual(
             appState.indeterminateSessionWriteContexts[ObjectIdentifier(session)]?.location.fileURL,
             destinationURL

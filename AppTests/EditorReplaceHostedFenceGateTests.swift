@@ -34,12 +34,12 @@ extension EditorFindHostedGateTests {
         // Pending editor source with no composition, so each refusal below goes through the
         // production command path to App's §5.6 decision.
         let installation = try XCTUnwrap(editorCoordinator(in: hosted.window)?.currentDocumentBindingInstallation)
-        appState.pendingEditorSourceInstallations[installation] = appState.currentDocument
-        XCTAssertTrue(appState.hasPendingEditorSource(for: appState.currentDocument))
+        appState.pendingEditorSourceInstallations[installation] = appState.shownSession
+        XCTAssertTrue(appState.hasPendingEditorSource(for: appState.shownSession))
         try assertAppRefusal(hosted, .pendingEditorSource)
 
         appState.reloadExternallyChangedFile()
-        let stateURL = try XCTUnwrap(appState.sessionStateURL(for: appState.currentDocument))
+        let stateURL = try XCTUnwrap(appState.sessionStateURL(for: appState.shownSession))
         XCTAssertEqual(appState.deferredExternalChangeResolutions[stateURL], .reload)
         XCTAssertTrue(appState.externalReloadTasks.isEmpty, "the Reload read is suspended")
 
@@ -64,16 +64,16 @@ extension EditorFindHostedGateTests {
             selectedRange: NSRange(location: 1, length: 0),
             replacementRange: .notFound
         )
-        XCTAssertTrue(appState.hasPendingEditorSource(for: appState.currentDocument))
+        XCTAssertTrue(appState.hasPendingEditorSource(for: appState.shownSession))
         XCTAssertEqual(
-            appState.editorReplaceAuthorizationDecision(for: appState.currentDocument),
+            appState.editorReplaceAuthorizationDecision(for: appState.shownSession),
             .refused(.pendingEditorSource)
         )
         try assertMarkedTextRefusal(hosted)
 
         appState.reloadExternallyChangedFile()
         XCTAssertEqual(
-            appState.editorReplaceAuthorizationDecision(for: appState.currentDocument),
+            appState.editorReplaceAuthorizationDecision(for: appState.shownSession),
             .refused(.externalResolutionSuspended)
         )
         try assertMarkedTextRefusal(hosted)
@@ -96,7 +96,7 @@ extension EditorFindHostedGateTests {
         }
         XCTAssertThrowsError(try appState.saveCurrentDocument())
         appState.anchoredFileSaveOverride = nil
-        XCTAssertNotNil(appState.indeterminateSessionWrites[ObjectIdentifier(appState.currentDocument)])
+        XCTAssertNotNil(appState.indeterminateSessionWrites[ObjectIdentifier(appState.shownSession)])
         XCTAssertEqual(
             appState.externalChangePrompt?.fileURL.lastPathComponent,
             "post.md",
@@ -138,7 +138,7 @@ extension EditorFindHostedGateTests {
     func testHostedReplaceRefusesDuringAWorkspaceMutationWriteFence() async throws {
         let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two", query: "hit")
         let appState = hosted.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         try appState.beginWorkspaceNamespaceMutation([session])
 
         try assertAppRefusal(hosted, .workspaceMutationWriteFence)
@@ -158,7 +158,7 @@ extension EditorFindHostedGateTests {
         // Pending editor source on its own refuses for its §5.6 reason through the
         // production path.
         let installation = try XCTUnwrap(editorCoordinator(in: hosted.window)?.currentDocumentBindingInstallation)
-        appState.pendingEditorSourceInstallations[installation] = appState.currentDocument
+        appState.pendingEditorSourceInstallations[installation] = appState.shownSession
         try assertAppRefusal(hosted, .pendingEditorSource)
         appState.pendingEditorSourceInstallations[installation] = nil
 
@@ -170,7 +170,7 @@ extension EditorFindHostedGateTests {
             replacementRange: .notFound
         )
         XCTAssertEqual(
-            appState.editorReplaceAuthorizationDecision(for: appState.currentDocument),
+            appState.editorReplaceAuthorizationDecision(for: appState.shownSession),
             .refused(.pendingEditorSource)
         )
         try assertMarkedTextRefusal(hosted)
@@ -190,7 +190,7 @@ extension EditorFindHostedGateTests {
         try await waitUntil("the missing-file recovery prompt appears") {
             appState.missingFilePrompt?.fileURL.lastPathComponent == "post.md"
         }
-        let stateURL = try XCTUnwrap(appState.sessionStateURL(for: appState.currentDocument))
+        let stateURL = try XCTUnwrap(appState.sessionStateURL(for: appState.shownSession))
         XCTAssertTrue(appState.detachedSessionURLs.contains(stateURL))
 
         try assertAppRefusal(hosted, .detachedRecoveryAuthority)

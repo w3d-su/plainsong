@@ -7,6 +7,8 @@ import WorkspaceKit
 /// File › Open…, Save, launch restoration, and error presentation.
 extension AppState {
     func restoreLastOpenedFileIfNeeded() {
+        // A refused extra scene must not consume the one app-global restore attempt.
+        guard WindowOpenAdmission.admits(windowState) else { return }
         guard !didAttemptRestore else { return }
         didAttemptRestore = true
 
@@ -24,7 +26,7 @@ extension AppState {
         else {
             return
         }
-        guard shouldRestoreLastOpenedFile, currentDocument.fileURL == nil else {
+        guard shouldRestoreLastOpenedFile, shownSession.fileURL == nil else {
             return
         }
         do {
@@ -38,6 +40,7 @@ extension AppState {
 
     func openFile() {
         do {
+            try refuseWindowFileOpenIfNeeded()
             try validateWorkspaceMutationRecoveryStoresLoaded()
         } catch {
             present(error, title: "Could Not Open File")
@@ -60,6 +63,11 @@ extension AppState {
     }
 
     func openExternalFile(_ url: URL) {
+        let target = KeyWindowRouter.shared.facadeForExternalOpen(fallback: self)
+        guard target === self else {
+            target.openExternalFile(url)
+            return
+        }
         do {
             try open(url: url, rememberAsLastOpened: true, preserveWorkspace: false)
         } catch {
@@ -84,6 +92,35 @@ extension AppState {
             title: title,
             message: userVisibleDescription(for: error)
         )
+    }
+
+    /// Session failures land on the window showing `session`. An unseen warm session uses
+    /// the home window (`docs/window-state-gates.md` §3.2, W3 bullets 5–6).
+    func present(_ error: Error, title: String, for session: DocumentSession) {
+        let visible = UserVisibleError(
+            title: title,
+            message: userVisibleDescription(for: error)
+        )
+        if let window = registry.connectedWindows.first(where: { $0.shownSession === session }) {
+            window.presentedError = visible
+            KeyWindowRouter.shared.focus(window)
+            return
+        }
+        let home = KeyWindowRouter.shared.home(for: registry) ?? self
+        home.presentedError = visible
+        KeyWindowRouter.shared.focus(home.windowState)
+    }
+
+    func presentOnHome(_ error: Error, title: String) {
+        let home = KeyWindowRouter.shared.home(for: registry) ?? self
+        home.present(error, title: title)
+        KeyWindowRouter.shared.focus(home.windowState)
+    }
+
+    func refuseWindowFileOpenIfNeeded() throws {
+        guard WindowOpenAdmission.admits(windowState) else {
+            throw AppStateError.windowFileOpenRefused
+        }
     }
 
     private func userVisibleDescription(for error: Error) -> String {
@@ -118,20 +155,20 @@ extension AppState {
 /// Document facts the menus, toolbar, and preview read.
 extension AppState {
     var hasOpenDocument: Bool {
-        currentDocument.fileURL != nil
+        shownSession.fileURL != nil
     }
 
     var canSave: Bool {
-        guard let url = sessionStateURL(for: currentDocument) else {
+        guard let url = sessionStateURL(for: shownSession) else {
             return false
         }
         return !hasWorkspaceMutationRecoveryLoadFailure &&
             !isSaving &&
-            !hasPendingEditorSource(for: currentDocument) &&
-            externalReloadTasks[ObjectIdentifier(currentDocument)] == nil &&
-            indeterminateSessionWrites[ObjectIdentifier(currentDocument)] == nil &&
-            !workspaceMutationWriteFences.contains(ObjectIdentifier(currentDocument)) &&
-            !indeterminateWorkspaceMutationSessions.contains(ObjectIdentifier(currentDocument)) &&
+            !hasPendingEditorSource(for: shownSession) &&
+            externalReloadTasks[ObjectIdentifier(shownSession)] == nil &&
+            indeterminateSessionWrites[ObjectIdentifier(shownSession)] == nil &&
+            !workspaceMutationWriteFences.contains(ObjectIdentifier(shownSession)) &&
+            !indeterminateWorkspaceMutationSessions.contains(ObjectIdentifier(shownSession)) &&
             !detachedSessionURLs.contains(url) &&
             pendingExternalTexts[url] == nil &&
             pendingExternalFileVersions[url] == nil &&
@@ -139,7 +176,7 @@ extension AppState {
     }
 
     var windowTitle: String {
-        workspaceRootURL?.lastPathComponent ?? currentDocument.fileURL?.lastPathComponent ?? "Plainsong"
+        workspaceRootURL?.lastPathComponent ?? shownSession.fileURL?.lastPathComponent ?? "Plainsong"
     }
 
     var previewAssetRootURL: URL? {

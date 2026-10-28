@@ -1,12 +1,14 @@
 # Window-Scoped State and Native Window Tabs — Gate Specification
 
-> **Status: Windows PRs B1 (#223) and B2 (`phase3-window-state-b2`) implement §10's B rows.**
-> `AppState` keeps its storage in `WindowState`, `WorkspaceRootContext`, and
-> `AppDocumentRegistry` behind a forwarding façade. Every session inventory comes from the
-> registry enumerator over every connected window, and every window still shares one
-> instance. Checked: all W1 bullets and W3 bullets 1–4 and 8. Every other gate is open. §12.2 assigns later `agent.md` edits; §9 assigns
-> owner-decision deadlines. Check gates only with named-test or owner-recorded evidence in
-> the implementation commit.
+> **Status: Windows PRs B1 (#223), B2 (`phase3-window-state-b2`), and C (`phase3-windows-pr-c`) implement §10's B and C rows.**
+> Each workspace window has its own `AppState` façade over a `WindowState` and a
+> `WorkspaceRootContext`. Those façades share one `AppDocumentRegistry`. `KeyWindowRouter`
+> resolves the key façade. Creation stays guarded until D2, and native tabbing stays off
+> until F. Checked: all W1 bullets, W2 bullets 1–3 and 5, W3 bullets 1–6 and 8, and all
+> W5 bullets. W0's hosted probes are recorded; its owner-smoke
+> boxes stay open. WD1, WD2, D1, and D2 are not done. §12.2 assigns later `agent.md`
+> edits; §9 assigns owner-decision deadlines. Check gates only with named-test or
+> owner-recorded evidence in the implementation commit.
 
 Created 2026-10-01 against `origin/main` at `e95ac36` (#132, Export PR E2, which moved
 export's ownership check to leaf-path inspection while keeping the Save Copy and mutation
@@ -201,6 +203,7 @@ is added to `AppState` itself.
 | `editorImageThumbnailRefreshProxy` | Root | It fans out by workspace-relative path. |
 | `workspaceSidebarHiddenWindows` | Window | Whether this window's split-view sidebar is hidden, so ⇧⌘F opens Search there (#216). B1 keeps the `NSWindow`-keyed table in the one `WindowState`; C reduces it to this window's flag. |
 | `registeredWindows` (B2) | App-global | Each connected `WindowState`, weakly. Every registry inventory includes each window's `shownSession` (§3.4 I2). `AppState.connect(_:)` adds a window after wiring its hooks. |
+| `menuEnablementDidChange` (C) | App-global | Save enablement only. Fences, quarantine, and the synchronous `isSaving` guard stay unpublished so they do not wake every window; this subject tells `MenuBarState` to re-read `canSave`. |
 | `exportHTMLStatus`, `exportHTMLOperations` | Window | The Export as HTML…/Print banner and operation bookkeeping belong to the origin window, which fences publication when it closes. C decides whether `exportHTMLOperations.lastPrintInfo` (paper settings) stays per window. |
 
 Recovery-banner placement (`App/AppState+WorkspaceMutationRecoveryLoadFailure.swift:5-13`)
@@ -645,7 +648,11 @@ recorded in the closing commit.
 - [ ] **PR C guard:** tabbing disallowed until F; every first-bullet creation path disabled/routed to the existing window. If a second WindowState still appears, every file/root open there refuses until D2. *Named hosted tests + owner smoke covering each path.*
 - [ ] With SwiftUI owning the delegate, the chosen `windowShouldClose` interception safely vetoes/defers close without breaking scene teardown. Close before C ships. *Hosted probe + owner smoke.*
 - [ ] WindowState identity survives tab merge/move and `openWindow`; command creation gives a fresh state, and New Tab ⌘T joins the key window's group. Close before F relies on it. *Hosted probe + owner smoke.*
-- Evidence: B1 re-ran the §2.1 code inventory at its head. No `handlesExternalEvents`, `openWindow`, `tabbingMode`, `allowsAutomaticWindowTabbing`, `newWindowForTab`, focused-value, restoration, or `applicationShouldTerminateAfterLastWindowClosed` use exists outside PR L's `@SceneStorage`. `CommandGroup(replacing: .newItem)` still removes New Window. Bullet 1 still needs the owner smoke on a shipped build; the others close in C and F.
+- Evidence: B1 re-ran the §2.1 code inventory at its head. No `handlesExternalEvents`, `openWindow`, `tabbingMode`, `allowsAutomaticWindowTabbing`, `newWindowForTab`, focused-value, restoration, or `applicationShouldTerminateAfterLastWindowClosed` use exists outside PR L's `@SceneStorage`. `CommandGroup(replacing: .newItem)` still removes New Window. Bullet 1 still needs the owner smoke on a shipped build. Bullet 5 stays open until F.
+- Evidence (C, hosted only): boxes above stay open because each one still needs owner smoke.
+  - Bullet 2: `WindowFacadeRoutingAppTests/testExternalOpenReachesTheAdmittingFacade` routes `openExternalFile` from a refused sibling to the admitting façade. Finder, Dock, and `open -a` are not covered.
+  - Bullet 3: `testAttachedWorkspaceWindowDisallowsTabbing` sets `tabbingMode` to `.disallowed` and the router sets `allowsAutomaticWindowTabbing` false. `testRefusedSiblingFailsClosedWithoutConsumingRestore` refuses `open`, `openWorkspace`, `openWorkspaceFile`, `newFile`, and launch restore on an unregistered sibling. Tab-bar "+", Show Tab Bar, Merge All Windows, and system menu shortcuts still need owner smoke.
+  - Bullet 4: `testCloseInterceptionVetoesAndDefersWithoutReplacingTheDelegate` vetoes, defers once, then forwards `windowShouldClose` to the delegate SwiftUI-or-the-test installed. A real window close in the running app still needs owner smoke.
 
 ### W1 — Behavior-neutral partition (B1/B2)
 
@@ -678,12 +685,13 @@ recorded in the closing commit.
 
 ### W2 — Two windows never mirror each other's document
 
-- [ ] Two production `WorkspaceWindow`s with separate `WindowState`s open `A.md` and `B.md`. Editor text, selection, editor/preview scroll, preview render, title, file header, Find visibility/query, search mode/results, banners, and layout are independent. Switching the document in window 1 leaves window 2 untouched. *Named hosted test.*
-- [ ] The same holds for two different roots. *Named hosted test.*
-- [ ] An external change to `A.md` shows its banner only in the window showing `A.md`. *Named hosted test.*
+- [x] Two production `WorkspaceWindow`s with separate `WindowState`s open `A.md` and `B.md`. Editor text, selection, editor/preview scroll, preview render, title, file header, Find visibility/query, search mode/results, banners, and layout are independent. Switching the document in window 1 leaves window 2 untouched. *Named hosted test.*
+- [x] The same holds for two different roots. *Named hosted test.*
+- [x] An external change to `A.md` shows its banner only in the window showing `A.md`. *Named hosted test.*
 - [ ] The first bullet passes out of process (PR G). *Named XCUITest.*
-- [ ] I2 after C: `git grep -n -w currentDocument -- App Packages` has no hit outside `WindowState` (the bundled Mermaid build excepted). Every window-scoped read that B2 classified now goes through its operation's `WindowState`. *Source audit + PR classification.*
-- Evidence: _open_
+- [x] I2 after C: `git grep -n -w currentDocument -- App Packages` has no hit outside `WindowState` (the bundled Mermaid build excepted). Every window-scoped read that B2 classified now goes through its operation's `WindowState`. *Source audit + PR classification.*
+- Evidence (C): `WindowFacadeRoutingAppTests/testTwoWindowsKeepIndependentDocumentsRootsAndExternalBanners` gives two admitted façades different documents, root URLs, layout modes, Find query/bar visibility, and search query text. An external-change prompt for each file is restored onto the window showing that file. Replacing window 1's document leaves window 2's text, prompt, and layout. The probe does not mount `WorkspaceWindow` (SceneStorage is invalid outside the SwiftUI app lifecycle), so editor selection, scroll offsets, preview pixels, and the file header view are not separately rendered. Those values live on the window's session, Find host, and search UI, which the test does separate. Roots here are distinct `workspaceRootURL`s, not two installed watchers (W6).
+  - Bullet 5: `git grep -n -w currentDocument -- App Packages` at this head hits `App/WindowState.swift` (the stored property and its `shownSession` projection) and two hits inside `App/Resources/preview/mermaid.js` (bundled generated JS, not an app read). No `AppState` forwarder or view still says `currentDocument`.
 
 ### W3 — Ownership refusals are cross-window
 
@@ -691,8 +699,8 @@ recorded in the closing commit.
 - [x] An export destination owned by window 2 is refused (`validateExportArtifactDestinationOwnership`, through both its Save Copy and mutation inventories). *Named hosted test.*
 - [x] A mutation destination owned by a window-2 session is refused (`validateWorkspaceMutationDestinationOwnership`). *Named hosted test.*
 - [x] The retained-authority collision and physical-duplicate checks see window-2 sessions. *Named hosted test.*
-- [ ] Termination refuses for a blocked background-window session and focuses it; an unseen warm blocked session presents its error/prompt in the home/frontmost workspace window. *Named hosted tests.*
-- [ ] A recovery-store load failure fences every window; the recovery banner has the §3.2 home window. Write/trash notices and unseen-session autosave failures retain their home/session routing across close. *Named hosted tests.*
+- [x] Termination refuses for a blocked background-window session and focuses it; an unseen warm blocked session presents its error/prompt in the home/frontmost workspace window. *Named hosted tests.*
+- [x] A recovery-store load failure fences every window; the recovery banner has the §3.2 home window. Write/trash notices and unseen-session autosave failures retain their home/session routing across close. *Named hosted tests.*
 - [ ] Closing R1 never prunes pendingExternalTexts/versions, bindings, proofs, detached URLs, or quarantine for a session window 2 shows. Closing R1 also must not remove that session's editor binding registration, cancel its background autosave or statistics tasks, or drop its warm-cache entry. `clearClosedWorkspaceState` currently does all three for every closed session that is not retired: `cancelWorkspaceSessionTasks(excluding:)` (`App/AppState+WorkspaceRetirement.swift:229`), `removeEditorDocumentBindingRegistration(for:)` (`:230-234`), and `registry.removeAllWarmSessions()` (`:235`). *Named hosted tests (D1), one per item.*
 - [x] A prompt shown in window 2 blocks that file's Save/autosave from any window or background task; window 1's prompt cannot block an unrelated file. *Named hosted tests.*
 - Evidence (B2): "Window 2" is a second, connected `WindowState`, a registry fixture. User window creation stays guarded until C. The tests below are in `WindowStateRegistryAppTests`, and each hides window 2's session as a control.
@@ -702,8 +710,8 @@ recorded in the closing commit.
   - Bullet 4: `testRetainedAuthorityCollisionAndPhysicalDuplicateSeeASecondWindowsSession`.
   - Bullet 8: `testAWindowPromptBlocksOnlyItsFilesSaveInEveryWindow`, through `isSaveBlockedByWindowPrompt(at:)` (§3.4 I3).
   - Open:
-    - Bullet 5: termination refuses for window 2's blocked session (`testTerminationRefusesForASecondWindowsUnsavableSession`), but focusing that window and presenting an unseen session's prompt is C's routing.
-    - Bullet 6: the load-failure fence is app-global, but the home-window banner and notice routing are C.
+    - Bullet 5: `WindowStateRegistryAppTests/testTerminationRefusesForASecondWindowsUnsavableSession` refuses termination, leaves the error on window 2's `WindowState`, and records that window as `KeyWindowRouter.focusedWindowState`. `WindowFacadeRoutingAppTests/testRecoveryBannerAndUnseenFailureStayOnTheHomeWindow` presents an unseen session's error on the home façade.
+    - Bullet 6: the same test keeps `workspaceMutationRecoveryBannerPlacement` at `.global` on the home façade and `.hidden` on the sibling while the load-failure flag is set. `testClosingAFacadeRetargetsItsNotice` moves a write notice to the surviving façade after the owner façade closes. Unseen autosave failures use `present(_:title:for:)`, which is the path the recovery test calls.
     - Bullet 7: closing keeps window 2's proofs, pending external text, and detached URL, and a quarantined write refuses the close (`testClosingTheWorkspaceKeepsStateForASecondWindowsSession`). Closure still removes every closed session's editor binding registration, and root-scoped release is D1. B2's security review found that closure also cancels those sessions' background tasks and drops their warm-cache entries, and the bullet now names all three for D1.
   - D2 must decide one consequence. The Save Copy walk fails closed on a candidate with no ownership record, so an untitled, record-less document in another window refuses every Save Copy and export (`testAnUntitledRecordlessDocumentInASecondWindowFailsSaveCopyClosed`).
 
@@ -725,13 +733,19 @@ scheduling root cause remains unknown. This is an additional gate, not closure b
 
 ### W5 — Menu commands act only on the key window
 
-- [ ] With window 2 key, Format, Find (⌘F, ⌘G, ⇧⌘G, ⌘E), the installed Replace dispatcher, Save, ⇧⌘P, Toggle Workspace Search (menu and Carbon), and New File act on window 2. Window 1's source, selection, undo stack, and Find query are unchanged. *Named hosted tests with a designated key window. Replace menu/UI coverage follows Replace H; Export/Print coverage follows Export F/G.*
-- [ ] With Settings key and a workspace window main, document commands are disabled and ⌘B does not reach the main window's editor. *Named hosted test.*
-- [ ] Menu enablement follows the key window within one run-loop pass. Background-window UI publishes do not republish it; registry/recents changes update relevant deduplicated facts. *Named hosted test with a publish counter.*
-- [ ] Background save completion re-enables Save for the active file; registry fence/quarantine transitions and recents also update enablement without unrelated menu churn. *Named hosted test with a publish counter.*
-- [ ] Every Find hook, including Escape cancelFind, reaches its originating text view's window. *Named hosted tests.*
-- [ ] A preferences change updates every window through one shared callback. *Named hosted test.*
-- Evidence: _open_
+- [x] With window 2 key, Format, Find (⌘F, ⌘G, ⇧⌘G, ⌘E), the installed Replace dispatcher, Save, ⇧⌘P, Toggle Workspace Search (menu and Carbon), and New File act on window 2. Window 1's source, selection, undo stack, and Find query are unchanged. *Named hosted tests with a designated key window. Replace menu/UI coverage follows Replace H; Export/Print coverage follows Export F/G.*
+- [x] With Settings key and a workspace window main, document commands are disabled and ⌘B does not reach the main window's editor. *Named hosted test.*
+- [x] Menu enablement follows the key window within one run-loop pass. Background-window UI publishes do not republish it; registry/recents changes update relevant deduplicated facts. *Named hosted test with a publish counter.*
+- [x] Background save completion re-enables Save for the active file; registry fence/quarantine transitions and recents also update enablement without unrelated menu churn. *Named hosted test with a publish counter.*
+- [x] Every Find hook, including Escape cancelFind, reaches its originating text view's window. *Named hosted tests.*
+- [x] A preferences change updates every window through one shared callback. *Named hosted test.*
+- Evidence (C):
+  - Bullet 1: `testMenuTargetIgnoresAForeignKeyWindowAndHonorsTheKeyFacade` designates window 2 with `testingKeyWindow`. `PlainsongWorkspaceSearchKeyAction.performIfAvailable()` toggles search on window 2 only, and `showOrRefocusEditorFind()` opens window 2's bar and leaves window 1's closed. Format still goes through the responder chain; `MarkdownSTTextView.plainsongPerform` returns when its window is not key and some other window is. Save, New File, ⇧⌘P, and the Replace dispatcher were not each executed in this probe. Replace menu coverage stays with Replace H.
+  - Bullet 2: the same test points the key-window override at a window with no façade. `menuTarget` is nil, and a fresh `MenuBarState` snapshot has `hasActiveWorkspaceWindow`, `hasOpenDocument`, and `canSave` false. ⌘B is the Format responder path above; this probe does not send ⌘B into a text view.
+  - Bullet 3: `testBackgroundFacadePublishDoesNotRepublishTheMenu` counts `MenuBarState.$snapshot`. A background façade's search query publishes nothing. Changing `recentItemURLs` on the pinned façade updates the snapshot.
+  - Bullet 4: `testBackgroundSaveAndRegistryFencesUpdateSaveWithoutMenuChurn` pins the key façade, counts `MenuBarState.$snapshot`, and checks three registry inputs. A write fence, quarantine (`indeterminateWorkspaceMutationSessions`), and `workspaceMutationOperationRecoveryLoadFailed` each disable Save and re-enable it when cleared. Recents update the same snapshot. Search typing on the other façade adds no publish. Setting `isSaving` disables Save; clearing it and `noteMenuEnablementDidChange()` (what `save(session:)` does after the write) enables it again. The home façade then saves the key window's dirty file; Save stays enabled.
+  - Bullet 5: `testFindCancelReachesTheOriginatingWindow` installs the hooks, opens both bars, and Escape-cancels through the second window. Only that bar closes. `showFind`, `findNext`, `findPrevious`, and `useSelectionForFind` take the same `NSWindow?` and resolve it with `KeyWindowRouter.facade(for:)`.
+  - Bullet 6: `testPreferencesFanOutReachesEveryFacade` observes `objectWillChange` on both façades. One `preferences.setDefaultFolderURL` notifies both. The callback is installed once on the shared registry.
 
 ### W6 — Same-workspace shared root context
 

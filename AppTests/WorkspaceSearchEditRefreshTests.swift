@@ -22,8 +22,8 @@ final class WorkspaceSearchEditRefreshTests: XCTestCase {
         try await waitForActiveSearchRefresh("initial search") { provider.requests.count == 1 }
         let generation = appState.workspaceSearchState.queryGeneration
 
-        appState.applyAuthorizedEditorText("needle one", to: appState.currentDocument)
-        appState.applyAuthorizedEditorText("needle two", to: appState.currentDocument)
+        appState.applyAuthorizedEditorText("needle one", to: appState.shownSession)
+        appState.applyAuthorizedEditorText("needle two", to: appState.shownSession)
 
         // Typing neither replaces the search state (a whole-window publish) nor restarts it.
         XCTAssertEqual(appState.workspaceSearchState.queryGeneration, generation)
@@ -51,7 +51,7 @@ final class WorkspaceSearchEditRefreshTests: XCTestCase {
         try await waitForActiveSearchRefresh("initial search") { provider.requests.count == 1 }
 
         appState.selectWorkspaceSidebarMode(.files)
-        appState.applyAuthorizedEditorText("needle hidden", to: appState.currentDocument)
+        appState.applyAuthorizedEditorText("needle hidden", to: appState.shownSession)
         try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertEqual(provider.requests.count, 1, "no search runs while Files is showing")
         XCTAssertTrue(appState.workspaceSearchEditRefresh.isPendingUntilSearchShows)
@@ -77,7 +77,7 @@ final class WorkspaceSearchEditRefreshTests: XCTestCase {
         try await waitForActiveSearchRefresh("initial search") { provider.requests.count == 1 }
 
         // A refresh waiting for the typing pause.
-        appState.applyAuthorizedEditorText("needle one", to: appState.currentDocument)
+        appState.applyAuthorizedEditorText("needle one", to: appState.shownSession)
         XCTAssertNotNil(appState.workspaceSearchEditRefresh.task)
         appState.clearWorkspaceSearch()
         XCTAssertNil(appState.workspaceSearchEditRefresh.task)
@@ -86,7 +86,7 @@ final class WorkspaceSearchEditRefreshTests: XCTestCase {
         appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
         try await waitForActiveSearchRefresh("second search") { provider.requests.count == 2 }
         appState.selectWorkspaceSidebarMode(.files)
-        appState.applyAuthorizedEditorText("needle two", to: appState.currentDocument)
+        appState.applyAuthorizedEditorText("needle two", to: appState.shownSession)
         XCTAssertTrue(appState.workspaceSearchEditRefresh.isPendingUntilSearchShows)
         appState.clearWorkspaceSearch()
         XCTAssertFalse(appState.workspaceSearchEditRefresh.isPendingUntilSearchShows)

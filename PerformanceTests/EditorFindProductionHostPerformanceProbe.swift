@@ -58,7 +58,7 @@ extension EditorFindPerformanceTests {
         )
         assertSession(initial, matches: scenario, label: "live-query prime")
         _ = try await EditorFindPerformanceSupport.waitForWorkspaceUpdate(in: harness) {
-            $0.documentRevision == appState.currentDocument.version
+            $0.documentRevision == appState.shownSession.version
                 && $0.isBarVisible
                 && $0.queryText == scenario.pattern
                 && $0.hasActiveQuery
@@ -110,7 +110,7 @@ extension EditorFindPerformanceTests {
         // Keep the deterministic edit in the mounted visible range. Moving the caret to the
         // 1 MiB tail would benchmark a cold full-document scroll/layout, not edit admission.
         harness.textView.textSelection = NSRange(location: 0, length: 0)
-        let baselineVersion = harness.app.appState.currentDocument.version
+        let baselineVersion = harness.app.appState.shownSession.version
         var samples = WorkspaceEditSamples()
         let warningPhaseID = UUID().uuidString.lowercased()
         logMeasuredEditWarningPhase(
@@ -284,7 +284,7 @@ extension EditorFindPerformanceTests {
             in: harness,
             after: generation
         ) {
-            $0.documentRevision == harness.app.appState.currentDocument.version
+            $0.documentRevision == harness.app.appState.shownSession.version
                 && $0.isBarVisible
                 && $0.queryText == scenario.pattern
                 && $0.hasActiveQuery
@@ -307,8 +307,8 @@ extension EditorFindPerformanceTests {
         XCTAssertEqual(controller.completedMatchCount, baselineCompletedCount)
         XCTAssertNil(controller.session)
         XCTAssertNil(controller.pendingNavigationCommand)
-        XCTAssertEqual(appState.currentDocument.version, expectedVersion)
-        XCTAssertTrue(appState.currentDocument.text.hasPrefix(expectedSourcePrefix))
+        XCTAssertEqual(appState.shownSession.version, expectedVersion)
+        XCTAssertTrue(appState.shownSession.text.hasPrefix(expectedSourcePrefix))
     }
 
     func assertProductionWorkspaceUpdate(
@@ -327,7 +327,7 @@ extension EditorFindPerformanceTests {
             editorGenerationBefore,
             "production editor representable update did not run for edit \(iteration)"
         )
-        XCTAssertEqual(harness.textView.text, harness.app.appState.currentDocument.text)
+        XCTAssertEqual(harness.textView.text, harness.app.appState.shownSession.text)
         XCTAssertTrue(snapshot.isBarVisible)
         XCTAssertEqual(snapshot.queryText, scenario.pattern)
         XCTAssertFalse(snapshot.hasActiveQuery)

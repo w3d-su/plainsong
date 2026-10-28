@@ -15,11 +15,11 @@ extension AppState {
 
     func closeWorkspaceForReplacement() throws {
         try validateWorkspaceMutationRecoveryStoresLoaded(
-            at: workspaceRootURL ?? sessionStateURL(for: currentDocument)
+            at: workspaceRootURL ?? sessionStateURL(for: shownSession)
         )
         guard workspaceMutationNamespaceDepth == 0 else {
             throw AppStateError.workspaceMutationInProgress(
-                workspaceRootURL ?? sessionStateURL(for: currentDocument) ?? currentDocument.fileURL
+                workspaceRootURL ?? sessionStateURL(for: shownSession) ?? shownSession.fileURL
                     ?? URL(fileURLWithPath: "/")
             )
         }
@@ -220,7 +220,7 @@ private extension AppState {
         for session in registry.sessions(from: [.fileBackedWindowDocuments]) {
             proofRetainedSessionIdentities.insert(ObjectIdentifier(session))
         }
-        if !retainedSessionIdentities.contains(ObjectIdentifier(currentDocument)) {
+        if !retainedSessionIdentities.contains(ObjectIdentifier(shownSession)) {
             autosaveTask?.cancel()
             autosaveTask = nil
             statisticsTask?.cancel()
@@ -248,9 +248,9 @@ private extension AppState {
         externalChangePrompt = nil
         missingFilePrompt = nil
         indeterminateFileWriteReconciliationPrompt = nil
-        restoreRecoveryPrompt(for: currentDocument)
-        if indeterminateSessionWrites[ObjectIdentifier(currentDocument)] != nil {
-            refreshIndeterminateFileWriteReconciliation(for: currentDocument)
+        restoreRecoveryPrompt(for: shownSession)
+        if indeterminateSessionWrites[ObjectIdentifier(shownSession)] != nil {
+            refreshIndeterminateFileWriteReconciliation(for: shownSession)
         }
 
         for plan in retirementPlans {

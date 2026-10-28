@@ -124,7 +124,7 @@ struct WindowStatePartitionFixture {
         try Data("hit one".utf8).write(to: location.fileURL)
         let session = DocumentSession(text: "hit one", url: location.fileURL, fileKind: .markdown)
         return WindowStatePartitionFixture(
-            appState: AppState(currentDocument: session, shouldRestoreLastOpenedFile: false),
+            appState: AppState(shownSession: session, shouldRestoreLastOpenedFile: false),
             location: location
         )
     }
@@ -150,7 +150,7 @@ struct WindowStatePartitionFixture {
     func windowAuthorityWrites() -> [WindowStatePartitionInputWrite<WindowState>] {
         let url = location.fileURL
         return [
-            .init(input: "currentDocument") { $0.currentDocument = DocumentSession(text: "container") },
+            .init(input: "shownSession") { $0.shownSession = DocumentSession(text: "container") },
             .init(input: "externalChangePrompt") { $0.externalChangePrompt = .init(fileURL: url) },
             .init(input: "missingFilePrompt") { $0.missingFilePrompt = .init(fileURL: url) },
             .init(input: "editorFocusRequestID") { $0.editorFocusRequestID += 1 },
@@ -194,7 +194,7 @@ struct WindowStatePartitionFixture {
 
     /// The same 16 inputs, written through `AppState`'s façade on its current session.
     private func facadeAuthorityWrites() throws -> [WindowStatePartitionAuthorityMutation] {
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let sessionID = ObjectIdentifier(session)
         let url = location.fileURL
         let installation = makeInstallation()
@@ -212,7 +212,7 @@ struct WindowStatePartitionFixture {
             .init(input: input, path: "façade", apply: apply)
         }
         return [
-            facade("currentDocument") { $0.currentDocument = DocumentSession(text: "façade") },
+            facade("shownSession") { $0.shownSession = DocumentSession(text: "façade") },
             facade("externalChangePrompt") { $0.externalChangePrompt = .init(fileURL: url) },
             facade("missingFilePrompt") { $0.missingFilePrompt = .init(fileURL: url) },
             // `private(set)` on the façade; `requestEditorFocus()` is its writer.

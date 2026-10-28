@@ -106,8 +106,8 @@ extension ExportHTMLCommandAppTests {
                     fixture.appState.workspaceRootURL = nil
                     fixture.appState.workspaceRootURL = fixture.root
                 } else {
-                    fixture.appState.currentDocument = DocumentSession()
-                    fixture.appState.currentDocument = fixture.session
+                    fixture.appState.shownSession = DocumentSession()
+                    fixture.appState.shownSession = fixture.session
                 }
             }
             try await XCTUnwrap(fixture.appState.exportCurrentDocumentAsHTML()).value

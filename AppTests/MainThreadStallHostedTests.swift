@@ -221,7 +221,7 @@ extension EditorFindHostedGateTests {
             XCTAssertTrue(gutter.lastDrawnLabels.contains { $0.number == caretLine && $0.isCurrent },
                           "The naturally displayed gutter must mark the caret line")
         }
-        XCTAssertEqual(MarkdownTextView.textStorage(of: editor)?.string, hosted.appState.currentDocument.text)
+        XCTAssertEqual(MarkdownTextView.textStorage(of: editor)?.string, hosted.appState.shownSession.text)
         let name = visitingDocumentEnd ? "after viewing the end" : "from the middle"
         let mode = layoutMode == .sourcePreview ? "Source+preview" : "Source-only"
         var report = busySliceReport(slices)

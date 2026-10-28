@@ -258,7 +258,7 @@ extension WorkspaceSearchActiveRefreshTests {
         var inactiveUI = fixture.appState.workspaceSearchUI
         inactiveUI.queryText = "never-run"
         fixture.appState.workspaceSearchUI = inactiveUI
-        fixture.appState.applyAuthorizedEditorText("edited without query", to: fixture.appState.currentDocument)
+        fixture.appState.applyAuthorizedEditorText("edited without query", to: fixture.appState.shownSession)
         fixture.appState.applyDocumentText("warm without query", to: warm)
         try await Task.sleep(nanoseconds: 60_000_000)
         XCTAssertTrue(provider.requests.isEmpty)

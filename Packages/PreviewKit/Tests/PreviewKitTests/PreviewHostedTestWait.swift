@@ -37,8 +37,7 @@ enum PreviewHostedTestWait {
     ) async throws {
         let start = DispatchTime.now().uptimeNanoseconds
         while DispatchTime.now().uptimeNanoseconds - start < timeoutNanoseconds {
-            do { try Task.checkCancellation() }
-            catch {
+            do { try Task.checkCancellation() } catch {
                 note(description, phase: "check-cancellation-error", error: error)
                 throw error
             }
@@ -50,8 +49,7 @@ enum PreviewHostedTestWait {
                 note(description, phase: "condition-error", error: error)
                 throw error
             }
-            do { try await Task.sleep(nanoseconds: 50_000_000) }
-            catch {
+            do { try await Task.sleep(nanoseconds: 50_000_000) } catch {
                 note(description, phase: "poll-sleep-error", error: error)
                 throw error
             }
@@ -82,16 +80,14 @@ enum PreviewHostedTestWait {
         timeoutNanoseconds: UInt64,
         operation: (@escaping @MainActor @Sendable (Result<Any?, Error>) -> Void) -> Void
     ) async throws -> Any? {
-        do { try Task.checkCancellation() }
-        catch {
+        do { try Task.checkCancellation() } catch {
             note(description, phase: "callback-check-cancellation-error", error: error)
             throw error
         }
         return try await withCheckedThrowingContinuation { continuation in
             let gate = CompletionGate(continuation, operation: description)
             gate.deadline = Task { @MainActor in
-                do { try await Task.sleep(nanoseconds: timeoutNanoseconds) }
-                catch {
+                do { try await Task.sleep(nanoseconds: timeoutNanoseconds) } catch {
                     if !(error is CancellationError) {
                         note(description, phase: "callback-deadline-sleep-error", error: error)
                     }

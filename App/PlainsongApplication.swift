@@ -140,7 +140,8 @@ enum PlainsongWorkspaceSearchKeyAction {
     @MainActor
     @discardableResult
     static func performIfAvailable() -> Bool {
-        guard let appState = PlainsongAppServices.appState,
+        // No target still consumes the Carbon event (`handlePress` ignores this Bool).
+        guard let appState = KeyWindowRouter.shared.menuTarget(defaultFacade: nil),
               appState.canUseWorkspaceSearch
         else {
             return false

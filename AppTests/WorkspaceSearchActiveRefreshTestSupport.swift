@@ -121,19 +121,19 @@ func makeActiveSearchRefreshFixture(
     }
 
     let snapshot = activeSearchRefreshSnapshot(paths: files.keys, rootURL: rootURL)
-    let currentDocument: DocumentSession
+    let shownSession: DocumentSession
     if let currentPath, let text = files[currentPath] {
         let fileURL = rootURL.appendingPathComponent(currentPath)
-        currentDocument = DocumentSession(
+        shownSession = DocumentSession(
             text: text,
             url: fileURL,
             fileKind: FileKind(url: fileURL)
         )
     } else {
-        currentDocument = DocumentSession()
+        shownSession = DocumentSession()
     }
     let appState = AppState(
-        currentDocument: currentDocument,
+        shownSession: shownSession,
         directoryScanner: scanner,
         workspaceSearchStreamProvider: provider,
         workspaceSearchDebounceNanoseconds: debounceNanoseconds,
@@ -153,8 +153,8 @@ func makeActiveSearchRefreshFixture(
         snapshot: snapshot,
         options: .init(showAllFiles: false)
     )
-    if currentDocument.fileURL != nil {
-        try retainActiveSearchRefreshSession(currentDocument, in: appState)
+    if shownSession.fileURL != nil {
+        try retainActiveSearchRefreshSession(shownSession, in: appState)
     }
     return ActiveSearchRefreshFixture(appState: appState, rootURL: rootURL, snapshot: snapshot)
 }
