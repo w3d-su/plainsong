@@ -14,15 +14,14 @@ sanitizer/asset/SVG policy. PR #26 landed Settings/themes and closed #16. The
 2026-06-25 final sweeps fixed scroll sync, launch/Open Recent, MDX error liveness, and
 live MDX completion-popup checklist blockers; `docs/m5-checklist.md` now passes.
 
-Phase 2 WYSIWYG is still experimental. The inline fold/reveal mechanism and native interaction gates
-exist behind an off-by-default **WYSIWYG mode (Experimental)** setting; source-only and source+preview
-remain the default user-facing modes. To try it, enable **Settings ▸ Editor ▸ WYSIWYG mode
-(Experimental)**, then cycle layouts from the **View** menu (`⌘⇧P`); it falls back to source-only if
-the editor mechanism is unavailable, without altering source text. It stays off by default and is not
-promoted to stable until [`docs/wysiwyg-release-checklist.md`](docs/wysiwyg-release-checklist.md) is
-fully green. Inline-link folding and eligible local image thumbnails in folder workspaces are available
-only inside that Experimental mode; reference links, autolinks, ineligible/single-file images,
-fenced-code custom fragments, tables, Mermaid/math widgets, and real MDX rendering remain raw/deferred.
+Phase 2 WYSIWYG is a layout choice beside source-only and source+preview: pick it in the toolbar
+or cycle layouts from the **View** menu (`⌘⇧P`). Its release gates are in
+[`docs/wysiwyg-release-checklist.md`](docs/wysiwyg-release-checklist.md). Turning off **Settings ▸
+Editor ▸ WYSIWYG mode** (on by default) removes it from the layouts, and it falls back to
+source-only if the editor mechanism is unavailable, without altering source text. It folds inline Markdown,
+inline links, and eligible local image thumbnails in folder workspaces; reference links, autolinks,
+ineligible/single-file images, fenced-code custom fragments, tables, Mermaid/math widgets, and real
+MDX rendering remain raw/deferred.
 
 ## Installing (alpha)
 
@@ -85,7 +84,7 @@ supported. Live fixture coverage: `Fixtures/math.md`.
   cards); components are not executed.
 - **Preview images** are limited to PNG/JPEG/GIF/WebP up to 10 MiB; SVG is not rendered.
   Remote images are off by default, and enabling them allows `https:` images only.
-- **WYSIWYG is Experimental and inline-only** (headings, emphasis/strike, inline code,
+- **WYSIWYG is inline-only** (headings, emphasis/strike, inline code,
   list/quote styling, inline `[text](url)` links, and thumbnails for local PNG/JPEG/GIF/WebP
   images up to 10 MiB in a folder workspace). Reference links, autolinks, remote/SVG/
   single-file images, tables, code fences, and Mermaid/math stay as raw Markdown in the

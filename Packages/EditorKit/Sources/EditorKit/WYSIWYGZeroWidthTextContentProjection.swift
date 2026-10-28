@@ -1,6 +1,6 @@
 import AppKit
 
-/// TextKit 2 projection used only by the non-user-facing WYSIWYG development hook.
+/// TextKit 2 projection used only by the WYSIWYG presentation.
 ///
 /// The backing NSTextStorage remains exact Markdown. Folded delimiters become equal-length
 /// U+200B runs, while active image spans become one U+FFFC attachment plus equal-length

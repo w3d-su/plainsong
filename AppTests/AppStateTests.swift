@@ -107,6 +107,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceRootURL = rootURL
         let wysiwygPresentation = MarkdownEditorDevelopmentPresentation.inlineFoldRevealWithLinkFolding
 
+        appState.preferences.setExperimentalWYSIWYGEnabled(false)
         appState.setLayoutMode(.wysiwyg)
         XCTAssertNil(appState.editorImageThumbnailConfiguration(
             for: session,
@@ -761,6 +762,9 @@ final class AppStateTests: XCTestCase {
         let first = AppState(userDefaults: defaults)
         XCTAssertFalse(first.isPreviewVisible)
 
+        // Source only → WYSIWYG → source + preview: WYSIWYG is in the cycle by default.
+        first.togglePreview()
+        XCTAssertEqual(AppState(userDefaults: defaults).layoutMode, .wysiwyg)
         first.togglePreview()
 
         let second = AppState(userDefaults: defaults)
@@ -809,6 +813,7 @@ final class AppStateTests: XCTestCase {
             defaults.removePersistentDomain(forName: suiteName)
         }
         let appState = AppState(userDefaults: defaults)
+        appState.preferences.setExperimentalWYSIWYGEnabled(false)
 
         XCTAssertFalse(appState.preferences.experimentalWYSIWYGEnabled)
         XCTAssertEqual(appState.layoutMode, .sourceOnly)
@@ -856,6 +861,7 @@ final class AppStateTests: XCTestCase {
         defer {
             defaults.removePersistentDomain(forName: suiteName)
         }
+        PlainsongPreferences(userDefaults: defaults).setExperimentalWYSIWYGEnabled(false)
         defaults.set(EditorLayoutMode.wysiwyg.rawValue, forKey: AppState.layoutModeDefaultsKey)
 
         let appState = AppState(userDefaults: defaults)
@@ -863,7 +869,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(appState.layoutMode, .sourceOnly)
         XCTAssertFalse(appState.shouldUseWYSIWYGPresentation)
         XCTAssertEqual(defaults.string(forKey: AppState.layoutModeDefaultsKey), EditorLayoutMode.sourceOnly.rawValue)
-        XCTAssertTrue(appState.wysiwygFallbackMessage?.contains("Experimental WYSIWYG is disabled") == true)
+        XCTAssertTrue(appState.wysiwygFallbackMessage?.contains("WYSIWYG is turned off in Settings") == true)
     }
 
     func testWYSIWYGMechanismFailureFallsBackToSourceOnlyWithoutChangingText() throws {
@@ -897,6 +903,7 @@ final class AppStateTests: XCTestCase {
         defer {
             defaults.removePersistentDomain(forName: suiteName)
         }
+        PlainsongPreferences(userDefaults: defaults).setExperimentalWYSIWYGEnabled(false)
         defaults.set(EditorLayoutMode.wysiwyg.rawValue, forKey: AppState.layoutModeDefaultsKey)
 
         let appState = AppState(userDefaults: defaults)
@@ -913,6 +920,7 @@ final class AppStateTests: XCTestCase {
         defer {
             defaults.removePersistentDomain(forName: suiteName)
         }
+        PlainsongPreferences(userDefaults: defaults).setExperimentalWYSIWYGEnabled(false)
         defaults.set(EditorLayoutMode.wysiwyg.rawValue, forKey: AppState.layoutModeDefaultsKey)
 
         let appState = AppState(userDefaults: defaults)
@@ -952,7 +960,7 @@ final class AppStateTests: XCTestCase {
         }
 
         let first = PlainsongPreferences(userDefaults: defaults)
-        XCTAssertFalse(first.experimentalWYSIWYGEnabled)
+        XCTAssertTrue(first.experimentalWYSIWYGEnabled)
         first.setAutosaveIntervalSeconds(2.5)
         first.setEditorFontName("Menlo")
         first.setEditorFontSize(16)
@@ -961,7 +969,7 @@ final class AppStateTests: XCTestCase {
         first.setEditorTheme(.graphite)
         first.setPreviewTheme(.dark)
         first.setAllowsRemoteImages(true)
-        first.setExperimentalWYSIWYGEnabled(true)
+        first.setExperimentalWYSIWYGEnabled(false)
         first.setAssetFolderRelativePath("media/images")
         first.setDefaultFileExtension(.mdx)
 
@@ -974,7 +982,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(second.editorTheme, .graphite)
         XCTAssertEqual(second.previewTheme, .dark)
         XCTAssertTrue(second.allowsRemoteImages)
-        XCTAssertTrue(second.experimentalWYSIWYGEnabled)
+        XCTAssertFalse(second.experimentalWYSIWYGEnabled)
         XCTAssertEqual(second.assetFolderRelativePath, "media/images")
         XCTAssertEqual(second.defaultFileExtension, .mdx)
     }

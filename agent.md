@@ -688,7 +688,7 @@ format. The 2026-10-18 profile above, and every earlier budget, stay in that arc
 
 ---
 
-## 13. Phase 2 — Typora-Style WYSIWYG (Experimental; gates in `docs/wysiwyg-release-checklist.md`)
+## 13. Phase 2 — Typora-Style WYSIWYG (a layout choice, on by default; gates in `docs/wysiwyg-release-checklist.md`)
 
 Approach: stay on TextKit 2 (no contentEditable). The source text remains the model; the
 editor *folds* markdown tokens via rendering, not text mutation:
@@ -705,7 +705,7 @@ editor *folds* markdown tokens via rendering, not text mutation:
 - Undo, IME composition (Chinese input!), and selection across folded tokens are the risk
   areas — write exploratory tests early. **IME correctness is non-negotiable: test with
   Traditional Chinese (Zhuyin/Pinyin) marked text at every change.**
-- Experimental single Replace edits raw UTF-16 source only. When the current match is
+- WYSIWYG single Replace edits raw UTF-16 source only. When the current match is
   not the selection, the action only selects it and synchronously removes any image
   marker over it; folded owners reveal later through the existing debounced
   selection-driven reparse. An action whose selection already is the match (even the
