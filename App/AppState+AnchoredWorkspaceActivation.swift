@@ -36,7 +36,7 @@ extension AppState {
             throw AppStateError.invalidSessionIdentity(key)
         }
 
-        if let cachedSession = sessionCache[key] {
+        if let cachedSession = registry.warmSession(at: key) {
             guard let cachedStateURL = sessionStateURL(for: cachedSession),
                   exactFileURLSpellingMatches(cachedStateURL, key)
             else {
@@ -260,7 +260,7 @@ extension AppState {
     ) -> Bool {
         let key = activation.canonicalURL
         moveCurrentDocumentWorkToBackgroundForAnchoredActivation(session)
-        sessionCache[key] = session
+        registry.setWarmSession(session, at: key)
         if !reconcilesExternalChange {
             clearMissingFileActivationFence(at: key)
         }

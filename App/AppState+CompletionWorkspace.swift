@@ -169,15 +169,15 @@ extension AppState {
     func workspaceSearchDirtyOverlays(
         rootAuthority: WorkspaceFileSystemRootAuthority
     ) async throws -> WorkspaceSearchOverlayCollection {
-        let cachedSessions = sessionCache
+        let cachedSessions = registry.warmSessionEntries
             .sorted { first, second in
                 Self.workspaceSearchPathLessThan(
-                    first.key.absoluteString,
-                    second.key.absoluteString
+                    first.url.absoluteString,
+                    second.url.absoluteString
                 )
             }
-            .map(\.value)
-        let candidateSessions = [currentDocument] + cachedSessions
+            .map(\.session)
+        let candidateSessions = registry.sessions(from: [.windowDocuments]) + cachedSessions
         var seenSessions: Set<ObjectIdentifier> = []
         var inputs: [WorkspaceSearchDirtyOverlayInput] = []
 

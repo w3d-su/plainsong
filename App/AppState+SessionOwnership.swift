@@ -94,9 +94,9 @@ extension AppState {
     /// releases the session.
     func releaseUnreferencedSessionOwnership(for session: DocumentSession) {
         let sessionIdentity = ObjectIdentifier(session)
-        guard currentDocument !== session,
+        guard !registry.isShownByAnyWindow(session),
               case .unavailable? = unanchoredManagedSessionOwnershipProofs[sessionIdentity],
-              !sessionCache.values.contains(where: { $0 === session }),
+              !registry.isWarmSession(session),
               !isRetiredEditorSession(session),
               !editorDocumentBindingSessions.values.contains(where: { $0 === session }),
               !editorBindingInstallations.values.contains(where: { $0 === session }),

@@ -241,7 +241,7 @@ extension ExportHTMLCommandAppTests {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[documentURL] = session
+        appState.registry.sessionCache[documentURL] = session
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: location,

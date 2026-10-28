@@ -441,10 +441,7 @@ extension AppState {
 
     func workspaceMutationTerminationSessions() -> [DocumentSession] {
         var sessions = workspaceMutationManagedSessions()
-        sessions.append(contentsOf: workspaceMutationTextRecoverySessions.values)
-        if currentDocument.fileURL != nil {
-            sessions.append(currentDocument)
-        }
+        sessions.append(contentsOf: registry.sessions(from: [.textRecovery, .fileBackedWindowDocuments]))
         var seen: Set<ObjectIdentifier> = []
         return sessions.filter { seen.insert(ObjectIdentifier($0)).inserted }
     }

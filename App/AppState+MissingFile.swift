@@ -155,7 +155,7 @@ extension AppState {
             session: session
         )
         let destination = saveCopyLocation.fileURL
-        if let existingSession = sessionCache[destination], existingSession !== session {
+        if let existingSession = registry.warmSession(at: destination), existingSession !== session {
             throw AppStateError.invalidSessionIdentity(destination)
         }
         let saveCopyInspection = try validateWorkspaceSaveCopyDestinationOwnership(
@@ -298,7 +298,7 @@ private extension AppState {
         _ = advanceSessionLifecycle(for: completed.session)
         completed.session.markSaved(text: completed.text, url: destination)
         _ = clearWorkspaceMutationTextRecovery(for: completed.session)
-        sessionCache[destination] = completed.session
+        registry.setWarmSession(completed.session, at: destination)
         adoptAnchoredFileBinding(
             completed.binding,
             for: completed.session,
@@ -481,13 +481,9 @@ extension AppState {
     }
 
     func workspaceSaveCopyOwnershipCandidates() -> [DocumentSession] {
-        var candidates = Array(sessionCache.values)
-        candidates.append(contentsOf: retiredEditorDocumentSessions.values.map(\.session))
-        candidates.append(contentsOf: editorDocumentBindingSessions.values)
-        candidates.append(contentsOf: editorBindingInstallations.values)
-        candidates.append(contentsOf: workspaceMutationRetainedRecoverySessions())
-        candidates.append(currentDocument)
-        return candidates
+        registry.sessions(from: [
+            .warmCache, .retired, .editorBindings, .editorInstallations, .mutationRecovery, .windowDocuments,
+        ])
     }
 }
 
@@ -647,7 +643,7 @@ private extension AppState {
         _ = advanceSessionLifecycle(for: session)
         indeterminateSessionWrites[sessionIdentity] = result
         indeterminateSessionWriteContexts[sessionIdentity] = context
-        sessionCache[context.location.fileURL] = session
+        registry.setWarmSession(session, at: context.location.fileURL)
         session.reset(
             text: text,
             url: context.location.fileURL,

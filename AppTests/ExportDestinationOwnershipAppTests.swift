@@ -56,7 +56,7 @@ final class ExportDestinationOwnershipAppTests: XCTestCase {
             )
             switch placement {
             case "cached":
-                fixture.appState.sessionCache[standaloneURL] = session
+                fixture.appState.registry.sessionCache[standaloneURL] = session
             case "retired":
                 fixture.appState.retiredEditorDocumentSessions[standaloneURL] =
                     RetiredEditorDocumentSession(
@@ -126,7 +126,7 @@ final class ExportDestinationOwnershipAppTests: XCTestCase {
             isDirty: true
         )
         let sessionIdentity = ObjectIdentifier(session)
-        fixture.appState.sessionCache[quarantinedURL] = session
+        fixture.appState.registry.sessionCache[quarantinedURL] = session
         fixture.appState.indeterminateSessionWrites[sessionIdentity] = WorkspaceIndeterminateFileWrite(
             reason: .durabilityFailed,
             preparedMetadata: nil,
@@ -336,7 +336,7 @@ extension ExportDestinationOwnershipAppTests {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[ownedURL] = ownedSession
+        appState.registry.sessionCache[ownedURL] = ownedSession
         appState.anchoredSessionFileBindings[ObjectIdentifier(ownedSession)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: ownedLocation,

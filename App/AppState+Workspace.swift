@@ -409,7 +409,7 @@ extension AppState {
         ) else {
             throw AppStateError.invalidSessionIdentity(key)
         }
-        if let cachedSession = sessionCache[key] {
+        if let cachedSession = registry.warmSession(at: key) {
             guard retainedManagedSessionLocation(for: cachedSession) == location else {
                 throw AppStateError.invalidSessionIdentity(key)
             }
@@ -468,7 +468,7 @@ extension AppState {
             sha256Digest: loaded.sha256Digest,
             preparedImageAssetAuthority: preparedRead.preparedAuthority
         )
-        sessionCache[key] = session
+        registry.setWarmSession(session, at: key)
         detachedSessionURLs.remove(key)
         if let prompt = missingFilePrompt,
            exactFileURLSpellingMatches(prompt.fileURL, key)
@@ -764,10 +764,10 @@ extension AppState {
         _ = advanceSessionLifecycle(for: session)
         if session !== currentDocument {
             moveCurrentDocumentWorkToBackgroundBeforeSwitch()
-            sessionCache[canonicalURL] = session
+            registry.setWarmSession(session, at: canonicalURL)
             setCurrentDocument(session)
         } else {
-            sessionCache[canonicalURL] = session
+            registry.setWarmSession(session, at: canonicalURL)
             synchronizeWorkspaceTreeSelection(for: session)
         }
         handleExternalChange(for: session, advancingDiskEvent: false)

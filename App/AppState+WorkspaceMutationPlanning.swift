@@ -331,7 +331,7 @@ extension AppState {
         for session: DocumentSession,
         oldURL: URL
     ) throws -> WorkspaceSessionRelocationOwnership {
-        let cacheKeys = sessionCache.compactMap { key, owner in owner === session ? key : nil }
+        let cacheKeys = registry.warmSessionURLs(for: session)
         guard cacheKeys.count <= 1,
               cacheKeys.allSatisfy({ exactFileURLSpellingMatches($0, oldURL) })
         else {

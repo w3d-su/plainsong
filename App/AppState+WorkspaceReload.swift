@@ -59,7 +59,7 @@ extension AppState {
         guard workspaceSearchState.activeQuery != nil,
               let rootAuthority = workspaceSearchRootAuthority,
               workspaceSearchAuthorityMatchesCurrentRoot(rootAuthority),
-              session === currentDocument || sessionCache.values.contains(where: { $0 === session })
+              registry.isShownByAnyWindow(session) || registry.isWarmSession(session)
         else {
             return
         }
@@ -203,7 +203,7 @@ extension AppState {
         }
         let installedAuthority = workspaceSearchRootAuthority.flatMap { namesScannedRoot($0) ? $0 : nil }
         var retained: Set<String> = []
-        for session in [currentDocument] + Array(sessionCache.values) {
+        for session in registry.sessions(from: [.windowDocuments, .warmCache]) {
             // Every spelling that may name the session inside this root; extra entries only
             // make the scan enumerate more.
             if let location = retainedAnchoredSessionLocation(for: session),

@@ -90,18 +90,9 @@ extension AppState {
 @MainActor
 private extension AppState {
     func workspaceSessionsForClosure() -> [DocumentSession] {
-        var sessions = Array(sessionCache.values)
-        sessions.append(contentsOf: retiredEditorDocumentSessions.values.map(\.session))
-        sessions.append(contentsOf: editorDocumentBindingSessions.values)
-        sessions.append(contentsOf: editorBindingInstallations.values)
-        sessions.append(contentsOf: workspaceMutationRetainedRecoverySessions())
-        if currentDocument.fileURL != nil {
-            sessions.append(currentDocument)
-        }
-        var seenSessions: Set<ObjectIdentifier> = []
-        return sessions.filter { session in
-            seenSessions.insert(ObjectIdentifier(session)).inserted
-        }.sorted { first, second in
+        registry.sessions(from: [
+            .warmCache, .retired, .editorBindings, .editorInstallations, .mutationRecovery, .fileBackedWindowDocuments,
+        ]).sorted { first, second in
             sessionClosureIdentity(first).utf8.lexicographicallyPrecedes(
                 sessionClosureIdentity(second).utf8
             )
@@ -226,8 +217,8 @@ private extension AppState {
             ObjectIdentifier($0.session)
         })
         var proofRetainedSessionIdentities = retainedSessionIdentities
-        if currentDocument.fileURL != nil {
-            proofRetainedSessionIdentities.insert(ObjectIdentifier(currentDocument))
+        for session in registry.sessions(from: [.fileBackedWindowDocuments]) {
+            proofRetainedSessionIdentities.insert(ObjectIdentifier(session))
         }
         if !retainedSessionIdentities.contains(ObjectIdentifier(currentDocument)) {
             autosaveTask?.cancel()
@@ -241,7 +232,7 @@ private extension AppState {
         {
             removeEditorDocumentBindingRegistration(for: session)
         }
-        sessionCache.removeAll()
+        registry.removeAllWarmSessions()
         for session in sessions
             where !proofRetainedSessionIdentities.contains(ObjectIdentifier(session))
         {

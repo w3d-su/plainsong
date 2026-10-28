@@ -37,8 +37,9 @@ final class WindowStatePartitionAppTests: XCTestCase {
         )
         XCTAssertEqual(
             Self.storedPropertyNames(of: appState.registry),
+            // `registeredWindows` is B2's window list for inventories (§3.4 I2).
             WindowStatePartitionInventory.registry.union(["onEditorReplaceAuthorityInputChange",
-                                                          "replaceAuthority"])
+                                                          "replaceAuthority", "registeredWindows"])
         )
         XCTAssertEqual(
             WindowStatePartitionInventory.window.count + WindowStatePartitionInventory.root.count
@@ -59,7 +60,7 @@ final class WindowStatePartitionAppTests: XCTestCase {
 
         appState.showAllFiles = true
         appState.workspaceGeneration = 7
-        appState.sessionCache[url] = session
+        appState.registry.sessionCache[url] = session
         XCTAssertTrue(appState.windowState.showAllFiles)
         XCTAssertEqual(appState.workspaceRootContext.workspaceGeneration, 7)
         XCTAssertTrue(appState.registry.sessionCache[url] === session)
@@ -69,7 +70,7 @@ final class WindowStatePartitionAppTests: XCTestCase {
         appState.registry.sessionCache[url] = nil
         XCTAssertFalse(appState.showAllFiles)
         XCTAssertEqual(appState.workspaceGeneration, 8)
-        XCTAssertNil(appState.sessionCache[url])
+        XCTAssertNil(appState.registry.sessionCache[url])
     }
 
     // MARK: - W1 bullet 1: all 16 Replace authority inputs

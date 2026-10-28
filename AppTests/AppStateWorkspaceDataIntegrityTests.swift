@@ -325,8 +325,8 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         XCTAssertEqual(fixture.appState.sessionStateURL(for: session), newLocation.fileURL)
         XCTAssertEqual(session.fileURL, newLocation.fileURL)
         XCTAssertTrue(session.isDirty)
-        XCTAssertNil(fixture.appState.sessionCache[oldLocation.fileURL])
-        XCTAssertTrue(fixture.appState.sessionCache[newLocation.fileURL] === session)
+        XCTAssertNil(fixture.appState.registry.sessionCache[oldLocation.fileURL])
+        XCTAssertTrue(fixture.appState.registry.sessionCache[newLocation.fileURL] === session)
         XCTAssertEqual(
             fixture.appState.anchoredSessionFileBinding(for: session)?.location,
             newLocation
@@ -378,7 +378,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         editorBinding.onLifecycle(.installed(installation))
         let editorOldURL = try XCTUnwrap(appState.sessionStateURL(for: editorOnly))
-        appState.sessionCache[editorOldURL] = nil
+        appState.registry.sessionCache[editorOldURL] = nil
         appState.applyDocumentText("Cached changed", to: cached)
         appState.applyDocumentText("Retired changed", to: retired)
         let expectation = try fixture.expectation("drafts")
@@ -408,7 +408,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         }
         let cachedDestination = try fixture.location("archive/drafts/cached.md").fileURL
         let retiredDestination = try fixture.location("archive/drafts/retired.md").fileURL
-        XCTAssertTrue(appState.sessionCache[cachedDestination] === cached)
+        XCTAssertTrue(appState.registry.sessionCache[cachedDestination] === cached)
         XCTAssertTrue(
             appState.retiredEditorDocumentSessions[retiredDestination]?.session === retired
         )
@@ -452,7 +452,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.url("renamed.md").path))
         XCTAssertTrue(appState.currentDocument === session)
         XCTAssertEqual(appState.sessionStateURL(for: session), oldLocation.fileURL)
-        XCTAssertTrue(appState.sessionCache[oldLocation.fileURL] === session)
+        XCTAssertTrue(appState.registry.sessionCache[oldLocation.fileURL] === session)
         XCTAssertEqual(
             appState.anchoredSessionFileBinding(for: session)?.identity,
             expectedIdentity
@@ -579,8 +579,8 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: destinationLocation.fileURL.path))
         XCTAssertEqual(appState.sessionStateURL(for: source), sourceLocation.fileURL)
         XCTAssertEqual(appState.sessionStateURL(for: destination), destinationLocation.fileURL)
-        XCTAssertTrue(appState.sessionCache[sourceLocation.fileURL] === source)
-        XCTAssertTrue(appState.sessionCache[destinationLocation.fileURL] === destination)
+        XCTAssertTrue(appState.registry.sessionCache[sourceLocation.fileURL] === source)
+        XCTAssertTrue(appState.registry.sessionCache[destinationLocation.fileURL] === destination)
         XCTAssertEqual(appState.anchoredSessionFileBinding(for: source), sourceBinding)
         XCTAssertEqual(appState.anchoredSessionFileBinding(for: destination), destinationBinding)
         XCTAssertEqual(appState.sessionPolicy.dirtyState(for: sourceLocation.fileURL), false)
@@ -888,7 +888,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
                 stateURL,
                 destination.fileURL
             ))
-            XCTAssertTrue(fixture.appState.sessionCache[destination.fileURL] === session)
+            XCTAssertTrue(fixture.appState.registry.sessionCache[destination.fileURL] === session)
             XCTAssertEqual(
                 fixture.appState.anchoredSessionFileBinding(for: session)?.location,
                 destination
@@ -1137,7 +1137,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         appState.finishRetiredEditorDocumentSessionIfPossible(for: retired)
         appState.retainMetadataOnlyForRetiredEditorSessions()
 
-        XCTAssertTrue(appState.sessionCache[cachedURL] === cached)
+        XCTAssertTrue(appState.registry.sessionCache[cachedURL] === cached)
         XCTAssertTrue(appState.retiredEditorDocumentSessions[retiredURL]?.session === retired)
         XCTAssertEqual(appState.pendingExternalTexts[cachedURL], "Retained metadata")
         XCTAssertNotNil(appState.anchoredSessionFileBinding(for: cached))
@@ -1261,7 +1261,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: location.fileURL.path))
         XCTAssertNil(fixture.appState.currentDocument.fileURL)
-        XCTAssertNil(fixture.appState.sessionCache[location.fileURL])
+        XCTAssertNil(fixture.appState.registry.sessionCache[location.fileURL])
         XCTAssertNil(fixture.appState.anchoredSessionFileBinding(for: session))
         XCTAssertNil(
             fixture.appState.editorImageAssetDocumentAuthorities[ObjectIdentifier(session)]
@@ -1460,7 +1460,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: destination.path))
         XCTAssertTrue(appState.currentDocument === originalSession)
-        XCTAssertNil(appState.sessionCache[destination])
+        XCTAssertNil(appState.registry.sessionCache[destination])
         XCTAssertTrue(appState.workspaceMutationRecoveries.isEmpty)
         XCTAssertTrue(operationStore.records.isEmpty)
         XCTAssertNil(appState.workspaceMutationReconciliationPrompt)
@@ -1777,7 +1777,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             installationID: EditorDocumentBindingInstallationID()
         )
         editorBinding.onLifecycle(.installed(editorInstallation))
-        try appState.sessionCache[fixture.location("editor-only.md").fileURL] = nil
+        try appState.registry.sessionCache[fixture.location("editor-only.md").fileURL] = nil
         let outsideEventGeneration = appState.currentExternalDiskEventGeneration(for: outside)
         let editorOnlyEventGeneration = appState.currentExternalDiskEventGeneration(
             for: editorOnly
@@ -2321,7 +2321,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             WorkspaceSessionEviction(url: targetLocation.fileURL, requiresSave: false),
         ])
 
-        XCTAssertTrue(appState.sessionCache[targetLocation.fileURL] === target)
+        XCTAssertTrue(appState.registry.sessionCache[targetLocation.fileURL] === target)
         XCTAssertNotNil(appState.anchoredSessionFileBinding(for: target))
         XCTAssertEqual(appState.sessionPolicy.dirtyState(for: targetLocation.fileURL), false)
 
@@ -2331,7 +2331,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         }
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: targetLocation.fileURL.path))
-        XCTAssertTrue(appState.sessionCache[targetLocation.fileURL] === target)
+        XCTAssertTrue(appState.registry.sessionCache[targetLocation.fileURL] === target)
         XCTAssertNotNil(appState.anchoredSessionFileBinding(for: target))
         XCTAssertEqual(appState.sessionPolicy.dirtyState(for: targetLocation.fileURL), false)
         XCTAssertTrue(appState.workspaceMutationWriteFences.isEmpty)
@@ -2628,8 +2628,8 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         XCTAssertEqual(recovery.sessionCommitState, .committed)
         XCTAssertFalse(recovery.records.isEmpty)
         XCTAssertEqual(session.fileURL, destination.fileURL)
-        XCTAssertTrue(appState.sessionCache[destination.fileURL] === session)
-        XCTAssertNil(appState.sessionCache[source.fileURL])
+        XCTAssertTrue(appState.registry.sessionCache[destination.fileURL] === session)
+        XCTAssertNil(appState.registry.sessionCache[source.fileURL])
         XCTAssertEqual(appState.anchoredSessionFileBinding(for: session)?.location, destination)
         XCTAssertTrue(appState.indeterminateWorkspaceMutationSessions.contains(sessionIdentity))
 
@@ -2675,8 +2675,8 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             "Replacement"
         )
         XCTAssertEqual(session.fileURL, destination.fileURL)
-        XCTAssertTrue(appState.sessionCache[destination.fileURL] === session)
-        XCTAssertNil(appState.sessionCache[source.fileURL])
+        XCTAssertTrue(appState.registry.sessionCache[destination.fileURL] === session)
+        XCTAssertNil(appState.registry.sessionCache[source.fileURL])
         XCTAssertEqual(appState.sessionPolicy.dirtyState(for: destination.fileURL), false)
         XCTAssertNil(appState.sessionPolicy.dirtyState(for: source.fileURL))
         XCTAssertEqual(appState.anchoredSessionFileBinding(for: session)?.location, destination)
@@ -2717,8 +2717,8 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: escapedArchive.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: source.fileURL.path))
         XCTAssertEqual(session.fileURL, destination.fileURL)
-        XCTAssertTrue(appState.sessionCache[destination.fileURL] === session)
-        XCTAssertNil(appState.sessionCache[source.fileURL])
+        XCTAssertTrue(appState.registry.sessionCache[destination.fileURL] === session)
+        XCTAssertNil(appState.registry.sessionCache[source.fileURL])
         XCTAssertEqual(appState.sessionPolicy.dirtyState(for: destination.fileURL), false)
         XCTAssertNil(appState.sessionPolicy.dirtyState(for: source.fileURL))
         XCTAssertEqual(appState.anchoredSessionFileBinding(for: session)?.location, destination)
@@ -3628,8 +3628,8 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         XCTAssertTrue(appState.workspaceMutationRecoveries.isEmpty)
         XCTAssertTrue(appState.indeterminateWorkspaceMutationSessions.isEmpty)
         XCTAssertEqual(session.fileURL, destination.fileURL)
-        XCTAssertTrue(appState.sessionCache[destination.fileURL] === session)
-        XCTAssertNil(appState.sessionCache[source.fileURL])
+        XCTAssertTrue(appState.registry.sessionCache[destination.fileURL] === session)
+        XCTAssertNil(appState.registry.sessionCache[source.fileURL])
         XCTAssertEqual(
             appState.anchoredSessionFileBinding(for: session)?.location,
             destination
@@ -5168,7 +5168,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         XCTAssertEqual(recovery.publicationState, .committed)
         XCTAssertNotNil(operationStore.records[record.id])
         XCTAssertNil(appState.currentDocument.fileURL)
-        XCTAssertTrue(appState.sessionCache.isEmpty)
+        XCTAssertTrue(appState.registry.sessionCache.isEmpty)
         XCTAssertNil(appState.anchoredSessionFileBinding(for: appState.currentDocument))
         XCTAssertTrue(appState.editorImageAssetDocumentAuthorities.isEmpty)
         XCTAssertEqual(
@@ -6825,7 +6825,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             _ = appState.sessionPolicy.access(location.fileURL, isDirty: false)
             switch storage {
             case .cached:
-                appState.sessionCache[location.fileURL] = session
+                appState.registry.sessionCache[location.fileURL] = session
             case .retired:
                 appState.retiredEditorDocumentSessions[location.fileURL] =
                     RetiredEditorDocumentSession(
@@ -6950,7 +6950,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             preparedImageAssetAuthority: preparedAuthority,
             allowsImageAssetAuthorityBootstrap: true
         )
-        appState.sessionCache[currentLocation.fileURL] = current
+        appState.registry.sessionCache[currentLocation.fileURL] = current
         appState.recordKnownSessionDiskText(
             currentRead.file.text,
             for: current,

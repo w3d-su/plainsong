@@ -4,11 +4,7 @@ import MarkdownCore
 @MainActor
 extension AppState {
     func flushAutosaveIfNeeded() {
-        var sessions = [currentDocument]
-        sessions.append(contentsOf: sessionCache.values)
-        sessions.append(contentsOf: retiredEditorDocumentSessions.values.map(\.session))
-        var seen: Set<ObjectIdentifier> = []
-        sessions = sessions.filter { seen.insert(ObjectIdentifier($0)).inserted }
+        var sessions = registry.sessions(from: [.windowDocuments, .warmCache, .retired])
         sessions.sort { first, second in
             let firstURL = first.fileURL?.absoluteString ?? ""
             let secondURL = second.fileURL?.absoluteString ?? ""
@@ -142,7 +138,9 @@ extension AppState {
         else {
             return false
         }
-        guard session === currentDocument || sessionCache[url] === session || isRetiredEditorSession(session) else {
+        guard registry.isShownByAnyWindow(session) || registry.isWarmSession(session, at: url)
+            || isRetiredEditorSession(session)
+        else {
             return false
         }
         return !detachedSessionURLs.contains(url) &&
@@ -151,8 +149,15 @@ extension AppState {
             externalDiskInspectionTasks[sessionIdentity] == nil &&
             pendingExternalTexts[url] == nil &&
             pendingExternalFileVersions[url] == nil &&
-            externalChangePrompt.map { !exactFileURLSpellingMatches($0.fileURL, url) } != false &&
-            missingFilePrompt.map { !exactFileURLSpellingMatches($0.fileURL, url) } != false
+            !isSaveBlockedByWindowPrompt(at: url)
+    }
+
+    /// Whether any connected window's external-change or missing-file prompt names `url`.
+    /// A prompt blocks that file's save and autosave from every window (§3.4 I3).
+    func isSaveBlockedByWindowPrompt(at url: URL) -> Bool {
+        registry.connectedWindows.contains { window in
+            window.saveBlockingPromptURLs.contains { exactFileURLSpellingMatches($0, url) }
+        }
     }
 }
 

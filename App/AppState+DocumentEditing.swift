@@ -353,7 +353,7 @@ extension AppState {
         if session !== currentDocument {
             moveCurrentDocumentWorkToBackgroundForSearchActivation()
         }
-        sessionCache[canonicalURL] = session
+        registry.setWarmSession(session, at: canonicalURL)
 
         switch prepared.source {
         case .loaded:

@@ -140,9 +140,10 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
    preview via the JS bridge. JS renders HTML, patches DOM with morphdom, reports back
    `renderComplete(version)`.
 5. Scroll sync uses line ↔ DOM node mapping (§8).
-6. Autosave: debounced 1 s after last edit + on window resign; atomic write via
-   `Data.write(.atomic)`; file watcher suppresses self-triggered events by comparing
-   content hash.
+6. Autosave: debounced 1 s after last edit + on window resign, where one app-global flush
+   saves every connected window's document, warm session and retired session that may
+   autosave; atomic write via `Data.write(.atomic)`; file watcher suppresses
+   self-triggered events by comparing content hash.
 
 ### Key types (initial sketch — keep names)
 
@@ -161,8 +162,11 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 - `AppDocumentRegistry` (App) — per-file and app-global state that the cross-window
   invariants (`docs/window-state-gates.md` §3.4) must see: writers, bindings, external-change
   state, quarantine, session cache and LRU, recovery stores, notices, recents, preferences,
-  services, and the one Replace authority generation. `AppState` forwards all three under
-  the old property names (§3.2 there) until the B2/C migration.
+  services, and the one Replace authority generation. Its `sessions(from:)` enumerator over
+  every connected window (`AppState.connect(_:)`), the warm cache, and the documented extras
+  is the only session inventory, and only the registry touches the warm cache (§3.4 I2).
+  `AppState` forwards all three containers' remaining properties under the old names
+  until PR C.
 
 ### Concurrency rules
 

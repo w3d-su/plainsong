@@ -269,7 +269,7 @@ extension WorkspaceSearchActiveRefreshTests {
             .appendingPathComponent("outside.md")
         defer { try? FileManager.default.removeItem(at: outsideURL.deletingLastPathComponent()) }
         let outsideSession = DocumentSession(text: "outside", url: outsideURL, fileKind: .markdown)
-        fixture.appState.sessionCache[outsideURL] = outsideSession
+        fixture.appState.registry.sessionCache[outsideURL] = outsideSession
         fixture.appState.applyDocumentText("outside changed", to: outsideSession)
 
         let nonEditableURL = fixture.rootURL.appendingPathComponent("notes.txt")
@@ -278,7 +278,7 @@ extension WorkspaceSearchActiveRefreshTests {
             url: nonEditableURL,
             fileKind: .markdown
         )
-        fixture.appState.sessionCache[nonEditableURL] = nonEditableSession
+        fixture.appState.registry.sessionCache[nonEditableURL] = nonEditableSession
         fixture.appState.applyDocumentText("plain text changed", to: nonEditableSession)
 
         if let warmURL = warm.fileURL {

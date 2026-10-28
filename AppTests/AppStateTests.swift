@@ -2904,7 +2904,7 @@ final class AppStateTests: XCTestCase {
         )
         appState.setCurrentDocument(unrelatedSession, synchronizingWorkspaceTree: false)
         appState.completionWorkspaceTask?.cancel()
-        XCTAssertTrue(appState.sessionCache[post] === sessionA)
+        XCTAssertTrue(appState.registry.sessionCache[post] === sessionA)
 
         try FileManager.default.moveItem(at: root, to: moved)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -2925,7 +2925,7 @@ final class AppStateTests: XCTestCase {
         }
 
         XCTAssertTrue(appState.currentDocument === unrelatedSession)
-        XCTAssertTrue(appState.sessionCache[post] === sessionA)
+        XCTAssertTrue(appState.registry.sessionCache[post] === sessionA)
         XCTAssertEqual(appState.anchoredSessionFileBinding(for: sessionA), bindingA)
         XCTAssertEqual(try String(contentsOf: post, encoding: .utf8), "disk B")
     }
@@ -2956,7 +2956,7 @@ final class AppStateTests: XCTestCase {
         let sessionA = appState.currentDocument
         let bindingA = try XCTUnwrap(appState.anchoredSessionFileBinding(for: sessionA))
         let retiredBindingID = EditorDocumentBindingID()
-        appState.sessionCache[post] = nil
+        appState.registry.sessionCache[post] = nil
         appState.retiredEditorDocumentSessions[post] = RetiredEditorDocumentSession(
             canonicalURL: post,
             session: sessionA,
@@ -3018,7 +3018,7 @@ final class AppStateTests: XCTestCase {
 
         appState.workspaceReloadPostPrepareHook = {
             appState.workspaceReloadPostPrepareHook = nil
-            appState.sessionCache[post] = nil
+            appState.registry.sessionCache[post] = nil
         }
         let refresh = Task {
             try await appState.reloadWorkspaceTree(root: root, selectFirstIfNeeded: false)
@@ -3028,7 +3028,7 @@ final class AppStateTests: XCTestCase {
         try await refresh.value
 
         XCTAssertFalse(appState.currentDocument === evictedSession)
-        XCTAssertTrue(appState.sessionCache[post] === appState.currentDocument)
+        XCTAssertTrue(appState.registry.sessionCache[post] === appState.currentDocument)
         XCTAssertEqual(appState.currentDocument.text, "captured A")
         XCTAssertNotNil(appState.anchoredSessionFileBinding(for: appState.currentDocument))
     }
@@ -3117,7 +3117,7 @@ final class AppStateTests: XCTestCase {
 
         XCTAssertEqual(appState.currentDocument.fileURL?.standardizedFileURL, secondPost)
         XCTAssertEqual(appState.currentDocument.text, "captured B")
-        XCTAssertTrue(appState.sessionCache[secondPost] === appState.currentDocument)
+        XCTAssertTrue(appState.registry.sessionCache[secondPost] === appState.currentDocument)
     }
 
     func testWorkspaceRefreshRetriesSameSessionSaveDuringFinalSuspension() async throws {
@@ -3222,7 +3222,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[originalURL] = session
+        appState.registry.sessionCache[originalURL] = session
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: originalLocation,
@@ -3265,7 +3265,7 @@ final class AppStateTests: XCTestCase {
             isDirty: true
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
-        appState.sessionCache[originalURL] = session
+        appState.registry.sessionCache[originalURL] = session
         try FileManager.default.removeItem(at: originalURL)
         appState.markSessionDetachedFromMissingFile(session, url: originalURL)
         var expectations: [WorkspaceNoFollowFileWriteExpectation] = []
@@ -3305,7 +3305,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[originalURL] = session
+        appState.registry.sessionCache[originalURL] = session
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: originalLocation,
@@ -3361,7 +3361,7 @@ final class AppStateTests: XCTestCase {
             isDirty: true
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
-        appState.sessionCache[originalURL] = session
+        appState.registry.sessionCache[originalURL] = session
         try FileManager.default.removeItem(at: originalURL)
         appState.markSessionDetachedFromMissingFile(session, url: originalURL)
         var expectations: [WorkspaceNoFollowFileWriteExpectation] = []
@@ -3491,8 +3491,8 @@ final class AppStateTests: XCTestCase {
         let firstProof = try XCTUnwrap(
             appState.unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(firstSession)]
         )
-        XCTAssertTrue(appState.sessionCache[nfcLocation.fileURL] === firstSession)
-        XCTAssertNil(appState.sessionCache[aliasURL])
+        XCTAssertTrue(appState.registry.sessionCache[nfcLocation.fileURL] === firstSession)
+        XCTAssertNil(appState.registry.sessionCache[aliasURL])
         XCTAssertEqual(
             appState.sessionStateURL(for: firstSession)?.path(percentEncoded: false).utf8.map(\.self),
             nfcLocation.fileURL.path(percentEncoded: false).utf8.map(\.self)
@@ -3592,7 +3592,7 @@ final class AppStateTests: XCTestCase {
             isDirty: true
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
-        appState.sessionCache[documentURL] = session
+        appState.registry.sessionCache[documentURL] = session
 
         try FileManager.default.removeItem(at: documentURL)
         try writeText("replacement B", to: documentURL)
@@ -3614,7 +3614,7 @@ final class AppStateTests: XCTestCase {
             isDirty: true
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
-        appState.sessionCache[documentURL] = session
+        appState.registry.sessionCache[documentURL] = session
         let descriptor = Darwin.open(documentURL.path, O_WRONLY | O_TRUNC)
         XCTAssertGreaterThanOrEqual(descriptor, 0)
         if descriptor >= 0 {
@@ -3648,7 +3648,7 @@ final class AppStateTests: XCTestCase {
                 isDirty: true
             )
             let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
-            appState.sessionCache[documentURL] = session
+            appState.registry.sessionCache[documentURL] = session
             if startsExisting {
                 try FileManager.default.removeItem(at: documentURL)
             }
@@ -3750,7 +3750,7 @@ final class AppStateTests: XCTestCase {
             isDirty: true
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
-        appState.sessionCache[originalURL] = session
+        appState.registry.sessionCache[originalURL] = session
 
         try FileManager.default.moveItem(at: selectedRoot, to: movedA)
         try FileManager.default.createDirectory(at: selectedRoot, withIntermediateDirectories: true)
@@ -3784,7 +3784,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[nfdLocation.fileURL] = session
+        appState.registry.sessionCache[nfdLocation.fileURL] = session
         let result = WorkspaceIndeterminateFileWrite(
             reason: .durabilityFailed,
             preparedMetadata: nil,
@@ -3856,7 +3856,7 @@ final class AppStateTests: XCTestCase {
             appState.workspaceSearchRootAuthority = authorityB
             appState.workspaceGeneration = 1
             appState.workspaceInstalledCaptureGeneration = 1
-            appState.sessionCache[sourceURL] = sourceSession
+            appState.registry.sessionCache[sourceURL] = sourceSession
             appState.anchoredSessionFileBindings[ObjectIdentifier(sourceSession)] =
                 AnchoredWorkspaceSessionFileBinding(
                     location: sourceLocationB,
@@ -3874,7 +3874,7 @@ final class AppStateTests: XCTestCase {
             )
             switch placement {
             case .cached:
-                appState.sessionCache[ownedURL] = ownedSession
+                appState.registry.sessionCache[ownedURL] = ownedSession
                 appState.anchoredSessionFileBindings[ownedIdentity] = ownedBinding
             case .retired:
                 appState.retiredEditorDocumentSessions[ownedURL] = RetiredEditorDocumentSession(
@@ -3891,7 +3891,7 @@ final class AppStateTests: XCTestCase {
                 appState.editorDocumentBindingSessions[bindingID] = ownedSession
                 appState.anchoredSessionFileBindings[ownedIdentity] = ownedBinding
             case .quarantined:
-                appState.sessionCache[ownedURL] = ownedSession
+                appState.registry.sessionCache[ownedURL] = ownedSession
                 appState.indeterminateSessionWrites[ownedIdentity] = WorkspaceIndeterminateFileWrite(
                     reason: .durabilityFailed,
                     preparedMetadata: nil,
@@ -4008,8 +4008,8 @@ final class AppStateTests: XCTestCase {
             currentDocument: missingSession,
             shouldRestoreLastOpenedFile: false
         )
-        appState.sessionCache[missingURL] = missingSession
-        appState.sessionCache[otherURL] = otherSession
+        appState.registry.sessionCache[missingURL] = missingSession
+        appState.registry.sessionCache[otherURL] = otherSession
         appState.anchoredSessionFileBindings[ObjectIdentifier(missingSession)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: missingLocation,
@@ -4023,9 +4023,9 @@ final class AppStateTests: XCTestCase {
 
         appState.closeMissingFile()
 
-        XCTAssertNil(appState.sessionCache[missingURL])
+        XCTAssertNil(appState.registry.sessionCache[missingURL])
         XCTAssertNil(appState.anchoredSessionFileBindings[ObjectIdentifier(missingSession)])
-        XCTAssertTrue(appState.sessionCache[otherURL] === otherSession)
+        XCTAssertTrue(appState.registry.sessionCache[otherURL] === otherSession)
         XCTAssertEqual(otherSession.text, "dirty B")
         XCTAssertNil(appState.currentDocument.fileURL)
     }
@@ -4054,8 +4054,8 @@ final class AppStateTests: XCTestCase {
             currentDocument: missingSession,
             shouldRestoreLastOpenedFile: false
         )
-        appState.sessionCache[missingURL] = missingSession
-        appState.sessionCache[otherURL] = otherSession
+        appState.registry.sessionCache[missingURL] = missingSession
+        appState.registry.sessionCache[otherURL] = otherSession
         appState.indeterminateSessionWrites[ObjectIdentifier(missingSession)] =
             WorkspaceIndeterminateFileWrite(
                 reason: .durabilityFailed,
@@ -4078,14 +4078,14 @@ final class AppStateTests: XCTestCase {
 
         appState.closeMissingFile()
 
-        XCTAssertTrue(appState.sessionCache[missingURL] === missingSession)
+        XCTAssertTrue(appState.registry.sessionCache[missingURL] === missingSession)
         XCTAssertTrue(appState.currentDocument === missingSession)
         XCTAssertNotNil(appState.indeterminateSessionWrites[ObjectIdentifier(missingSession)])
         XCTAssertEqual(
             appState.indeterminateSessionWriteContexts[ObjectIdentifier(missingSession)]?.location,
             missingLocation
         )
-        XCTAssertTrue(appState.sessionCache[otherURL] === otherSession)
+        XCTAssertTrue(appState.registry.sessionCache[otherURL] === otherSession)
         XCTAssertEqual(appState.pendingExternalTexts[otherURL], "pending B")
         XCTAssertEqual(appState.lastKnownDiskHashes[otherURL], "known B")
         XCTAssertTrue(appState.detachedSessionURLs.contains(otherURL))
@@ -4121,8 +4121,8 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[missingURL] = missingSession
-        appState.sessionCache[destinationURL] = destinationSession
+        appState.registry.sessionCache[missingURL] = missingSession
+        appState.registry.sessionCache[destinationURL] = destinationSession
         appState.anchoredSessionFileBindings[ObjectIdentifier(missingSession)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: missingLocation,
@@ -4135,7 +4135,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertThrowsError(try appState.saveDetachedCurrentDocument(to: destinationURL))
 
         XCTAssertEqual(try String(contentsOf: destinationURL, encoding: .utf8), "destination disk")
-        XCTAssertTrue(appState.sessionCache[destinationURL] === destinationSession)
+        XCTAssertTrue(appState.registry.sessionCache[destinationURL] === destinationSession)
         XCTAssertTrue(appState.currentDocument === missingSession)
         XCTAssertNotNil(appState.anchoredSessionFileBinding(for: missingSession))
     }
@@ -4149,7 +4149,7 @@ final class AppStateTests: XCTestCase {
         )
 
         XCTAssertEqual(try String(contentsOf: fixture.ownedURL, encoding: .utf8), "owned disk")
-        XCTAssertTrue(fixture.appState.sessionCache[fixture.ownedURL] === fixture.ownedSession)
+        XCTAssertTrue(fixture.appState.registry.sessionCache[fixture.ownedURL] === fixture.ownedSession)
         XCTAssertEqual(fixture.ownedSession.text, "dirty owned session")
         XCTAssertTrue(fixture.appState.currentDocument === fixture.missingSession)
         XCTAssertNotNil(fixture.appState.anchoredSessionFileBinding(for: fixture.missingSession))
@@ -4158,7 +4158,7 @@ final class AppStateTests: XCTestCase {
     func testSaveMissingCopyRefusesExistingCaseAliasWithoutCachedOwner() throws {
         let fixture = try makeSaveCopyCaseAliasFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
-        fixture.appState.sessionCache[fixture.ownedURL] = nil
+        fixture.appState.registry.sessionCache[fixture.ownedURL] = nil
         fixture.appState.anchoredSessionFileBindings[ObjectIdentifier(fixture.ownedSession)] = nil
 
         XCTAssertThrowsError(
@@ -4193,7 +4193,7 @@ final class AppStateTests: XCTestCase {
                 "owned disk"
             )
             XCTAssertTrue(
-                fixture.appState.sessionCache[fixture.ownedURL] === fixture.ownedSession
+                fixture.appState.registry.sessionCache[fixture.ownedURL] === fixture.ownedSession
             )
             XCTAssertTrue(fixture.appState.currentDocument === fixture.missingSession)
         }
@@ -4227,7 +4227,7 @@ final class AppStateTests: XCTestCase {
         )
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.caseAliasURL.path))
-        XCTAssertTrue(fixture.appState.sessionCache[fixture.ownedURL] === fixture.ownedSession)
+        XCTAssertTrue(fixture.appState.registry.sessionCache[fixture.ownedURL] === fixture.ownedSession)
         XCTAssertTrue(fixture.appState.currentDocument === fixture.missingSession)
         XCTAssertTrue(fixture.appState.currentDocument.isDirty)
     }
@@ -4235,7 +4235,7 @@ final class AppStateTests: XCTestCase {
     func testSaveMissingCopyRefusesDestinationOwnedOnlyByRetiredEditorSession() throws {
         let fixture = try makeSaveCopyCaseAliasFixture(requiresCaseAlias: false)
         defer { try? FileManager.default.removeItem(at: fixture.root) }
-        fixture.appState.sessionCache[fixture.ownedURL] = nil
+        fixture.appState.registry.sessionCache[fixture.ownedURL] = nil
         let retiredBindingID = EditorDocumentBindingID()
         fixture.appState.retiredEditorDocumentSessions[fixture.ownedURL] =
             RetiredEditorDocumentSession(
@@ -4279,7 +4279,7 @@ final class AppStateTests: XCTestCase {
             fileKind: .markdown,
             isDirty: true
         )
-        fixture.appState.sessionCache[ownedURL] = ownedSession
+        fixture.appState.registry.sessionCache[ownedURL] = ownedSession
         fixture.appState.anchoredSessionFileBindings[ObjectIdentifier(ownedSession)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: ownedLocation,
@@ -4378,7 +4378,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[standaloneURL] = session
+        appState.registry.sessionCache[standaloneURL] = session
         appState.missingFilePrompt = AppState.MissingFilePrompt(fileURL: standaloneURL)
 
         XCTAssertThrowsError(try appState.saveDetachedCurrentDocument(to: destinationURL))
@@ -4418,7 +4418,7 @@ final class AppStateTests: XCTestCase {
             )
             switch ownership {
             case "cached":
-                fixture.appState.sessionCache[standaloneURL] = ownedSession
+                fixture.appState.registry.sessionCache[standaloneURL] = ownedSession
             case "retired":
                 let bindingID = EditorDocumentBindingID()
                 fixture.appState.retiredEditorDocumentSessions[standaloneURL] =
@@ -4467,7 +4467,7 @@ final class AppStateTests: XCTestCase {
             fileKind: .markdown,
             isDirty: true
         )
-        fixture.appState.sessionCache[ownedURL] = ownedSession
+        fixture.appState.registry.sessionCache[ownedURL] = ownedSession
         fixture.appState.retainUnanchoredManagedSessionOwnership(for: ownedSession)
         try FileManager.default.linkItem(at: ownedURL, to: destinationURL)
         try FileManager.default.removeItem(at: ownedURL)
@@ -4494,7 +4494,7 @@ final class AppStateTests: XCTestCase {
             fileKind: .markdown,
             isDirty: true
         )
-        fixture.appState.sessionCache[ownedURL] = ownedSession
+        fixture.appState.registry.sessionCache[ownedURL] = ownedSession
         fixture.appState.retainUnanchoredManagedSessionOwnership(for: ownedSession)
         try FileManager.default.linkItem(at: ownedURL, to: destinationURL)
         try FileManager.default.removeItem(at: ownedURL)
@@ -4518,7 +4518,7 @@ final class AppStateTests: XCTestCase {
             fileKind: .markdown,
             isDirty: true
         )
-        fixture.appState.sessionCache[unprovableURL] = unprovableSession
+        fixture.appState.registry.sessionCache[unprovableURL] = unprovableSession
         fixture.appState.retainUnanchoredManagedSessionOwnership(for: unprovableSession)
 
         XCTAssertThrowsError(try fixture.appState.saveDetachedCurrentDocument(to: destinationURL))
@@ -4564,8 +4564,8 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[missingURL] = missingSession
-        appState.sessionCache[ownedURL] = ownedSession
+        appState.registry.sessionCache[missingURL] = missingSession
+        appState.registry.sessionCache[ownedURL] = ownedSession
         appState.anchoredSessionFileBindings[ObjectIdentifier(missingSession)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: missingLocation,
@@ -4585,8 +4585,8 @@ final class AppStateTests: XCTestCase {
 
         XCTAssertEqual(try String(contentsOf: ownedURL, encoding: .utf8), "owned disk")
         XCTAssertEqual(try String(contentsOf: destinationURL, encoding: .utf8), "unsaved A")
-        XCTAssertTrue(appState.sessionCache[ownedURL] === ownedSession)
-        XCTAssertTrue(appState.sessionCache[destinationURL] === missingSession)
+        XCTAssertTrue(appState.registry.sessionCache[ownedURL] === ownedSession)
+        XCTAssertTrue(appState.registry.sessionCache[destinationURL] === missingSession)
         XCTAssertFalse(missingSession.isDirty)
     }
 
@@ -4617,7 +4617,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[missingURL] = session
+        appState.registry.sessionCache[missingURL] = session
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: missingLocation,
@@ -4671,7 +4671,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[missingURL] = missingSession
+        appState.registry.sessionCache[missingURL] = missingSession
         appState.anchoredSessionFileBindings[ObjectIdentifier(missingSession)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: missingLocation,
@@ -4726,8 +4726,8 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[missingURL] = missingSession
-        appState.sessionCache[ownedURL] = ownedSession
+        appState.registry.sessionCache[missingURL] = missingSession
+        appState.registry.sessionCache[ownedURL] = ownedSession
         appState.anchoredSessionFileBindings[ObjectIdentifier(missingSession)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: missingLocation,
@@ -4772,7 +4772,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[missingURL] = session
+        appState.registry.sessionCache[missingURL] = session
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: missingLocation,
@@ -4788,8 +4788,8 @@ final class AppStateTests: XCTestCase {
         let binding = try XCTUnwrap(appState.anchoredSessionFileBinding(for: session))
         XCTAssertEqual(binding.location.rootAuthority, authority)
         XCTAssertEqual(binding.location.fileURL, destinationURL)
-        XCTAssertTrue(appState.sessionCache[destinationURL] === session)
-        XCTAssertNil(appState.sessionCache[missingURL])
+        XCTAssertTrue(appState.registry.sessionCache[destinationURL] === session)
+        XCTAssertNil(appState.registry.sessionCache[missingURL])
         XCTAssertEqual(try String(contentsOf: destinationURL, encoding: .utf8), "unsaved A")
         XCTAssertEqual(appState.editorDocumentBindingIDs[ObjectIdentifier(session)], editorBinding.id)
         XCTAssertTrue(appState.editorDocumentBindingSessions[editorBinding.id] === session)
@@ -4815,7 +4815,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[missingURL] = session
+        appState.registry.sessionCache[missingURL] = session
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: missingLocation,
@@ -4870,7 +4870,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[missingURL] = session
+        appState.registry.sessionCache[missingURL] = session
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: missingLocation,
@@ -4925,7 +4925,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[missingURL] = session
+        appState.registry.sessionCache[missingURL] = session
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: missingLocation,
@@ -4963,8 +4963,8 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(appState.currentDocument.fileURL?.standardizedFileURL, destinationURL)
         XCTAssertEqual(appState.currentDocument.text, "unsaved A")
         XCTAssertTrue(appState.currentDocument.isDirty)
-        XCTAssertTrue(appState.sessionCache[destinationURL] === session)
-        XCTAssertNil(appState.sessionCache[missingURL])
+        XCTAssertTrue(appState.registry.sessionCache[destinationURL] === session)
+        XCTAssertNil(appState.registry.sessionCache[missingURL])
         XCTAssertEqual(appState.pendingExternalTexts[destinationURL], "unsaved A")
         XCTAssertEqual(appState.externalChangePrompt?.fileURL.standardizedFileURL, destinationURL)
         XCTAssertNil(appState.missingFilePrompt)
@@ -5005,7 +5005,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[missingURL] = session
+        appState.registry.sessionCache[missingURL] = session
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: missingLocation,
@@ -5112,7 +5112,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authorityA
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[missingURL] = session
+        appState.registry.sessionCache[missingURL] = session
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: missingLocation,
@@ -5181,7 +5181,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[retainedURL] = session
+        appState.registry.sessionCache[retainedURL] = session
         appState.detachedSessionURLs.insert(retainedURL)
         appState.missingFilePrompt = AppState.MissingFilePrompt(fileURL: retainedURL)
         let indeterminate = WorkspaceIndeterminateFileWrite(
@@ -5247,7 +5247,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[retainedURL] = session
+        appState.registry.sessionCache[retainedURL] = session
         appState.missingFilePrompt = AppState.MissingFilePrompt(fileURL: retainedURL)
         let indeterminate = WorkspaceIndeterminateFileWrite(
             reason: .durabilityFailed,
@@ -5302,7 +5302,7 @@ final class AppStateTests: XCTestCase {
             isDirty: true
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
-        appState.sessionCache[post] = session
+        appState.registry.sessionCache[post] = session
         let originalBinding = AnchoredWorkspaceSessionFileBinding(
             location: location,
             identity: loaded.metadata.identity,
@@ -5374,7 +5374,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
         appState.workspaceAccess = SecurityScopedAccess.startAccessing(root)
-        appState.sessionCache[post] = session
+        appState.registry.sessionCache[post] = session
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: location,
@@ -5465,7 +5465,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[missingURL] = session
+        appState.registry.sessionCache[missingURL] = session
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: missingLocation,
@@ -5496,8 +5496,8 @@ final class AppStateTests: XCTestCase {
 
         XCTAssertFalse(session.isDirty)
         XCTAssertEqual(session.fileURL?.standardizedFileURL, destinationURL)
-        XCTAssertTrue(appState.sessionCache[destinationURL] === session)
-        XCTAssertNil(appState.sessionCache[missingURL])
+        XCTAssertTrue(appState.registry.sessionCache[destinationURL] === session)
+        XCTAssertNil(appState.registry.sessionCache[missingURL])
         XCTAssertEqual(
             appState.anchoredSessionFileBinding(for: session)?.location,
             destinationLocation
@@ -5541,7 +5541,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[missingURL] = session
+        appState.registry.sessionCache[missingURL] = session
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: missingLocation,
@@ -5590,8 +5590,8 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: destinationURL, encoding: .utf8), "replacement B")
         XCTAssertEqual(session.fileURL?.standardizedFileURL, destinationURL)
         XCTAssertTrue(session.isDirty)
-        XCTAssertTrue(appState.sessionCache[destinationURL] === session)
-        XCTAssertNil(appState.sessionCache[missingURL])
+        XCTAssertTrue(appState.registry.sessionCache[destinationURL] === session)
+        XCTAssertNil(appState.registry.sessionCache[missingURL])
         XCTAssertEqual(
             appState.indeterminateSessionWrites[sessionIdentity]?.recoveryArtifact,
             .retained(cleanupLocation)
@@ -5640,7 +5640,7 @@ final class AppStateTests: XCTestCase {
             isDirty: true
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
-        appState.sessionCache[post] = session
+        appState.registry.sessionCache[post] = session
         let binding = AnchoredWorkspaceSessionFileBinding(
             location: location,
             identity: loaded.metadata.identity,
@@ -5690,7 +5690,7 @@ final class AppStateTests: XCTestCase {
             isDirty: true
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
-        appState.sessionCache[post] = session
+        appState.registry.sessionCache[post] = session
         appState.anchoredFileSaveOverride = { text, location, expectation in
             let outcome = try MarkdownFileStore().save(
                 text: text,
@@ -5734,7 +5734,7 @@ final class AppStateTests: XCTestCase {
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
         try FileManager.default.removeItem(at: missingURL)
-        appState.sessionCache[missingURL] = session
+        appState.registry.sessionCache[missingURL] = session
         appState.detachedSessionURLs.insert(missingURL)
         appState.missingFilePrompt = AppState.MissingFilePrompt(fileURL: missingURL)
         appState.anchoredFileSaveOverride = { text, location, expectation in
@@ -5759,8 +5759,8 @@ final class AppStateTests: XCTestCase {
 
         XCTAssertFalse(session.isDirty)
         XCTAssertEqual(session.fileURL?.standardizedFileURL, destinationURL)
-        XCTAssertTrue(appState.sessionCache[destinationURL] === session)
-        XCTAssertNil(appState.sessionCache[missingURL])
+        XCTAssertTrue(appState.registry.sessionCache[destinationURL] === session)
+        XCTAssertNil(appState.registry.sessionCache[missingURL])
         XCTAssertNil(appState.indeterminateSessionWrites[ObjectIdentifier(session)])
         XCTAssertEqual(
             appState.fileWriteArtifactNotices.first?.artifactState,
@@ -5783,7 +5783,7 @@ final class AppStateTests: XCTestCase {
             isDirty: true
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
-        appState.sessionCache[post] = session
+        appState.registry.sessionCache[post] = session
         let indeterminate = WorkspaceIndeterminateFileWrite(
             reason: .durabilityFailed,
             preparedMetadata: loaded.metadata,
@@ -5840,7 +5840,7 @@ final class AppStateTests: XCTestCase {
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
         try FileManager.default.removeItem(at: missingURL)
-        appState.sessionCache[missingURL] = session
+        appState.registry.sessionCache[missingURL] = session
         appState.detachedSessionURLs.insert(missingURL)
         appState.missingFilePrompt = AppState.MissingFilePrompt(fileURL: missingURL)
         let indeterminate = WorkspaceIndeterminateFileWrite(
@@ -5889,7 +5889,7 @@ final class AppStateTests: XCTestCase {
             isDirty: true
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
-        appState.sessionCache[post] = session
+        appState.registry.sessionCache[post] = session
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: location,
@@ -5955,7 +5955,7 @@ final class AppStateTests: XCTestCase {
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
         defer { appState.autosaveTask?.cancel() }
         let sessionIdentity = ObjectIdentifier(session)
-        appState.sessionCache[post] = session
+        appState.registry.sessionCache[post] = session
         _ = appState.sessionPolicy.access(post, isDirty: false)
         appState.anchoredSessionFileBindings[sessionIdentity] = AnchoredWorkspaceSessionFileBinding(
             location: location,
@@ -6108,7 +6108,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[post] = session
+        appState.registry.sessionCache[post] = session
         _ = appState.sessionPolicy.access(post, isDirty: false)
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
             AnchoredWorkspaceSessionFileBinding(
@@ -6140,7 +6140,7 @@ final class AppStateTests: XCTestCase {
         }
 
         XCTAssertTrue(appState.currentDocument === session)
-        XCTAssertTrue(appState.sessionCache[post] === session)
+        XCTAssertTrue(appState.registry.sessionCache[post] === session)
         XCTAssertEqual(session.text, "local edits")
         XCTAssertEqual(appState.pendingExternalTexts[post], "disk A")
         XCTAssertEqual(
@@ -6193,7 +6193,7 @@ final class AppStateTests: XCTestCase {
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
         defer { appState.autosaveTask?.cancel() }
         let sessionIdentity = ObjectIdentifier(session)
-        appState.sessionCache[post] = session
+        appState.registry.sessionCache[post] = session
         _ = appState.sessionPolicy.access(post, isDirty: false)
         appState.unanchoredManagedSessionOwnershipProofs[sessionIdentity] = .proven(
             UnanchoredManagedSessionFileProof(
@@ -6227,7 +6227,7 @@ final class AppStateTests: XCTestCase {
         }
 
         XCTAssertTrue(appState.currentDocument === session)
-        XCTAssertTrue(appState.sessionCache[post] === session)
+        XCTAssertTrue(appState.registry.sessionCache[post] === session)
         XCTAssertEqual(session.text, "standalone local edits")
         XCTAssertEqual(appState.pendingExternalTexts[post], "disk A")
         XCTAssertEqual(
@@ -6401,7 +6401,7 @@ final class AppStateTests: XCTestCase {
             sha256Digest: loaded.sha256Digest,
             installedWorkspaceLocation: nil
         )
-        appState.sessionCache[location.fileURL] = session
+        appState.registry.sessionCache[location.fileURL] = session
         appState.unanchoredManagedSessionOwnershipProofs[sessionIdentity] = .proven(originalProof)
         appState.scheduleAutosave(for: session)
         XCTAssertNotNil(appState.sessionAutosaveTasks[sessionIdentity])
@@ -6442,7 +6442,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[location.fileURL] = session
+        appState.registry.sessionCache[location.fileURL] = session
         let originalBinding = AnchoredWorkspaceSessionFileBinding(
             location: location,
             identity: loaded.metadata.identity,
@@ -6493,7 +6493,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[location.fileURL] = session
+        appState.registry.sessionCache[location.fileURL] = session
         let originalBinding = AnchoredWorkspaceSessionFileBinding(
             location: location,
             identity: loaded.metadata.identity,
@@ -6585,7 +6585,7 @@ final class AppStateTests: XCTestCase {
             isDirty: false
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
-        appState.sessionCache[location.fileURL] = session
+        appState.registry.sessionCache[location.fileURL] = session
         let bindingA = AnchoredWorkspaceSessionFileBinding(
             location: location,
             identity: loadedA.metadata.identity,
@@ -6643,7 +6643,7 @@ final class AppStateTests: XCTestCase {
             var staleInspectionTask: Task<Void, Never>?
             switch source {
             case "cached":
-                appState.sessionCache[location.fileURL] = session
+                appState.registry.sessionCache[location.fileURL] = session
                 retiredBindingID = nil
             case "retired":
                 let bindingID = EditorDocumentBindingID()
@@ -6868,7 +6868,7 @@ final class AppStateTests: XCTestCase {
         }
 
         XCTAssertTrue(appState.currentDocument === session)
-        XCTAssertTrue(appState.sessionCache[location.fileURL] === session)
+        XCTAssertTrue(appState.registry.sessionCache[location.fileURL] === session)
         XCTAssertTrue(appState.detachedSessionURLs.contains(location.fileURL))
         XCTAssertEqual(appState.pendingExternalTexts[location.fileURL], "disk A")
         XCTAssertEqual(appState.externalChangePrompt?.fileURL, location.fileURL)
@@ -6926,7 +6926,7 @@ final class AppStateTests: XCTestCase {
             let retiredBindingID: EditorDocumentBindingID?
             switch source {
             case "cached":
-                appState.sessionCache[locationA.fileURL] = session
+                appState.registry.sessionCache[locationA.fileURL] = session
                 retiredBindingID = nil
             case "retired":
                 let bindingID = EditorDocumentBindingID()
@@ -6954,7 +6954,7 @@ final class AppStateTests: XCTestCase {
             case "cached":
                 XCTAssertThrowsError(try appState.activateFileSession(url: sourceURL))
                 XCTAssertTrue(appState.currentDocument !== session)
-                XCTAssertTrue(appState.sessionCache[locationA.fileURL] === session)
+                XCTAssertTrue(appState.registry.sessionCache[locationA.fileURL] === session)
             case "retired":
                 try appState.activateFileSession(url: sourceURL)
                 XCTAssertTrue(appState.currentDocument !== session)
@@ -7039,7 +7039,7 @@ final class AppStateTests: XCTestCase {
             XCTAssertEqual(url, locationB.fileURL)
         }
         XCTAssertTrue(appState.retiredEditorDocumentSessions[locationA.fileURL]?.session === session)
-        XCTAssertNil(appState.sessionCache[locationB.fileURL])
+        XCTAssertNil(appState.registry.sessionCache[locationB.fileURL])
         XCTAssertEqual(appState.pendingExternalTexts[locationA.fileURL], "disk B1")
         XCTAssertEqual(
             appState.unanchoredManagedSessionOwnershipProofs[sessionIdentity],
@@ -7054,7 +7054,7 @@ final class AppStateTests: XCTestCase {
             fileKind: loadedB.file.fileKind,
             isDirty: false
         )
-        appState.sessionCache[locationB.fileURL] = cachedB
+        appState.registry.sessionCache[locationB.fileURL] = cachedB
         appState.unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(cachedB)] = .proven(
             UnanchoredManagedSessionFileProof(
                 location: locationB,
@@ -7064,7 +7064,7 @@ final class AppStateTests: XCTestCase {
             )
         )
         XCTAssertThrowsError(try appState.activateFileSession(url: sourceURL))
-        XCTAssertTrue(appState.sessionCache[locationB.fileURL] === cachedB)
+        XCTAssertTrue(appState.registry.sessionCache[locationB.fileURL] === cachedB)
         XCTAssertTrue(appState.currentDocument !== cachedB)
         XCTAssertEqual(appState.pendingExternalTexts[locationA.fileURL], "disk B1")
         XCTAssertEqual(try String(contentsOf: sourceURL, encoding: .utf8), "disk B2")
@@ -7153,7 +7153,7 @@ final class AppStateTests: XCTestCase {
             isDirty: false
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
-        appState.sessionCache[location.fileURL] = session
+        appState.registry.sessionCache[location.fileURL] = session
         let bindingA = AnchoredWorkspaceSessionFileBinding(
             location: location,
             identity: loadedA.metadata.identity,
@@ -7207,7 +7207,7 @@ final class AppStateTests: XCTestCase {
             isDirty: false
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
-        appState.sessionCache[location.fileURL] = session
+        appState.registry.sessionCache[location.fileURL] = session
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: location,
@@ -7277,7 +7277,7 @@ final class AppStateTests: XCTestCase {
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
         defer { appState.autosaveTask?.cancel() }
-        appState.sessionCache[location.fileURL] = session
+        appState.registry.sessionCache[location.fileURL] = session
         _ = appState.sessionPolicy.access(location.fileURL, isDirty: false)
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
             AnchoredWorkspaceSessionFileBinding(
@@ -7561,7 +7561,7 @@ final class AppStateTests: XCTestCase {
         appState.workspaceGeneration = previousInstalledGeneration
         appState.workspaceInstalledCaptureGeneration = previousInstalledGeneration
         appState.workspaceTree = previousTree
-        appState.sessionCache[documentURL.standardizedFileURL] = currentSession
+        appState.registry.sessionCache[documentURL.standardizedFileURL] = currentSession
         appState.workspaceReloadPostProofHook = {
             try FileManager.default.moveItem(at: root, to: moved)
             try FileManager.default.createDirectory(
@@ -7598,7 +7598,7 @@ final class AppStateTests: XCTestCase {
         )
         XCTAssertEqual(appState.workspaceTree, previousTree)
         XCTAssertTrue(appState.currentDocument === currentSession)
-        XCTAssertTrue(appState.sessionCache[documentURL.standardizedFileURL] === currentSession)
+        XCTAssertTrue(appState.registry.sessionCache[documentURL.standardizedFileURL] === currentSession)
         XCTAssertEqual(appState.currentDocument.text, "captured A")
         XCTAssertNotEqual(appState.currentDocument.text, "replacement B")
     }
@@ -7689,7 +7689,7 @@ final class AppStateTests: XCTestCase {
             isDirty: true
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
-        appState.sessionCache[originalURL] = session
+        appState.registry.sessionCache[originalURL] = session
         try FileManager.default.removeItem(at: originalURL)
         appState.markSessionDetachedFromMissingFile(session, url: originalURL)
         let indeterminate = WorkspaceIndeterminateFileWrite(
@@ -7799,7 +7799,7 @@ final class AppStateTests: XCTestCase {
             preparedImageAssetAuthority: preparedRead.preparedAuthority,
             allowsImageAssetAuthorityBootstrap: true
         )
-        appState.sessionCache[location.fileURL] = currentSession
+        appState.registry.sessionCache[location.fileURL] = currentSession
     }
 
     private func writeText(_ text: String, to url: URL, touchOffset: TimeInterval = 0) throws {
@@ -8042,7 +8042,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
 
         XCTAssertTrue(fixture.textView.hasMarkedText())
         XCTAssertTrue(appState.isEditorDocumentBindingInstalled(bindingA.id, session: sessionA))
-        XCTAssertTrue(appState.sessionCache[documentAURL.standardizedFileURL] === sessionA)
+        XCTAssertTrue(appState.registry.sessionCache[documentAURL.standardizedFileURL] === sessionA)
         XCTAssertEqual(fixture.coordinator.currentDocumentIdentity, AppState.editorDocumentIdentity(for: documentAURL))
         XCTAssertEqual(Data(sessionB.text.utf8), Data(dirtySourceB.utf8))
         XCTAssertEqual(sessionB.version, 1)
@@ -8074,7 +8074,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
                 )
         }
         XCTAssertTrue(appState.isEditorDocumentBindingInstalled(bindingB.id, session: sessionB))
-        XCTAssertNil(appState.sessionCache[documentAURL.standardizedFileURL])
+        XCTAssertNil(appState.registry.sessionCache[documentAURL.standardizedFileURL])
         XCTAssertEqual(fixture.coordinator.currentDocumentIdentity, AppState.editorDocumentIdentity(for: documentBURL))
 
         _ = bindingA.sourceContract.publish(EditorDocumentSourcePublication(
@@ -8269,7 +8269,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             coordinator: editorFixture.coordinator
         )
         XCTAssertTrue(appState.isEditorDocumentBindingInstalled(bindingB.id, session: sessionB))
-        XCTAssertTrue(appState.sessionCache[canonicalA] === sessionA)
+        XCTAssertTrue(appState.registry.sessionCache[canonicalA] === sessionA)
         XCTAssertTrue(sessionA.isDirty)
         XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), externalSourceA)
 
@@ -8497,7 +8497,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             shouldRestoreLastOpenedFile: false
         )
         let key = try XCTUnwrap(appState.sessionStateURL(for: session))
-        appState.sessionCache[key] = session
+        appState.registry.sessionCache[key] = session
         appState.replaceDocumentText(local, in: session)
         appState.pendingExternalTexts[key] = "detected disk conflict"
         appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: key)
@@ -8553,7 +8553,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             shouldRestoreLastOpenedFile: false
         )
         let key = try XCTUnwrap(appState.sessionStateURL(for: session))
-        appState.sessionCache[key] = session
+        appState.registry.sessionCache[key] = session
         appState.replaceDocumentText(local, in: session)
         appState.pendingExternalTexts[key] = olderDisk
         appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: key)
@@ -8608,7 +8608,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             shouldRestoreLastOpenedFile: false
         )
         let key = try XCTUnwrap(appState.sessionStateURL(for: session))
-        appState.sessionCache[key] = session
+        appState.registry.sessionCache[key] = session
         appState.replaceDocumentText(local, in: session)
         appState.pendingExternalTexts[key] = olderDisk
         appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: key)
@@ -8676,7 +8676,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             shouldRestoreLastOpenedFile: false
         )
         let key = documentURL.standardizedFileURL
-        appState.sessionCache[key] = session
+        appState.registry.sessionCache[key] = session
         appState.pendingExternalTexts[key] = oneMiBSource
         appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: key)
         appState.reloadExternallyChangedFile()
@@ -8815,7 +8815,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             shouldRestoreLastOpenedFile: false
         )
         let key = documentURL.standardizedFileURL
-        appState.sessionCache[key] = session
+        appState.registry.sessionCache[key] = session
         let binding = appState.editorDocumentBinding(for: session)
         var selection: NSRange? = NSRange(location: (local as NSString).length, length: 0)
         let view = MarkdownTextView(
@@ -8888,7 +8888,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             shouldRestoreLastOpenedFile: false
         )
         let key = documentURL.standardizedFileURL
-        appState.sessionCache[key] = session
+        appState.registry.sessionCache[key] = session
         let binding = appState.editorDocumentBinding(for: session)
         var selection1: NSRange? = NSRange(location: (local as NSString).length, length: 0)
         var selection2 = selection1
@@ -9031,7 +9031,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             userDefaults: defaults
         )
         let key = try XCTUnwrap(appState.sessionStateURL(for: session))
-        appState.sessionCache[key] = session
+        appState.registry.sessionCache[key] = session
         let binding = appState.editorDocumentBinding(for: session)
         var selection1: NSRange? = NSRange(location: (local as NSString).length, length: 0)
         var selection2 = selection1
@@ -9137,7 +9137,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let session = DocumentSession(text: original, url: documentURL, fileKind: .markdown)
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
         let key = documentURL.standardizedFileURL
-        appState.sessionCache[key] = session
+        appState.registry.sessionCache[key] = session
         appState.recordKnownDiskText(original, for: key, modificationDate: originalModificationDate)
 
         let handle = try FileHandle(forWritingTo: documentURL)
@@ -9223,7 +9223,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
         let key = documentURL.standardizedFileURL
-        appState.sessionCache[key] = session
+        appState.registry.sessionCache[key] = session
         appState.recordKnownDiskText(source, for: key)
         let binding = appState.editorDocumentBinding(for: session)
         var selection: NSRange? = NSRange(location: 1, length: 0)
@@ -9453,7 +9453,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             shouldRestoreLastOpenedFile: false
         )
         let key = documentURL.standardizedFileURL
-        appState.sessionCache[key] = session
+        appState.registry.sessionCache[key] = session
         appState.pendingExternalTexts[key] = "unreadable replacement"
         appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: key)
 
@@ -9515,7 +9515,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
         let key = documentURL.standardizedFileURL
-        appState.sessionCache[key] = session
+        appState.registry.sessionCache[key] = session
         appState.recordKnownDiskText(diskX, for: key)
         let binding = appState.editorDocumentBinding(for: session)
         var selection1: NSRange? = NSRange(location: (local as NSString).length, length: 0)
@@ -9616,7 +9616,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
 
         XCTAssertEqual(appState.workspaceRootURL?.standardizedFileURL, rootURL.standardizedFileURL)
         XCTAssertTrue(appState.currentDocument === session)
-        XCTAssertTrue(appState.sessionCache[stateURL] === session)
+        XCTAssertTrue(appState.registry.sessionCache[stateURL] === session)
         XCTAssertTrue(session.isDirty)
         XCTAssertEqual(session.text, "Local dirty text")
         XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), "External disk text")
@@ -9646,7 +9646,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         )
         let appState = AppState(shouldRestoreLastOpenedFile: false)
         let quarantinedIdentity = ObjectIdentifier(quarantinedSession)
-        appState.sessionCache[quarantinedURL] = quarantinedSession
+        appState.registry.sessionCache[quarantinedURL] = quarantinedSession
         appState.indeterminateSessionWrites[quarantinedIdentity] = WorkspaceIndeterminateFileWrite(
             reason: .durabilityFailed,
             preparedMetadata: nil,
@@ -9661,11 +9661,11 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             )
         appState.sessionPolicy = WorkspaceSessionLRUPolicy(limit: 1)
         _ = appState.sessionPolicy.access(quarantinedURL, isDirty: false)
-        appState.sessionCache[otherURL] = otherSession
+        appState.registry.sessionCache[otherURL] = otherSession
 
         appState.handleSessionAccess(url: otherURL, isDirty: false)
 
-        XCTAssertTrue(appState.sessionCache[quarantinedURL] === quarantinedSession)
+        XCTAssertTrue(appState.registry.sessionCache[quarantinedURL] === quarantinedSession)
         XCTAssertNotNil(appState.indeterminateSessionWrites[quarantinedIdentity])
         XCTAssertEqual(
             appState.indeterminateSessionWriteContexts[quarantinedIdentity]?.location,
@@ -9686,7 +9686,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
         let sessionIdentity = ObjectIdentifier(session)
-        appState.sessionCache[quarantinedURL] = session
+        appState.registry.sessionCache[quarantinedURL] = session
         appState.indeterminateSessionWrites[sessionIdentity] = WorkspaceIndeterminateFileWrite(
             reason: .durabilityFailed,
             preparedMetadata: nil,
@@ -9709,7 +9709,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             securityScopedAuthorityOwner: nil
         )
         appState.currentDocument = DocumentSession()
-        appState.sessionCache[quarantinedURL] = nil
+        appState.registry.sessionCache[quarantinedURL] = nil
 
         binding.onLifecycle(.revoked(installation))
 
@@ -9745,7 +9745,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             appState.workspaceSearchRootAuthority = location.rootAuthority
             appState.workspaceGeneration = 1
             appState.workspaceInstalledCaptureGeneration = 1
-            appState.sessionCache[quarantinedURL] = session
+            appState.registry.sessionCache[quarantinedURL] = session
             appState.indeterminateSessionWrites[sessionIdentity] = WorkspaceIndeterminateFileWrite(
                 reason: .durabilityFailed,
                 preparedMetadata: nil,
@@ -9766,7 +9766,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertThrowsError(try closeFixture.appState.closeWorkspaceForReplacement())
         XCTAssertEqual(closeFixture.appState.workspaceRootURL, closeFixture.root)
         XCTAssertTrue(
-            closeFixture.appState.sessionCache[closeFixture.location.fileURL]
+            closeFixture.appState.registry.sessionCache[closeFixture.location.fileURL]
                 === closeFixture.session
         )
         XCTAssertEqual(
@@ -9789,7 +9789,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         )
         XCTAssertEqual(switchFixture.appState.workspaceRootURL, switchFixture.root)
         XCTAssertTrue(
-            switchFixture.appState.sessionCache[switchFixture.location.fileURL]
+            switchFixture.appState.registry.sessionCache[switchFixture.location.fileURL]
                 === switchFixture.session
         )
         XCTAssertEqual(
@@ -9831,7 +9831,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
 
         XCTAssertEqual(appState.workspaceRootURL?.standardizedFileURL, rootURL.standardizedFileURL)
         XCTAssertTrue(appState.currentDocument === session)
-        XCTAssertTrue(appState.sessionCache[canonicalURL] === session)
+        XCTAssertTrue(appState.registry.sessionCache[canonicalURL] === session)
         XCTAssertTrue(session.isDirty)
         XCTAssertEqual(session.text, "Local dirty text")
         XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), "External disk text")
@@ -9860,7 +9860,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         appState.closeWorkspace()
 
         XCTAssertNil(appState.workspaceRootURL)
-        XCTAssertTrue(appState.sessionCache.isEmpty)
+        XCTAssertTrue(appState.registry.sessionCache.isEmpty)
         XCTAssertNil(appState.editorDocumentBindingIDs[ObjectIdentifier(session)])
         XCTAssertNil(appState.editorDocumentBindingSessions[binding.id])
         XCTAssertTrue(appState.retiredEditorDocumentSessions.isEmpty)
@@ -10745,7 +10745,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             preserveWorkspace: false
         )
         XCTAssertTrue(appState.currentDocument === sessionA)
-        XCTAssertTrue(appState.sessionCache[canonicalA] === sessionA)
+        XCTAssertTrue(appState.registry.sessionCache[canonicalA] === sessionA)
         XCTAssertTrue(appState.retiredEditorDocumentSessions[canonicalA]?.session === sessionA)
         XCTAssertNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionA)])
         XCTAssertNotNil(appState.sessionStatisticsTasks[ObjectIdentifier(sessionA)])
@@ -10761,7 +10761,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let committedSourceA = dirtySourceA + committedText
         XCTAssertEqual(Array(sessionA.text.utf16), Array(committedSourceA.utf16))
         XCTAssertTrue(appState.currentDocument === sessionA)
-        XCTAssertTrue(appState.sessionCache[canonicalA] === sessionA)
+        XCTAssertTrue(appState.registry.sessionCache[canonicalA] === sessionA)
         XCTAssertTrue(appState.editorDocumentBindingSessions[bindingA.id] === sessionA)
         XCTAssertEqual(
             Set(appState.editorBindingInstallations.values.map(ObjectIdentifier.init)),
@@ -10866,7 +10866,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertNil(appState.retiredEditorDocumentSessions[oldCanonicalURL])
         XCTAssertTrue(appState.retiredEditorDocumentSessions[newCanonicalURL]?.session === session)
         XCTAssertTrue(appState.currentDocument === session)
-        XCTAssertTrue(appState.sessionCache[newCanonicalURL] === session)
+        XCTAssertTrue(appState.registry.sessionCache[newCanonicalURL] === session)
         XCTAssertEqual(session.fileURL?.standardizedFileURL, newCanonicalURL)
         XCTAssertEqual(appState.sessionStateURL(for: session), newCanonicalURL)
         XCTAssertEqual(appState.activeEditorDocumentIdentity, AppState.editorDocumentIdentity(for: newCanonicalURL))
@@ -10883,7 +10883,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let finalSource = committedSource + " post-copy"
         XCTAssertEqual(Array(session.text.utf16), Array(finalSource.utf16))
         XCTAssertTrue(appState.currentDocument === session)
-        XCTAssertTrue(appState.sessionCache[newCanonicalURL] === session)
+        XCTAssertTrue(appState.registry.sessionCache[newCanonicalURL] === session)
         XCTAssertTrue(appState.isEditorDocumentBindingInstalled(binding.id, session: session))
 
         MarkdownTextView.dismantleNSView(
@@ -10926,7 +10926,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let destinationKey = destinationURL.standardizedFileURL.resolvingSymlinksInPath()
         appState.retainUnanchoredManagedSessionOwnership(for: destinationSession)
         try FileManager.default.removeItem(at: sourceURL)
-        appState.sessionCache[sourceKey] = sourceSession
+        appState.registry.sessionCache[sourceKey] = sourceSession
         appState.detachedSessionURLs.insert(sourceKey)
         appState.missingFilePrompt = AppState.MissingFilePrompt(fileURL: sourceKey)
         appState.retiredEditorDocumentSessions[sourceKey] = RetiredEditorDocumentSession(
@@ -10958,7 +10958,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertTrue(
             appState.retiredEditorDocumentSessions[destinationKey]?.session === destinationSession
         )
-        XCTAssertTrue(appState.sessionCache[sourceKey] === sourceSession)
+        XCTAssertTrue(appState.registry.sessionCache[sourceKey] === sourceSession)
         XCTAssertEqual(sourceSession.fileURL?.standardizedFileURL, sourceKey)
         XCTAssertTrue(sourceSession.isDirty)
     }
@@ -11114,7 +11114,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
                 appState.externalDiskInspectionTasks[ObjectIdentifier(sessionA)] == nil
         }
         XCTAssertTrue(appState.currentDocument === sessionA)
-        XCTAssertTrue(appState.sessionCache[canonicalA] === sessionA)
+        XCTAssertTrue(appState.registry.sessionCache[canonicalA] === sessionA)
         XCTAssertEqual(sessionA.text, localSourceA)
         XCTAssertEqual(
             appState.missingFilePrompt?.fileURL.standardizedFileURL,
@@ -11124,7 +11124,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         try appState.saveDetachedCurrentDocument(to: recoveredURL)
         let recoveredCanonicalURL = recoveredURL.standardizedFileURL.resolvingSymlinksInPath()
         XCTAssertTrue(appState.currentDocument === sessionA)
-        XCTAssertTrue(appState.sessionCache[recoveredCanonicalURL] === sessionA)
+        XCTAssertTrue(appState.registry.sessionCache[recoveredCanonicalURL] === sessionA)
         XCTAssertEqual(sessionA.fileURL?.standardizedFileURL, recoveredCanonicalURL)
         XCTAssertNil(appState.retiredEditorDocumentSessions[canonicalA])
         XCTAssertNil(appState.retiredEditorDocumentSessions[recoveredCanonicalURL])
@@ -13721,13 +13721,13 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let duplicatePath = DocumentSession(text: "duplicate", url: aliasURL, fileKind: .markdown)
         duplicatePath.replaceText("duplicate dirty")
 
-        appState.sessionCache[warmURL] = warm
-        appState.sessionCache[cleanURL] = clean
-        appState.sessionCache[detachedURL] = detached
-        appState.sessionCache[nonMarkdownURL] = nonMarkdown
-        appState.sessionCache[outsideURL] = outside
-        appState.sessionCache[aliasURL] = duplicatePath
-        appState.sessionCache[currentURL] = appState.currentDocument
+        appState.registry.sessionCache[warmURL] = warm
+        appState.registry.sessionCache[cleanURL] = clean
+        appState.registry.sessionCache[detachedURL] = detached
+        appState.registry.sessionCache[nonMarkdownURL] = nonMarkdown
+        appState.registry.sessionCache[outsideURL] = outside
+        appState.registry.sessionCache[aliasURL] = duplicatePath
+        appState.registry.sessionCache[currentURL] = appState.currentDocument
         appState.detachedSessionURLs.insert(detachedURL.standardizedFileURL)
         appState.retainUnanchoredManagedSessionOwnership(for: warm)
 
@@ -13801,8 +13801,8 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let aliasedSession = appState.currentDocument
         let canonicalTargetURL = targetURL.standardizedFileURL.resolvingSymlinksInPath()
         XCTAssertEqual(aliasedSession.fileURL, canonicalTargetURL)
-        XCTAssertTrue(appState.sessionCache[canonicalTargetURL] === aliasedSession)
-        XCTAssertNil(appState.sessionCache[aliasURL.standardizedFileURL])
+        XCTAssertTrue(appState.registry.sessionCache[canonicalTargetURL] === aliasedSession)
+        XCTAssertNil(appState.registry.sessionCache[aliasURL.standardizedFileURL])
         XCTAssertEqual(appState.workspaceTree?.selectedNode?.relativePath, "target.md")
         XCTAssertEqual(
             appState.activeEditorDocumentIdentity,
@@ -13879,7 +13879,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authorityB
         appState.workspaceGeneration = 2
         appState.workspaceInstalledCaptureGeneration = 2
-        appState.sessionCache[staleURL] = staleSession
+        appState.registry.sessionCache[staleURL] = staleSession
         appState.anchoredSessionFileBindings[ObjectIdentifier(staleSession)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: locationA,
@@ -14631,7 +14631,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             url: targetURL,
             fileKind: .markdown
         )
-        scenario.fixture.appState.sessionCache[targetURL] = detachedSession
+        scenario.fixture.appState.registry.sessionCache[targetURL] = detachedSession
         scenario.fixture.appState.recordKnownDiskText("beta", for: targetURL)
         scenario.fixture.appState.detachedSessionURLs.insert(targetURL)
 
@@ -14653,7 +14653,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             url: mismatchedURL,
             fileKind: .markdown
         )
-        scenario.fixture.appState.sessionCache[targetURL] = mismatchedSession
+        scenario.fixture.appState.registry.sessionCache[targetURL] = mismatchedSession
         scenario.fixture.appState.recordKnownDiskText("alpha", for: mismatchedURL)
 
         activateAndAssertNavigationUnchanged(scenario, olderNavigation: olderNavigation)
@@ -14766,7 +14766,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertFalse(statistics.isCancelled)
         XCTAssertFalse(completion.isCancelled)
         XCTAssertFalse(search.isCancelled)
-        XCTAssertNil(appState.sessionCache[originalParent.appendingPathComponent("b.md")])
+        XCTAssertNil(appState.registry.sessionCache[originalParent.appendingPathComponent("b.md")])
     }
 
     func testAcceptedActivationHardLinkCollisionPreservesEntirePreviousTransaction() async throws {
@@ -14828,7 +14828,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertFalse(completion.isCancelled)
         XCTAssertFalse(search.isCancelled)
         XCTAssertEqual(appState.anchoredSessionFileBindings, previousBindings)
-        XCTAssertNil(appState.sessionCache[documentBURL.standardizedFileURL])
+        XCTAssertNil(appState.registry.sessionCache[documentBURL.standardizedFileURL])
     }
 
     func testAcceptedActivationUnownedHardLinkTreeCollisionPreservesEntirePreviousTransaction() async throws {
@@ -14898,7 +14898,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertFalse(completion.isCancelled)
         XCTAssertFalse(search.isCancelled)
         XCTAssertEqual(appState.anchoredSessionFileBindings, previousBindings)
-        XCTAssertNil(appState.sessionCache[documentBURL.standardizedFileURL])
+        XCTAssertNil(appState.registry.sessionCache[documentBURL.standardizedFileURL])
     }
 
     func testAcceptedActivationInvalidRangePreservesEntirePreviousTransaction() async throws {
@@ -15038,7 +15038,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         try source.write(to: documentURL, atomically: true, encoding: .utf8)
         let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
-        appState.sessionCache[documentURL.standardizedFileURL] = session
+        appState.registry.sessionCache[documentURL.standardizedFileURL] = session
         var selection: NSRange? = NSRange(location: 0, length: 0)
         let binding = appState.editorDocumentBinding(for: session)
         let representable = MarkdownTextView(
@@ -15294,7 +15294,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
         let canonicalURL = try XCTUnwrap(appState.sessionStateURL(for: session))
-        appState.sessionCache[canonicalURL] = session
+        appState.registry.sessionCache[canonicalURL] = session
         appState.recordKnownDiskText(source, for: canonicalURL)
         let binding = appState.editorDocumentBinding(for: session)
         var selection1: NSRange? = NSRange(location: (source as NSString).length, length: 0)
@@ -15422,7 +15422,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
         let canonicalURL = try XCTUnwrap(appState.sessionStateURL(for: session))
-        appState.sessionCache[canonicalURL] = session
+        appState.registry.sessionCache[canonicalURL] = session
         appState.recordKnownDiskText(source, for: canonicalURL)
         let binding = appState.editorDocumentBinding(for: session)
         var selection: NSRange? = NSRange(location: (source as NSString).length, length: 0)
@@ -15561,7 +15561,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
         let canonicalURL = try XCTUnwrap(appState.sessionStateURL(for: session))
-        appState.sessionCache[canonicalURL] = session
+        appState.registry.sessionCache[canonicalURL] = session
         appState.recordKnownDiskText(source, for: canonicalURL)
         let binding = appState.editorDocumentBinding(for: session)
         let installation = EditorDocumentBindingInstallation(
@@ -15614,7 +15614,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
         let canonicalURL = try XCTUnwrap(appState.sessionStateURL(for: session))
-        appState.sessionCache[canonicalURL] = session
+        appState.registry.sessionCache[canonicalURL] = session
         appState.recordKnownDiskText(source, for: canonicalURL)
         let binding = appState.editorDocumentBinding(for: session)
         var selection: NSRange? = NSRange(location: (source as NSString).length, length: 0)
@@ -15683,7 +15683,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let sessionA = DocumentSession(text: sourceA, url: documentAURL, fileKind: .markdown)
         let appState = AppState(currentDocument: sessionA, shouldRestoreLastOpenedFile: false)
         let canonicalA = try XCTUnwrap(appState.sessionStateURL(for: sessionA))
-        appState.sessionCache[canonicalA] = sessionA
+        appState.registry.sessionCache[canonicalA] = sessionA
         appState.recordKnownDiskText(sourceA, for: canonicalA)
         let bindingA = appState.editorDocumentBinding(for: sessionA)
         let installationA = EditorDocumentBindingInstallation(
@@ -15788,7 +15788,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let sessionA = DocumentSession(text: sourceA, url: documentAURL, fileKind: .markdown)
         let appState = AppState(currentDocument: sessionA, shouldRestoreLastOpenedFile: false)
         let canonicalA = try XCTUnwrap(appState.sessionStateURL(for: sessionA))
-        appState.sessionCache[canonicalA] = sessionA
+        appState.registry.sessionCache[canonicalA] = sessionA
         appState.recordKnownDiskText(sourceA, for: canonicalA)
         let bindingA = appState.editorDocumentBinding(for: sessionA)
         var selectionA1: NSRange? = NSRange(location: (sourceA as NSString).length, length: 0)
@@ -15907,7 +15907,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         try Data([0xFF]).write(to: invalidBURL)
         let sessionA = DocumentSession(text: sourceA, url: documentAURL, fileKind: .markdown)
         let appState = AppState(currentDocument: sessionA, shouldRestoreLastOpenedFile: false)
-        appState.sessionCache[documentAURL.standardizedFileURL] = sessionA
+        appState.registry.sessionCache[documentAURL.standardizedFileURL] = sessionA
         let binding = appState.editorDocumentBinding(for: sessionA)
         var selection: NSRange? = NSRange(location: (sourceA as NSString).length, length: 0)
         let view = MarkdownTextView(
@@ -15965,7 +15965,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
         let sourceKey = sourceURL.standardizedFileURL.resolvingSymlinksInPath()
         let destinationKey = destinationURL.standardizedFileURL.resolvingSymlinksInPath()
-        appState.sessionCache[sourceKey] = session
+        appState.registry.sessionCache[sourceKey] = session
         appState.detachedSessionURLs.insert(sourceKey)
         appState.missingFilePrompt = AppState.MissingFilePrompt(fileURL: sourceKey)
         appState.lastKnownDiskHashes[sourceKey] = "retained-hash"
@@ -15998,7 +15998,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: destinationURL, encoding: .utf8), sentinel)
         XCTAssertTrue(appState.currentDocument === session)
         XCTAssertEqual(session.fileURL?.standardizedFileURL, sourceKey)
-        XCTAssertTrue(appState.sessionCache[sourceKey] === session)
+        XCTAssertTrue(appState.registry.sessionCache[sourceKey] === session)
         XCTAssertTrue(appState.retiredEditorDocumentSessions[sourceKey]?.session === wrongOwner)
         XCTAssertNil(appState.retiredEditorDocumentSessions[destinationKey])
         XCTAssertEqual(Set(appState.editorBindingInstallations.keys), Set(installations.keys))
@@ -16560,7 +16560,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         appState.adoptAnchoredFileBinding(retainedBinding, for: retainedSession)
         switch storage {
         case .cached:
-            appState.sessionCache[retainedLocation.fileURL] = retainedSession
+            appState.registry.sessionCache[retainedLocation.fileURL] = retainedSession
         case .retired:
             appState.retiredEditorDocumentSessions[retainedLocation.fileURL] =
                 RetiredEditorDocumentSession(
@@ -16630,7 +16630,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertThrowsError(try appState.save(session: retainedSession))
         switch storage {
         case .cached:
-            XCTAssertTrue(appState.sessionCache[retainedLocation.fileURL] === retainedSession)
+            XCTAssertTrue(appState.registry.sessionCache[retainedLocation.fileURL] === retainedSession)
         case .retired:
             XCTAssertTrue(
                 appState.retiredEditorDocumentSessions[retainedLocation.fileURL]?.session ===
@@ -16716,7 +16716,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             sha256Digest: loadedB.sha256Digest
         )
         let canonicalB = locationB.fileURL
-        appState.sessionCache[canonicalB] = sessionB
+        appState.registry.sessionCache[canonicalB] = sessionB
         appState.recordKnownDiskText(sourceA, for: canonicalA)
         appState.recordKnownDiskText(sentinelB, for: canonicalB)
 
@@ -16860,7 +16860,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
                 ),
                 for: currentSession
             )
-            appState.sessionCache[location.fileURL] = currentSession
+            appState.registry.sessionCache[location.fileURL] = currentSession
             _ = appState.sessionPolicy.access(location.fileURL, isDirty: currentSession.isDirty)
         }
     }
@@ -16918,7 +16918,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             options: .init(showAllFiles: false)
         )
         if let fileURL = currentDocument.fileURL?.standardizedFileURL {
-            appState.sessionCache[fileURL] = currentDocument
+            appState.registry.sessionCache[fileURL] = currentDocument
             let location = try rootAuthority.canonicalizedLocation(forFileURL: fileURL)
             try appState.activateAnchoredFileSession(at: location)
         }

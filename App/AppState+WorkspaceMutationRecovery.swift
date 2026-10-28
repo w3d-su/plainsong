@@ -324,10 +324,7 @@ enum WorkspaceMutationReconciliationCompletion {
 @MainActor
 extension AppState {
     func workspaceMutationRetainedRecoverySessions() -> [DocumentSession] {
-        var sessions = workspaceMutationRecoveries.values.flatMap(\.remainingSessions)
-        sessions.append(contentsOf: workspaceMutationTextRecoverySessions.values)
-        var seen: Set<ObjectIdentifier> = []
-        return sessions.filter { seen.insert(ObjectIdentifier($0)).inserted }
+        registry.sessions(from: [.mutationRecovery])
     }
 
     func nextWorkspaceMutationRecovery() -> WorkspaceMutationRecoveryContext? {

@@ -189,7 +189,7 @@ func retainActiveSearchRefreshSession(
         ),
         for: session
     )
-    appState.sessionCache[location.fileURL] = session
+    appState.registry.sessionCache[location.fileURL] = session
     _ = appState.sessionPolicy.access(location.fileURL, isDirty: session.isDirty)
 }
 

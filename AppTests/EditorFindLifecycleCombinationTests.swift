@@ -223,7 +223,7 @@ final class EditorFindLifecycleCombinationTests: XCTestCase {
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[missingURL] = session
+        appState.registry.sessionCache[missingURL] = session
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: missingLocation,

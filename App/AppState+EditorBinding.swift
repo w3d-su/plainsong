@@ -232,10 +232,10 @@ extension AppState {
         // input may continue changing its in-memory source even though every disk
         // write stays fenced. Non-current detached sessions still require an exact
         // retirement lease before an editor installation can publish.
-        if session === currentDocument { return true }
+        if registry.isShownByAnyWindow(session) { return true }
         guard let fileURL = sessionStateURL(for: session) else { return false }
         guard !detachedSessionURLs.contains(fileURL) else { return false }
-        return sessionCache[fileURL] === session
+        return registry.isWarmSession(session, at: fileURL)
     }
 
     func removeEditorDocumentBindingRegistration(for session: DocumentSession) {
@@ -380,7 +380,7 @@ private extension AppState {
         editorBindingInstallations[installation] = nil
         if !isEditorDocumentBindingInstalled(expectedBindingID, session: session),
            let canonicalURL = retiredCanonicalURL(for: session),
-           sessionCache[canonicalURL] !== session
+           !registry.isWarmSession(session, at: canonicalURL)
         {
             removeEditorDocumentBindingRegistration(
                 for: session,
@@ -633,8 +633,8 @@ private extension AppState {
         else {
             return
         }
-        guard currentDocument !== session,
-              sessionCache[canonicalURL] !== session,
+        guard !registry.isShownByAnyWindow(session),
+              !registry.isWarmSession(session, at: canonicalURL),
               !retiredEditorDocumentSessions.values.contains(where: { $0.session === session })
         else {
             return
