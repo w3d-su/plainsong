@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <!-- CSP still allows https images; the content rule is what turns those loads off. -->
+    <meta http-equiv="x-dns-prefetch-control" content="off" />
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src asset: data: https:; font-src 'self';"

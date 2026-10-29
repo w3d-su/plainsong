@@ -84,6 +84,9 @@ struct IOSProductionComposition {
         controller.onNavigationFailure = { [weak scene = runtime.scene] message in
             scene?.presentedError = IOSShellError(title: "Link Could Not Be Opened", message: message)
         }
+        controller.onPreviewUnavailable = { [weak scene = runtime.scene] message in
+            scene?.presentedError = IOSShellError(title: "Preview Unavailable", message: message)
+        }
         return runtime
     }
 

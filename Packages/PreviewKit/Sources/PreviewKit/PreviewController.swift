@@ -68,12 +68,14 @@ public final class PreviewController: NSObject, ObservableObject {
     var pendingExportRender: PendingExportRender?
     private(set) var theme = "system"
     private(set) var allowRemoteImages = false
+    /// Export controllers never tell JavaScript that remote images are allowed.
+    let locksRemoteImagesOff: Bool
     /// Nil for the export controller, which keeps the blocking list it was created with,
     /// and nil until compilation finishes when this controller had to wait for it.
     var liveRemoteImageRules: PreviewRemoteImageRules?
     var activeContentRuleList: WKContentRuleList?
     /// The blocking list failed to compile. The page stays unloaded so nothing can be fetched.
-    var remoteImageNetworkUnavailable = false
+    @Published public private(set) var remoteImageNetworkUnavailable = false
     /// True while the first compilation is still outstanding. The requested switch is kept
     /// and applied when the lists arrive, so creation does not block the main queue.
     let awaitsRemoteImageRules: Bool
@@ -93,7 +95,8 @@ public final class PreviewController: NSObject, ObservableObject {
         retriesSilentInitialLoad: Bool = PreviewInitialReadiness.retriesSilentInitialLoadByDefault,
         initialReadinessScheduler: @escaping PreviewInitialReadiness.Scheduler = PreviewInitialReadiness.schedule,
         pageLoadOverrideForTesting: (@MainActor (WKWebView, URL?) -> WKNavigation?)? = nil,
-        remoteImageRules: PreviewRemoteImageRules? = nil
+        remoteImageRules: PreviewRemoteImageRules? = nil,
+        locksRemoteImagesOff: Bool = false
     ) {
         let resolvedLiveRules: PreviewRemoteImageRules?
         let installedRule: WKContentRuleList?
@@ -143,9 +146,9 @@ public final class PreviewController: NSObject, ObservableObject {
         self.pageLoadOverrideForTesting = pageLoadOverrideForTesting
         liveRemoteImageRules = resolvedLiveRules
         activeContentRuleList = installedRule
-        remoteImageNetworkUnavailable = !waitsForRules && contentRuleList == nil
-            && installedRule == nil
+        self.locksRemoteImagesOff = locksRemoteImagesOff
         awaitsRemoteImageRules = waitsForRules
+        let blockListMissing = !waitsForRules && contentRuleList == nil && installedRule == nil
 
         super.init()
 
@@ -155,11 +158,13 @@ public final class PreviewController: NSObject, ObservableObject {
         assetSchemeHandler.onCurrentFailure = { [weak self] failure in
             self?.emitPreviewEvent(.failed(failure))
         }
-        if waitsForRules {
+        if blockListMissing {
+            reportRemoteImageNetworkUnavailable()
+        } else if waitsForRules {
             PreviewRemoteImageRuleStore.whenReady { [weak self] rules in
                 self?.applyCompiledRemoteImageRules(rules)
             }
-        } else if !remoteImageNetworkUnavailable {
+        } else {
             loadPreviewPage()
             startInitialReadinessWatchdog()
         }
@@ -457,6 +462,9 @@ public extension PreviewController {
     }
 
     func setAllowsRemoteImages(_ allowRemoteImages: Bool) {
+        if locksRemoteImagesOff {
+            return
+        }
         if awaitsRemoteImageRules, liveRemoteImageRules == nil {
             self.allowRemoteImages = allowRemoteImages
             return
@@ -624,13 +632,18 @@ extension PreviewController {
         let allowed = allowRemoteImages && rules.httpsImages != nil && rules.blockAll != nil
         allowRemoteImages = allowed
         guard let rule = rules.rule(allowingHTTPSImages: allowed) else {
-            remoteImageNetworkUnavailable = true
+            reportRemoteImageNetworkUnavailable()
             return
         }
         webView.configuration.userContentController.add(rule)
         activeContentRuleList = rule
         loadPreviewPage()
         startInitialReadinessWatchdog()
+    }
+
+    func reportRemoteImageNetworkUnavailable() {
+        remoteImageNetworkUnavailable = true
+        emitPreviewEvent(.contentRuleUnavailable)
     }
 
     func loadPreviewPage(stoppingCurrentLoad: Bool = false) {

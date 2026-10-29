@@ -104,7 +104,7 @@ Arbitrary CSS from the internet is a real attack surface even under the current 
 
 | Risk | Detail |
 |---|---|
-| Tracking | **Closed 2026-10-29.** The static CSP still lists `img-src https:` so an allowed image is not rejected by CSP. A WebKit content rule now blocks every http(s) subresource while Allow Remote Images is off, including CSS `url()`, `srcset`, and `<picture>`. The JS `<img>` policy remains a second layer. |
+| Tracking | **Closed 2026-10-29.** The static CSP still lists `img-src https:` so an allowed image is not rejected by CSP. A WebKit content rule now blocks every http(s) and ws(s) load while Allow Remote Images is off, including CSS `url()`, `srcset`, and `<picture>`. The JS `<img>` policy remains a second layer. A failed block-list compile leaves the page unloaded and reports the failure. |
 | Spoofing | Selectors can hide content, fake the MDX error banner or stale indicator, or use `content:` to show text that is not in the source. |
 | Breaking features | Hiding `[data-line]` anchors, transforms or `position: fixed` break scroll sync; heavy selectors and animations hurt the §12 preview budget. |
 | Export | Would freeze third-party CSS into published HTML. |
@@ -113,9 +113,10 @@ Prerequisites before user CSS is implemented, each its own gate:
 
 1. **Done (2026-10-29).** The CSS `url()` bypass is closed at the network layer rather than
    by rewriting the static CSP. While Allow Remote Images is off, a WebKit content rule
-   blocks every `http:`/`https:` subresource; while it is on, the same slot allows only
-   `https:` images. `img-src https:` stays in the static CSP so an allowed image can load.
-   See `docs/decisions/2026-10-29-remote-image-network-block.md`.
+   blocks every `http:`/`https:` and `ws:`/`wss:` load; while it is on, the same slot allows
+   only `https:` images. `img-src https:` stays in the static CSP so an allowed image can
+   load. A failed block-list compile does not load the page. See
+   `docs/decisions/2026-10-29-remote-image-network-block.md`.
 2. A CSS sanitizer (tokenizer-based, likely a new npm dependency → Decision Log) that
    rejects `url()`, `@import`, `@font-face`, `image-set`, `position: fixed`, and scopes
    all rules under the preview body.

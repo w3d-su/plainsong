@@ -444,13 +444,15 @@ republishes only when its value changes literally.
   removes remote `<img>` `src` values unless the preference is on, and even then it
   permits only `https:` images. The network layer is a WebKit content rule compiled once
   on the first preview controller (`WKContentRuleListStore`) and swapped without
-  reloading the page: off blocks every `http:`/`https:` subresource; on blocks every
-  `http:`/`https:` load except `https:` images. Script, style, font, navigation, and
-  fetch are unchanged.
+  reloading the page. The next list is added before the previous one is removed, so the
+  overlap stays fail-closed. Off blocks every `http:`/`https:` and `ws:`/`wss:` load; on
+  blocks those loads except `https:` images. The rule blocks remote script, style, font,
+  fetch, and navigation in both states; their CSP and the JS link handling are unchanged.
   Link clicks stay in JavaScript (`preventDefault` plus `linkClicked`), so the rule does
-  not take over external opening. If the blocking list fails to compile, the preview
-  page is not loaded. If only the https-image exception fails, the preference is treated
-  as off. Export keeps the blocking list for its whole life.
+  not take over external opening. If the blocking list fails to compile, the preview page
+  is not loaded, the failure is shown, and that result is not cached. If only the
+  https-image exception fails, the preference is treated as off. Export keeps the blocking
+  list for its whole life and will not tell JavaScript that remote images are allowed.
 - **Local assets:** custom scheme `asset://` via `WKURLSchemeHandler`. JS rewrites
   relative image/link `src` to `asset://<workspace-relative-path>`; the handler resolves
   against the current file's directory / workspace root. Render payloads carry an opaque

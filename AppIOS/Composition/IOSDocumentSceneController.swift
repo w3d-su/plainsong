@@ -20,6 +20,7 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     let openDestinationFolder: @MainActor (URL) async throws -> IOSWorkspaceGrant
     var openExternalURL: ((URL) -> Void)?
     var onNavigationFailure: ((String) -> Void)?
+    var onPreviewUnavailable: ((String) -> Void)?
 
     private(set) var currentGrant: IOSWorkspaceGrant?
     var handle: IOSDocumentHandle?

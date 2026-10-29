@@ -11,11 +11,16 @@
     @MainActor
     final class RemoteImageNetworkPolicyTests: XCTestCase {
         private func imageHosts(for token: String) -> [String] {
-            ["img", "srcset", "picture", "css"].map { "plainsong-\($0)-\(token).invalid" }
+            // Inline SVG `<image href>` is an image resource, so the https-image exception allows it.
+            ["img", "srcset", "picture", "css", "imageset", "poster", "preload", "inlinesvg"].map {
+                "plainsong-\($0)-\(token).invalid"
+            }
         }
 
         private func blockedHosts(for token: String) -> [String] {
-            ["svg", "script", "font", "fetch", "style", "http"].map { "plainsong-\($0)-\(token).invalid" }
+            ["svg", "script", "font", "fetch", "style", "http", "import", "iframe", "prefetch", "preconnect"].map {
+                "plainsong-\($0)-\(token).invalid"
+            }
         }
 
         func testSwitchingRemoteImagesDoesNotReloadAndOnlyHTTPSImagesConnect() async throws {
@@ -63,7 +68,7 @@
         }
 
         func testImageRuleCompileFailureKeepsTheSwitchOff() async throws {
-            let compiled = await PreviewRemoteImageRuleStore.makeRules(
+            let compiled = try await makeRules(
                 blockSource: PreviewRemoteImageRuleStore.blockSource,
                 imagesSource: "{not-json"
             )
@@ -82,7 +87,7 @@
         }
 
         func testBlockRuleCompileFailureDoesNotLoadOrOpenTheNetwork() async throws {
-            let compiled = await PreviewRemoteImageRuleStore.makeRules(
+            let compiled = try await makeRules(
                 blockSource: "{not-json",
                 imagesSource: PreviewRemoteImageRuleStore.imagesSource
             )
@@ -92,13 +97,65 @@
             defer { harness.proxy.stop() }
             let controller = try harness.makeLiveController(rules: compiled)
             defer { controller.invalidate() }
+            var events: [IOSPreviewEvent] = []
+            _ = controller.observe { events.append($0) }
             XCTAssertTrue(controller.remoteImageNetworkUnavailable)
+            XCTAssertTrue(events.contains { if case .contentRuleUnavailable = $0 { return true }; return false })
             controller.setAllowsRemoteImages(true)
             XCTAssertFalse(controller.allowRemoteImages)
             try await Task.sleep(nanoseconds: 400_000_000)
             XCTAssertFalse(controller.isReady)
             XCTAssertNil(controller.webView.url)
             XCTAssertEqual(harness.proxy.connections, [])
+        }
+
+        func testRuleIdentifierChangesWhenTheSourceChanges() {
+            XCTAssertEqual(
+                PreviewRemoteImageRuleStore.blockIdentifier,
+                PreviewRemoteImageRuleStore.identifier(
+                    prefix: "plainsong-preview-block",
+                    source: PreviewRemoteImageRuleStore.blockSource
+                )
+            )
+            XCTAssertNotEqual(
+                PreviewRemoteImageRuleStore.blockIdentifier,
+                PreviewRemoteImageRuleStore.identifier(
+                    prefix: "plainsong-preview-block",
+                    source: PreviewRemoteImageRuleStore.blockSource + " "
+                )
+            )
+            XCTAssertTrue(PreviewRemoteImageRuleStore.blockSource.contains("wss?"))
+        }
+
+        /// CSP on the file URL does not explain every silent host. Removing the rule must
+        /// still contact script, style, and font, or the blocked-wave assertions are empty.
+        func testCSPAloneStillContactsRemoteScriptStyleAndFont() async throws {
+            let harness = try await ProxyHarness()
+            defer { harness.proxy.stop() }
+            let controller = try harness.makeLiveController()
+            defer { controller.invalidate() }
+            try await PreviewHostedTestWait.until("csp control ready") { controller.isReady }
+            let rule = try XCTUnwrap(controller.activeContentRuleList)
+            controller.webView.configuration.userContentController.remove(rule)
+            controller.activeContentRuleList = nil
+            try await Task.sleep(nanoseconds: 200_000_000)
+            let baseline = harness.proxy.connections.count
+            try await installWave("csp", in: controller.webView)
+            let contacted = try await harness.connections(
+                since: baseline,
+                containingAll: ["script", "font", "style", "import"].map { "plainsong-\($0)-csp.invalid" }
+            )
+            for kind in ["img", "srcset", "picture", "css", "imageset", "script", "font", "style", "import"] {
+                let host = "plainsong-\(kind)-csp.invalid"
+                XCTAssertTrue(
+                    contacted.contains { $0.contains(host) },
+                    "CSP alone did not request \(host): \(contacted)"
+                )
+            }
+            for kind in ["fetch", "http"] {
+                let host = "plainsong-\(kind)-csp.invalid"
+                XCTAssertFalse(contacted.contains { $0.contains(host) }, "CSP should still block \(host): \(contacted)")
+            }
         }
 
         func testExportControllerBlocksInjectedRemoteLoads() async throws {
@@ -114,9 +171,22 @@
             try await installWave("export", in: controller.webView)
             try await harness.assertNoNewConnections(since: baseline)
             controller.setAllowsRemoteImages(true)
+            XCTAssertFalse(controller.allowRemoteImages)
             let forced = harness.proxy.connections.count
             try await installWave("export-on", in: controller.webView)
             try await harness.assertNoNewConnections(since: forced)
+        }
+
+        private func makeRules(blockSource: String, imagesSource: String) async throws -> PreviewRemoteImageRules {
+            let compiled = await PreviewRemoteImageRuleStore.makeRules(
+                blockSource: blockSource,
+                imagesSource: imagesSource
+            )
+            let identifiers = compiled.identifiers
+            addTeardownBlock {
+                PreviewRemoteImageRuleStore.removeStoredRules(identifiers: identifiers)
+            }
+            return compiled.rules
         }
 
         private func installWave(_ token: String, in webView: WKWebView) async throws {
@@ -158,6 +228,50 @@
                 + "src:url(https://plainsong-font-\(token).invalid/\(token).woff2)}";
               style.setAttribute("data-plainsong-probe", "1");
               document.documentElement.appendChild(style);
+              const fontUser = document.createElement("span");
+              fontUser.style.fontFamily = "'Probe\(token)'";
+              fontUser.textContent = "x";
+              add(fontUser);
+              const imageSet = document.createElement("div");
+              imageSet.style.width = "8px";
+              imageSet.style.height = "8px";
+              imageSet.style.backgroundImage = "image-set(url(https://plainsong-imageset-\(token).invalid/\(
+                  token
+              ).png) 1x)";
+              add(imageSet);
+              const imported = document.createElement("style");
+              imported.textContent = "@import url(https://plainsong-import-\(token).invalid/\(token).css);";
+              imported.setAttribute("data-plainsong-probe", "1");
+              document.documentElement.appendChild(imported);
+              const video = document.createElement("video");
+              video.poster = "https://plainsong-poster-\(token).invalid/\(token).png";
+              add(video);
+              const frame = document.createElement("iframe");
+              frame.src = "https://plainsong-iframe-\(token).invalid/\(token).html";
+              add(frame);
+              const preload = document.createElement("link");
+              preload.rel = "preload";
+              preload.as = "image";
+              preload.href = "https://plainsong-preload-\(token).invalid/\(token).png";
+              preload.setAttribute("data-plainsong-probe", "1");
+              document.documentElement.appendChild(preload);
+              const prefetch = document.createElement("link");
+              prefetch.rel = "prefetch";
+              prefetch.href = "https://plainsong-prefetch-\(token).invalid/\(token).txt";
+              prefetch.setAttribute("data-plainsong-probe", "1");
+              document.documentElement.appendChild(prefetch);
+              const preconnect = document.createElement("link");
+              preconnect.rel = "preconnect";
+              preconnect.href = "https://plainsong-preconnect-\(token).invalid";
+              preconnect.setAttribute("data-plainsong-probe", "1");
+              document.documentElement.appendChild(preconnect);
+              const inline = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+              inline.setAttribute("width", "8");
+              inline.setAttribute("height", "8");
+              const nested = document.createElementNS("http://www.w3.org/2000/svg", "image");
+              nested.setAttribute("href", "https://plainsong-inlinesvg-\(token).invalid/\(token).png");
+              inline.appendChild(nested);
+              add(inline);
               fetch("https://plainsong-fetch-\(token).invalid/\(token).json").catch(() => {});
               const link = document.createElement("link");
               link.rel = "stylesheet";
@@ -178,6 +292,10 @@
             (() => {
               document.querySelectorAll("[data-plainsong-probe]").forEach((node) => {
                 if (node instanceof HTMLImageElement) node.src = "";
+                if (node instanceof HTMLIFrameElement) node.src = "";
+                if (node instanceof HTMLVideoElement) node.poster = "";
+                if (node instanceof HTMLStyleElement) node.textContent = "";
+                if (node instanceof HTMLLinkElement) node.href = "";
                 node.remove();
               });
               return "ok";
@@ -247,9 +365,16 @@
         }
 
         func assertNoNewConnections(since baseline: Int) async throws {
-            try await Task.sleep(nanoseconds: 1_000_000_000)
-            let added = Array(proxy.connections.dropFirst(baseline))
-            XCTAssertEqual(added, [], "unexpected remote requests: \(added)")
+            let deadline = Date().addingTimeInterval(2.5)
+            while Date() < deadline {
+                let added = Array(proxy.connections.dropFirst(baseline))
+                if !added.isEmpty {
+                    XCTFail("unexpected remote requests: \(added)")
+                    return
+                }
+                try await Task.sleep(nanoseconds: 100_000_000)
+            }
+            XCTAssertEqual(Array(proxy.connections.dropFirst(baseline)), [])
         }
     }
 #endif

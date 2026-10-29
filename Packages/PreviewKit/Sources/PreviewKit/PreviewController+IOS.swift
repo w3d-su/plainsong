@@ -21,7 +21,13 @@ extension PreviewController: IOSPreviewControlling, PreviewAssetAccessChecking {
     public func observe(
         _ handler: @escaping @MainActor (IOSPreviewEvent) -> Void
     ) -> any IOSObservation {
-        eventHub.add(handler)
+        let observation = eventHub.add(handler)
+        // Init reports this before any observer exists. Replay it so a later subscriber,
+        // including the iOS scene, still learns why the page was not loaded.
+        if remoteImageNetworkUnavailable {
+            handler(.contentRuleUnavailable)
+        }
+        return observation
     }
 
     public func isCurrent(_ context: PreviewAssetAccessContext) -> Bool {

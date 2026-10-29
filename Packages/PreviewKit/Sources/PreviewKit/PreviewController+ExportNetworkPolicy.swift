@@ -25,7 +25,8 @@ extension PreviewController {
         return PreviewController(
             previewIndexURL: previewIndexURL,
             contentRuleList: rule,
-            websiteDataStore: websiteDataStore
+            websiteDataStore: websiteDataStore,
+            locksRemoteImagesOff: true
         )
     }
 }

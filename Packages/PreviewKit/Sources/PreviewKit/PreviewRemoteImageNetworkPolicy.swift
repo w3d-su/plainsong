@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import WebKit
 
@@ -22,15 +23,38 @@ struct PreviewRemoteImageRules {
 /// lists at once leaves the block in force.
 @MainActor
 enum PreviewRemoteImageRuleStore {
-    static let blockIdentifier = "plainsong-preview-block-http-v1"
-    static let imagesIdentifier = "plainsong-preview-https-images-v1"
-    static let blockSource = #"[{"trigger":{"url-filter":"^https?://"},"action":{"type":"block"}}]"#
+    /// WebKit rejects `|` in a url-filter ("Disjunctions are not supported yet"), so ws(s)
+    /// is a second trigger rather than one alternation. The image exception still ignores
+    /// only https images; it does not unblock ws(s).
+    static let blockSource = #"[{"trigger":{"url-filter":"^https?://"},"action":{"type":"block"}},"#
+        + #"{"trigger":{"url-filter":"^wss?://"},"action":{"type":"block"}}]"#
     static let imagesSource = #"[{"trigger":{"url-filter":"^https?://"},"action":{"type":"block"}},"#
+        + #"{"trigger":{"url-filter":"^wss?://"},"action":{"type":"block"}},"#
         + #"{"trigger":{"url-filter":"^https://","resource-type":["image"]},"#
         + #""action":{"type":"ignore-previous-rules"}}]"#
+    static var blockIdentifier: String {
+        identifier(prefix: "plainsong-preview-block", source: blockSource)
+    }
 
+    static var imagesIdentifier: String {
+        identifier(prefix: "plainsong-preview-https-images", source: imagesSource)
+    }
+
+    /// A changed rule source gets a new store key, so a stale compiled list cannot be reused.
+    static func identifier(prefix: String, source: String) -> String {
+        let digest = SHA256.hash(data: Data(source.utf8))
+        let hex = digest.prefix(6).map { String(format: "%02x", $0) }.joined()
+        return "\(prefix)-\(hex)"
+    }
+
+    private static let retiredIdentifiers = [
+        "plainsong-export-no-http-v1",
+        "plainsong-preview-block-http-v1",
+        "plainsong-preview-https-images-v1",
+    ]
     private static var cached: PreviewRemoteImageRules?
     private static var started = false
+    private static var retiredRemoved = false
     private static var waiters: [(PreviewRemoteImageRules) -> Void] = []
 
     static func cachedRules() -> PreviewRemoteImageRules? {
@@ -39,7 +63,8 @@ enum PreviewRemoteImageRuleStore {
 
     /// Calls `completion` on the main thread. A cached result is delivered immediately.
     /// Compilation stays off the typing path: the first request starts it, and later
-    /// requests reuse that result.
+    /// requests reuse that result. A missing block list is not cached, so the next
+    /// controller tries again.
     static func whenReady(_ completion: @escaping (PreviewRemoteImageRules) -> Void) {
         if let cached {
             completion(cached)
@@ -56,21 +81,37 @@ enum PreviewRemoteImageRuleStore {
     }
 
     /// Compiles caller-supplied sources under fresh identifiers. Used to prove a bad list
-    /// fails closed without replacing the process-wide rules.
-    static func makeRules(blockSource: String, imagesSource: String) async -> PreviewRemoteImageRules {
+    /// fails closed without replacing the process-wide rules. The caller removes
+    /// `identifiers` from the store when the lists are no longer needed.
+    static func makeRules(
+        blockSource: String,
+        imagesSource: String
+    ) async -> (rules: PreviewRemoteImageRules, identifiers: [String]) {
         let token = UUID().uuidString
+        let blockIdentifier = "plainsong-preview-test-block-\(token)"
+        let imagesIdentifier = "plainsong-preview-test-images-\(token)"
         return await withCheckedContinuation { continuation in
-            load(identifier: "plainsong-preview-test-block-\(token)", source: blockSource) { block in
-                load(identifier: "plainsong-preview-test-images-\(token)", source: imagesSource) { images in
-                    continuation.resume(returning: combined(block: block, images: images))
+            load(identifier: blockIdentifier, source: blockSource) { block in
+                load(identifier: imagesIdentifier, source: imagesSource) { images in
+                    continuation.resume(returning: (
+                        combined(block: block, images: images),
+                        [blockIdentifier, imagesIdentifier]
+                    ))
                 }
             }
+        }
+    }
+
+    static func removeStoredRules(identifiers: [String]) {
+        for identifier in identifiers {
+            WKContentRuleListStore.default().removeContentRuleList(forIdentifier: identifier) { _ in }
         }
     }
 
     private static func startIfNeeded() {
         guard !started else { return }
         started = true
+        removeRetiredLists()
         load(identifier: blockIdentifier, source: blockSource) { block in
             load(identifier: imagesIdentifier, source: imagesSource) { images in
                 publish(combined(block: block, images: images))
@@ -78,15 +119,26 @@ enum PreviewRemoteImageRuleStore {
         }
     }
 
+    private static func removeRetiredLists() {
+        guard !retiredRemoved else { return }
+        retiredRemoved = true
+        removeStoredRules(identifiers: retiredIdentifiers)
+    }
+
     private static func combined(block: WKContentRuleList?, images: WKContentRuleList?) -> PreviewRemoteImageRules {
         PreviewRemoteImageRules(blockAll: block, httpsImages: block == nil ? nil : images)
     }
 
     private static func publish(_ rules: PreviewRemoteImageRules) {
-        guard cached == nil else { return }
-        cached = rules
         let pending = waiters
         waiters.removeAll()
+        if rules.blockAll == nil {
+            // A transient store failure must not blank every later preview until relaunch.
+            cached = nil
+            started = false
+        } else if cached == nil {
+            cached = rules
+        }
         pending.forEach { $0(rules) }
     }
 
@@ -121,22 +173,26 @@ extension PreviewController {
     /// The network layer is updated before JavaScript is told about the new flag, so an
     /// image whose `src` is restored cannot race ahead of the rule that should allow it.
     func enforcedRemoteImageAllowance(_ requested: Bool) -> Bool {
+        guard !locksRemoteImagesOff else { return false }
         guard let liveRemoteImageRules else { return requested }
         let allowed = requested && liveRemoteImageRules.httpsImages != nil
         swapRemoteImageRule(liveRemoteImageRules.rule(allowingHTTPSImages: allowed))
         return allowed
     }
 
+    /// Adds the next list before removing the previous one. The two lists overlap for one
+    /// IPC, and both together still block, so that gap fails closed instead of falling
+    /// open to the static `img-src https:` policy.
     func swapRemoteImageRule(_ next: WKContentRuleList?) {
         let controller = webView.configuration.userContentController
-        if let activeContentRuleList {
-            if activeContentRuleList === next { return }
-            controller.remove(activeContentRuleList)
-            self.activeContentRuleList = nil
-        }
+        guard activeContentRuleList !== next else { return }
+        let previous = activeContentRuleList
         if let next {
             controller.add(next)
-            activeContentRuleList = next
         }
+        if let previous {
+            controller.remove(previous)
+        }
+        activeContentRuleList = next
     }
 }
