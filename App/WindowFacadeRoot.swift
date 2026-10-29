@@ -9,13 +9,31 @@ import SwiftUI
 @MainActor
 final class WindowFacadeHolder: ObservableObject {
     let facade: AppState
+    /// Token for a scene that claimed the owner. Nil for a refused sibling.
+    /// A retry after the claim expires presents a different token.
+    let ownerClaimToken: UUID?
 
     init(owner: AppState) {
-        if KeyWindowRouter.shared.claimOwner(owner) {
+        if let token = KeyWindowRouter.shared.claimOwner(owner) {
             facade = owner
+            ownerClaimToken = token
         } else {
             facade = owner.makeSiblingFacade(admitsFileOperations: WindowOpenAdmission.admitsLaterScenes)
+            ownerClaimToken = nil
         }
+    }
+}
+
+private struct WorkspaceOwnerClaimTokenKey: EnvironmentKey {
+    static let defaultValue: UUID? = nil
+}
+
+extension EnvironmentValues {
+    /// Claim token of the scene being rendered. Nil for previews and hosted roots
+    /// that attach a façade directly.
+    var workspaceOwnerClaimToken: UUID? {
+        get { self[WorkspaceOwnerClaimTokenKey.self] }
+        set { self[WorkspaceOwnerClaimTokenKey.self] = newValue }
     }
 }
 
@@ -30,6 +48,7 @@ struct WindowFacadeRoot: View {
     var body: some View {
         WorkspaceWindow()
             .environmentObject(holder.facade)
+            .environment(\.workspaceOwnerClaimToken, holder.ownerClaimToken)
             .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
             .onOpenURL { url in
                 holder.facade.openExternalFile(url)
@@ -211,6 +230,12 @@ final class WorkspaceSceneReopener {
         pendingPresentations.removeAll()
         lastOpenExpired = true
         awaitingFirstScene = false
+        // The scene that claimed the owner but never attached still holds the claim.
+        // Release it so the retry can claim the owner, and leave that scene's token
+        // stale so its late window cannot share the owner with the retry.
+        if let owner = retainedOwner {
+            KeyWindowRouter.shared.releaseUnattachedClaim(owner)
+        }
     }
 
     private func admittingFacades(of owner: AppState) -> [AppState] {

@@ -34,6 +34,7 @@ enum WorkspaceShell { case automatic, fixed, split }
 
 private struct WorkspaceWindowContent: View {
     @EnvironmentObject private var appState: AppState
+    @Environment(\.workspaceOwnerClaimToken) private var ownerClaimToken
     @Binding var inspectorIntent: Bool
     @Binding var inspectorWidth: Double
     let shellOverride: WorkspaceShell
@@ -97,11 +98,15 @@ private struct WorkspaceWindowContent: View {
                     representedURL: appState.shownSession.fileURL,
                     isDocumentEdited: appState.shownSession.isDirty,
                     contentMinWidth: windowMinimum,
-                    onWindow: { [inspectorVisibility, hostWindow, appState, isSidebarHidden] window in
+                    onWindow: { [inspectorVisibility, hostWindow, appState, isSidebarHidden, ownerClaimToken] window in
                         inspectorVisibility.attach(to: window)
                         hostWindow.window = window
                         appState.setWorkspaceSidebarHidden(isSidebarHidden, in: window)
-                        KeyWindowRouter.shared.attach(window, to: appState)
+                        KeyWindowRouter.shared.attach(
+                            window,
+                            to: appState,
+                            ownerClaimToken: ownerClaimToken
+                        )
                     }
                 )
             )

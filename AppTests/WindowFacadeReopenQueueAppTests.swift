@@ -161,7 +161,7 @@ final class WindowFacadeReopenQueueAppTests: XCTestCase {
         XCTAssertEqual(opened, 0)
     }
 
-    func testClaimedOwnerCanRetryAfterItsAttachWaitExpires() {
+    func testClaimedOwnerCanRetryAfterItsAttachWaitExpires() throws {
         let owner = makePrimary()
         _ = WindowFacadeHolder(owner: owner)
         WorkspaceSceneReopener.shared.noteLaunchSettled()
@@ -172,14 +172,32 @@ final class WindowFacadeReopenQueueAppTests: XCTestCase {
         })
         XCTAssertEqual(opened, 0, "wait for the scene that already claimed the owner")
         WorkspaceSceneReopener.shared.expireOpeningForTesting()
-        WorkspaceSceneReopener.shared.performFileCommand(openScene: { opened += 1 }, action: { _ in
+        XCTAssertFalse(
+            KeyWindowRouter.shared.isOwnerClaimed(owner),
+            "an expired attach wait releases the claim that never attached"
+        )
+        var replacement: WindowFacadeHolder?
+        WorkspaceSceneReopener.shared.performFileCommand(openScene: {
+            opened += 1
+            replacement = WindowFacadeHolder(owner: owner)
+        }, action: { _ in
             ran.append(2)
         })
         XCTAssertEqual(opened, 1, "an expired claim cannot block the next command forever")
+        let current = try XCTUnwrap(replacement)
+        XCTAssertTrue(current.facade === owner)
 
-        KeyWindowRouter.shared.attach(makeWindow(), to: owner)
+        try KeyWindowRouter.shared.attach(
+            makeWindow(),
+            to: owner,
+            ownerClaimToken: XCTUnwrap(current.ownerClaimToken)
+        )
         XCTAssertEqual(ran, [2], "the expired command does not replay")
         KeyWindowRouter.shared.closeFacade(owner)
+        XCTAssertTrue(
+            owner.registry.connectedWindows.contains { $0 === owner.windowState },
+            "closing the retried owner keeps its document"
+        )
         _ = WindowFacadeHolder(owner: owner)
         WorkspaceSceneReopener.shared.performFileCommand(openScene: { opened += 1 }, action: { _ in })
         XCTAssertEqual(opened, 1, "a successful attach restores waiting for the next claimed scene")
@@ -202,4 +220,151 @@ final class WindowFacadeReopenQueueAppTests: XCTestCase {
     }
 }
 
+/// An expired owner claim must be claimable again, and the retired scene's window
+/// must not take that claim back.
+@MainActor
+final class WindowFacadeExpiredClaimAppTests: XCTestCase {
+    private var defaults: UserDefaults!
+    private var suiteName = ""
+    private var windows: [NSWindow] = []
+
+    override func setUp() async throws {
+        KeyWindowRouter.shared.resetForTesting()
+        suiteName = "WindowFacadeExpiredClaim-\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)
+    }
+
+    override func tearDown() async throws {
+        for window in windows {
+            window.orderOut(nil)
+        }
+        windows = []
+        KeyWindowRouter.shared.resetForTesting()
+        WindowOpenAdmission.resetForTesting()
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    func testExpiredClaimReopensOntoTheOwnerAndIgnoresTheOldScene() async throws {
+        let owner = makePrimary()
+        let stale = WindowFacadeHolder(owner: owner)
+        let staleToken = try XCTUnwrap(stale.ownerClaimToken)
+        WorkspaceSceneReopener.shared.noteLaunchSettled()
+        var opened = 0
+        var ran = 0
+        WorkspaceSceneReopener.shared.performFileCommand(openScene: { opened += 1 }, action: { facade in
+            XCTAssertTrue(facade === owner)
+            ran += 1
+        })
+        XCTAssertEqual(opened, 0)
+        WorkspaceSceneReopener.shared.expireOpeningForTesting()
+
+        var replacement: WindowFacadeHolder?
+        WorkspaceSceneReopener.shared.performFileCommand(openScene: {
+            opened += 1
+            replacement = WindowFacadeHolder(owner: owner)
+        }, action: { facade in
+            XCTAssertTrue(facade === owner)
+            ran += 1
+        })
+        let current = try XCTUnwrap(replacement)
+        XCTAssertTrue(current.facade === owner, "the retry claims the owner instead of a refused sibling")
+        XCTAssertTrue(WindowOpenAdmission.admits(current.facade.windowState))
+        let currentToken = try XCTUnwrap(current.ownerClaimToken)
+        XCTAssertNotEqual(currentToken, staleToken)
+        XCTAssertEqual(opened, 1)
+        XCTAssertEqual(ran, 0)
+
+        owner.externalChangePrompt = AppState.ExternalChangePrompt(
+            fileURL: URL(fileURLWithPath: "/tmp/expired-claim.md")
+        )
+        let staleWindow = makeWindow()
+        let veto = ExpiredClaimVetoDelegate()
+        staleWindow.delegate = veto
+        staleWindow.orderFront(nil)
+        KeyWindowRouter.shared.attach(staleWindow, to: owner, ownerClaimToken: staleToken)
+        XCTAssertEqual(ran, 0, "the retired scene does not run the retry")
+        XCTAssertFalse(KeyWindowRouter.shared.hasAttachedWindow(owner))
+        XCTAssertNil(KeyWindowRouter.shared.facade(for: staleWindow))
+        XCTAssertTrue(KeyWindowRouter.shared.isOwnerClaimed(owner))
+        XCTAssertNotNil(owner.externalChangePrompt)
+        try await waitUntilClosed(veto)
+        XCTAssertNotNil(owner.externalChangePrompt)
+        XCTAssertTrue(KeyWindowRouter.shared.facades(in: owner.registry).contains { $0 === owner })
+
+        let replacementWindow = makeWindow()
+        KeyWindowRouter.shared.attach(replacementWindow, to: owner, ownerClaimToken: currentToken)
+        XCTAssertEqual(ran, 1)
+        XCTAssertTrue(KeyWindowRouter.shared.facade(for: replacementWindow) === owner)
+        XCTAssertNotNil(owner.externalChangePrompt)
+    }
+
+    func testLateRetiredSceneCannotReplaceTheAttachedOwner() async throws {
+        let owner = makePrimary()
+        let stale = WindowFacadeHolder(owner: owner)
+        let staleToken = try XCTUnwrap(stale.ownerClaimToken)
+        WorkspaceSceneReopener.shared.noteLaunchSettled()
+        WorkspaceSceneReopener.shared.performFileCommand(openScene: {}, action: { _ in })
+        WorkspaceSceneReopener.shared.expireOpeningForTesting()
+        let replacement = WindowFacadeHolder(owner: owner)
+        let currentToken = try XCTUnwrap(replacement.ownerClaimToken)
+        let replacementWindow = makeWindow()
+        KeyWindowRouter.shared.attach(replacementWindow, to: owner, ownerClaimToken: currentToken)
+        owner.externalChangePrompt = AppState.ExternalChangePrompt(
+            fileURL: URL(fileURLWithPath: "/tmp/expired-claim.md")
+        )
+
+        let staleWindow = makeWindow()
+        let veto = ExpiredClaimVetoDelegate()
+        staleWindow.delegate = veto
+        staleWindow.orderFront(nil)
+        KeyWindowRouter.shared.attach(staleWindow, to: owner, ownerClaimToken: staleToken)
+        try await waitUntilClosed(veto)
+
+        XCTAssertTrue(KeyWindowRouter.shared.facade(for: replacementWindow) === owner)
+        XCTAssertNil(KeyWindowRouter.shared.facade(for: staleWindow))
+        XCTAssertTrue(KeyWindowRouter.shared.isOwnerClaimed(owner))
+        XCTAssertNotNil(owner.externalChangePrompt)
+        XCTAssertTrue(KeyWindowRouter.shared.hasAttachedWindow(owner))
+    }
+
+    private func waitUntilClosed(_ delegate: ExpiredClaimVetoDelegate) async throws {
+        let deadline = Date().addingTimeInterval(2)
+        while delegate.willCloseCount == 0, Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertEqual(delegate.willCloseCount, 1)
+        XCTAssertFalse(delegate.asked)
+    }
+
+    private func makePrimary() -> AppState {
+        AppState(shouldRestoreLastOpenedFile: false, userDefaults: defaults)
+    }
+
+    private func makeWindow() -> NSWindow {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 120),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        windows.append(window)
+        return window
+    }
+}
+
 private struct ReopenQueueProbeError: Error {}
+
+private final class ExpiredClaimVetoDelegate: NSObject, NSWindowDelegate {
+    var asked = false
+    var willCloseCount = 0
+
+    func windowShouldClose(_: NSWindow) -> Bool {
+        asked = true
+        return false
+    }
+
+    func windowWillClose(_: Notification) {
+        willCloseCount += 1
+    }
+}

@@ -75,6 +75,13 @@ final class KeyWindowRouter: ObservableObject {
         weak var facade: AppState?
     }
 
+    /// The scene that currently shows the owner. `token` fences a scene whose
+    /// reopen wait expired: its later window must not attach as this claim.
+    private struct OwnerClaim {
+        weak var facade: AppState?
+        let token: UUID
+    }
+
     private struct WindowBox {
         weak var window: NSWindow?
     }
@@ -86,8 +93,9 @@ final class KeyWindowRouter: ObservableObject {
     private var closeObservers: [ObjectIdentifier: NSObjectProtocol] = [:]
     private var noticeOwners: [UUID: FacadeBox] = [:]
     /// App-owned façades a scene currently shows. Released when that scene's window closes,
-    /// so the next scene (Dock reopen, Finder open) gets the owner back.
-    private var claimedOwners: [ObjectIdentifier: FacadeBox] = [:]
+    /// or when a reopen wait expires before the window attaches, so the next scene (Dock
+    /// reopen, Finder open, or a retry) gets the owner back.
+    private var claimedOwners: [ObjectIdentifier: OwnerClaim] = [:]
     /// Owners whose window closed. The next claim restores prompts from registry state.
     private var closedOwnersNeedingPromptRestore: Set<ObjectIdentifier> = []
     private var resignObserver: NSObjectProtocol?
@@ -129,20 +137,32 @@ final class KeyWindowRouter: ObservableObject {
         claimedOwners[ObjectIdentifier(owner)]?.facade === owner
     }
 
-    /// Gives a new scene the app-owned façade when no open scene shows it. Returns false while
-    /// another scene shows it, so the caller builds a sibling instead. The owner keeps its
-    /// document across a close, as the one shared `AppState` did before PR C.
-    func claimOwner(_ owner: AppState) -> Bool {
+    /// Gives a new scene the app-owned façade when no open scene shows it. Returns that
+    /// scene's claim token, or nil while another scene shows the owner so the caller builds
+    /// a sibling. The owner keeps its document across a close, as the one shared `AppState`
+    /// did before PR C.
+    func claimOwner(_ owner: AppState) -> UUID? {
         prune()
         let identifier = ObjectIdentifier(owner)
-        guard claimedOwners[identifier]?.facade !== owner else { return false }
-        claimedOwners[identifier] = FacadeBox(facade: owner)
+        guard claimedOwners[identifier]?.facade !== owner else { return nil }
+        let token = UUID()
+        claimedOwners[identifier] = OwnerClaim(facade: owner, token: token)
         WorkspaceSceneReopener.shared.remember(owner)
         track(owner)
         if closedOwnersNeedingPromptRestore.remove(identifier) != nil {
             owner.restoreRecoveryPrompt(for: owner.shownSession)
         }
-        return true
+        return token
+    }
+
+    /// Drops a claim whose window never attached. The scene that held the token keeps it;
+    /// a later attach from that scene closes its window instead of sharing the owner.
+    func releaseUnattachedClaim(_ owner: AppState) {
+        prune()
+        let identifier = ObjectIdentifier(owner)
+        guard claimedOwners[identifier]?.facade === owner else { return }
+        guard !hasAttachedWindow(owner) else { return }
+        claimedOwners[identifier] = nil
     }
 
     func track(_ facade: AppState) {
@@ -156,7 +176,16 @@ final class KeyWindowRouter: ObservableObject {
     }
 
     /// Idempotent: SwiftUI reports the hosting window on every view update.
-    func attach(_ window: NSWindow, to facade: AppState) {
+    ///
+    /// A scene that claimed the owner passes `ownerClaimToken`. A token that is no longer
+    /// current belongs to a scene whose wait expired. That window is closed and does not
+    /// replace the owner's window, close observer, claim, or prompts. Callers that pass nil
+    /// attach directly; production workspace scenes pass the token from their holder.
+    func attach(_ window: NSWindow, to facade: AppState, ownerClaimToken: UUID? = nil) {
+        if let ownerClaimToken, !isCurrentOwnerClaim(ownerClaimToken, facade: facade) {
+            closeRetiredOwnerScene(window)
+            return
+        }
         let identifier = ObjectIdentifier(facade)
         if isTracked(facade), windowsByFacade[identifier]?.window === window {
             if WindowOpenAdmission.admits(facade.windowState) {
@@ -371,6 +400,21 @@ final class KeyWindowRouter: ObservableObject {
 
     private func isTracked(_ facade: AppState) -> Bool {
         facades[ObjectIdentifier(facade)]?.facade === facade
+    }
+
+    private func isCurrentOwnerClaim(_ token: UUID, facade: AppState) -> Bool {
+        guard let claim = claimedOwners[ObjectIdentifier(facade)], claim.facade === facade else {
+            return false
+        }
+        return claim.token == token
+    }
+
+    /// `close` does not ask `windowShouldClose`, matching a refused sibling. No close
+    /// observer is installed, so this window cannot release the replacement claim.
+    private func closeRetiredOwnerScene(_ window: NSWindow) {
+        Task { @MainActor [weak window] in
+            window?.close()
+        }
     }
 
     private var facadesInOrder: [AppState] {

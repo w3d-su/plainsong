@@ -7,7 +7,8 @@ key-window routing while creation stays guarded. WD1, WD2, D1, and D2 stay open.
 
 Each workspace scene owns an `AppState`. A scene uses the app-owned façade whenever no
 open scene shows it (`KeyWindowRouter.claimOwner`); the claim ends when that scene's
-window closes. A one-time flag here made every scene after a close a refused sibling, so
+window closes, or when a reopen wait expires before the window attaches
+(`docs/decisions/2026-10-29-windows-claimed-scene-attach-wait.md`). A one-time flag here made every scene after a close a refused sibling, so
 the app could not get a usable window back without relaunching. The owner keeps its
 document and stays registered across the close, as the single `AppState` did before C.
 Closing still clears that window's external-change, missing-file, and indeterminate-write
