@@ -292,7 +292,9 @@ private final class CountingAssetSchemeHandler: NSObject, WKURLSchemeHandler {
         lock.withLock { urls }
     }
 
-    /// Serves `asset://<name>.svg` unvalidated, with the production SVG headers.
+    /// Serves `asset://<name>.svg` unvalidated and without the response CSP.
+    /// Image-mode isolation has to show up without that backstop. The media type also
+    /// omits `charset`, so decoding does not depend on the production Content-Type.
     func webView(_: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
         lock.withLock { urls.append(urlSchemeTask.request.url?.absoluteString ?? "") }
         guard let url = urlSchemeTask.request.url,

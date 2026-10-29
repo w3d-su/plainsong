@@ -37,15 +37,17 @@ header: it serves fourteen well-formed, painted hostile samples (script, `onload
 `foreignObject`, `<image href>`, `<use href>`, `@import`, `url(https:)` in style, an
 escaped `url(`, `image-set`, `@font-face`, `feImage`, a `fill` URL, a SMIL `values` URL,
 and the rejected-but-paintable end-to-end control) with no validator and no CSP,
-and records zero bridge messages and zero proxy connections, while a page script and a
-page image prove both observers work. Document mode is already closed by the navigation
-policy and the page CSP (`default-src 'none'`).
+and records no bridge message or proxy connection from those samples. On the macOS
+15.7.9 CI run, the page-script and page-image controls produced one bridge message
+and one `CONNECT`, proving both observers work. Document mode is already closed by
+the navigation policy and the page CSP (`default-src 'none'`).
 
 `data:image/svg+xml` and inline `<svg>` stay blocked. HTML/PDF export still omits SVG
 (`AssetURLPolicy.loadAsset` remains the raster export gate). WYSIWYG does not thumbnail
 SVG. Remote `https:` SVG is not specially blocked or validated (owner decision pending).
-With Allow Remote Images off it is never requested; with it on, the S0 remote probe saw
-four `CONNECT` requests to the remote host and no successful decode. It would render in
+With Allow Remote Images off, that probe records no connection. With it on, WebKit
+sends a `CONNECT` for the remote image. The macOS 27 run saw four and did not observe
+a successful decode; the macOS 15.7.9 CI run of this test saw one. It would render in
 the same image mode as any remote image. Filtering by `.svg` would not help (`a.png` can
 answer `image/svg+xml`); a real control is a separate gate that proxies remote images
 through a native scheme, checks the MIME type, and validates or rejects SVG.
