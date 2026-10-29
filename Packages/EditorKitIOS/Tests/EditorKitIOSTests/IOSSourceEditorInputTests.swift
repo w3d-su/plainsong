@@ -104,7 +104,10 @@ final class IOSSourceEditorInputTests: XCTestCase {
         harness.textView.insertText("!")
         let deadline = Date().addingTimeInterval(2)
         while !published, Date() < deadline {
-            try await Task.sleep(for: .milliseconds(20))
+            // Sleep alone does not service the main queue on the hosted runner, so the
+            // deferred statistics hop never lands. Yield, then drain the main run loop.
+            await Task.yield()
+            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.02))
         }
         XCTAssertTrue(published)
         XCTAssertEqual(harness.session.statistics, TextStatistics(text: "hello!"))

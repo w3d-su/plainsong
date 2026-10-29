@@ -206,19 +206,26 @@ extension IOSSourceEditorController {
         guard !ExactSourceFragment.matches(current, installation.session.text) else { return }
         installation.session.replaceTextFromAuthorizedEditor(current, refreshStatistics: false)
         let version = installation.session.version
-        let session = installation.session
-        Task { @MainActor [weak self] in
-            let statistics = await Task.detached(priority: .utility) {
-                TextStatistics(text: current)
-            }.value
-            guard session.version == version, ExactSourceFragment.matches(session.text, current) else { return }
-            guard session.statistics != statistics else { return }
-            session.applyStatistics(statistics)
-            // Chrome reads the editor snapshot, which was emitted before this count finished.
-            if self?.installation?.session === session {
-                self?.emitSnapshot()
-            }
+        // Count off the main actor, then hop back. Awaiting the utility task from the
+        // main actor can stall: word breaking may need the main thread while this actor
+        // is suspended inside that await, so the snapshot never republishes.
+        Task.detached(priority: .utility) { [weak self] in
+            let statistics = TextStatistics(text: current)
+            await self?.republishDeferredStatistics(statistics, version: version, text: current)
         }
+    }
+
+    private func republishDeferredStatistics(
+        _ statistics: TextStatistics,
+        version: Int,
+        text: String
+    ) {
+        guard let session = installation?.session else { return }
+        guard session.version == version, ExactSourceFragment.matches(session.text, text) else { return }
+        guard session.statistics != statistics else { return }
+        session.applyStatistics(statistics)
+        // Chrome reads the editor snapshot, which was emitted before this count finished.
+        emitSnapshot()
     }
 
     func consumeSelectionEpoch() {
