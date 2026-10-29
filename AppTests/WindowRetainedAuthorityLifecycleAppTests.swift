@@ -115,10 +115,10 @@ final class WindowRetainedAuthorityLifecycleAppTests: XCTestCase {
 
         binding.onLifecycle(.revoked(installation))
 
-        XCTAssertEqual(fixture.appState.editorDocumentBinding(for: session).id, binding.id)
+        XCTAssertEqual(fixture.appState.registeredEditorDocumentBindingID(for: session), binding.id)
         fixture.appState.setCurrentDocument(session, requestingEditorFocus: false)
         XCTAssertTrue(fixture.appState.shownSession === session)
-        XCTAssertEqual(fixture.appState.editorDocumentBinding(for: session).id, binding.id)
+        XCTAssertEqual(fixture.appState.registeredEditorDocumentBindingID(for: session), binding.id)
     }
 
     func testDiscardAlsoRemovesTheInstallationWindowRecord() throws {

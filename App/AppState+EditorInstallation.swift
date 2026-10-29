@@ -71,9 +71,19 @@ extension AppState {
         editorBindingInstallations[installation] = nil
         editorInstallationWindows[installation] = nil
         supersededEditorWriterInstallations.remove(installation)
+        // Keep main's retired-cold cleanup. Also drop a registration only when it
+        // is the last reference holding a retained root scope. An unshown untitled
+        // or recovery session keeps its registration.
+        let retiredCold = retiredCanonicalURL(for: session).map {
+            !registry.isWarmSession(session, at: $0)
+        } ?? false
+        let holdsRetainedRootScope = registry.retainedWorkspaceAuthorityOwners[sessionIdentity] != nil
         if !isEditorDocumentBindingInstalled(expectedBindingID, session: session),
-           !registry.isWarmSession(session),
-           isRetiredEditorSession(session) || !registry.isShownByAnyWindow(session)
+           retiredCold || (
+               holdsRetainedRootScope &&
+                   !registry.isWarmSession(session) &&
+                   (isRetiredEditorSession(session) || !registry.isShownByAnyWindow(session))
+           )
         {
             removeEditorDocumentBindingRegistration(
                 for: session,
