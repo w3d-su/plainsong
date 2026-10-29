@@ -32,13 +32,14 @@ struct PlainsongApp: App {
     init() {
         let state = makePlainsongAppState()
         _appState = StateObject(wrappedValue: state)
+        WorkspaceSceneReopener.shared.remember(state)
         _menuBarState = StateObject(wrappedValue: MenuBarState())
         // Find menu actions → the originating editor's window (§5.1).
         EditorFindCommandDelivery.installHooks()
     }
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: WorkspaceSceneReopener.sceneID) {
             WindowFacadeRoot(owner: appState)
                 .tint(.accentColor)
                 .onAppear {

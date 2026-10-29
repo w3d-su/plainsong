@@ -110,20 +110,43 @@ extension AppState {
             title: title,
             message: userVisibleDescription(for: error)
         )
-        let window = registry.connectedWindows.first { $0.shownSession === session }
-            ?? (KeyWindowRouter.shared.home(for: registry) ?? self).windowState
+        let matching = registry.connectedWindows.filter { $0.shownSession === session }
+        if let shown = matching.first(where: { KeyWindowRouter.shared.hasAttachedWindow($0) }) {
+            shown.presentedError = visible
+            if activatesWindow {
+                KeyWindowRouter.shared.focus(shown)
+            }
+            return
+        }
+        if activatesWindow, WorkspaceSceneReopener.shared.reopenShowing(visible) {
+            return
+        }
+        let window = matching.first ?? (KeyWindowRouter.shared.home(for: registry) ?? self).windowState
         window.presentedError = visible
         if activatesWindow {
             KeyWindowRouter.shared.focus(window)
         }
     }
 
-    /// Termination refusals with no session. The user asked to quit, so the home window
-    /// comes forward.
+    /// Termination refusals with no session. A visible home window comes forward. With no
+    /// window, the workspace scene opens again and then shows the error.
     func presentOnHome(_ error: Error, title: String) {
-        let home = KeyWindowRouter.shared.home(for: registry) ?? self
-        home.present(error, title: title)
-        KeyWindowRouter.shared.focus(home.windowState)
+        let visible = UserVisibleError(
+            title: title,
+            message: userVisibleDescription(for: error)
+        )
+        if let home = KeyWindowRouter.shared.home(for: registry),
+           KeyWindowRouter.shared.hasAttachedWindow(home)
+        {
+            home.presentedError = visible
+            KeyWindowRouter.shared.focus(home.windowState)
+            return
+        }
+        if WorkspaceSceneReopener.shared.reopenShowing(visible) {
+            return
+        }
+        present(error, title: title)
+        KeyWindowRouter.shared.focus(windowState)
     }
 
     func refuseWindowFileOpenIfNeeded() throws {

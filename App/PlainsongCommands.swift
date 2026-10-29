@@ -11,9 +11,18 @@ import SwiftUI
 /// `EditorCommandDispatcher`; only what the menu *displays* routes through the snapshot.
 struct PlainsongCommands: Commands {
     @ObservedObject var menuBarState: MenuBarState
+    @Environment(\.openWindow) private var openWindow
 
     private var commandTarget: AppState? {
         KeyWindowRouter.shared.menuTarget(defaultFacade: nil)
+    }
+
+    private func performFileCommand(_ action: @escaping (AppState) -> Void) {
+        WorkspaceSceneReopener.shared.performFileCommand(openScene: openWorkspaceScene, action: action)
+    }
+
+    private func openWorkspaceScene() {
+        openWindow(id: WorkspaceSceneReopener.sceneID)
     }
 
     private var snapshot: MenuBarSnapshot {
@@ -23,14 +32,14 @@ struct PlainsongCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
             Button("New File") {
-                commandTarget?.newFile()
+                performFileCommand { $0.newFile() }
             }
             .keyboardShortcut("n", modifiers: .command)
 
             Divider()
 
             Button("Open...") {
-                commandTarget?.openFile()
+                performFileCommand { $0.openFile() }
             }
             .keyboardShortcut("o", modifiers: .command)
 
@@ -40,7 +49,7 @@ struct PlainsongCommands: Commands {
                 } else {
                     ForEach(snapshot.recentItemURLs, id: \.self) { url in
                         Button(url.lastPathComponent) {
-                            commandTarget?.openExternalFile(url)
+                            performFileCommand { $0.openExternalFile(url) }
                         }
                     }
                 }

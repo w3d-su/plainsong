@@ -270,6 +270,127 @@ final class WindowFacadeLifecycleAppTests: XCTestCase {
         XCTAssertEqual(probe.willCloseCount, 1)
     }
 
+    func testFileCommandWithNoWindowReopensTheOwnerAndRunsThere() {
+        let owner = makePrimary()
+        _ = WindowFacadeHolder(owner: owner)
+        let window = makeWindow()
+        KeyWindowRouter.shared.attach(window, to: owner)
+        KeyWindowRouter.shared.closeFacade(owner)
+        XCTAssertNil(KeyWindowRouter.shared.menuTarget(defaultFacade: nil))
+        XCTAssertFalse(KeyWindowRouter.shared.hasAttachedWindow(owner))
+
+        var opened = 0
+        var ran = 0
+        WorkspaceSceneReopener.shared.performFileCommand(openScene: { opened += 1 }, action: { facade in
+            XCTAssertTrue(facade === owner)
+            ran += 1
+        })
+        XCTAssertEqual(opened, 1)
+        XCTAssertEqual(ran, 0, "the command waits until the new scene attaches the owner")
+        WorkspaceSceneReopener.shared.performFileCommand(openScene: { opened += 1 }, action: { _ in
+            ran += 1
+        })
+        XCTAssertEqual(opened, 1, "a second command does not open another scene")
+
+        _ = WindowFacadeHolder(owner: owner)
+        KeyWindowRouter.shared.attach(makeWindow(), to: owner)
+        XCTAssertEqual(ran, 2)
+        XCTAssertTrue(KeyWindowRouter.shared.menuTarget(defaultFacade: nil) === owner)
+    }
+
+    func testFileCommandBeforeTheFirstSceneWaitsForItsWindow() {
+        let owner = makePrimary()
+        WorkspaceSceneReopener.shared.remember(owner)
+        var opened = 0
+        var ran = false
+        WorkspaceSceneReopener.shared.performFileCommand(openScene: { opened += 1 }, action: { facade in
+            XCTAssertTrue(facade === owner)
+            ran = true
+        })
+        XCTAssertEqual(opened, 0, "SwiftUI is already opening the launch scene")
+        XCTAssertFalse(ran)
+        _ = WindowFacadeHolder(owner: owner)
+        KeyWindowRouter.shared.attach(makeWindow(), to: owner)
+        XCTAssertTrue(ran)
+    }
+
+    func testFileCommandWithSeveralWindowsAndNoKeyWindowDoesNotGuess() {
+        let owner = makePrimary()
+        _ = WindowFacadeHolder(owner: owner)
+        let sibling = owner.makeSiblingFacade(admitsFileOperations: true)
+        KeyWindowRouter.shared.attach(makeWindow(), to: owner)
+        KeyWindowRouter.shared.attach(makeWindow(), to: sibling)
+        KeyWindowRouter.shared.testingUsesKeyWindowOverride = true
+        KeyWindowRouter.shared.testingKeyWindow = nil
+        var opened = false
+        var ran = false
+        WorkspaceSceneReopener.shared.performFileCommand(openScene: { opened = true }, action: { _ in
+            ran = true
+        })
+        XCTAssertFalse(opened)
+        XCTAssertFalse(ran)
+    }
+
+    func testQuitRefusalForAClosedSessionUsesAnAttachedHome() {
+        let owner = makePrimary()
+        _ = WindowFacadeHolder(owner: owner)
+        KeyWindowRouter.shared.attach(makeWindow(), to: owner)
+        let sibling = owner.makeSiblingFacade(admitsFileOperations: true)
+        KeyWindowRouter.shared.attach(makeWindow(), to: sibling)
+        XCTAssertFalse(sibling.shownSession === owner.shownSession)
+        KeyWindowRouter.shared.closeFacade(owner)
+        var opened = false
+        WorkspaceSceneReopener.shared.installOpenScene { opened = true }
+        owner.present(
+            LifecycleProbeError(),
+            title: "Could Not Quit",
+            for: owner.shownSession,
+            activatesWindow: true
+        )
+        XCTAssertEqual(sibling.presentedError?.title, "Could Not Quit")
+        XCTAssertNil(owner.presentedError)
+        XCTAssertTrue(KeyWindowRouter.shared.focusedWindowState === sibling.windowState)
+        XCTAssertFalse(opened)
+    }
+
+    func testQuitRefusalWithNoWindowReopensTheOwnerBeforeShowingTheError() {
+        let owner = makePrimary()
+        _ = WindowFacadeHolder(owner: owner)
+        KeyWindowRouter.shared.attach(makeWindow(), to: owner)
+        KeyWindowRouter.shared.closeFacade(owner)
+        var opened = 0
+        WorkspaceSceneReopener.shared.installOpenScene { opened += 1 }
+        owner.presentOnHome(LifecycleProbeError(), title: "Could Not Quit")
+        XCTAssertEqual(opened, 1)
+        XCTAssertNil(owner.presentedError)
+
+        _ = WindowFacadeHolder(owner: owner)
+        KeyWindowRouter.shared.attach(makeWindow(), to: owner)
+        XCTAssertEqual(owner.presentedError?.title, "Could Not Quit")
+    }
+
+    func testRefusedSceneClosesWithoutAskingAVetoingDelegate() async throws {
+        let owner = makePrimary()
+        _ = WindowFacadeHolder(owner: owner)
+        KeyWindowRouter.shared.closeFacade(owner)
+        let sibling = owner.makeSiblingFacade(admitsFileOperations: false)
+        let window = makeWindow()
+        let veto = VetoCloseDelegate()
+        window.delegate = veto
+        window.orderFront(nil)
+        KeyWindowRouter.shared.attach(window, to: sibling)
+        XCTAssertNil(
+            KeyWindowRouter.shared.home(for: owner.registry),
+            "a refused scene is not home while it is waiting to close"
+        )
+        let deadline = Date().addingTimeInterval(2)
+        while window.isVisible, Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertFalse(window.isVisible)
+        XCTAssertFalse(veto.asked)
+    }
+
     private func makePrimary() -> AppState {
         AppState(shouldRestoreLastOpenedFile: false, userDefaults: defaults)
     }
@@ -309,5 +430,16 @@ private final class CloseProbe: NSObject, NSWindowDelegate {
 
     func windowDidResize(_: Notification) {
         resizeCount += 1
+    }
+}
+
+private struct LifecycleProbeError: Error {}
+
+private final class VetoCloseDelegate: NSObject, NSWindowDelegate {
+    var asked = false
+
+    func windowShouldClose(_: NSWindow) -> Bool {
+        asked = true
+        return false
     }
 }

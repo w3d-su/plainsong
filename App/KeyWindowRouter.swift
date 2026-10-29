@@ -132,6 +132,7 @@ final class KeyWindowRouter: ObservableObject {
         let identifier = ObjectIdentifier(owner)
         guard claimedOwners[identifier]?.facade !== owner else { return false }
         claimedOwners[identifier] = FacadeBox(facade: owner)
+        WorkspaceSceneReopener.shared.remember(owner)
         track(owner)
         if closedOwnersNeedingPromptRestore.remove(identifier) != nil {
             owner.restoreRecoveryPrompt(for: owner.shownSession)
@@ -153,6 +154,9 @@ final class KeyWindowRouter: ObservableObject {
     func attach(_ window: NSWindow, to facade: AppState) {
         let identifier = ObjectIdentifier(facade)
         if isTracked(facade), windowsByFacade[identifier]?.window === window {
+            if WindowOpenAdmission.admits(facade.windowState) {
+                WorkspaceSceneReopener.shared.noteAttached(facade)
+            }
             return
         }
         track(facade)
@@ -173,11 +177,15 @@ final class KeyWindowRouter: ObservableObject {
             }
         }
         objectWillChange.send()
-        // The one close path for a refused scene. It runs once the scene has a window.
-        guard !WindowOpenAdmission.admits(facade.windowState) else { return }
-        Task { @MainActor [weak window] in
-            window?.performClose(nil)
+        // A refused scene owns no document, so a delegate veto must not keep its empty
+        // window. `close` does not ask `windowShouldClose`; attach does not try again.
+        guard WindowOpenAdmission.admits(facade.windowState) else {
+            Task { @MainActor [weak window] in
+                window?.close()
+            }
+            return
         }
+        WorkspaceSceneReopener.shared.noteAttached(facade)
     }
 
     func isHome(_ facade: AppState) -> Bool {
@@ -188,7 +196,16 @@ final class KeyWindowRouter: ObservableObject {
     /// itself, and errors or the foreground autosave must not land there.
     func home(for registry: AppDocumentRegistry) -> AppState? {
         let peers = facades(in: registry)
-        return peers.first { WindowOpenAdmission.admits($0.windowState) } ?? peers.first
+        return peers.first { WindowOpenAdmission.admits($0.windowState) }
+    }
+
+    func hasAttachedWindow(_ facade: AppState) -> Bool {
+        windowsByFacade[ObjectIdentifier(facade)]?.window != nil
+    }
+
+    func hasAttachedWindow(_ window: WindowState) -> Bool {
+        guard let facade = facadesInOrder.first(where: { $0.windowState === window }) else { return false }
+        return hasAttachedWindow(facade)
     }
 
     func peers(of facade: AppState) -> [AppState] {
@@ -342,6 +359,7 @@ final class KeyWindowRouter: ObservableObject {
             claimedOwners = [:]
             closedOwnersNeedingPromptRestore = []
             focusedWindowState = nil
+            WorkspaceSceneReopener.shared.resetForTesting()
             objectWillChange.send()
         }
     #endif

@@ -69,7 +69,7 @@ final class MenuBarState: ObservableObject {
     init() {
         overriddenFacade = nil
         let target = KeyWindowRouter.shared.menuTarget(defaultFacade: nil)
-        let registryFacade = target ?? KeyWindowRouter.shared.firstLiveFacade
+        let registryFacade = Self.registryFacade(for: target)
         snapshot = MenuBarSnapshot(
             appState: target,
             recentItemURLs: registryFacade?.recentItemURLs ?? []
@@ -110,9 +110,15 @@ final class MenuBarState: ObservableObject {
             }
     }
 
+    /// Recents survive the last window closing. Document commands still follow
+    /// `menuTarget`, which is nil until a workspace window is attached again.
+    private static func registryFacade(for target: AppState?) -> AppState? {
+        target ?? KeyWindowRouter.shared.firstLiveFacade ?? WorkspaceSceneReopener.shared.knownOwner
+    }
+
     private func refresh() {
         let target = overriddenFacade ?? KeyWindowRouter.shared.menuTarget(defaultFacade: nil)
-        let registryFacade = target ?? KeyWindowRouter.shared.firstLiveFacade
+        let registryFacade = Self.registryFacade(for: target)
         let facadeID = target.map { ObjectIdentifier($0) }
         let registryID = registryFacade.map { ObjectIdentifier($0.registry) }
         if facadeID != subscribedFacadeID || registryID != subscribedRegistryID {
