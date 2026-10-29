@@ -134,6 +134,14 @@ final class IOSProductionDocumentWorkflowTests: XCTestCase {
         runtime.scene.stopObserving()
     }
 
+    func testContentRuleUnavailablePresentsAnAlert() throws {
+        let (_, runtime, controller) = try fixtureRuntime()
+        controller.previewEvent(.contentRuleUnavailable)
+        XCTAssertEqual(runtime.scene.presentedError?.title, "Preview Unavailable")
+        XCTAssertEqual(runtime.scene.presentedError?.message, PreviewNetworkPolicyFailure.userMessage)
+        XCTAssertNil(controller.snapshot.unavailableReason)
+    }
+
     func testMissingPreviewLinkPresentsAnAlertAndKeepsTheProductionDocumentWritable() async throws {
         let (fixture, runtime, controller) = try fixtureRuntime()
         try await controller.openPickedURL(fixture.root, scope: .directory)

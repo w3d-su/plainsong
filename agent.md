@@ -446,10 +446,32 @@ republishes only when its value changes literally.
   arrives, and accepts only a protocol match from the current page generation.
 - **Security:** strict CSP (`default-src 'none'; script-src 'self'; style-src 'self'
   'unsafe-inline'; img-src asset: data: https:`), `isElementFullscreenEnabled` off, and
-  no remote loads by default. The preview JS removes remote image `src` values unless
-  the user enables the Allow Remote Images preference; that preference permits only
-  `https:` images and does not relax script, style, navigation, or non-image network
-  behavior.
+  no remote loads by default. Two layers enforce Allow Remote Images. The JS layer still
+  removes remote `<img>` `src` values unless the preference is on, and even then it
+  permits only `https:` images. The network layer is a WebKit content rule compiled once
+  on the first preview controller (`WKContentRuleListStore`) and swapped without
+  reloading the page. The next list is added before the previous one is removed, so the
+  overlap stays fail-closed. Off blocks every `http:`/`https:` and `ws:`/`wss:` load; on
+  blocks those loads except `https:` images. On the `file://` preview page that CSP does
+  not stop remote script, style, or font; the content rule does. Every preview and export
+  `WKWebView` is created by `PreviewController` and installs the blocking list before the
+  page loads. A new web view, including print or Quick Look, has to go through that
+  controller. `make lint` is a textual guard for production Swift and Objective-C, not a
+  Swift parser. It scans all non-test targets from the resolved `project.yml` spec and
+  package `Sources` directories, including a new extension target outside App/AppIOS.
+  WebKit imports are limited to PreviewKit and the three export adapters that only name
+  WebKit types. SwiftUI `WebView` and `WebPage` calls are rejected. Direct `WKWebView`
+  and `WKWebViewConfiguration` calls are allowed only in the controller's two factory
+  files. Aliases, subclasses, `.self`, bare `.init`, inferred `.init`,
+  `type(of:).init`, and dynamic lookup of a `WK` class are rejected as well, including
+  `.m` and `.mm` sources. Concatenated class names and `removeAllContentRuleLists()` are
+  outside the guard. Link clicks stay in JavaScript (`preventDefault` plus
+  `linkClicked`), so the rule does not take over external opening. If the blocking list
+  fails to compile, the preview page is not loaded and the failure is shown. That result
+  is not cached. The same controller tries again once, off the typing path, and again
+  when another document is shown. If only the https-image exception fails, the preference
+  is treated as off. Export keeps the blocking list for its whole life and will not tell
+  JavaScript that remote images are allowed.
 - **Local assets:** custom scheme `asset://` via `WKURLSchemeHandler`. JS rewrites
   relative image/link `src` to `asset://<workspace-relative-path>`; the handler resolves
   against the current file's directory / workspace root. Render payloads carry an opaque

@@ -13,6 +13,7 @@ final class PreviewIOSHostedTests: XCTestCase {
         var events: [IOSPreviewEvent] = []
         _ = controller.observe { events.append($0) }
         try await waitUntil("bridge ready") { controller.isReady }
+        XCTAssertNotNil(controller.activeContentRuleList)
         XCTAssertTrue(events.contains {
             if case .ready = $0 {
                 return true

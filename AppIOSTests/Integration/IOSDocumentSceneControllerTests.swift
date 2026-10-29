@@ -2,6 +2,7 @@ import EditorKitIOS
 import Foundation
 import MarkdownCore
 @testable import PlainsongIOS
+import PreviewKitContracts
 import WorkspaceCore
 import WorkspaceKitIOS
 import XCTest
@@ -383,5 +384,13 @@ final class IOSDocumentSceneControllerTests: XCTestCase {
         XCTAssertEqual(proposal.result.newSelection, capture.selection)
         XCTAssertEqual(fixture.editor.binding.session.text, "- [ ] item\n")
         XCTAssertEqual(fixture.editor.selection, capture.selection)
+    }
+
+    @MainActor
+    func testContentRuleUnavailableReachesACallbackInstalledAfterObservation() {
+        let fixture = IOSSceneControllerFixture(previewEventOnObserve: .contentRuleUnavailable)
+        var received: String?
+        fixture.controller.onPreviewUnavailable = { received = $0 }
+        XCTAssertEqual(received, PreviewNetworkPolicyFailure.userMessage)
     }
 }
