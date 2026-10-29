@@ -46,7 +46,10 @@
             XCTAssertTrue(controller.activeContentRuleList === good.blockAll)
         }
 
-        func testStalePlainsongRuleIdentifiersAreRemovedUnlessProtected() async {
+        func testStalePreviewRulesAreRemovedWithoutDeletingOtherFeatures() async {
+            let current = await PreviewRemoteImageRuleStore.rules()
+            XCTAssertNotNil(current.blockAll)
+            XCTAssertNotNil(current.httpsImages)
             let protected = await PreviewRemoteImageRuleStore.makeRules(
                 blockSource: PreviewRemoteImageRuleStore.blockSource,
                 imagesSource: PreviewRemoteImageRuleStore.imagesSource
@@ -56,21 +59,37 @@
                 PreviewRemoteImageRuleStore.unprotectStoredRules(protectedIDs)
                 PreviewRemoteImageRuleStore.removeStoredRules(identifiers: protectedIDs, force: true)
             }
-            let staleID = "plainsong-preview-block-stale"
-            let stale = await PreviewRemoteImageRuleStore.storeRuleForTesting(
-                identifier: staleID,
-                source: PreviewRemoteImageRuleStore.blockSource
-            )
-            XCTAssertNotNil(stale)
+            let token = UUID().uuidString
+            let staleIDs = [
+                "plainsong-preview-block-stale-\(token)",
+                "plainsong-preview-https-images-stale-\(token)",
+                "plainsong-export-no-http-v1",
+            ]
+            let unrelatedID = "plainsong-other-feature-\(token)"
+            let storedIDs = staleIDs + [unrelatedID]
             addTeardownBlock {
-                PreviewRemoteImageRuleStore.removeStoredRules(identifiers: [staleID], force: true)
+                PreviewRemoteImageRuleStore.removeStoredRules(identifiers: storedIDs, force: true)
+            }
+            for identifier in storedIDs {
+                let stored = await PreviewRemoteImageRuleStore.storeRuleForTesting(
+                    identifier: identifier,
+                    source: PreviewRemoteImageRuleStore.blockSource
+                )
+                XCTAssertNotNil(stored)
             }
             await PreviewRemoteImageRuleStore.removeUnprotectedStaleRules()
-            let staleAfter = await PreviewRemoteImageRuleStore.lookupStoredRule(identifier: staleID)
-            XCTAssertNil(staleAfter)
-            for identifier in protectedIDs {
+            for identifier in staleIDs {
+                let stale = await PreviewRemoteImageRuleStore.lookupStoredRule(identifier: identifier)
+                XCTAssertNil(stale, "stale \(identifier) was kept")
+            }
+            let keptIDs = protectedIDs + [
+                unrelatedID,
+                PreviewRemoteImageRuleStore.blockIdentifier,
+                PreviewRemoteImageRuleStore.imagesIdentifier,
+            ]
+            for identifier in keptIDs {
                 let kept = await PreviewRemoteImageRuleStore.lookupStoredRule(identifier: identifier)
-                XCTAssertNotNil(kept, "protected \(identifier) was removed")
+                XCTAssertNotNil(kept, "retained \(identifier) was removed")
             }
         }
     }

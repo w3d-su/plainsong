@@ -46,6 +46,7 @@ test: test-packages test-hosted test-preview
 # App/Plainsong.entitlements.
 test-packages: generate
 	$(MAKE) test-f2-tooling
+	python3 Scripts/test-preview-webview-layering.py
 	Scripts/check-sparkle-layering.sh
 	@set -e; for pkg in $(PACKAGES); do \
 		echo "==> swift test: $$pkg"; \
@@ -87,6 +88,7 @@ format: swiftformat-version-check
 	swiftlint --fix --quiet
 
 lint: swiftformat-version-check
+	python3 Scripts/check-preview-webview-layering.py
 	swiftformat $(SWIFT_FORMAT_PATHS) --lint $(SWIFTFORMAT_COMPAT_FLAGS)
 	swiftlint
 

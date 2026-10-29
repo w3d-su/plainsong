@@ -451,8 +451,9 @@ republishes only when its value changes literally.
   not stop remote script, style, or font; the content rule does. Every preview and export
   `WKWebView` is created by `PreviewController` and installs the blocking list before the
   page loads. A new web view, including print or Quick Look, has to go through that
-  controller. Link clicks stay in JavaScript (`preventDefault` plus `linkClicked`), so
-  the rule does not take over external opening. If the blocking list fails to compile,
+  controller. `make lint` checks production Swift sources and permits direct WebKit
+  construction only in the controller's two factory files. Link clicks stay in JavaScript
+  (`preventDefault` plus `linkClicked`), so the rule does not take over external opening. If the blocking list fails to compile,
   the preview page is not loaded and the failure is shown. That result is not cached.
   The same controller tries again once, off the typing path, and again when another
   document is shown. If only the https-image exception fails, the preference is treated

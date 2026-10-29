@@ -100,7 +100,7 @@ enum PreviewRemoteImageRuleStore {
         }
     }
 
-    /// Keeps a `plainsong-` identifier out of the prefix sweep. Tests call this before compile.
+    /// Keeps a preview identifier out of the prefix sweep. Tests call this before compile.
     static func protectStoredRules(_ identifiers: [String]) {
         protectedIdentifiers.formUnion(identifiers)
     }
@@ -151,19 +151,20 @@ enum PreviewRemoteImageRuleStore {
         }
     }
 
-    /// Drops every `plainsong-` list except the two hashes in use. A changed rule source
-    /// therefore does not leave its previous hash in the store, and a crashed test does not
-    /// leave `plainsong-preview-test-*` behind. Identifiers registered with
-    /// `protectStoredRules` are left alone so a parallel test can still look them up.
+    /// Drops stale preview lists and the retired export list, preserving other features'
+    /// namespaces. Current hashes and identifiers registered with `protectStoredRules`
+    /// stay available, including lists a parallel test is still using.
     static func removeUnprotectedStaleRules() async {
         let identifiers = await WKContentRuleListStore.default().availableIdentifiers()
         let keep: Set = [blockIdentifier, imagesIdentifier]
+        let legacy: Set = ["plainsong-export-no-http-v1"]
         let stale = (identifiers ?? []).filter { identifier in
-            identifier.hasPrefix("plainsong-")
+            (identifier.hasPrefix("plainsong-preview-") || legacy.contains(identifier))
                 && !keep.contains(identifier)
                 && !protectedIdentifiers.contains(identifier)
         }
-        for identifier in stale where !protectedIdentifiers.contains(identifier) && !keep.contains(identifier) {
+        // Each removal awaits WebKit, so protection may change before the next iteration.
+        for identifier in stale where !protectedIdentifiers.contains(identifier) {
             try? await WKContentRuleListStore.default().removeContentRuleList(forIdentifier: identifier)
         }
     }

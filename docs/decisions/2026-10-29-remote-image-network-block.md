@@ -31,9 +31,10 @@ stays as the second layer.
 
 Store identifiers are a prefix plus the first 12 hex characters of the rule source's
 SHA-256, so a changed rule cannot reuse a previously compiled list. The first compilation
-also deletes every other stored `plainsong-` identifier, except the two current hashes
-and any identifier a test has marked in use. A later source change therefore does not
-leave the previous hash behind.
+also deletes stale `plainsong-preview-` identifiers and the retired
+`plainsong-export-no-http-v1`, except the two current hashes and any identifier a test
+has marked in use. Other features' `plainsong-` identifiers are left alone. A later source
+change therefore does not leave the previous hash behind.
 
 If the blocking list fails to compile, the preview page is not loaded and the failure is
 reported (`IOSPreviewEvent.contentRuleUnavailable`, a macOS preview-pane message, and an
@@ -51,9 +52,12 @@ The rule blocks remote script, style, font, fetch, and navigation in both states
 CSP on the `file://` page is not that defense: with no content rule, the probe still
 recorded `GET` for remote script, font, and stylesheet. Every preview and export
 `WKWebView` has to be created by `PreviewController`, which installs the blocking list
-before the page loads. A later print or Quick Look web view cannot rely on the CSP meta
-element. Link clicks are still `preventDefault` plus the `linkClicked` bridge message,
-so external opening does not depend on the web view navigating.
+before the page loads. `make lint` scans production Swift sources and rejects direct
+`WKWebView` and `WKWebViewConfiguration` construction outside the controller's two
+specific factory files; test and probe sources are excluded. A later print or Quick
+Look web view cannot rely on the CSP meta element. Link clicks are still `preventDefault`
+plus the `linkClicked` bridge message, so external opening does not depend on the web view
+navigating.
 
 ## Why this shape
 
@@ -113,6 +117,14 @@ alone (`img-src` has no `http:`). The allow list's exception is `https` only, so
 Automated tests use the existing loopback CONNECT proxy and distinct `.invalid` hosts.
 They prove which hosts are contacted and that the tunnel is refused. They do not complete
 TLS. The completed `GET` lines above are from the probe, not from those tests.
+
+For preconnect, the no-rule control observes a CONNECT and both installed lists prevent
+that CONNECT. This evidence does not cover DNS resolution before rule evaluation when
+production runs without the proxy. User-authored connection hints are removed by the
+renderer before DOM insertion: vitest covers `link` with `preconnect`, `dns-prefetch`,
+and `prefetch`, plus `meta http-equiv="refresh"`, in both Markdown and MDX. The bundled
+page also disables DNS prefetch with `x-dns-prefetch-control: off`. These are separate
+layers; the proxy test is not a DNS-traffic measurement.
 
 ## Alternatives
 
