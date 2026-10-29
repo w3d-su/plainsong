@@ -77,7 +77,9 @@ Sparkle supports sandboxed apps through its XPC services:
   `codesign --verify --deep --strict` (verification only). A shipped plist whose
   `PLAINSONG_UPDATES_ENABLED` is not `NO` must have a 32-byte EdDSA key, the expected
   HTTPS feed (`https://w3d-su.github.io/plainsong/appcast.xml`), `SURequireSignedFeed`,
-  and `SUVerifyUpdateBeforeExtraction`. The installer-launcher key and the mach-lookup
+  and `SUVerifyUpdateBeforeExtraction`. The key check matches Sparkle's decoder
+  (no padding repair, no interior whitespace). The feed check strips quotes only.
+  CI runs the same guard on the Debug Info.plist after the ui-performance build. The installer-launcher key and the mach-lookup
   exceptions are present even when the flag is NO. They do not start the updater, and
   the temporary exceptions need a separate pass before a Mac App Store submission.
 
@@ -140,6 +142,7 @@ no Developer ID identity. U-G4–U-G9 stay open for U2 and U3.
   the app in both the unsigned and Developer ID paths of `Scripts/release.sh`.
   The finished app is also `codesign --verify --deep --strict` (verification only).
   A non-`NO` shipped plist must pass the key, feed, and signed-feed guard.
+  The key check matches Sparkle's decoder, and the feed check strips quotes only.
   Unsigned path: passed 2026-10-29, including the review-fix pass
   (`codesign --verify --strict` on each nested item, `--deep --strict` on the app,
   and the shipped-plist guard). The release directory was deleted afterward.

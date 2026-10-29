@@ -54,8 +54,11 @@ items is checked with `codesign --verify --strict`, and the finished app is then
 checked with `codesign --verify --deep --strict` (verification only). If the shipped
 `PLAINSONG_UPDATES_ENABLED` is not `NO`, the plist must contain a 32-byte EdDSA
 public key, `https://w3d-su.github.io/plainsong/appcast.xml`, `SURequireSignedFeed`,
-and `SUVerifyUpdateBeforeExtraction`. That feed URL is the release guard's expected
-host. U-D4 is still the owner's decision, so U2 changes the constant if the host
+and `SUVerifyUpdateBeforeExtraction`. The key check matches Sparkle 2.10.0
+`decode()`: trim only the ends, require padding, and reject interior whitespace.
+The feed check strips quotes only, not whitespace. That feed URL is the release
+guard's expected host. CI also runs the guard on the Debug Info.plist after
+`hosted (ui-performance)` builds the app. U-D4 is still the owner's decision, so U2 changes the constant if the host
 changes. U1's `NO` build does not have to satisfy it.
 
 Install and relaunch goes through the normal quit path, so this change does not bypass

@@ -216,6 +216,10 @@ jobs:
         if: ${{ matrix.build_app }}
         run: make build
 
+      - name: Check built update configuration
+        if: ${{ matrix.build_app }}
+        run: Scripts/check-shipped-update-configuration.sh "$XCODE_DERIVED_DATA/Build/Products/Debug/Plainsong.app/Contents/Info.plist"
+
       - name: Capture failure environment
         if: ${{ failure() || cancelled() }}
         run: |

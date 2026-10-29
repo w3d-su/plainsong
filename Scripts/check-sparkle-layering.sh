@@ -43,8 +43,13 @@ if revision not in package_block:
     print(f"error: Sparkle must be pinned by {revision}", file=sys.stderr)
     sys.exit(1)
 for line in package_block:
-    if line.startswith(("exactVersion:", "branch:", "from:", "minVersion:", "maxVersion:")):
-        print(f"error: Sparkle pin must be the revision above, found {line}", file=sys.stderr)
+    if not line or line.startswith("#"):
+        continue
+    if not line.startswith(("url:", "revision:")):
+        print(
+            f"error: Sparkle package block may only contain url, revision, and comments, found {line}",
+            file=sys.stderr,
+        )
         sys.exit(1)
 if linked_from != ["Plainsong"]:
     print(f"error: Sparkle must be linked only by Plainsong, found {linked_from}", file=sys.stderr)

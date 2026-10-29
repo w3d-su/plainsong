@@ -28,14 +28,16 @@ if enabled == "NO":
     sys.exit(0)
 
 def decoded_length(value):
+    # Sparkle 2.10.0 decode(): trim ends only, then
+    # initWithBase64EncodedString:options:0. Missing padding and interior
+    # whitespace are invalid. Do not repair either.
     if not isinstance(value, str):
         return None
-    compact = "".join(value.split())
-    if not compact:
+    stripped = value.strip()
+    if not stripped or len(stripped) % 4 != 0:
         return None
-    padded = compact + ("=" * ((-len(compact)) % 4))
     try:
-        raw = base64.b64decode(padded, validate=True)
+        raw = base64.b64decode(stripped, validate=True)
     except Exception:
         return None
     return len(raw)
@@ -57,7 +59,8 @@ if key_length != 32:
     errors.append("SUPublicEDKey must be base64 that decodes to 32 bytes")
 
 feed = info.get("SUFeedURL")
-normalized = feed.strip().strip("\"'") if isinstance(feed, str) else None
+# Sparkle strips quotes only. Surrounding whitespace stays and will not parse.
+normalized = feed.strip("\"'") if isinstance(feed, str) else None
 if normalized != expected:
     errors.append(f"SUFeedURL must be {expected}")
 
@@ -145,6 +148,41 @@ write("missing-flag.plist", {
     "SUFeedURL": expected,
     "SUPublicEDKey": good_key,
 })
+write("unpadded-key.plist", {
+    "PLAINSONG_UPDATES_ENABLED": "YES",
+    "SUFeedURL": expected,
+    "SUPublicEDKey": good_key.rstrip("="),
+    "SURequireSignedFeed": True,
+    "SUVerifyUpdateBeforeExtraction": True,
+})
+write("inner-space-key.plist", {
+    "PLAINSONG_UPDATES_ENABLED": "YES",
+    "SUFeedURL": expected,
+    "SUPublicEDKey": good_key[:8] + " " + good_key[8:],
+    "SURequireSignedFeed": True,
+    "SUVerifyUpdateBeforeExtraction": True,
+})
+write("surrounding-whitespace-key.plist", {
+    "PLAINSONG_UPDATES_ENABLED": "YES",
+    "SUFeedURL": expected,
+    "SUPublicEDKey": "\n" + good_key + " ",
+    "SURequireSignedFeed": True,
+    "SUVerifyUpdateBeforeExtraction": True,
+})
+write("padded-feed.plist", {
+    "PLAINSONG_UPDATES_ENABLED": "YES",
+    "SUFeedURL": " " + expected + " ",
+    "SUPublicEDKey": good_key,
+    "SURequireSignedFeed": True,
+    "SUVerifyUpdateBeforeExtraction": True,
+})
+write("quoted-feed.plist", {
+    "PLAINSONG_UPDATES_ENABLED": "YES",
+    "SUFeedURL": '"' + expected + '"',
+    "SUPublicEDKey": good_key,
+    "SURequireSignedFeed": True,
+    "SUVerifyUpdateBeforeExtraction": True,
+})
 PY
     failed=0
     while IFS=$'\t' read -r name expect; do
@@ -154,9 +192,12 @@ PY
                 failed=1
             fi
         else
-            if check_plist "$tmp/$name"; then
+            # Expected failures must not look like a real CI error.
+            if check_plist "$tmp/$name" 2>/dev/null; then
                 echo "error: $name should fail" >&2
                 failed=1
+            else
+                echo "expected failure: $name"
             fi
         fi
     done << 'CASES'
@@ -169,6 +210,11 @@ http-feed.plist	fail
 wrong-host.plist	fail
 missing-verify.plist	fail
 missing-flag.plist	fail
+unpadded-key.plist	fail
+inner-space-key.plist	fail
+surrounding-whitespace-key.plist	pass
+padded-feed.plist	fail
+quoted-feed.plist	pass
 CASES
     rm -rf "$tmp"
     if [[ "$failed" -ne 0 ]]; then
