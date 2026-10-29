@@ -92,8 +92,49 @@ xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Release
     "${STRIP_SETTINGS[@]}" \
     clean build
 
-echo "==> Verify code signature"
-codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+# Sparkle's Code Sign on Copy step re-signs the framework but not the XPC services
+# and helpers inside it. Re-sign from the inside out, then the app, so the outer
+# signature covers the nested ones. Each item is signed on its own so Downloader.xpc
+# keeps its own entitlements (Sparkle sandboxing guide).
+resign_sparkle_and_verify() {
+    local framework="$APP_PATH/Contents/Frameworks/Sparkle.framework"
+    local root="$framework/Versions/B"
+    local installer="$root/XPCServices/Installer.xpc"
+    local downloader="$root/XPCServices/Downloader.xpc"
+    local autoupdate="$root/Autoupdate"
+    local updater_app="$root/Updater.app"
+    local item
+    for item in "$installer" "$downloader" "$autoupdate" "$updater_app" "$framework"; do
+        if [[ ! -e "$item" ]]; then
+            echo "error: Sparkle item missing: $item" >&2
+            exit 1
+        fi
+    done
+
+    echo "==> Re-sign Sparkle (innermost first)"
+    if [[ "$UNSIGNED" == "1" ]]; then
+        codesign --force --sign - "$installer"
+        codesign --force --sign - --preserve-metadata=entitlements "$downloader"
+        codesign --force --sign - "$autoupdate"
+        codesign --force --sign - "$updater_app"
+        codesign --force --sign - "$framework"
+        codesign --force --sign - --preserve-metadata=entitlements "$APP_PATH"
+    else
+        codesign --force --sign "$PLAINSONG_SIGNING_IDENTITY" -o runtime --timestamp "$installer"
+        codesign --force --sign "$PLAINSONG_SIGNING_IDENTITY" -o runtime --timestamp --preserve-metadata=entitlements "$downloader"
+        codesign --force --sign "$PLAINSONG_SIGNING_IDENTITY" -o runtime --timestamp "$autoupdate"
+        codesign --force --sign "$PLAINSONG_SIGNING_IDENTITY" -o runtime --timestamp "$updater_app"
+        codesign --force --sign "$PLAINSONG_SIGNING_IDENTITY" -o runtime --timestamp "$framework"
+        codesign --force --sign "$PLAINSONG_SIGNING_IDENTITY" -o runtime --timestamp --preserve-metadata=entitlements "$APP_PATH"
+    fi
+
+    echo "==> Verify Sparkle and app signatures"
+    for item in "$installer" "$downloader" "$autoupdate" "$updater_app" "$framework" "$APP_PATH"; do
+        codesign --verify --strict --verbose=2 "$item"
+    done
+}
+
+resign_sparkle_and_verify
 
 echo "==> Verify the dSYM matches the stripped executable"
 if [[ ! -d "$DSYM_PATH" ]]; then
