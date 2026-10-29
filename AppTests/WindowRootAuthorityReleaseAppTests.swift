@@ -61,6 +61,32 @@ final class WindowRootAuthorityReleaseAppTests: XCTestCase {
         XCTAssertTrue(owner.hasStopped)
     }
 
+    func testStandaloneReplacementRetiresOwnInstallationAndPreservesOtherOwners() throws {
+        let fixture = try SecondWindowRegistryFixture.make(testCase: self)
+        fixture.appState.workspaceRootURL = nil
+        fixture.appState.workspaceSearchRootAuthority = nil
+        let thirdURL = try XCTUnwrap(fixture.appState.sessionStateURL(for: fixture.third))
+        fixture.appState.registry.setWarmSession(fixture.third, at: thirdURL)
+        fixture.appState.indeterminateWorkspaceMutationSessions.insert(ObjectIdentifier(fixture.second))
+        fixture.appState.pendingExternalTexts[thirdURL] = "unrelated warm conflict"
+        let binding = fixture.appState.editorDocumentBinding(for: fixture.first)
+        let installation = EditorDocumentBindingInstallation(
+            bindingID: binding.id, installationID: EditorDocumentBindingInstallationID()
+        )
+        binding.onLifecycle(.installed(installation))
+        defer { binding.onLifecycle(.revoked(installation)) }
+
+        try fixture.appState.closeWorkspaceForReplacement()
+
+        let retired = try XCTUnwrap(fixture.appState.retiredEditorDocumentSessions[fixture.firstURL])
+        XCTAssertTrue(retired.awaitingInstallations.contains(installation))
+        XCTAssertTrue(fixture.secondWindow.shownSession === fixture.second)
+        XCTAssertTrue(fixture.appState.indeterminateWorkspaceMutationSessions
+            .contains(ObjectIdentifier(fixture.second)))
+        XCTAssertTrue(fixture.appState.registry.warmSession(at: thirdURL) === fixture.third)
+        XCTAssertEqual(fixture.appState.pendingExternalTexts[thirdURL], "unrelated warm conflict")
+    }
+
     func testLastReleaseRefusesOwnRootQuarantineAndKeepsItsLiveScope() throws {
         let fixture = try SecondWindowRegistryFixture.make(testCase: self)
         let access = SecurityScopedAccess.startAccessing(fixture.root)

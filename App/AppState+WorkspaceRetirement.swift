@@ -95,8 +95,8 @@ extension AppState {
 
 @MainActor
 private extension AppState {
-    /// Every session whose retained authority or installed membership belongs to the
-    /// closing root. Preflight covers preserved sessions as well as the release set.
+    /// Root closure covers its preserved sessions as well as the release set. Without
+    /// a root, replacement retires only this window's shown and installed documents.
     func workspaceSessionsForRootPreflight() -> [DocumentSession] {
         registry.sessions(from: [
             .warmCache, .retired, .editorBindings, .editorInstallations, .mutationRecovery, .fileBackedWindowDocuments,
@@ -110,7 +110,12 @@ private extension AppState {
     }
 
     func sessionBelongsToClosingRoot(_ session: DocumentSession) -> Bool {
-        guard let authority = workspaceSearchRootAuthority else { return false }
+        guard let authority = workspaceSearchRootAuthority else {
+            if session === shownSession { return true }
+            return editorBindingInstallations.contains { installation, owner in
+                owner === session && registry.editorInstallationWindows[installation]?.window === windowState
+            }
+        }
         if let location = retainedManagedSessionLocation(for: session),
            location.rootAuthority == authority
         {

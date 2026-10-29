@@ -19,3 +19,10 @@ Rejecting every close with a preserved session would be safe but would postpone
 D1b's cross-window release behavior. Keeping the scope on the closing facade would
 make its lifetime depend on that facade. Registry ownership follows the session
 instead, without adding work to source publication.
+
+Standalone replacement has no workspace-root authority to filter by. Its release
+set instead includes that window's shown session and live editor installations,
+so composition can publish until retirement's final revoke. Other windows and
+unrelated warm sessions remain outside the replacement preflight. The existing
+standalone composition, late Reload and failed-destination tests cover this
+boundary; a cross-window test verifies the narrower inventory.
