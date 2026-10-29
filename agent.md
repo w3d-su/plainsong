@@ -260,8 +260,14 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   debouncing provider notices. A per-file content notice drops only that path; changed
   trees and explicit searches read again. In-flight reads cannot restore an invalidated
   cache entry, including a size or encoding refusal.
-- Each workspace window has its own `AppState` façade, `WindowState`, and
-  `WorkspaceRootContext`, and they share one `AppDocumentRegistry`. The warm-session
+- Each workspace window has its own `AppState` façade and `WindowState`. Windows on
+  the same canonical physical root share one `WorkspaceRootContext`, indexed weakly by
+  the shared `AppDocumentRegistry` (D1c). A root has one scope start, watcher, snapshot,
+  generation and scan per refresh; each participant keeps its own filtered tree,
+  expansion, selection, reload disposition and search. Namespace mutation is app-wide;
+  deferred refresh and image-placement counts stay per root, and drain services every
+  queued root. A departing participant clears only its own window tasks and search;
+  the last reference runs D1b release. The warm-session
   LRU is one global cache: 8 warm sessions plus every installed document. An installed
   document is an editor-binding installation or any connected window's shown session;
   it does not count toward the 8 and cannot be evicted. Other protected sessions still
@@ -275,8 +281,11 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   recency (D1b). Last-root preflight includes every session belonging to that root,
   including a session another window preserves. Preserved sessions retain the original
   security scope until eviction or final ownership release. Editor installations record
-  their owning window, so delayed teardown in the closing window uses retirement. Same-file focus (WD1), one shared root context (D1c), and a
-  user-facing New Window (D2) are not implemented yet.
+  their owning window, so delayed teardown in the closing window uses retirement.
+  Adopting a warm document in another window synchronously supersedes old writers;
+  late release/revoke cannot affect the new writer. Root overlap and a root containing
+  another window's installed standalone file refuse before installation and offer Show.
+  Same-file routing (WD1) and a user-facing New Window remain with D2.
 - With no attached workspace window, New File, Open, and Open Recent wait for a scene
   that has claimed the owner. A three-second attach timeout lets the next command retry;
   a tracked façade alone does not establish that a scene exists.

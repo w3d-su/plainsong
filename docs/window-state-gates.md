@@ -773,9 +773,9 @@ C's fallback. W8 then verifies D2's routing to an existing or new window under W
 
 - [ ] Every §5.2 entry point that targets a file current in another window focuses that window and creates no second installation. *Named hosted tests, one per entry point.*
 - [ ] Hard links and case or NFC/NFD aliases count as the same file. *Named hosted test.*
-- [ ] Every session has ≤ 1 writer always and ≤ 1 live installation after SwiftUI teardown settles. Adoption revokes the old writer synchronously; late teardown cannot revoke the new writer. *Debug assertions + named hosted test with delayed teardown (D1c).* Drive the delayed writer-release and revoked-installation events through the editor-binding installation-release path on admitted façade fixtures; a mounted `WorkspaceWindow` is not required.
-- [ ] A warm session adopted by window 2 after window 1 switched away transfers the writer; window 1's stale installation cannot publish. *Named hosted test.*
-- Evidence: _open_
+- [x] Every session has ≤ 1 writer always and ≤ 1 live installation after SwiftUI teardown settles. Adoption revokes the old writer synchronously; late teardown cannot revoke the new writer. *Debug assertions + named hosted test with delayed teardown (D1c).* Drive the delayed writer-release and revoked-installation events through the editor-binding installation-release path on admitted façade fixtures; a mounted `WorkspaceWindow` is not required.
+- [x] A warm session adopted by window 2 after window 1 switched away transfers the writer; window 1's stale installation cannot publish. *Named hosted test.*
+- Evidence (D1c): `WindowWriterAdoptionAppTests/testWarmAdoptionRevokesTheOldWriterBeforeTheNewInstallationExists` refuses stale publication and activation immediately at adoption. `testDelayedWriterReleaseAndInstallationRevocationCannotRevokeTheAdoptedWriter` drives late release and revoke through production binding lifecycle, verifies the new writer remains authorized, and leaves one live installation. These are admitted facade fixtures; WD1 entry-point routing and mounted production windows remain D2. Typing evidence is recorded in `docs/perf/2026-10-30-windows-d1c-typing-ab.md`.
 
 ### PR C scheduling re-verification (R22)
 
@@ -803,20 +803,31 @@ scheduling root cause remains unknown. This is an additional gate, not closure b
 
 ### W6 — Same-workspace shared root context
 
-- [ ] Two windows on one root share one watcher, one security-scope start, and one scan per refresh. *Named hosted test.*
-- [ ] A rename in window 1 of the file current in window 2 relocates window 2's session. Window 2's saves are refused during the fence. Both trees update with each window preserving its own Show All Files filter, expansion, selection, and reload disposition. *Named hosted test.*
-- [ ] Closing window 1 keeps its root alive. Last release checks only eligible R1 sessions once; any still-installed session/authority survives. *Named hosted test.*
+- [x] Two windows on one root share one watcher, one security-scope start, and one scan per refresh. *Named hosted test.*
+- [x] A rename in window 1 of the file current in window 2 relocates window 2's session. Window 2's saves are refused during the fence. Both trees update with each window preserving its own Show All Files filter, expansion, selection, and reload disposition. *Named hosted test.*
+- [x] Closing window 1 keeps its root alive. Last release checks only eligible R1 sessions once; any still-installed session/authority survives. *Named hosted test.*
 - [x] Last R1 release preserves R2 warm sessions and standalone warm sessions, their tasks/metadata and LRU entries/recency; no global LRU reset or prune. *Named hosted test.*
 - [x] Last R1 release leaves every session another window shows registered and warm: its editor binding registration, its background autosave and statistics tasks, and its warm-cache entry all survive. The same holds when that window shows a file from another root. Those removals run only for the release set (`App/AppState+WorkspaceRetirement.swift:267-276`). *Named hosted tests, one per item.*
 - [x] R2 fenced/quarantined/conflicted state does not block an otherwise-safe R1 release and is unchanged by it. Global transaction/store-load fences remain enforced. *Named hosted tests.*
-- [ ] An R2 watcher event during R1 mutation stays queued and refreshes R2 after drain; every deferred root is serviced. *Named hosted test.*
-- [ ] **8a.** Overlapping roots and a root containing an installed standalone file refuse before installation. *Named hosted tests (D1c).*
+- [x] An R2 watcher event during R1 mutation stays queued and refreshes R2 after drain; every deferred root is serviced. *Named hosted test.*
+- [x] **8a.** Overlapping roots and a root containing an installed standalone file refuse before installation. *Named hosted tests (D1c).*
 - [ ] **8b.** A single file inside an open root routes per §4.3 (WD1, then WD7). *Named hosted tests (D2).*
-- [ ] **9.** A second namespace transaction, from any window or root, is refused while one runs. *Named hosted test.*
-- Evidence (D1b), `WindowRootReleaseAppTests`. Bullets 1–3, 7, 8a, 8b, and 9 stay open for D1c or D2.
+- [x] **9.** A second namespace transaction, from any window or root, is refused while one runs. *Named hosted test.*
+- Evidence (D1b), `WindowRootReleaseAppTests`. D1c evidence follows; bullet 8b stays open for D2.
   - Bullet 4: `testLastR1ReleasePreservesOtherRootAndStandaloneSessionsAndLRURecency` drops only the closing root's warm session. The other root's warm session, a standalone session, its background task, its pending external text, the standalone detached URL, and LRU recency all survive. There is no global LRU reset.
   - Bullet 5: `testLastR1ReleaseKeepsAnotherWindowsEditorBindingRegistration`, `testLastR1ReleaseKeepsAnotherWindowsBackgroundTasks`, `testLastR1ReleaseKeepsAnotherWindowsWarmCacheEntry`, and `testLastR1ReleaseKeepsASessionShownFromAnotherRoot`.
   - Bullet 6: `testOtherRootFencedQuarantinedAndConflictedStateDoesNotBlockR1Release` leaves the other root's fence, quarantine, conflict text, and warm session in place. `testGlobalTransactionAndStoreLoadFencesStillBlockR1Release` still refuses the close.
+  - Final revoke keeps a retired cold registration removal and otherwise removes a registration only when it is the last reference on a retained root scope. `WindowRetainedAuthorityLifecycleAppTests/testRevokingAnUnshownUntitledSessionKeepsItsBindingRegistration` keeps an unshown untitled registration and can show it again. `testLastRevokeReleasesScopeWhenOnlyAnotherWindowsInstallationKeptTheSession` still stops that scope. `/tmp/plainsong-d1c-evidence/lifecycle-1.xcresult` executed 6 tests with 0 failures.
+
+- Evidence (D1c), 18 named hosted tests in `/tmp/plainsong-d1c-evidence/hosted-7.xcresult` (zero failures):
+  - Bullet 1: `WindowSharedRootAppTests/testSameCanonicalRootSharesOneWatcherScopeAndScanPerRefresh` opens a symlink alias, counts one real scope start and scanner invocation, and shares watcher identity. `testWatcherSurvivesTheCreatingFacadeLeavingAndBeingReleased` drives a real watcher after the creator deallocates. `testInFlightInitialScanSurvivesItsInitiatorDetaching` holds the first scan across detach.
+  - Bullet 2: `WindowSharedRootMutationAppTests/testRenameRelocatesTheOtherWindowsSessionFencesSaveAndPreservesWindowTreesAndSearches` checks relocation, a save refusal during the global fence, independent filters/expansion/selection and each query's refresh generation from one scan. `testRefreshKeepsEachWindowsMissingAndPresentDocumentDisposition` pins independent missing/present outcomes. `testOneWindowsInvalidDocumentDoesNotBlockTheRemainingRefreshRecipients` updates the third participant after the second refuses an invalid document.
+  - Bullet 3: `WindowSharedRootAppTests/testOnlyLastReleaseRunsRootRetirementAndRetainsInstalledAuthority` keeps the shared generation/snapshot/scope on detach and retains installed authority at last release. `testDetachingClearsOnlyItsOwnSearchAndKeepsThePeersQueryAndGeneration` pins window task/search isolation. D1b's root quarantine and retained-authority tests still apply to the last release.
+  - Bullet 7: `WindowSharedRootMutationAppTests/testR2WatcherEventsDuringR1MutationDrainEveryPendingRoot` queues both R2 and R3 under an R1 transaction and verifies all three refresh exactly once on drain.
+  - Bullet 8a: `WindowSharedRootAdmissionAppTests` covers ancestor, descendant, filesystem `/`, shown standalone, delayed standalone, and `testDelayedStandaloneInstallationStillRefusesAfterItsWindowOpensAnotherRoot`. Refusal happens before scope or root installation and offers Show. `/tmp/plainsong-d1c-evidence/related-1.xcresult` then ran the window, workspace and session regression: 651 tests, 1 skipped, 0 failures.
+  - Bullet 9: `WindowSharedRootMutationAppTests/testNamespaceTransactionIsGlobalWhileImagePlacementCountStaysPerRoot` pins the app-wide namespace fence and per-root image count.
+  - `WindowSharedRootAppTests/testBodyEditsDoNotFanOutPublishesOrScansToTheOtherWindow` performs 200 body edits with zero peer facade publishes or scans. Debug typing A/B is recorded in `docs/perf/2026-10-30-windows-d1c-typing-ab.md`; four-window W12 and Release/residency acceptance remain G.
+  - Limits: `make lint` reported 0 serious violations and `make test-preview` passed 229 tests. The full hosted run `/tmp/plainsong-d1c-evidence/full-hosted-1.xcresult` was interrupted after native UI timeouts while the screen was locked; it is not a complete suite result. The same AX filename failure reproduces on `main`, while fresh-host WKWebView and Save Panel cases passed on both trees (`main-ui-counterprobe-1.xcresult`, `d1c-ui-counterprobe-1.xcresult`).
 
 ### W7 — Window close lifecycle
 
