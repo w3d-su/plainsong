@@ -70,7 +70,9 @@ extension AppBackedEditorPerformanceTests {
     func makeAppFixture(
         source: String,
         directoryPrefix: String,
-        fileName: String
+        fileName: String,
+        syntaxTheme: MarkdownSyntaxTheme? = nil,
+        customTheme: CustomThemeDocument? = nil
     ) async throws -> AppFixture {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("\(directoryPrefix)-\(UUID().uuidString)")
@@ -93,6 +95,8 @@ extension AppBackedEditorPerformanceTests {
         let editor = MarkdownEditorView(
             text: binding.text,
             fileKind: .markdown,
+            syntaxTheme: syntaxTheme,
+            customTheme: customTheme,
             showsLineNumbers: false,
             documentIdentity: AppState.editorDocumentIdentity(for: documentURL),
             documentBindingID: binding.id,

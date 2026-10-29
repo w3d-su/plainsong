@@ -62,7 +62,7 @@ projects such as Astro/Next.js content directories).
 | Structure parsing (outline, etc.) | Reuse the tree-sitter syntax tree. Optionally [swift-markdown](https://github.com/swiftlang/swift-markdown) for export tasks. | Avoid two parsers driving the same UI. |
 | Preview | `WKWebView` + local JS bundle built with **esbuild** from `preview-src/` | No remote network access by default (strict CSP). |
 | Preview JS pipeline | unified: `remark-parse`, `remark-gfm`, `remark-frontmatter`, `remark-math`, `remark-mdx` (mdx only) → `rehype`, `rehype-katex`, `highlight.js` for fences; `mermaid` for ```mermaid fences; `morphdom` for incremental DOM patching | unified/remark is the standard 2026 pipeline and the only realistic path to MDX support. |
-| Persistence of prefs | `UserDefaults` + built-in theme IDs; custom theme/user CSS imports deferred | |
+| Persistence of prefs | `UserDefaults` + built-in and imported editor color themes; user CSS deferred | |
 | Project generation | **XcodeGen** (`project.yml` committed; `.xcodeproj` is generated, never hand-edited) | pbxproj diffs are hostile to LLM collaboration. |
 | Lint/format | SwiftFormat + SwiftLint (configs committed) | |
 | Updates | [Sparkle](https://github.com/sparkle-project/Sparkle) 2.10.0, App target only | Pinned to revision `eef1a539a373c1f1a320624b1130fc5de7b2e100` (tag 2.10.0). `PLAINSONG_UPDATES_ENABLED` defaults to NO, so the app does not create or start `SPUUpdater` and makes no update request. Packages must not import Sparkle. |
@@ -648,9 +648,25 @@ attempt without a Decision Log entry.
 
 ## 11. Theming & Settings
 
-- **Editor themes:** two built-ins wired through Settings and applied live. Custom JSON
-  theme files in Application Support are deferred until a separate import/validation
-  design exists.
+- **Editor themes:** two built-ins (`standard`, `graphite`) plus imported color themes.
+  Settings › Editor imports a JSON file (`NSOpenPanel`) and copies the validated bytes
+  into the sandbox container at `Application Support/Plainsong/Themes/<id>.json`. No
+  bookmark is kept. Re-importing an id asks before replacing that copy. Reveal in Finder
+  and Remove act on the copy; Remove moves it to the Trash. Schema v1 is colors only
+  (`#RRGGBB` or `#RRGGBBAA`, 64 KiB, closed keys): an unknown field rejects the whole
+  file, and a missing slot inherits the built-in. Names are trimmed, NFC-normalized,
+  at most 128 Unicode scalars, and cannot contain control, format, or line-break
+  characters or start with a combining mark. A name must contain at least one scalar
+  other than whitespace, a default-ignorable character, or the braille blank.
+  Imported themes are in their own picker section. The picker shows `name (id)` when
+  a name matches a built-in or another imported theme. `text`, `caret`, and
+  `background` must be opaque. While Increase
+  Contrast is on, the editor uses the built-in colors. An unreadable selected theme
+  falls back to Plainsong for that launch with a non-modal notice and keeps the stored id.
+  Switching themes recolors the open editor without reloading the document. Fonts, user
+  CSS, and Mermaid colors from tokens stay deferred. The design is
+  `docs/custom-themes-design.md`; preview tokens in the same file are validated and
+  stored but not applied until the `setThemeTokens` bridge.
 - **Preview themes:** bundled CSS variables for system/light/dark preview themes, paired
   with the editor settings bridge. User CSS overrides are deferred until a separate
   sanitizer/design exists.

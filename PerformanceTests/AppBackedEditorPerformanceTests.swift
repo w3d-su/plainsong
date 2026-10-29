@@ -105,6 +105,43 @@ final class AppBackedEditorPerformanceTests: XCTestCase {
         }
     }
 
+    func testHostedCustomSelectionThemeTypingStaysUnderFrameBudget() async throws {
+        let source = try Self.fixtureText("Fixtures/large-1mb.md")
+        XCTAssertGreaterThanOrEqual(source.utf8.count, 1_048_576)
+        let document = try CustomThemeValidation.validate(Data("""
+        {"schemaVersion":1,"id":"ink","name":"Ink","light":{"editor":{"text":"#112233","background":"#FFFFFF","caret":"#000000","selection":"#224466"}}}
+        """.utf8)).get()
+        let resolved = MarkdownSyntaxTheme.resolving(document)
+        let appFixture = try await makeAppFixture(
+            source: source,
+            directoryPrefix: "AppBackedCustomSelectionTyping",
+            fileName: "large.md",
+            syntaxTheme: resolved,
+            customTheme: document
+        )
+        defer { tearDownAppFixture(appFixture) }
+        let fixture = appFixture.editor
+        XCTAssertTrue(fixture.window.makeFirstResponder(fixture.textView))
+        fixture.textView.textSelection = NSRange(location: 0, length: 24)
+        fixture.textView.layoutSubtreeIfNeeded()
+        let scans = fixture.textView.selectionHighlightTreeScans
+        XCTAssertGreaterThan(scans, 0)
+        fixture.textView.layout()
+        XCTAssertEqual(fixture.textView.selectionHighlightTreeScans, scans)
+        fixture.textView.textSelection = NSRange(location: 0, length: 0)
+        try await Task.sleep(nanoseconds: 50_000_000)
+        await settleScheduledSwiftUIUpdate(in: fixture)
+
+        let ordinaryLatency = await measureHostedUpdate(in: fixture) {
+            fixture.textView.insertText("a", replacementRange: .notFound)
+        }
+        print(String(
+            format: "THEME PERF hosted custom-selection 1 MiB ordinary %.3f ms",
+            ordinaryLatency
+        ))
+        assertFrameBudget(ordinaryLatency, label: "custom selection ordinary insertion")
+    }
+
     func testHostedAppStateStaleIMEReplacementBoundariesPreserveExactUTF16() async throws {
         let scenarios: [(caretLocation: Int, expectedPrefix: String)] = [
             (1, "A\u{81FA}e\u{0301}\u{1F9EA}B"),
