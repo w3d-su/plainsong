@@ -667,9 +667,11 @@ attempt without a Decision Log entry.
   with the editor settings bridge. User CSS overrides are deferred until a separate
   sanitizer/design exists.
 - **Settings window (SwiftUI `Settings` scene):** General (default folder, autosave
-  interval), Editor (font, size, theme import, line numbers, typewriter sync), Preview
-  (theme, allow remote images), Files (image-paste asset folder pattern, default
-  extension `.md`/`.mdx`).
+  interval; when updates are enabled, automatic checks, automatic download and install,
+  and beta updates), Editor (font, size, line numbers, typewriter sync), Preview (theme,
+  allow remote images), Files (image-paste asset folder pattern, default extension
+  `.md`/`.mdx`). Plainsong > Check for Updates… and those update toggles stay hidden
+  while `PLAINSONG_UPDATES_ENABLED` is NO.
 
 ---
 

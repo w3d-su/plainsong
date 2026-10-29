@@ -143,6 +143,8 @@ final class CustomThemeValidationTests: XCTestCase {
             Rejection(label: "line separator name", payload: base(name: "Ink\u{2028}Two"), expected: .name),
             Rejection(label: "paragraph separator name", payload: base(name: "In\u{2029}k"), expected: .name),
             Rejection(label: "combining mark name", payload: base(name: "\u{0301}"), expected: .name),
+            Rejection(label: "spacing mark prefix", payload: base(name: "\u{093E}Ink"), expected: .name),
+            Rejection(label: "enclosing mark prefix", payload: base(name: "\u{20DD}Ink"), expected: .name),
             Rejection(
                 label: "long name",
                 payload: base(name: String(repeating: "N", count: 129)),
@@ -239,6 +241,9 @@ final class CustomThemeValidationTests: XCTestCase {
         let document = try validate(base(name: "  \(composed)  "))
         XCTAssertEqual(document.name, "\u{00E9}")
         XCTAssertEqual(document.name.unicodeScalars.count, 1)
+        for name in ["A\u{093E}", "A\u{20DD}"] {
+            XCTAssertEqual(try validate(base(name: name)).name, name)
+        }
     }
 
     func testRejectsAGraphemeThatHidesTooManyScalars() throws {

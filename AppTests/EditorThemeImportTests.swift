@@ -216,12 +216,11 @@ final class EditorThemeImportTests: XCTestCase {
         XCTAssertTrue(names.contains("ink (ink-b)"))
         XCTAssertTrue(names.contains("Solo"))
         XCTAssertFalse(names.contains("Solo (solo)"))
-        XCTAssertEqual(
-            fixture.preferences.builtInEditorThemeChoices.map(\.name),
-            ["Plainsong", "Graphite"]
-        )
-        XCTAssertFalse(fixture.preferences.builtInEditorThemeChoices.contains { $0.id == "plainsong-copy" })
-        XCTAssertTrue(fixture.preferences.importedEditorThemeChoices.contains { $0.id == "plainsong-copy" })
+        let sections = fixture.preferences.editorThemePickerSections
+        XCTAssertEqual(sections.builtIn.map(\.name), ["Plainsong", "Graphite"])
+        XCTAssertFalse(sections.builtIn.contains { $0.id == "plainsong-copy" })
+        XCTAssertTrue(sections.imported.contains { $0.id == "plainsong-copy" })
+        XCTAssertEqual(sections.builtIn + sections.imported, fixture.preferences.editorThemePickerChoices)
     }
 
     @MainActor

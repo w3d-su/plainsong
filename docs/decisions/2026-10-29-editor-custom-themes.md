@@ -32,17 +32,17 @@ resolve from the built-in palette.
 
 Names are stored in NFC, trimmed, limited to 128 Unicode scalars, and rejected when
 they contain control, format, line-separator, or paragraph-separator characters, or when
-they start with a combining mark. Homoglyphs are not given their own denylist. Imported
-themes are listed in a separate picker section, and the picker still appends `name (id)`
-when a name collides with a built-in display name or another imported theme. Increase
-Contrast is seeded on the main actor and updated from the workspace notification
-center into a lock; theme colors do not read `NSWorkspace` while resolving. A theme file
-is opened without following links and is read only after `fstat` shows a regular file.
+they start with a combining mark (nonspacing, spacing, or enclosing). Homoglyphs are
+not given their own denylist. Imported themes are listed in a separate picker section,
+and the picker still appends `name (id)` when a name collides with a built-in display
+name or another imported theme. Increase Contrast is seeded on the main actor and updated
+from the workspace notification center into a lock; theme colors do not read `NSWorkspace`
+while resolving. A theme file is opened without following links and is read only after
+`fstat` shows a regular file.
 STTextView 2.4.1 does not offer a selection-color API (`selectedLineHighlightColor` is
 the current line), so a custom selection color is still painted onto
-`STSelectionHighlightView`. Layout
-repaints only that selection container, which lives for the life of the text view,
-instead of walking every layout fragment on each keystroke.
+`STSelectionHighlightView`. Layout repaints only that selection container, which lives
+for the life of the text view, instead of walking every layout fragment on each keystroke.
 
 Missing editor slots inherit the built-in `standard` colors, which are already dynamic
 system colors. An omitted `dark` object inherits the built-in dark appearance for every

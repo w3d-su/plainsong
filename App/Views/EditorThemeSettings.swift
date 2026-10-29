@@ -6,18 +6,19 @@ struct EditorThemeSettings: View {
     @ObservedObject var preferences: PlainsongPreferences
 
     var body: some View {
+        let choices = preferences.editorThemePickerSections
         Picker("Theme", selection: Binding(
             get: { preferences.editorThemeIdentifier },
             set: { preferences.selectEditorTheme(identifier: $0) }
         )) {
             Section("Built-in") {
-                ForEach(preferences.builtInEditorThemeChoices) { choice in
+                ForEach(choices.builtIn) { choice in
                     Text(choice.name).tag(choice.id)
                 }
             }
-            if !preferences.importedEditorThemeChoices.isEmpty {
+            if !choices.imported.isEmpty {
                 Section("Imported") {
-                    ForEach(preferences.importedEditorThemeChoices) { choice in
+                    ForEach(choices.imported) { choice in
                         Text(choice.name).tag(choice.id)
                     }
                 }

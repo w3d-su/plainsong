@@ -127,12 +127,12 @@ extension PlainsongPreferences {
         return choices
     }
 
-    var builtInEditorThemeChoices: [EditorThemeChoice] {
-        editorThemePickerChoices.filter { MarkdownEditorTheme(rawValue: $0.id) != nil }
-    }
-
-    var importedEditorThemeChoices: [EditorThemeChoice] {
-        editorThemePickerChoices.filter { MarkdownEditorTheme(rawValue: $0.id) == nil }
+    var editorThemePickerSections: (builtIn: [EditorThemeChoice], imported: [EditorThemeChoice]) {
+        let choices = editorThemePickerChoices
+        return (
+            builtIn: choices.filter { MarkdownEditorTheme(rawValue: $0.id) != nil },
+            imported: choices.filter { MarkdownEditorTheme(rawValue: $0.id) == nil }
+        )
     }
 
     func reloadImportedEditorThemes() {

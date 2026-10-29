@@ -378,7 +378,12 @@ public enum CustomThemeValidation {
                 false
             }
         }
-        if hasHiddenScalar || scalars.first?.properties.generalCategory == .nonspacingMark {
+        if hasHiddenScalar {
+            return nil
+        }
+        if let first = scalars.first,
+           [.nonspacingMark, .spacingMark, .enclosingMark].contains(first.properties.generalCategory)
+        {
             return nil
         }
         return normalized
