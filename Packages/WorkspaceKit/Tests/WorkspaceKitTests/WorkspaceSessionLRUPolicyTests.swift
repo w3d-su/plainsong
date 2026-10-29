@@ -200,6 +200,37 @@ final class WorkspaceSessionLRUPolicyTests: XCTestCase {
         XCTAssertEqual(policy.dirtyState(for: retained), true)
     }
 
+    func testInstalledAndProtectedURLDoesNotCountTowardWarmCapacity() {
+        var policy = WorkspaceSessionLRUPolicy(limit: 1)
+        let both = URL(fileURLWithPath: "/tmp/both.md")
+        let warm = URL(fileURLWithPath: "/tmp/warm.md")
+        let incoming = URL(fileURLWithPath: "/tmp/incoming.md")
+
+        XCTAssertTrue(policy.access(
+            both,
+            isDirty: false,
+            protectedURLs: [both],
+            installedURLs: [both]
+        ).isEmpty)
+        XCTAssertTrue(policy.access(
+            warm,
+            isDirty: false,
+            protectedURLs: [both],
+            installedURLs: [both]
+        ).isEmpty)
+
+        XCTAssertEqual(
+            policy.access(
+                incoming,
+                isDirty: false,
+                protectedURLs: [both],
+                installedURLs: [both]
+            ).map(\.url),
+            [warm]
+        )
+        XCTAssertEqual(policy.warmURLsInLeastRecentOrder, [both, incoming])
+    }
+
     func testTrimKeepsInstalledSessionsOutsideWarmCapacity() {
         var policy = WorkspaceSessionLRUPolicy(limit: 1)
         let installed = URL(fileURLWithPath: "/tmp/installed.md")

@@ -290,6 +290,10 @@ extension AppState {
         unanchoredManagedSessionOwnershipProofs[sessionIdentity] =
             .unavailable(fileURL: record.originalURL)
         detachedSessionURLs.insert(record.originalURL)
+        // Match activateFileSession: the restored document is shown, and therefore
+        // installed, before admission. Accessing it first would count it while the
+        // previous untitled document still occupies the installed exemption.
+        setCurrentDocument(session, synchronizingWorkspaceTree: false)
         handleSessionEvictions(
             sessionPolicy.access(
                 record.originalURL,
@@ -298,7 +302,6 @@ extension AppState {
                 installedURLs: installedSessionURLs()
             )
         )
-        setCurrentDocument(session, synchronizingWorkspaceTree: false)
         restoreRecoveryPrompt(for: session)
     }
 

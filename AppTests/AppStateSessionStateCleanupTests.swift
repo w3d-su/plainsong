@@ -124,6 +124,40 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
         return session
     }
 
+    func testTextRecoveryAccessTreatsTheRestoredSessionAsInstalled() throws {
+        let fixture = try SessionStateCleanupFixture()
+        defer { fixture.cleanUp() }
+        let appState = fixture.makeAppState(shownSession: DocumentSession())
+        appState.sessionPolicy = .init(limit: 1)
+        let warmURL = fixture.url("warm.md")
+        try "disk".write(to: warmURL, atomically: false, encoding: .utf8)
+        try appState.activateFileSession(url: warmURL)
+        let warm = appState.shownSession
+        let warmStateURL = try XCTUnwrap(appState.sessionStateURL(for: warm))
+        appState.setCurrentDocument(DocumentSession(), synchronizingWorkspaceTree: false)
+        XCTAssertEqual(appState.sessionPolicy.warmURLsInLeastRecentOrder, [warmStateURL])
+
+        let recoveredURL = fixture.url("recovered.md")
+        appState.pendingWorkspaceMutationTextRecoveryRecords = [
+            WorkspaceMutationTextRecoveryRecord(
+                originalURL: recoveredURL,
+                fileKind: .markdown,
+                source: "Recovered text",
+                revision: 1,
+                reason: .trash
+            ),
+        ]
+        appState.restoreWorkspaceMutationTextRecoveryIfNeeded()
+
+        XCTAssertEqual(appState.shownSession.text, "Recovered text")
+        XCTAssertTrue(appState.installedSessionURLs().contains(recoveredURL))
+        XCTAssertTrue(appState.registry.warmSession(at: warmStateURL) === warm)
+        XCTAssertEqual(
+            appState.sessionPolicy.warmURLsInLeastRecentOrder,
+            [warmStateURL, recoveredURL]
+        )
+    }
+
     func testAllDirtyEvictionSavesFailOncePerPassAndRetainUnsavedText() throws {
         let fixture = try SessionStateCleanupFixture()
         defer { fixture.cleanUp() }
