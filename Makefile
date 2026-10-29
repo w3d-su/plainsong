@@ -47,6 +47,7 @@ test: test-packages test-hosted test-preview
 test-packages: generate
 	$(MAKE) test-f2-tooling
 	Scripts/check-sparkle-layering.sh
+	Scripts/check-shipped-update-configuration.sh --self-test
 	@set -e; for pkg in $(PACKAGES); do \
 		echo "==> swift test: $$pkg"; \
 		(cd Packages/$$pkg && swift test); \

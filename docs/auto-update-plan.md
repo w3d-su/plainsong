@@ -10,7 +10,8 @@
 > makes no update network request, and hides Check for Updates… plus the Settings toggles.
 > U-D3 (second-launch prompt, automatic checks after permission, automatic download off)
 > applies only when the setting is YES. `SUFeedURL` and `SUPublicEDKey` stay empty until U2.
-> The README "no auto-update" limitation stays until U3.
+> U1 tests of the YES path use a fake client. Real Sparkle rejects the empty key and
+> does not run a check until U2. The README "no auto-update" limitation stays until U3.
 
 ## 1. Baseline
 
@@ -42,13 +43,16 @@
 
 ### 3.1 App integration (App target only)
 
-- Swift package `sparkle-project/Sparkle`, pinned to an exact 2.x release at least two
-  weeks old, declared in `project.yml` and linked only by the App target. MarkdownCore,
-  EditorKit, PreviewKit and WorkspaceKit never import it (agent.md §17.3).
-- One `SPUStandardUpdaterController` created when the app starts. A
-  **Plainsong › Check for Updates…** item is placed after About through
-  `CommandGroup(after: .appInfo)`. It is enabled from `SPUUpdater.canCheckForUpdates`, as in
-  Sparkle's SwiftUI sample.
+- Swift package `sparkle-project/Sparkle`, pinned by git revision
+  `eef1a539a373c1f1a320624b1130fc5de7b2e100` (tag 2.10.0, at least two weeks old) in
+  `project.yml` and linked only by the App target. MarkdownCore, EditorKit, PreviewKit
+  and WorkspaceKit never import it (agent.md §17.3).
+- One `SPUStandardUpdaterController`, created only when `PLAINSONG_UPDATES_ENABLED`
+  is YES. U1 tests of that path use a fake client and do not start Sparkle. Real
+  Sparkle rejects the empty `SUPublicEDKey` and does not check a feed until U2 fills
+  the key and `SUFeedURL`. A **Plainsong › Check for Updates…** item is placed after
+  About through `CommandGroup(after: .appInfo)`. It is enabled from
+  `SPUUpdater.canCheckForUpdates`, as in Sparkle's SwiftUI sample.
 - Settings › General gets "Automatically check for updates", "Automatically download and
   install updates" and "Receive beta updates". These bind to `SPUUpdater` properties
   (`automaticallyChecksForUpdates`, `automaticallyDownloadsUpdates`) and to the allowed
@@ -67,9 +71,15 @@ Sparkle supports sandboxed apps through its XPC services:
 - Entitlements: `com.apple.security.temporary-exception.mach-lookup.global-name` with
   `$(PRODUCT_BUNDLE_IDENTIFIER)-spks` and `$(PRODUCT_BUNDLE_IDENTIFIER)-spki`.
 - `Scripts/release.sh` re-signs Sparkle's `Installer.xpc`, `Downloader.xpc`,
-  `Autoupdate`, `Updater.app` and the framework, innermost first. It never uses
-  `--deep`, and it re-signs before the app bundle so the outer signature is valid. Its
-  signature-verification step then checks each nested item.
+  `Autoupdate`, `Updater.app` and the framework, innermost first. Signing never uses
+  `--deep`. It re-signs before the app bundle so the outer signature is valid, then
+  checks each nested item with `codesign --verify --strict` and the finished app with
+  `codesign --verify --deep --strict` (verification only). A shipped plist whose
+  `PLAINSONG_UPDATES_ENABLED` is not `NO` must have a 32-byte EdDSA key, the expected
+  HTTPS feed (`https://w3d-su.github.io/plainsong/appcast.xml`), `SURequireSignedFeed`,
+  and `SUVerifyUpdateBeforeExtraction`. The installer-launcher key and the mach-lookup
+  exceptions are present even when the flag is NO. They do not start the updater, and
+  the temporary exceptions need a separate pass before a Mac App Store submission.
 
 ### 3.3 Quit and relaunch safety
 
@@ -106,7 +116,7 @@ quit, such as a save that cannot complete.
 
 | PR | Scope | Owner needed? |
 |---|---|---|
-| U1 | Decision entry; Sparkle package; updater controller; menu item; Settings toggles; Info.plist keys and entitlements; release-script re-signing; unit and hosted tests (§5) | No. The feed URL points at a placeholder until U2 |
+| U1 | Decision entry; Sparkle package; updater controller; menu item; Settings toggles; Info.plist keys and entitlements; release-script re-signing; unit and hosted tests (§5) | No. `SUFeedURL` and `SUPublicEDKey` are empty strings until U2. YES is covered with a fake client, not a live Sparkle check |
 | U2 | `make-appcast.sh`; `publish-appcast` workflow; `gh-pages` feed; README update | **Yes**: generate the keys and add the secret |
 | U3 | End-to-end update gate (§5 U-G4–U-G7) against a local test feed, then against the real feed with a signed build | **Yes**: signed builds need P1/P2; the owner runs the clean-machine pass |
 
@@ -128,7 +138,11 @@ no Developer ID identity. U-G4–U-G9 stay open for U2 and U3.
   U1 leaves `SUFeedURL` and `SUPublicEDKey` empty.
 - [ ] **U-G3** `codesign --verify --strict` passes for every nested Sparkle item and for
   the app in both the unsigned and Developer ID paths of `Scripts/release.sh`.
-  Unsigned path: passed 2026-10-29, then the release directory was deleted.
+  The finished app is also `codesign --verify --deep --strict` (verification only).
+  A non-`NO` shipped plist must pass the key, feed, and signed-feed guard.
+  Unsigned path: passed 2026-10-29, including the review-fix pass
+  (`codesign --verify --strict` on each nested item, `--deep --strict` on the app,
+  and the shipped-plist guard). The release directory was deleted afterward.
   Developer ID path: implemented, not executed.
 - [ ] **U-G4** Build N updates to N+1 from a local HTTPS test feed with the app sandboxed.
   The new `CFBundleVersion` runs afterwards, and the security-scoped bookmarks,
