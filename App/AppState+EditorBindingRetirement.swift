@@ -140,4 +140,3 @@ extension AppState {
         indeterminateWorkspaceMutationSessions.remove(sessionIdentity)
     }
 }
-

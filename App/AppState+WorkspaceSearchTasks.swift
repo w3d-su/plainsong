@@ -93,7 +93,6 @@ extension AppState {
             queryGeneration: workspaceSearchQueryGeneration
         )
     }
-
 }
 
 @MainActor

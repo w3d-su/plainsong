@@ -120,7 +120,6 @@ extension AppState {
         }
         return result
     }
-
 }
 
 struct WorkspaceReloadCurrentSessionState: Equatable {
@@ -177,4 +176,3 @@ struct WorkspaceReloadCurrentSessionState: Equatable {
         }
     }
 }
-
