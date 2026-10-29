@@ -1403,6 +1403,9 @@ extension AppState {
         if let recovery = nextWorkspaceMutationRecovery() {
             if let nextSession = recovery.remainingSessions.first {
                 setCurrentDocument(nextSession)
+                // The previous shown document is countable now. Trim before the
+                // next access, matching text-recovery admission.
+                reconcileSessionPolicyAfterEditorLeaseChange()
                 restoreRecoveryPrompt(for: nextSession)
             } else {
                 refreshWorkspaceMutationReconciliationPrompt()
@@ -1411,6 +1414,7 @@ extension AppState {
         }
         if let nextSession = nextWorkspaceMutationTextRecoverySession() {
             setCurrentDocument(nextSession)
+            reconcileSessionPolicyAfterEditorLeaseChange()
             restoreRecoveryPrompt(for: nextSession)
             return
         }

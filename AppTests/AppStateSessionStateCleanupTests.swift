@@ -158,6 +158,51 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
         )
     }
 
+    func testPromotingTextRecoveryTrimsThePreviousShownSession() throws {
+        let fixture = try SessionStateCleanupFixture()
+        defer { fixture.cleanUp() }
+        let appState = fixture.makeAppState(shownSession: DocumentSession())
+        appState.sessionPolicy = .init(limit: 1)
+        try "a".write(to: fixture.url("a.md"), atomically: false, encoding: .utf8)
+        try "b".write(to: fixture.url("b.md"), atomically: false, encoding: .utf8)
+        try appState.activateFileSession(url: fixture.url("a.md"))
+        let oldest = appState.shownSession
+        try appState.activateFileSession(url: fixture.url("b.md"))
+        let shown = appState.shownSession
+        let oldestURL = try XCTUnwrap(appState.sessionStateURL(for: oldest))
+        let shownURL = try XCTUnwrap(appState.sessionStateURL(for: shown))
+
+        let recoveredURL = fixture.url("recovered.md")
+        let recovered = DocumentSession(
+            text: "Recovered text",
+            url: recoveredURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let recoveryID = UUID()
+        let recoveredIdentity = ObjectIdentifier(recovered)
+        appState.workspaceMutationTextRecoveryContexts[recoveredIdentity] =
+            WorkspaceMutationTextRecoveryContext(
+                recoveryID: recoveryID,
+                originalURL: recoveredURL,
+                fileKind: .markdown,
+                reason: .trash,
+                persistedRevision: 1
+            )
+        appState.workspaceMutationTextRecoverySessions[recoveryID] = recovered
+        appState.unanchoredManagedSessionOwnershipProofs[recoveredIdentity] =
+            .unavailable(fileURL: recoveredURL)
+        appState.detachedSessionURLs.insert(recoveredURL)
+
+        appState.promoteNextWorkspaceMutationRecoverySessionIfNeeded()
+
+        XCTAssertTrue(appState.shownSession === recovered)
+        XCTAssertEqual(recovered.text, "Recovered text")
+        XCTAssertNil(appState.registry.warmSession(at: oldestURL))
+        XCTAssertTrue(appState.registry.warmSession(at: shownURL) === shown)
+        XCTAssertEqual(appState.sessionPolicy.warmURLsInLeastRecentOrder, [shownURL])
+    }
+
     func testAllDirtyEvictionSavesFailOncePerPassAndRetainUnsavedText() throws {
         let fixture = try SessionStateCleanupFixture()
         defer { fixture.cleanUp() }
