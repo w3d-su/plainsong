@@ -16,6 +16,7 @@ struct MarkdownHighlightResult: Equatable {
 
 actor MarkdownHighlightService {
     private let parser: MarkdownSyntaxParser?
+    private var cachedCustomTheme: CachedCustomSyntaxTheme?
 
     init() {
         parser = try? MarkdownSyntaxParser()
@@ -32,9 +33,7 @@ actor MarkdownHighlightService {
         developmentPresentation: MarkdownEditorDevelopmentPresentation = .source,
         selection: NSRange? = nil
     ) -> MarkdownHighlightResult {
-        let syntaxTheme = customTheme.map {
-            MarkdownSyntaxTheme.resolving($0, builtIn: theme)
-        } ?? MarkdownSyntaxTheme.builtIn(theme)
+        let syntaxTheme = syntaxTheme(for: customTheme, fallback: theme)
         let highlighter = MarkdownSyntaxHighlighter(
             theme: syntaxTheme,
             baseFont: MarkdownSyntaxHighlighter.editorFont(named: fontName, size: fontSize)
@@ -48,6 +47,36 @@ actor MarkdownHighlightService {
             selection: selection
         )
     }
+
+    private func syntaxTheme(
+        for document: CustomThemeDocument?,
+        fallback: MarkdownEditorTheme
+    ) -> MarkdownSyntaxTheme {
+        guard let document else {
+            return .builtIn(fallback)
+        }
+        // Increase Contrast is read when AppKit resolves the dynamic color, not on this
+        // path. Keying the cache on it would hop to the main thread for every highlight.
+        if let cachedCustomTheme,
+           cachedCustomTheme.document == document,
+           cachedCustomTheme.fallback == fallback
+        {
+            return cachedCustomTheme.theme
+        }
+        let resolved = MarkdownSyntaxTheme.resolving(document, builtIn: fallback)
+        cachedCustomTheme = CachedCustomSyntaxTheme(
+            document: document,
+            fallback: fallback,
+            theme: resolved
+        )
+        return resolved
+    }
+}
+
+private struct CachedCustomSyntaxTheme {
+    var document: CustomThemeDocument
+    var fallback: MarkdownEditorTheme
+    var theme: MarkdownSyntaxTheme
 }
 
 /// Parser-backed source styling for Markdown and MDX source mode.

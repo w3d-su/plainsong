@@ -16,13 +16,13 @@ extension PlainsongPreferences {
         }
         guard editorThemeIdentifier != identifier else { return }
         guard let document = importedEditorThemes.first(where: { $0.id == identifier }) else { return }
-        editorTheme = .standard
-        editorThemeIdentifier = identifier
-        resolvedEditorSyntaxTheme = MarkdownSyntaxTheme.resolving(document)
-        editorThemeFallbackNotice = nil
-        editorThemeRevision &+= 1
-        userDefaults.set(identifier, forKey: Keys.editorTheme)
-        notifyDidChange()
+        applyEditorThemeSelection(
+            identifier: identifier,
+            theme: .standard,
+            syntaxTheme: MarkdownSyntaxTheme.resolving(document),
+            notice: nil,
+            recordRevision: true
+        )
     }
 
     @discardableResult
@@ -39,13 +39,13 @@ extension PlainsongPreferences {
         }
         if case let .imported(document) = result {
             reloadImportedEditorThemes()
-            editorTheme = .standard
-            editorThemeIdentifier = document.id
-            resolvedEditorSyntaxTheme = MarkdownSyntaxTheme.resolving(document)
-            editorThemeFallbackNotice = nil
-            editorThemeRevision &+= 1
-            userDefaults.set(document.id, forKey: Keys.editorTheme)
-            notifyDidChange()
+            applyEditorThemeSelection(
+                identifier: document.id,
+                theme: .standard,
+                syntaxTheme: MarkdownSyntaxTheme.resolving(document),
+                notice: nil,
+                recordRevision: true
+            )
         }
         return result
     }
@@ -64,9 +64,30 @@ extension PlainsongPreferences {
         return trashed
     }
 
+    func observeEditorThemeAccessibilityChanges() {
+        guard editorThemeContrastObservation == nil else { return }
+        editorThemeContrastObservation = EditorThemeContrastObservation { [weak self] in
+            self?.reapplyEditorThemeForAccessibilityChange()
+        }
+    }
+
+    /// Increase Contrast changes which built-in color a custom slot must inherit. Re-resolve
+    /// so the open editor's chrome picks up the built-in colors. Highlight colors follow the
+    /// same setting when AppKit resolves them; that path does not rebuild the theme per key.
+    func reapplyEditorThemeForAccessibilityChange() {
+        guard let document = selectedCustomEditorTheme else { return }
+        applyEditorThemeSelection(
+            identifier: editorThemeIdentifier,
+            theme: .standard,
+            syntaxTheme: MarkdownSyntaxTheme.resolving(document),
+            notice: editorThemeFallbackNotice,
+            recordRevision: true
+        )
+    }
+
     func dismissEditorThemeFallbackNotice() {
         guard editorThemeFallbackNotice != nil else { return }
-        editorThemeFallbackNotice = nil
+        clearEditorThemeFallbackNotice()
         notifyDidChange()
     }
 
@@ -86,9 +107,20 @@ extension PlainsongPreferences {
         var choices = MarkdownEditorTheme.allCases.map {
             EditorThemeChoice(id: $0.rawValue, name: $0.displayName)
         }
-        choices += importedEditorThemes
-            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-            .map { EditorThemeChoice(id: $0.id, name: $0.name) }
+        let imported = importedEditorThemes.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+        var nameCounts: [String: Int] = [:]
+        for theme in imported {
+            nameCounts[editorThemeNameKey(theme.name), default: 0] += 1
+        }
+        let builtInNames = Set(MarkdownEditorTheme.allCases.map { editorThemeNameKey($0.displayName) })
+        choices += imported.map { theme in
+            let key = editorThemeNameKey(theme.name)
+            let isAmbiguous = builtInNames.contains(key) || nameCounts[key, default: 0] > 1
+            let name = isAmbiguous ? "\(theme.name) (\(theme.id))" : theme.name
+            return EditorThemeChoice(id: theme.id, name: name)
+        }
         if !choices.contains(where: { $0.id == editorThemeIdentifier }) {
             choices.append(EditorThemeChoice(
                 id: editorThemeIdentifier,
@@ -99,9 +131,13 @@ extension PlainsongPreferences {
     }
 
     func reloadImportedEditorThemes() {
-        importedEditorThemes = editorThemeLibrary.loadCatalog().themes.sorted {
+        setImportedEditorThemes(editorThemeLibrary.loadCatalog().themes.sorted {
             $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
-        }
+        })
+    }
+
+    private func editorThemeNameKey(_ name: String) -> String {
+        name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
     }
 
     static func editorThemeFallbackNotice(for identifier: String) -> String {
@@ -112,23 +148,7 @@ extension PlainsongPreferences {
     }
 
     private func themeData(at url: URL) throws -> Data {
-        let values: URLResourceValues
-        do {
-            values = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
-        } catch {
-            throw EditorThemeStoreError.unreadable
-        }
-        guard values.isRegularFile != false else {
-            throw EditorThemeStoreError.unreadable
-        }
-        if let fileSize = values.fileSize, fileSize > CustomThemeDocument.maximumByteCount {
-            throw EditorThemeStoreError.invalid(.exceedsMaximumSize(byteCount: fileSize))
-        }
-        do {
-            return try Data(contentsOf: url)
-        } catch {
-            throw EditorThemeStoreError.unreadable
-        }
+        try editorThemeLibrary.readThemeFile(at: url)
     }
 }
 
@@ -171,5 +191,28 @@ struct StoredEditorTheme {
             syntaxTheme: .standard,
             notice: PlainsongPreferences.editorThemeFallbackNotice(for: identifier)
         )
+    }
+}
+
+/// Removes the Increase Contrast observer when preferences are released.
+/// `isolated deinit` needs Swift 6.2; CI still compiles this target with Xcode 16.4.
+final class EditorThemeContrastObservation: @unchecked Sendable {
+    private let observer: NSObjectProtocol
+
+    @MainActor
+    init(onChange: @escaping @MainActor @Sendable () -> Void) {
+        observer = NotificationCenter.default.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: NSWorkspace.shared,
+            queue: .main
+        ) { _ in
+            Task { @MainActor in
+                onChange()
+            }
+        }
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(observer)
     }
 }

@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import MarkdownCore
 
@@ -55,9 +56,11 @@ enum EditorThemeValidationMessage {
         case let .reservedIdentifier(identifier):
             "\"\(identifier)\" is a built-in theme id."
         case .name:
-            "Theme names must be 1-64 characters."
+            "Theme names must be 1-128 Unicode scalars after trimming, with no control or format characters."
         case let .color(field):
             "\"\(field)\" must be a #RRGGBB or #RRGGBBAA color."
+        case let .nonOpaqueColor(field):
+            "\"\(field)\" must be opaque. text, caret, and background accept #RRGGBB or #RRGGBBAA with alpha FF."
         }
     }
 }
@@ -93,11 +96,14 @@ struct EditorThemeLibrary {
         var invalid: Set<String> = []
         for url in files where url.pathExtension == "json" {
             let identifier = url.deletingPathExtension().lastPathComponent
-            guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
-                  values.isSymbolicLink != true,
-                  values.isRegularFile == true,
-                  let data = try? Data(contentsOf: url),
-                  case let .success(document) = CustomThemeValidation.validate(data),
+            let data: Data
+            do {
+                data = try readThemeFile(at: url)
+            } catch {
+                invalid.insert(identifier)
+                continue
+            }
+            guard case let .success(document) = CustomThemeValidation.validate(data),
                   document.id == identifier
             else {
                 invalid.insert(identifier)
@@ -134,6 +140,49 @@ struct EditorThemeLibrary {
             throw EditorThemeStoreError.failedToStore
         }
         return .imported(document)
+    }
+
+    /// Reads at most 64 KiB + 1 byte. `read(upToCount:)` may return a short read, and a
+    /// size check alone races a file that grows after the stat. `O_NOFOLLOW` rejects a
+    /// symlink swapped in after the resource-value check.
+    func readThemeFile(at url: URL) throws -> Data {
+        let values: URLResourceValues
+        do {
+            values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+        } catch {
+            throw EditorThemeStoreError.unreadable
+        }
+        guard values.isSymbolicLink != true, values.isRegularFile == true else {
+            throw EditorThemeStoreError.unreadable
+        }
+        let maximum = CustomThemeDocument.maximumByteCount
+        if let fileSize = values.fileSize, fileSize > maximum {
+            throw EditorThemeStoreError.invalid(.exceedsMaximumSize(byteCount: fileSize))
+        }
+        let descriptor = url.withUnsafeFileSystemRepresentation { representation -> Int32 in
+            guard let representation else { return -1 }
+            return Darwin.open(representation, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+        }
+        guard descriptor >= 0 else {
+            throw EditorThemeStoreError.unreadable
+        }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        var data = Data()
+        let cap = maximum + 1
+        do {
+            while data.count < cap {
+                guard let chunk = try handle.read(upToCount: cap - data.count), !chunk.isEmpty else {
+                    break
+                }
+                data.append(chunk)
+            }
+        } catch {
+            throw EditorThemeStoreError.unreadable
+        }
+        if data.count > maximum {
+            throw EditorThemeStoreError.invalid(.exceedsMaximumSize(byteCount: data.count))
+        }
+        return data
     }
 
     func existingFileURL(identifier: String) -> URL? {

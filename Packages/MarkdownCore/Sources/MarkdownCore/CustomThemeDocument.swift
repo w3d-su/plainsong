@@ -8,7 +8,9 @@ public struct CustomThemeDocument: Equatable, Sendable {
     public static let schemaVersion = 1
     public static let maximumByteCount = 64 * 1024
     public static let builtInIdentifiers: Set<String> = ["standard", "graphite"]
-    public static let maximumNameLength = 64
+    /// NFC-normalized name, in Unicode scalars. `String.count` is grapheme clusters,
+    /// and one cluster can stack enough combining marks to hide a much longer value.
+    public static let maximumNameScalarCount = 128
 
     /// Closed editor slots. `gutter` is the gutter track; omitted, it follows the editor background.
     public static let editorColorKeys = [
@@ -94,6 +96,7 @@ public enum CustomThemeValidationFailure: Equatable, Sendable, Error {
     case reservedIdentifier(String)
     case name
     case color(String)
+    case nonOpaqueColor(String)
 }
 
 public enum CustomThemeValidation {
@@ -115,12 +118,15 @@ public enum CustomThemeValidation {
         if data.count > CustomThemeDocument.maximumByteCount {
             return .failure(.exceedsMaximumSize(byteCount: data.count))
         }
-        guard String(bytes: data, encoding: .utf8) != nil else {
+        guard let text = String(bytes: data, encoding: .utf8) else {
             return .failure(.invalidUTF8)
+        }
+        if CustomThemeJSONStructure.exceedsNestingLimit(text) || CustomThemeJSONStructure.hasDuplicateKeys(text) {
+            return .failure(.invalidJSON)
         }
         let parsed: Any
         do {
-            parsed = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
+            parsed = try JSONSerialization.jsonObject(with: data)
         } catch {
             return .failure(.invalidJSON)
         }
@@ -211,10 +217,10 @@ public enum CustomThemeValidation {
         case let .failure(failure):
             return .failure(failure)
         }
-        guard (1 ... CustomThemeDocument.maximumNameLength).contains(name.count) else {
+        guard let normalizedName = normalizedName(name) else {
             return .failure(.name)
         }
-        return .success((identifier, name))
+        return .success((identifier, normalizedName))
     }
 
     private static func requiredString(
@@ -291,7 +297,12 @@ public enum CustomThemeValidation {
         }
 
         let editor: [String: String]
-        switch colors(object["editor"], path: "\(path).editor", allowed: Set(CustomThemeDocument.editorColorKeys)) {
+        switch colors(
+            object["editor"],
+            path: "\(path).editor",
+            allowed: Set(CustomThemeDocument.editorColorKeys),
+            opaqueKeys: opaqueEditorColorKeys
+        ) {
         case let .success(parsed):
             editor = parsed
         case let .failure(failure):
@@ -299,7 +310,12 @@ public enum CustomThemeValidation {
         }
 
         let preview: [String: String]
-        switch colors(object["preview"], path: "\(path).preview", allowed: Set(CustomThemeDocument.previewColorKeys)) {
+        switch colors(
+            object["preview"],
+            path: "\(path).preview",
+            allowed: Set(CustomThemeDocument.previewColorKeys),
+            opaqueKeys: []
+        ) {
         case let .success(parsed):
             preview = parsed
         case let .failure(failure):
@@ -308,10 +324,13 @@ public enum CustomThemeValidation {
         return .success(CustomThemePalette(editor: editor, preview: preview))
     }
 
+    private static let opaqueEditorColorKeys: Set<String> = ["text", "caret", "background"]
+
     private static func colors(
         _ value: Any?,
         path: String,
-        allowed: Set<String>
+        allowed: Set<String>,
+        opaqueKeys: Set<String>
     ) -> Result<[String: String], CustomThemeValidationFailure> {
         guard let value else {
             return .success([:])
@@ -332,9 +351,43 @@ public enum CustomThemeValidation {
             guard let text = raw as? String, isHexColor(text) else {
                 return .failure(.color("\(path).\(key)"))
             }
+            if opaqueKeys.contains(key), !isOpaqueHexColor(text) {
+                return .failure(.nonOpaqueColor("\(path).\(key)"))
+            }
             colors[key] = text
         }
         return .success(colors)
+    }
+
+    /// Stores the trimmed NFC form. Callers display that string, so leading spaces cannot
+    /// impersonate a built-in name and bidi/format characters never reach the picker.
+    private static func normalizedName(_ name: String) -> String? {
+        let normalized = name.precomposedStringWithCanonicalMapping
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty,
+              normalized.unicodeScalars.count <= CustomThemeDocument.maximumNameScalarCount
+        else {
+            return nil
+        }
+        let hasHiddenScalar = normalized.unicodeScalars.contains { scalar in
+            switch scalar.properties.generalCategory {
+            case .control, .format:
+                true
+            default:
+                false
+            }
+        }
+        return hasHiddenScalar ? nil : normalized
+    }
+
+    private static func isOpaqueHexColor(_ value: String) -> Bool {
+        let scalars = Array(value.unicodeScalars)
+        if scalars.count == 7 {
+            return true
+        }
+        guard scalars.count == 9 else { return false }
+        let alpha = String(String.UnicodeScalarView(scalars.suffix(2)))
+        return alpha.caseInsensitiveCompare("ff") == .orderedSame
     }
 
     private static func unknownField(in object: [String: Any], allowed: Set<String>, path: String) -> String? {
@@ -358,5 +411,275 @@ public enum CustomThemeValidation {
             return nil
         }
         return number.intValue
+    }
+}
+
+/// Depth and duplicate-key checks that `JSONSerialization` does not report.
+/// A duplicate is rejected only when the scan completes; a scan that cannot
+/// recognize the text leaves the decision to `JSONSerialization`.
+private enum CustomThemeJSONStructure {
+    /// Schema v1 nests at most root, palette, then color map. Anything deeper is not a theme.
+    static let maximumDepth = 32
+
+    static func exceedsNestingLimit(_ text: String) -> Bool {
+        var depth = 0
+        var inString = false
+        var escaped = false
+        for scalar in text.unicodeScalars {
+            if inString {
+                if escaped {
+                    escaped = false
+                    continue
+                }
+                if scalar == "\\" {
+                    escaped = true
+                    continue
+                }
+                if scalar == "\"" {
+                    inString = false
+                }
+                continue
+            }
+            switch scalar {
+            case "\"":
+                inString = true
+            case "{", "[":
+                depth += 1
+                if depth > maximumDepth {
+                    return true
+                }
+            case "}", "]":
+                if depth > 0 {
+                    depth -= 1
+                }
+            default:
+                break
+            }
+        }
+        return false
+    }
+
+    static func hasDuplicateKeys(_ text: String) -> Bool {
+        var scanner = Scanner(text)
+        return scanner.scan() == .duplicate
+    }
+
+    private struct Scanner {
+        let scalars: [Unicode.Scalar]
+        var index = 0
+
+        enum Outcome {
+            case clean
+            case duplicate
+            case unrecognized
+        }
+
+        init(_ text: String) {
+            scalars = Array(text.unicodeScalars)
+        }
+
+        mutating func scan() -> Outcome {
+            skipWhitespace()
+            let value = parseValue()
+            guard value == .clean else { return value }
+            skipWhitespace()
+            return index == scalars.count ? .clean : .unrecognized
+        }
+
+        private mutating func parseValue() -> Outcome {
+            skipWhitespace()
+            guard let scalar = peek() else { return .unrecognized }
+            switch scalar {
+            case "{":
+                return parseObject()
+            case "[":
+                return parseArray()
+            case "\"":
+                return parseString() == nil ? .unrecognized : .clean
+            case "t":
+                return consumeLiteral("true")
+            case "f":
+                return consumeLiteral("false")
+            case "n":
+                return consumeLiteral("null")
+            case "-", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
+                return skipNumber() ? .clean : .unrecognized
+            default:
+                return .unrecognized
+            }
+        }
+
+        private mutating func parseObject() -> Outcome {
+            guard consume("{") else { return .unrecognized }
+            skipWhitespace()
+            if consume("}") {
+                return .clean
+            }
+            var keys: Set<String> = []
+            while true {
+                guard let key = parseString() else { return .unrecognized }
+                if keys.contains(key) {
+                    return .duplicate
+                }
+                keys.insert(key)
+                skipWhitespace()
+                guard consume(":") else { return .unrecognized }
+                let value = parseValue()
+                guard value == .clean else { return value }
+                skipWhitespace()
+                if consume("}") {
+                    return .clean
+                }
+                guard consume(",") else { return .unrecognized }
+                skipWhitespace()
+            }
+        }
+
+        private mutating func parseArray() -> Outcome {
+            guard consume("[") else { return .unrecognized }
+            skipWhitespace()
+            if consume("]") {
+                return .clean
+            }
+            while true {
+                let value = parseValue()
+                guard value == .clean else { return value }
+                skipWhitespace()
+                if consume("]") {
+                    return .clean
+                }
+                guard consume(",") else { return .unrecognized }
+                skipWhitespace()
+            }
+        }
+
+        private mutating func parseString() -> String? {
+            guard consume("\"") else { return nil }
+            var decoded = ""
+            while let scalar = peek() {
+                index += 1
+                if scalar == "\"" {
+                    return decoded
+                }
+                if scalar == "\\" {
+                    guard let escaped = parseEscape() else { return nil }
+                    decoded.unicodeScalars.append(escaped)
+                    continue
+                }
+                if scalar.value < 0x20 {
+                    return nil
+                }
+                decoded.unicodeScalars.append(scalar)
+            }
+            return nil
+        }
+
+        private mutating func parseEscape() -> Unicode.Scalar? {
+            guard let scalar = peek() else { return nil }
+            index += 1
+            switch scalar {
+            case "\"": return "\""
+            case "\\": return "\\"
+            case "/": return "/"
+            case "b": return "\u{08}"
+            case "f": return "\u{0C}"
+            case "n": return "\n"
+            case "r": return "\r"
+            case "t": return "\t"
+            case "u": return parseUnicodeEscape()
+            default: return nil
+            }
+        }
+
+        private mutating func parseUnicodeEscape() -> Unicode.Scalar? {
+            guard let unit = parseHexUnit() else { return nil }
+            if (0xD800 ... 0xDBFF).contains(unit) {
+                let saved = index
+                if consume("\\"), consume("u"), let low = parseHexUnit(), (0xDC00 ... 0xDFFF).contains(low) {
+                    let combined = 0x10000 + ((unit - 0xD800) << 10) + (low - 0xDC00)
+                    return Unicode.Scalar(combined)
+                }
+                index = saved
+                return nil
+            }
+            if (0xDC00 ... 0xDFFF).contains(unit) {
+                return nil
+            }
+            return Unicode.Scalar(unit)
+        }
+
+        private mutating func parseHexUnit() -> UInt32? {
+            var unit: UInt32 = 0
+            for _ in 0 ..< 4 {
+                guard let scalar = peek(), let digit = hexValue(scalar) else { return nil }
+                index += 1
+                unit = (unit << 4) | digit
+            }
+            return unit
+        }
+
+        private func hexValue(_ scalar: Unicode.Scalar) -> UInt32? {
+            switch scalar {
+            case "0" ... "9": scalar.value - Unicode.Scalar("0").value
+            case "a" ... "f": scalar.value - Unicode.Scalar("a").value + 10
+            case "A" ... "F": scalar.value - Unicode.Scalar("A").value + 10
+            default: nil
+            }
+        }
+
+        private mutating func skipNumber() -> Bool {
+            if peek() == "-" {
+                index += 1
+            }
+            guard let first = peek(), ("0" ... "9").contains(first) else { return false }
+            if first == "0" {
+                index += 1
+            } else {
+                while let scalar = peek(), ("0" ... "9").contains(scalar) {
+                    index += 1
+                }
+            }
+            if peek() == "." {
+                index += 1
+                guard let fraction = peek(), ("0" ... "9").contains(fraction) else { return false }
+                while let scalar = peek(), ("0" ... "9").contains(scalar) {
+                    index += 1
+                }
+            }
+            if peek() == "e" || peek() == "E" {
+                index += 1
+                if peek() == "+" || peek() == "-" {
+                    index += 1
+                }
+                guard let exponent = peek(), ("0" ... "9").contains(exponent) else { return false }
+                while let scalar = peek(), ("0" ... "9").contains(scalar) {
+                    index += 1
+                }
+            }
+            return true
+        }
+
+        private mutating func consumeLiteral(_ literal: String) -> Outcome {
+            for scalar in literal.unicodeScalars {
+                guard consume(scalar) else { return .unrecognized }
+            }
+            return .clean
+        }
+
+        private mutating func skipWhitespace() {
+            while let scalar = peek(), scalar == " " || scalar == "\n" || scalar == "\r" || scalar == "\t" {
+                index += 1
+            }
+        }
+
+        private func peek() -> Unicode.Scalar? {
+            index < scalars.count ? scalars[index] : nil
+        }
+
+        private mutating func consume(_ expected: Unicode.Scalar) -> Bool {
+            guard peek() == expected else { return false }
+            index += 1
+            return true
+        }
     }
 }

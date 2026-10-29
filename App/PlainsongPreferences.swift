@@ -54,11 +54,11 @@ final class PlainsongPreferences: ObservableObject {
     @Published private(set) var editorFontSize: Double
     @Published private(set) var showsLineNumbers: Bool
     @Published private(set) var typewriterSyncEnabled: Bool
-    @Published var editorTheme: MarkdownEditorTheme
-    @Published var editorThemeIdentifier: String
-    @Published var importedEditorThemes: [CustomThemeDocument]
-    @Published var resolvedEditorSyntaxTheme: MarkdownSyntaxTheme
-    @Published var editorThemeFallbackNotice: String?
+    @Published private(set) var editorTheme: MarkdownEditorTheme
+    @Published private(set) var editorThemeIdentifier: String
+    @Published private(set) var importedEditorThemes: [CustomThemeDocument]
+    @Published private(set) var resolvedEditorSyntaxTheme: MarkdownSyntaxTheme
+    @Published private(set) var editorThemeFallbackNotice: String?
     @Published private(set) var previewTheme: PreviewTheme
     @Published private(set) var allowsRemoteImages: Bool
     @Published private(set) var experimentalWYSIWYGEnabled: Bool
@@ -72,6 +72,7 @@ final class PlainsongPreferences: ObservableObject {
     let userDefaults: UserDefaults
     let editorThemeLibrary: EditorThemeLibrary
     var editorThemeRevision = 0
+    var editorThemeContrastObservation: EditorThemeContrastObservation?
 
     init(
         userDefaults: UserDefaults = .standard,
@@ -117,6 +118,7 @@ final class PlainsongPreferences: ObservableObject {
         )
         defaultFileExtension = userDefaults.string(forKey: Keys.defaultFileExtension)
             .flatMap(DefaultFileExtension.init(rawValue:)) ?? .md
+        observeEditorThemeAccessibilityChanges()
     }
 
     var editorFont: NSFont {
@@ -194,14 +196,38 @@ final class PlainsongPreferences: ObservableObject {
 
     func setEditorTheme(_ theme: MarkdownEditorTheme) {
         guard editorTheme != theme || editorThemeIdentifier != theme.rawValue else { return }
+        applyEditorThemeSelection(
+            identifier: theme.rawValue,
+            theme: theme,
+            syntaxTheme: .builtIn(theme),
+            notice: nil,
+            recordRevision: true
+        )
+    }
 
+    func applyEditorThemeSelection(
+        identifier: String,
+        theme: MarkdownEditorTheme,
+        syntaxTheme: MarkdownSyntaxTheme,
+        notice: String?,
+        recordRevision: Bool
+    ) {
         editorTheme = theme
-        editorThemeIdentifier = theme.rawValue
-        resolvedEditorSyntaxTheme = .builtIn(theme)
-        editorThemeFallbackNotice = nil
+        editorThemeIdentifier = identifier
+        resolvedEditorSyntaxTheme = syntaxTheme
+        editorThemeFallbackNotice = notice
+        guard recordRevision else { return }
         editorThemeRevision &+= 1
-        userDefaults.set(theme.rawValue, forKey: Keys.editorTheme)
+        userDefaults.set(identifier, forKey: Keys.editorTheme)
         notifyDidChange()
+    }
+
+    func setImportedEditorThemes(_ themes: [CustomThemeDocument]) {
+        importedEditorThemes = themes
+    }
+
+    func clearEditorThemeFallbackNotice() {
+        editorThemeFallbackNotice = nil
     }
 
     func setPreviewTheme(_ theme: PreviewTheme) {

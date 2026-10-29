@@ -55,13 +55,21 @@ One JSON file defines both editor and preview colors:
 
 ### 3.2 Validation (strict, reject the whole file)
 
-- ≤ 64 KiB, UTF-8, `JSONDecoder` into a closed struct; `schemaVersion` must be `1`.
+- ≤ 64 KiB, UTF-8, a closed walk of the JSON object rather than `JSONDecoder`;
+  `schemaVersion` must be `1`. `JSONDecoder` would drop unknown fields, which this
+  schema must reject. Duplicate keys, and nesting deeper than a palette, are rejected
+  before `JSONSerialization`.
 - Unknown keys reject [owner: strict for v1, so typos surface; a later schema can relax].
 - Values: `#RRGGBB` or `#RRGGBBAA` only. No names, `rgb()`, `var()` or other CSS text,
-  so preview values can never carry CSS syntax.
-- `id`: `[a-z0-9-]{1,64}`, must not collide with a built-in; `name`: 1–64 characters.
-- Contrast is **warned, not enforced**: Settings shows a notice when text/background or
-  code text/code background falls below 4.5:1.
+  so preview values can never carry CSS syntax. `text`, `caret`, and `background` must
+  be opaque (`#RRGGBB`, or `#RRGGBBAA` whose alpha is `FF`).
+- `id`: `[a-z0-9-]{1,64}`, must not collide with a built-in. `name` is trimmed,
+  NFC-normalized, 1–128 Unicode scalars, and cannot contain control or format
+  characters. The picker shows `name (id)` when that name matches a built-in display
+  name, or another imported theme, without regard to case.
+- Contrast is **warned, not enforced** (gate T7): Settings will show a notice when
+  text/background or code text/code background falls below 4.5:1. Until that warning
+  exists, an editor theme resolves to the built-in palette while Increase Contrast is on.
 
 Validation is a pure MarkdownCore function with table tests; App owns file I/O.
 
@@ -113,7 +121,7 @@ Prerequisites before user CSS is implemented, each its own gate:
 
 1. Tighten the static CSP so `img-src https:` is present only when remote images are on
    (per-load CSP or a pre-render switch), closing the CSS `url()` bypass for everyone.
-2. A CSS sanitizer (tokenizer-based, likely a new npm dependency → Decision Log) that
+2. A CSS sanitizer (tokenizer-based, likely a new npm dependency → `docs/decisions/`) that
    rejects `url()`, `@import`, `@font-face`, `image-set`, `position: fixed`, and scopes
    all rules under the preview body.
 3. User CSS never applies to export unless the user opts in per export.
@@ -139,7 +147,7 @@ Prerequisites before user CSS is implemented, each its own gate:
 | **T5 preview apply** | vitest + hosted: tokens apply per appearance, built-ins send empty maps, Mermaid still re-renders on appearance change |
 | **T6 export** | HTML/PDF freeze custom token values; E3 tests extended |
 | **T7 accessibility** | Contrast warning shown below 4.5:1; Settings controls keyboard/VoiceOver reachable (owner smoke) |
-| **T8 docs** | agent.md §11, README, Decision Log entry; ship two sample theme files in `docs/themes/` |
+| **T8 docs** | agent.md §11, README, a file in `docs/decisions/`; ship two sample theme files in `docs/themes/` |
 
 ## 7. PR plan
 
@@ -152,7 +160,10 @@ Prerequisites before user CSS is implemented, each its own gate:
 
 ## 8. Owner decisions
 
-- Token themes only for 1.0, user CSS deferred?
-- Strict rejection of unknown keys in schema v1?
-- Do custom themes also need font choices (family/size per slot), or colors only?
-- Mermaid colors from tokens in v1 or a follow-up?
+Accepted 2026-10-29. The record is
+`docs/decisions/2026-10-29-editor-custom-themes.md`.
+
+- Token themes only for 1.0. User CSS stays deferred.
+- Schema v1 rejects the whole file on an unknown field.
+- Colors only. Themes do not choose fonts.
+- Mermaid colors stay a follow-up, not v1.

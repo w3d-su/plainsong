@@ -31,6 +31,10 @@ final class MarkdownSTTextView: STTextView {
     var editorSelectionColorObserver: NSObjectProtocol?
     var isEnforcingSelectionColor = false
     var enforcesCustomSelectionColor = false
+    /// STTextView's selection container. It is created with the text view, so one lookup
+    /// is enough; highlight views themselves are rebuilt on every selection update.
+    weak var cachedEditorSelectionContainer: NSView?
+    var selectionHighlightTreeScans = 0
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()

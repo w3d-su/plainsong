@@ -88,8 +88,9 @@ supported. Live fixture coverage: `Fixtures/math.md`.
   in HTML/PDF export are not supported. Remote images are off by default, and enabling
   them allows `https:` images only; a remote SVG is left to WebKit and is not validated.
 - **Editor color themes** can be imported from Settings ▸ Editor. A theme is a JSON
-  palette (`#RRGGBB` or `#RRGGBBAA` only). The preview still uses the built-in system,
-  light, and dark palettes. User CSS and per-slot fonts are not supported.
+  palette (`#RRGGBB` or `#RRGGBBAA` only; text, caret, and background must be opaque).
+  The preview still uses the built-in system, light, and dark palettes. User CSS and
+  per-slot fonts are not supported.
 - **WYSIWYG is Experimental and inline-only** (headings, emphasis/strike, inline code,
   list/quote styling, inline `[text](url)` links, and thumbnails for local PNG/JPEG/GIF/WebP
   images up to 10 MiB in a folder workspace). Reference links, autolinks, remote/SVG/

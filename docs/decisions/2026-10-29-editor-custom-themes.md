@@ -5,7 +5,9 @@ On 2026-10-29 the owner accepted the recommendations in
 
 - Version 1.0 ships token colors only. User CSS stays deferred behind the prerequisites
   in that design.
-- Schema v1 rejects the whole file when it contains a field the decoder does not know. The validator walks the JSON object instead of using `JSONDecoder`, because `JSONDecoder` would drop unknown fields and accept a file this schema must reject.
+- Schema v1 rejects the whole file when it contains a field the decoder does not know.
+  The validator walks the JSON object instead of using `JSONDecoder`, because
+  `JSONDecoder` would drop unknown fields and accept a file this schema must reject.
 - Themes choose colors only. They do not choose fonts.
 - Mermaid keeps the built-in light and dark themes. Token-driven Mermaid colors are a
   follow-up.
@@ -21,6 +23,21 @@ to the Trash and, when that theme was selected, selects Plainsong, because the u
 deleted it. A file that is merely unreadable is different: the stored id stays, the
 editor uses Plainsong for the launch, and a non-modal banner explains why, so fixing the
 file and relaunching picks it up again.
+
+
+A later review tightened the same rules without opening preview or bridge work.
+`text`, `caret`, and `background` must be opaque, so a theme cannot hide the text,
+the caret, or the background. A custom background can still inherit a built-in text
+color; the 4.5:1 warning remains T7. While Increase Contrast is on, editor colors
+resolve from the built-in palette.
+
+Names are stored in NFC, trimmed, limited to 128 Unicode scalars, and rejected when
+they contain control or format characters. The picker appends `name (id)` when a name
+collides with a built-in display name or another imported theme. STTextView 2.4.1 does
+not offer a selection-color API (`selectedLineHighlightColor` is the current line), so
+a custom selection color is still painted onto `STSelectionHighlightView`. Layout
+repaints only that selection container, which lives for the life of the text view,
+instead of walking every layout fragment on each keystroke.
 
 Missing editor slots inherit the built-in `standard` colors, which are already dynamic
 system colors. An omitted `dark` object inherits the built-in dark appearance for every

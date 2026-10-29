@@ -9,6 +9,7 @@ public extension MarkdownSyntaxTheme {
         _ document: CustomThemeDocument,
         builtIn fallback: MarkdownEditorTheme = .standard
     ) -> MarkdownSyntaxTheme {
+        EditorThemeResolutionProbe.count += 1
         let base = MarkdownSyntaxTheme.builtIn(fallback)
         let light = document.light.editor
         let dark = document.dark?.editor
@@ -16,12 +17,18 @@ public extension MarkdownSyntaxTheme {
 
         func slot(_ key: String, builtIn color: NSColor) -> NSColor {
             let darkHex = darkOmitted ? nil : dark?[key]
+            // AppKit keeps the first provider registered for a name, so the name has to
+            // include the built-in fallback. Otherwise a later graphite resolve would
+            // keep the standard colors (or the reverse) for every omitted slot.
+            // Increase Contrast is not part of the name: the provider reads it when the
+            // color is resolved, and a second registration would be ignored.
             let name = [
                 "plainsong.theme",
+                fallback.rawValue,
                 document.id,
                 key,
                 light[key] ?? "-",
-                darkHex ?? "-",
+                darkOmitted ? "omit" : (darkHex ?? "-"),
             ].joined(separator: ".")
             return EditorThemeDynamicColor.resolving(
                 lightHex: light[key],
@@ -72,14 +79,30 @@ enum EditorThemeDynamicColor {
 
         let light = lightHex.flatMap(color(hex:))
         let dark = darkHex.flatMap(color(hex:))
-        // The name includes the hex values, so replacing a theme registers a new color.
+        // The name includes the fallback and hex values, so replacing a theme registers a new color.
         // AppKit keeps the first provider registered for a name.
         return NSColor(name: NSColor.Name(name)) { appearance in
+            if EditorThemeDynamicColor.increaseContrastEnabled() {
+                return builtIn
+            }
             let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             if isDark {
                 return (darkPaletteOmitted || dark == nil) ? builtIn : (dark ?? builtIn)
             }
             return light ?? builtIn
+        }
+    }
+
+    /// Tests replace this. Production reads the setting when a color is resolved.
+    /// One named color follows Increase Contrast; the name does not change with it.
+    nonisolated(unsafe) static var increaseContrastEnabled: () -> Bool = systemIncreaseContrast
+
+    static func systemIncreaseContrast() -> Bool {
+        if Thread.isMainThread {
+            return NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
+        }
+        return DispatchQueue.main.sync {
+            NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
         }
     }
 
@@ -126,4 +149,8 @@ enum EditorSyntaxThemeChrome {
             .init(showing: showsLineNumbers, syntaxTheme: theme, font: font)
         )
     }
+}
+
+enum EditorThemeResolutionProbe {
+    nonisolated(unsafe) static var count = 0
 }

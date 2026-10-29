@@ -47,6 +47,11 @@ extension MarkdownSTTextView {
     }
 
     func releaseCustomSelectionTint(in view: NSView) {
+        if view === self {
+            guard let container = editorSelectionContainer() else { return }
+            releaseCustomSelectionTint(in: container)
+            return
+        }
         if let tint = view.layer as? EditorSelectionTintLayer {
             tint.enforcedColor = nil
             let system = view.window?.isKeyWindow == true
@@ -82,13 +87,41 @@ extension MarkdownSTTextView {
         editorSelectionColorObserver = observer
     }
 
+    /// STTextView 2.4.1 has no selection-color API. `selectedLineHighlightColor` paints the
+    /// current line, and selection overlays are rebuilt as `STSelectionHighlightView`s.
+    /// Those views live under one stable `STSelectionView`, so layout repaints that list
+    /// instead of walking every text fragment.
     private func paintEditorSelectionColor(_ color: NSColor, in view: NSView) {
-        if String(describing: type(of: view)) == "STSelectionHighlightView" {
-            enforceSelectionColor(color, on: view)
+        guard view === self, let container = editorSelectionContainer() else { return }
+        for subview in container.subviews where Self.isSelectionHighlightView(subview) {
+            enforceSelectionColor(color, on: subview)
+        }
+    }
+
+    private func editorSelectionContainer() -> NSView? {
+        if let cachedEditorSelectionContainer {
+            return cachedEditorSelectionContainer
+        }
+        selectionHighlightTreeScans += 1
+        let found = findEditorSelectionContainer(in: self)
+        cachedEditorSelectionContainer = found
+        return found
+    }
+
+    private func findEditorSelectionContainer(in view: NSView) -> NSView? {
+        if String(describing: type(of: view)) == "STSelectionView" {
+            return view
         }
         for subview in view.subviews {
-            paintEditorSelectionColor(color, in: subview)
+            if let found = findEditorSelectionContainer(in: subview) {
+                return found
+            }
         }
+        return nil
+    }
+
+    private static func isSelectionHighlightView(_ view: NSView) -> Bool {
+        String(describing: type(of: view)) == "STSelectionHighlightView"
     }
 
     private func enforceSelectionColor(_ color: NSColor, on view: NSView) {

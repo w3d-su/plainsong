@@ -253,6 +253,15 @@ final class MarkdownSyntaxThemeCustomTests: XCTestCase {
         textView.layoutSubtreeIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.05))
 
+        let scans = textView.selectionHighlightTreeScans
+        XCTAssertGreaterThan(scans, 0)
+        textView.layout()
+        XCTAssertEqual(
+            textView.selectionHighlightTreeScans,
+            scans,
+            "layout repaints the selection container, not the document"
+        )
+
         let highlight = try XCTUnwrap(selectionHighlight(in: textView))
         let locked = try XCTUnwrap(highlight.layer?.backgroundColor)
         highlight.layer?.backgroundColor = NSColor.systemRed.cgColor
@@ -269,6 +278,73 @@ final class MarkdownSyntaxThemeCustomTests: XCTestCase {
         textView.layoutSubtreeIfNeeded()
         highlight.layer?.backgroundColor = NSColor.systemRed.cgColor
         XCTAssertNotEqual(highlight.layer?.backgroundColor, locked)
+    }
+
+    func testIncreaseContrastAndFallbackIdentityDoNotShareANamedColor() throws {
+        let previous = EditorThemeDynamicColor.increaseContrastEnabled
+        defer { EditorThemeDynamicColor.increaseContrastEnabled = previous }
+        // Light text is custom. Light code is omitted, so each fallback must keep its own
+        // built-in code color. Dark code is set only to force a named color for that slot.
+        let document = try CustomThemeValidation.validate(Data("""
+        {
+          "schemaVersion": 1,
+          "id": "ink",
+          "name": "Ink",
+          "light": {"editor": {"text": "#112233"}},
+          "dark": {"editor": {"code": "#445566"}}
+        }
+        """.utf8)).get()
+
+        EditorThemeDynamicColor.increaseContrastEnabled = { false }
+        let standard = MarkdownSyntaxTheme.resolving(document, builtIn: .standard)
+        let graphite = MarkdownSyntaxTheme.resolving(document, builtIn: .graphite)
+        let standardCode = components(standard.codeColor, appearance: .aqua)
+        let graphiteCode = components(graphite.codeColor, appearance: .aqua)
+        let standardBuiltIn = components(MarkdownSyntaxTheme.standard.codeColor, appearance: .aqua)
+        let graphiteBuiltIn = components(MarkdownSyntaxTheme.graphite.codeColor, appearance: .aqua)
+        XCTAssertEqual(standardCode.red, standardBuiltIn.red, accuracy: 0.02)
+        XCTAssertEqual(standardCode.green, standardBuiltIn.green, accuracy: 0.02)
+        XCTAssertEqual(standardCode.blue, standardBuiltIn.blue, accuracy: 0.02)
+        XCTAssertEqual(graphiteCode.red, graphiteBuiltIn.red, accuracy: 0.02)
+        XCTAssertEqual(graphiteCode.green, graphiteBuiltIn.green, accuracy: 0.02)
+        XCTAssertEqual(graphiteCode.blue, graphiteBuiltIn.blue, accuracy: 0.02)
+        let distinct = abs(standardCode.red - graphiteCode.red) > 0.05
+            || abs(standardCode.green - graphiteCode.green) > 0.05
+            || abs(standardCode.blue - graphiteCode.blue) > 0.05
+        XCTAssertTrue(distinct, "omitted code color must follow its own built-in fallback")
+
+        EditorThemeDynamicColor.increaseContrastEnabled = { true }
+        let contrastedText = components(standard.textColor, appearance: .aqua)
+        let builtInText = components(MarkdownSyntaxTheme.standard.textColor, appearance: .aqua)
+        XCTAssertEqual(contrastedText.red, builtInText.red, accuracy: 0.02)
+        XCTAssertEqual(contrastedText.green, builtInText.green, accuracy: 0.02)
+        XCTAssertEqual(contrastedText.blue, builtInText.blue, accuracy: 0.02)
+
+        // The provider registered above follows the setting. A new name is not required.
+        EditorThemeDynamicColor.increaseContrastEnabled = { false }
+        XCTAssertEqual(components(standard.textColor, appearance: .aqua).red, 0x11 / 255, accuracy: 0.01)
+    }
+
+    func testHighlightReusesTheResolvedThemeUntilTheDocumentChanges() async throws {
+        let document = try CustomThemeValidation.validate(Data("""
+        {"schemaVersion":1,"id":"ink","name":"Ink","light":{"editor":{"text":"#FF0000"}}}
+        """.utf8)).get()
+        let previous = EditorThemeResolutionProbe.count
+        defer { EditorThemeResolutionProbe.count = previous }
+        EditorThemeResolutionProbe.count = 0
+        let service = MarkdownHighlightService()
+        for _ in 0 ..< 2 {
+            _ = await service.highlight(
+                "Hello",
+                fileKind: .markdown,
+                visibleRange: NSRange(location: 0, length: 5),
+                theme: .standard,
+                customTheme: document,
+                fontName: MarkdownSyntaxHighlighter.systemMonospacedFontName,
+                fontSize: 13
+            )
+        }
+        XCTAssertEqual(EditorThemeResolutionProbe.count, 1)
     }
 
     private func selectionHighlight(in view: NSView) -> NSView? {

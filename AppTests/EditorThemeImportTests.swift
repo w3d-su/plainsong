@@ -111,6 +111,89 @@ final class EditorThemeImportTests: XCTestCase {
         XCTAssertEqual(alert.buttons.map(\.title), ["Replace", "Cancel"])
     }
 
+    func testFailureAlertKeepsTheValidationReason() {
+        let imported = EditorThemeFailureAlert.make(
+            messageText: "Could not import theme",
+            error: EditorThemeStoreError.invalid(.unknownField("css"))
+        )
+        XCTAssertEqual(imported.messageText, "Could not import theme")
+        XCTAssertTrue(imported.informativeText.contains("unknown field"))
+        XCTAssertTrue(imported.informativeText.contains("css"))
+
+        let removed = EditorThemeFailureAlert.make(
+            messageText: "Could not remove theme",
+            error: EditorThemeStoreError.notFound("missing")
+        )
+        XCTAssertEqual(removed.messageText, "Could not remove theme")
+        XCTAssertTrue(removed.informativeText.contains("missing"))
+        XCTAssertNotEqual(removed.messageText, removed.informativeText)
+    }
+
+    func testRejectedImportWritesNothingAndKeepsTheSelection() throws {
+        let fixture = try Fixture()
+        let before = fixture.preferences.editorThemeIdentifier
+        let oversized = Data(repeating: 0x20, count: CustomThemeDocument.maximumByteCount + 1)
+        XCTAssertThrowsError(try fixture.preferences.importEditorTheme(from: fixture.write(
+            "big.json",
+            oversized
+        ))) { error in
+            guard case EditorThemeStoreError.invalid(.exceedsMaximumSize) = error else {
+                return XCTFail("unexpected \(error)")
+            }
+        }
+        XCTAssertThrowsError(try fixture.preferences.importEditorTheme(from: fixture.directory))
+        let invalid = fixture.write(
+            "nope.json",
+            Data("{\"schemaVersion\":1,\"id\":\"nope\",\"name\":\"Nope\",\"light\":{},\"css\":\"x\"}".utf8)
+        )
+        XCTAssertThrowsError(try fixture.preferences.importEditorTheme(from: invalid))
+        XCTAssertEqual(fixture.preferences.editorThemeIdentifier, before)
+        XCTAssertEqual(
+            try FileManager.default.contentsOfDirectory(at: fixture.directory, includingPropertiesForKeys: nil).count,
+            0
+        )
+    }
+
+    func testLoadCatalogSkipsSymlinksMismatchedNamesAndOversizedFiles() throws {
+        let fixture = try Fixture()
+        let valid = Data("{\"schemaVersion\":1,\"id\":\"ink\",\"name\":\"Ink\",\"light\":{}}".utf8)
+        try valid.write(to: fixture.directory.appendingPathComponent("ink.json"))
+        try Data("{\"schemaVersion\":1,\"id\":\"other\",\"name\":\"Other\",\"light\":{}}".utf8)
+            .write(to: fixture.directory.appendingPathComponent("mismatched.json"))
+        try Data(repeating: 0x7B, count: CustomThemeDocument.maximumByteCount + 8)
+            .write(to: fixture.directory.appendingPathComponent("huge.json"))
+        let outside = fixture.write("linked.json", valid)
+        try FileManager.default.createSymbolicLink(
+            at: fixture.directory.appendingPathComponent("linked.json"),
+            withDestinationURL: outside
+        )
+        try FileManager.default.createDirectory(
+            at: fixture.directory.appendingPathComponent("folder.json"),
+            withIntermediateDirectories: true
+        )
+
+        let catalog = fixture.library.loadCatalog()
+        XCTAssertEqual(catalog.themes.map(\.id), ["ink"])
+        XCTAssertEqual(catalog.invalidIdentifiers, Set(["mismatched", "huge", "linked", "folder"]))
+    }
+
+    func testPickerShowsTheIdWhenANameCollides() throws {
+        let fixture = try Fixture()
+        for (id, name) in [("plainsong-copy", "Plainsong"), ("ink-a", "Ink"), ("ink-b", "ink"), ("solo", "Solo")] {
+            let payload = Data("""
+            {"schemaVersion":1,"id":"\(id)","name":"\(name)","light":{}}
+            """.utf8)
+            _ = try fixture.preferences.importEditorTheme(from: fixture.write("\(id).json", payload))
+        }
+        let names = fixture.preferences.editorThemePickerChoices.map(\.name)
+        XCTAssertTrue(names.contains("Plainsong"))
+        XCTAssertTrue(names.contains("Plainsong (plainsong-copy)"))
+        XCTAssertTrue(names.contains("Ink (ink-a)"))
+        XCTAssertTrue(names.contains("ink (ink-b)"))
+        XCTAssertTrue(names.contains("Solo"))
+        XCTAssertFalse(names.contains("Solo (solo)"))
+    }
+
     @MainActor
     private struct Fixture {
         let directory: URL

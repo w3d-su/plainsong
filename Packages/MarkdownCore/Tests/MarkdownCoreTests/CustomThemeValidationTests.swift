@@ -47,10 +47,11 @@ final class CustomThemeValidationTests: XCTestCase {
             "schemaVersion": 1,
             "id": "a",
             "name": "A",
-            "light": ["editor": ["caret": "#aabbccdd", "selection": "#AABBCC"]],
+            "light": ["editor": ["caret": "#aabbccff", "selection": "#AABBCC", "muted": "#aabbccdd"]],
         ])
-        XCTAssertEqual(document.light.editor["caret"], "#aabbccdd")
+        XCTAssertEqual(document.light.editor["caret"], "#aabbccff")
         XCTAssertEqual(document.light.editor["selection"], "#AABBCC")
+        XCTAssertEqual(document.light.editor["muted"], "#aabbccdd")
     }
 
     func testAcceptsExactly64KiBAndRejectsOneByteOver() throws {
@@ -135,9 +136,13 @@ final class CustomThemeValidationTests: XCTestCase {
                 expected: .reservedIdentifier("graphite")
             ),
             Rejection(label: "empty name", payload: base(name: ""), expected: .name),
+            Rejection(label: "blank name", payload: base(name: " \n\t"), expected: .name),
+            Rejection(label: "control name", payload: base(name: "Ink\u{0007}"), expected: .name),
+            Rejection(label: "bidi name", payload: base(name: "\u{202E}Ink"), expected: .name),
+            Rejection(label: "zero width name", payload: base(name: "In\u{200B}k"), expected: .name),
             Rejection(
                 label: "long name",
-                payload: base(name: String(repeating: "N", count: 65)),
+                payload: base(name: String(repeating: "N", count: 129)),
                 expected: .name
             ),
             Rejection(
@@ -180,6 +185,36 @@ final class CustomThemeValidationTests: XCTestCase {
                 payload: base(light: ["editor": [:], "extra": [:]]),
                 expected: .unknownField("light.extra")
             ),
+            Rejection(
+                label: "transparent text",
+                payload: base(editor: ["text": "#11223300"]),
+                expected: .nonOpaqueColor("light.editor.text")
+            ),
+            Rejection(
+                label: "transparent caret",
+                payload: base(editor: ["caret": "#aabbccdd"]),
+                expected: .nonOpaqueColor("light.editor.caret")
+            ),
+            Rejection(
+                label: "transparent background",
+                payload: base(editor: ["background": "#00000080"]),
+                expected: .nonOpaqueColor("light.editor.background")
+            ),
+            Rejection(
+                label: "invalid hex",
+                payload: base(editor: ["text": "#GGGGGG"]),
+                expected: .color("light.editor.text")
+            ),
+            Rejection(
+                label: "padded hex",
+                payload: base(editor: ["text": "#112233 "]),
+                expected: .color("light.editor.text")
+            ),
+            Rejection(
+                label: "fullwidth hex",
+                payload: base(editor: ["text": "＃１１２２３３"]),
+                expected: .color("light.editor.text")
+            ),
         ]
     }
 
@@ -191,9 +226,83 @@ final class CustomThemeValidationTests: XCTestCase {
     }
 
     func testHyphenatedIdentifierAndMaximumNameAreAccepted() throws {
-        let document = try validate(base(id: "-ok-", name: String(repeating: "n", count: 64)))
+        let document = try validate(base(id: "-ok-", name: String(repeating: "n", count: 128)))
         XCTAssertEqual(document.id, "-ok-")
-        XCTAssertEqual(document.name.count, 64)
+        XCTAssertEqual(document.name.unicodeScalars.count, 128)
+    }
+
+    func testNameIsTrimmedAndNFCNormalized() throws {
+        let composed = "e\u{0301}"
+        let document = try validate(base(name: "  \(composed)  "))
+        XCTAssertEqual(document.name, "\u{00E9}")
+        XCTAssertEqual(document.name.unicodeScalars.count, 1)
+    }
+
+    func testRejectsAGraphemeThatHidesTooManyScalars() throws {
+        // NFC composes the first mark into U+00C1, so 129 marks are still over the scalar cap.
+        let zalgo = "A" + String(repeating: "\u{0301}", count: 129)
+        XCTAssertEqual(zalgo.count, 1)
+        XCTAssertEqual(
+            try CustomThemeValidation.validate(json(base(name: zalgo))),
+            .failure(.name)
+        )
+    }
+
+    func testEmptyDarkPaletteInheritsAndHostileJSONIsRejected() throws {
+        let document = try validate([
+            "schemaVersion": 1,
+            "id": "ink",
+            "name": "Ink",
+            "light": ["editor": ["heading": "#010203"]],
+            "dark": [:],
+        ])
+        XCTAssertEqual(document.dark?.editor, [:])
+        XCTAssertEqual(document.dark?.preview, [:])
+
+        for sample in rawRejections() {
+            XCTAssertEqual(
+                CustomThemeValidation.validate(sample.payload),
+                .failure(sample.expected),
+                sample.label
+            )
+        }
+    }
+
+    private struct RawRejection {
+        var label: String
+        var payload: Data
+        var expected: CustomThemeValidationFailure
+    }
+
+    private func rawRejections() -> [RawRejection] {
+        let duplicate = Data("{\"schemaVersion\":1,\"id\":\"ink\",\"name\":\"Ink\",\"light\":{},\"id\":\"other\"}".utf8)
+        let nestedDuplicate = Data(
+            """
+            {"schemaVersion":1,"id":"ink","name":"Ink","light":{"editor":{"text":"#112233","text":"#000000"}}}
+            """.utf8
+        )
+        let escapedDuplicate = Data(
+            "{\"schemaVersion\":1,\"\\u0069d\":\"ink\",\"id\":\"ink\",\"name\":\"Ink\",\"light\":{}}".utf8
+        )
+        let numericIdentity = Data("{\"schemaVersion\":1,\"id\":12,\"name\":\"Ink\",\"light\":{}}".utf8)
+        let numericName = Data("{\"schemaVersion\":1,\"id\":\"ink\",\"name\":7,\"light\":{}}".utf8)
+        let stringSchema = Data("{\"schemaVersion\":\"1\",\"id\":\"ink\",\"name\":\"Ink\",\"light\":{}}".utf8)
+        let editorArray = Data("{\"schemaVersion\":1,\"id\":\"ink\",\"name\":\"Ink\",\"light\":{\"editor\":[]}}".utf8)
+        let lightString = Data("{\"schemaVersion\":1,\"id\":\"ink\",\"name\":\"Ink\",\"light\":\"x\"}".utf8)
+        var nested = Data(repeating: UInt8(ascii: "["), count: 30000)
+        nested.append(contentsOf: repeatElement(UInt8(ascii: "]"), count: 30000))
+        precondition(nested.count <= CustomThemeDocument.maximumByteCount)
+        return [
+            RawRejection(label: "duplicate id", payload: duplicate, expected: .invalidJSON),
+            RawRejection(label: "duplicate color", payload: nestedDuplicate, expected: .invalidJSON),
+            RawRejection(label: "escaped duplicate id", payload: escapedDuplicate, expected: .invalidJSON),
+            RawRejection(label: "numeric id", payload: numericIdentity, expected: .invalidJSON),
+            RawRejection(label: "numeric name", payload: numericName, expected: .invalidJSON),
+            RawRejection(label: "string schema", payload: stringSchema, expected: .invalidJSON),
+            RawRejection(label: "editor array", payload: editorArray, expected: .invalidJSON),
+            RawRejection(label: "light string", payload: lightString, expected: .invalidJSON),
+            RawRejection(label: "deep nesting", payload: nested, expected: .invalidJSON),
+        ]
     }
 
     private func validate(_ payload: Any) throws -> CustomThemeDocument {

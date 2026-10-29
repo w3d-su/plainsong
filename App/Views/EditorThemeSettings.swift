@@ -41,9 +41,7 @@ struct EditorThemeSettings: View {
         do {
             _ = try preferences.importEditorTheme(from: url)
         } catch {
-            let alert = NSAlert(error: error)
-            alert.messageText = "Could not import theme"
-            alert.runModal()
+            EditorThemeFailureAlert.make(messageText: "Could not import theme", error: error).runModal()
         }
     }
 
@@ -51,9 +49,17 @@ struct EditorThemeSettings: View {
         do {
             _ = try preferences.removeSelectedEditorTheme()
         } catch {
-            let alert = NSAlert(error: error)
-            alert.messageText = "Could not remove theme"
-            alert.runModal()
+            EditorThemeFailureAlert.make(messageText: "Could not remove theme", error: error).runModal()
         }
+    }
+}
+
+@MainActor
+enum EditorThemeFailureAlert {
+    static func make(messageText: String, error: Error) -> NSAlert {
+        let alert = NSAlert()
+        alert.messageText = messageText
+        alert.informativeText = error.localizedDescription
+        return alert
     }
 }
