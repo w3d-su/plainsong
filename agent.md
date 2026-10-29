@@ -671,7 +671,9 @@ attempt without a Decision Log entry.
   and beta updates), Editor (font, size, line numbers, typewriter sync), Preview (theme,
   allow remote images), Files (image-paste asset folder pattern, default extension
   `.md`/`.mdx`). Plainsong > Check for Updates… and those update toggles stay hidden
-  while `PLAINSONG_UPDATES_ENABLED` is NO.
+  while `PLAINSONG_UPDATES_ENABLED` is NO. When updates are enabled, the automatic
+  download toggle is disabled, and that preference is turned off, while automatic
+  checks are off.
 
 ---
 
