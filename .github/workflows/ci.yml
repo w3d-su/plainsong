@@ -89,7 +89,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Validate committed acceptance resources
-        run: sha256sum -c IOSAcceptanceTests/Resources/acceptance-resource-manifest.txt
+        run: sha256sum --strict -c IOSAcceptanceTests/Resources/acceptance-resource-manifest.txt
 
       - uses: actions/setup-node@v4
         with:

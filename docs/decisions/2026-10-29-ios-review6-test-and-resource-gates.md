@@ -12,7 +12,8 @@ job; it does not itself establish a main-thread deadlock. The implementation
 comment describes the actual execution and stale-result guards.
 
 The preview CI job checks all acceptance-resource digests immediately after
-checkout. The manual iOS workflow remains the simulator, archive and IPA gate,
+checkout, rejecting malformed checksum rows with `--strict`. The manual iOS
+workflow remains the simulator, archive and IPA gate,
 while an ordinary code PR now rejects stale resource pins on Linux. Updating
 pins automatically during CI was rejected because that would hide a mismatch
 between committed resources and the manifest under test.
@@ -20,3 +21,10 @@ between committed resources and the manifest under test.
 Synchronizing main preserves its window ownership and SVG rules alongside this
 PR's iOS search invalidation rules. Physical-device export, print and iCloud
 acceptance remain separate.
+
+The first integrated iOS run passed its PreviewKit tests but failed required-name
+validation: #229 replaced the blanket SVG rejection test with
+`testAdmittedSVGIsServedUnchangedAndRejectedSVGIsNot`, while the iOS manifest
+still named the removed case. The manifest now requires the replacement's
+admitted-byte/header and rejected-script assertions. The required-case count,
+missing-case rejection and full-suite no-skip checks stay intact.
