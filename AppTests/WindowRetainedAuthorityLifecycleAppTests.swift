@@ -98,6 +98,29 @@ final class WindowRetainedAuthorityLifecycleAppTests: XCTestCase {
         XCTAssertEqual(owner.dependentSessionCount, 0)
     }
 
+    func testRevokingAnUnshownUntitledSessionKeepsItsBindingRegistration() throws {
+        let fixture = try SecondWindowRegistryFixture.make(testCase: self)
+        let session = DocumentSession()
+        fixture.appState.setCurrentDocument(session, requestingEditorFocus: false)
+        let binding = fixture.appState.editorDocumentBinding(for: session)
+        let installation = EditorDocumentBindingInstallation(
+            bindingID: binding.id, installationID: EditorDocumentBindingInstallationID()
+        )
+        binding.onLifecycle(.installed(installation))
+        fixture.appState.setCurrentDocument(DocumentSession(), requestingEditorFocus: false)
+        let identity = ObjectIdentifier(session)
+        XCTAssertFalse(fixture.appState.registry.isShownByAnyWindow(session))
+        XCTAssertFalse(fixture.appState.registry.isWarmSession(session))
+        XCTAssertNil(fixture.appState.registry.retainedWorkspaceAuthorityOwners[identity])
+
+        binding.onLifecycle(.revoked(installation))
+
+        XCTAssertEqual(fixture.appState.editorDocumentBinding(for: session).id, binding.id)
+        fixture.appState.setCurrentDocument(session, requestingEditorFocus: false)
+        XCTAssertTrue(fixture.appState.shownSession === session)
+        XCTAssertEqual(fixture.appState.editorDocumentBinding(for: session).id, binding.id)
+    }
+
     func testDiscardAlsoRemovesTheInstallationWindowRecord() throws {
         let fixture = try SecondWindowRegistryFixture.make(testCase: self)
         let binding = fixture.appState.editorDocumentBinding(for: fixture.first)
