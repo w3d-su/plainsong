@@ -93,6 +93,7 @@ extension AppState {
     /// external read, or quarantine must keep the original fail-closed state until it
     /// releases the session.
     func releaseUnreferencedSessionOwnership(for session: DocumentSession) {
+        releaseRetainedWorkspaceAuthorityIfUnreferenced(for: session)
         let sessionIdentity = ObjectIdentifier(session)
         guard !registry.isShownByAnyWindow(session),
               case .unavailable? = unanchoredManagedSessionOwnershipProofs[sessionIdentity],
@@ -133,7 +134,9 @@ extension AppState {
         }
         // This runs only at explicit session lifecycle boundaries. SwiftUI body evaluation
         // consumes retained proof/cache state and never calls this filesystem path.
-        if case .proven? = unanchoredManagedSessionOwnershipProofs[sessionIdentity] { return }
+        if case .proven? = unanchoredManagedSessionOwnershipProofs[sessionIdentity] {
+            return
+        }
         guard unanchoredManagedSessionOwnershipProofs[sessionIdentity] == nil else { return }
         guard let fileURL = session.fileURL else {
             unanchoredManagedSessionOwnershipProofs[sessionIdentity] = .unavailable(fileURL: nil)
@@ -507,7 +510,9 @@ extension AppState {
         proof: UnanchoredManagedSessionFileProof
     ) {
         let sessionIdentity = ObjectIdentifier(session)
-        if proof.installedWorkspaceLocation != nil { return }
+        if proof.installedWorkspaceLocation != nil {
+            return
+        }
         guard let installedWorkspaceLocation = installedWorkspaceLocation(
             for: proof.location.fileURL,
             identity: proof.identity

@@ -239,6 +239,10 @@ routes (`Packages/EditorKit/Sources/EditorKit/EditingBehaviorsSupport.swift:120`
 clone registry (`Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceItemCreationTypes.swift:24-28`),
 and pure `exportAppPrivateRoot` (`App/AppState+ExportAppPrivateRoot.swift:9-26`).
 
+D1b adds registry-owned `editorInstallationWindows` (weak window identity per live
+installation) and `retainedWorkspaceAuthorityOwners` (scope leases for sessions preserved
+by another window). They supplement the historical 121-property inventory above.
+
 ### 3.4 Safety invariants that must stay global
 
 | ID | Invariant | Rule |
@@ -754,10 +758,12 @@ C's fallback. W8 then verifies D2's routing to an existing or new window under W
   - Open:
     - Bullet 5: `WindowStateRegistryAppTests/testTerminationRefusesForASecondWindowsUnsavableSession` refuses termination, leaves the error on window 2's `WindowState`, and records that window as `KeyWindowRouter.focusedWindowState`. `WindowFacadeRoutingAppTests/testRecoveryBannerAndUnseenFailureStayOnTheHomeWindow` presents an unseen session's error on the home façade.
     - Bullet 6: the same test keeps `workspaceMutationRecoveryBannerPlacement` at `.global` on the home façade and `.hidden` on the sibling while the load-failure flag is set. `testClosingAFacadeRetargetsItsNotice` moves a write notice to the surviving façade after the owner façade closes. Unseen autosave failures use `present(_:title:for:)`, which is the path the recovery test calls.
-    - Bullet 7: D1b evidence below. B2's `testClosingTheWorkspaceKeepsStateForASecondWindowsSession` kept proofs, pending external text, and the detached URL. D1b no longer lets that window's quarantined write refuse this root's close, and the close does not prune it.
+    - Bullet 7: D1b evidence below. B2's `testClosingTheWorkspaceKeepsStateForASecondWindowsSession` kept proofs, pending external text, and the detached URL. The last-root preflight still refuses R1's own quarantined write, even when another window shows it. R2 quarantine does not block R1.
   - D2 must decide one consequence. The Save Copy walk fails closed on a candidate with no ownership record, so an untitled, record-less document in another window refuses every Save Copy and export (`testAnUntitledRecordlessDocumentInASecondWindowFailsSaveCopyClosed`).
 - Evidence (D1b), `WindowRootReleaseAppTests`:
   - Bullet 7, one named test per item: `testClosingR1KeepsPendingExternalStateForASecondWindowsSession`, `testClosingR1KeepsAnchoredBindingForASecondWindowsSession`, `testClosingR1KeepsOwnershipProofForASecondWindowsSession`, `testClosingR1KeepsDetachedURLForASecondWindowsSession`, `testClosingR1KeepsQuarantineForASecondWindowsSession`, `testClosingR1KeepsEditorBindingRegistrationForASecondWindowsSession`, `testClosingR1KeepsBackgroundTasksForASecondWindowsSession`, and `testClosingR1KeepsWarmCacheEntryForASecondWindowsSession`. `testClosingR1KeepsASessionAnotherWindowInstalls` keeps a session another window still installs after that window stops showing it. `WindowStateRegistryAppTests/testClosingTheWorkspaceKeepsStateForASecondWindowsSession` still keeps proofs, pending external text, and the detached URL.
+
+- D1b review follow-up (2026-10-30): `WindowRootAuthorityReleaseAppTests/testLastReleaseKeepsScopeForRootSessionShownInAnotherWindowUntilEviction` retains the actual `workspaceAccess` object for the preserved R1 session, then verifies it stops on eviction. `testSingleWindowDelayedInstallationRetiresWithScopeUntilRevoked` verifies that a previous document's installation in the same window retires with the scope, and stops it only on revocation. `testLastReleaseRefusesOwnRootQuarantineAndKeepsItsLiveScope` pins the same-root preflight. The three new tests, all 16 root-release tests, the registry close test, and all nine partition tests passed (29 tests, zero failures; `/tmp/plainsong-d1b-review-evidence/hosted-2.xcresult`). The earlier compilation failure remains in `hosted-1.xcresult`.
 
 ### W4 — One writer per file across windows
 

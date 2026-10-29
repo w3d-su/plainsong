@@ -28,8 +28,10 @@ extension AppState {
         }
         // D1b: preflight and release only this root. Another root's fence, quarantine,
         // or conflict must not block, and must not be swept up with this close.
-        let sessionsToClose = workspaceSessionsForRootRelease()
-        if let quarantinedSession = sessionsToClose.first(where: {
+        let rootSessions = workspaceSessionsForRootPreflight()
+        let sessionsToClose = rootSessions.filter { !isPreservedForAnotherWindow($0) }
+        let preservedSessions = rootSessions.filter { isPreservedForAnotherWindow($0) }
+        if let quarantinedSession = rootSessions.first(where: {
             indeterminateWorkspaceMutationSessions.contains(ObjectIdentifier($0))
         }) {
             throw WorkspaceMutationError.indeterminateSession(
@@ -49,12 +51,12 @@ extension AppState {
 
         if let conflictURL = firstUnretirableExternalConflict(
             excluding: retiringSessionIdentities,
-            among: sessionsToClose
+            among: rootSessions
         ) {
             throw AppStateError.unresolvedExternalChange(conflictURL)
         }
 
-        if let quarantinedSession = sessionsToClose.first(where: { session in
+        if let quarantinedSession = rootSessions.first(where: { session in
             !retiringSessionIdentities.contains(ObjectIdentifier(session))
                 && indeterminateSessionWrites[ObjectIdentifier(session)] != nil
         }) {
@@ -78,27 +80,28 @@ extension AppState {
             throw AppStateError.missingFile(detachedPlan.canonicalURL)
         }
 
-        for session in sessionsToClose
+        for session in rootSessions
             where !retiringSessionIdentities.contains(ObjectIdentifier(session)) && session.isDirty
         {
             try save(session: session)
         }
         commitWorkspaceClosure(
             sessions: sessionsToClose,
-            retirementPlans: retirementPlans
+            retirementPlans: retirementPlans,
+            preserving: preservedSessions
         )
     }
 }
 
 @MainActor
 private extension AppState {
-    /// Sessions this close may retire: retained authority or installed membership in the
-    /// closing root, except a session another window still shows or installs.
-    func workspaceSessionsForRootRelease() -> [DocumentSession] {
+    /// Every session whose retained authority or installed membership belongs to the
+    /// closing root. Preflight covers preserved sessions as well as the release set.
+    func workspaceSessionsForRootPreflight() -> [DocumentSession] {
         registry.sessions(from: [
             .warmCache, .retired, .editorBindings, .editorInstallations, .mutationRecovery, .fileBackedWindowDocuments,
         ]).filter { session in
-            sessionBelongsToClosingRoot(session) && !isPreservedForAnotherWindow(session)
+            sessionBelongsToClosingRoot(session)
         }.sorted { first, second in
             sessionClosureIdentity(first).utf8.lexicographicallyPrecedes(
                 sessionClosureIdentity(second).utf8
@@ -129,12 +132,13 @@ private extension AppState {
         }) {
             return true
         }
-        if shownSession !== session,
-           editorBindingInstallations.values.contains(where: { $0 === session })
-        {
-            return true
+        return editorBindingInstallations.contains { installation, owner in
+            guard owner === session,
+                  let window = registry.editorInstallationWindows[installation]?.window,
+                  window !== windowState
+            else { return false }
+            return registry.connectedWindows.contains { $0 === window }
         }
-        return false
     }
 
     func sessionClosureIdentity(_ session: DocumentSession) -> String {
@@ -198,7 +202,8 @@ private extension AppState {
 
     func commitWorkspaceClosure(
         sessions: [DocumentSession],
-        retirementPlans: [EditorDocumentRetirementPlan]
+        retirementPlans: [EditorDocumentRetirementPlan],
+        preserving preservedSessions: [DocumentSession]
     ) {
         _ = advanceWorkspaceGeneration()
         workspaceReloadTask?.cancel()
@@ -207,7 +212,7 @@ private extension AppState {
         completionWorkspaceTask = nil
         workspaceWatcher?.stop()
         workspaceWatcher = nil
-        transferWorkspaceAuthority(to: retirementPlans)
+        transferWorkspaceAuthority(to: retirementPlans, preserving: preservedSessions)
         clearClosedWorkspaceState(
             sessions: sessions,
             retirementPlans: retirementPlans
@@ -215,12 +220,18 @@ private extension AppState {
     }
 
     func transferWorkspaceAuthority(
-        to retirementPlans: [EditorDocumentRetirementPlan]
+        to retirementPlans: [EditorDocumentRetirementPlan],
+        preserving preservedSessions: [DocumentSession]
     ) {
         let activeAuthority = workspaceAccess
         workspaceAccess = nil
         let authorityOwner = activeAuthority.map(RetiredWorkspaceAuthorityOwner.init(authority:))
 
+        if let authorityOwner {
+            for session in preservedSessions {
+                retainWorkspaceAuthority(authorityOwner, for: session)
+            }
+        }
         for plan in retirementPlans {
             beginEditorDocumentSessionRetirement(
                 canonicalURL: plan.canonicalURL,

@@ -82,9 +82,9 @@ final class WindowRootReleaseAppTests: XCTestCase {
             preparedSHA256Digest: "abcd"
         )
 
-        try fixture.appState.closeWorkspaceForReplacement()
+        XCTAssertThrowsError(try fixture.appState.closeWorkspaceForReplacement())
 
-        XCTAssertNil(fixture.appState.workspaceRootURL)
+        XCTAssertNotNil(fixture.appState.workspaceRootURL)
         XCTAssertEqual(fixture.appState.indeterminateSessionWrites[identity], write)
         XCTAssertEqual(
             fixture.appState.indeterminateSessionWriteContexts[identity]?.location,
@@ -137,13 +137,16 @@ final class WindowRootReleaseAppTests: XCTestCase {
     func testClosingR1KeepsASessionAnotherWindowInstalls() throws {
         let fixture = try SecondWindowRegistryFixture.make(testCase: self)
         fixture.appState.registry.setWarmSession(fixture.second, at: fixture.secondURL)
-        let binding = fixture.appState.editorDocumentBinding(for: fixture.second)
+        let owner = fixture.appState.makeSiblingFacade(admitsFileOperations: true)
+        owner.shownSession = fixture.second
+        let binding = owner.editorDocumentBinding(for: fixture.second)
         let installation = EditorDocumentBindingInstallation(
             bindingID: binding.id,
             installationID: EditorDocumentBindingInstallationID()
         )
         binding.onLifecycle(.installed(installation))
         fixture.hideSecond()
+        owner.setCurrentDocument(DocumentSession(), requestingEditorFocus: false)
 
         try fixture.appState.closeWorkspaceForReplacement()
 

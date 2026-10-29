@@ -511,6 +511,7 @@ private extension AppState {
         if !isRetiredEditorSession(session) {
             removeEditorDocumentBindingRegistration(for: session)
         }
+        releaseRetainedWorkspaceAuthorityIfUnreferenced(for: session)
         return true
     }
 
