@@ -65,6 +65,7 @@ projects such as Astro/Next.js content directories).
 | Persistence of prefs | `UserDefaults` + built-in theme IDs; custom theme/user CSS imports deferred | |
 | Project generation | **XcodeGen** (`project.yml` committed; `.xcodeproj` is generated, never hand-edited) | pbxproj diffs are hostile to LLM collaboration. |
 | Lint/format | SwiftFormat + SwiftLint (configs committed) | |
+| Updates | [Sparkle](https://github.com/sparkle-project/Sparkle) 2.10.0, App target only | Exact pin. `PLAINSONG_UPDATES_ENABLED` defaults to NO, so the app does not create or start `SPUUpdater` and makes no update request. Packages must not import Sparkle. |
 | JS tooling | Node 20+, npm, esbuild, vitest (preview pipeline unit tests) | |
 
 **Dependency policy:** keep the dependency list short. Adding any new Swift package or npm
@@ -662,8 +663,11 @@ attempt without a Decision Log entry.
   with the editor settings bridge. User CSS overrides are deferred until a separate
   sanitizer/design exists.
 - **Settings window (SwiftUI `Settings` scene):** General (default folder, autosave
-  interval), Editor (font, size, line numbers, typewriter sync), Preview (theme, allow
-  remote images), Files (image-paste asset folder pattern, default extension `.md`/`.mdx`).
+  interval; when updates are enabled, automatic checks, automatic download and install,
+  and beta updates), Editor (font, size, line numbers, typewriter sync), Preview (theme,
+  allow remote images), Files (image-paste asset folder pattern, default extension
+  `.md`/`.mdx`). Plainsong > Check for Updates… and those update toggles stay hidden
+  while `PLAINSONG_UPDATES_ENABLED` is NO.
 
 ---
 
@@ -876,6 +880,11 @@ make format           # swiftformat . && swiftlint --fix
   conflicts; edit `project.yml`.**
 - Code signing: "Sign to Run Locally" for dev; hardened runtime + notarization scripted
   later (Phase 3, direct distribution first, App Store optional).
+- `Scripts/release.sh` re-signs Sparkle innermost first: `Installer.xpc`,
+  `Downloader.xpc` (`--preserve-metadata=entitlements`), `Autoupdate`, `Updater.app`,
+  and `Sparkle.framework`, then the app. It never uses `--deep`. The Developer ID path
+  adds `-o runtime --timestamp`. Both paths then run `codesign --verify --strict` on
+  each nested item and the app.
 
 ---
 

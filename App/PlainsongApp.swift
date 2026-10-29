@@ -28,12 +28,14 @@ struct PlainsongApp: App {
     /// (see `MenuBarState` for why the menu must not track high-churn publishes).
     @StateObject private var menuBarState: MenuBarState
     @StateObject private var inspectorMenuState = InspectorMenuState.shared
+    @StateObject private var updateCenter: AppUpdateCenter
 
     init() {
         let state = makePlainsongAppState()
         _appState = StateObject(wrappedValue: state)
         WorkspaceSceneReopener.shared.remember(state)
         _menuBarState = StateObject(wrappedValue: MenuBarState())
+        _updateCenter = StateObject(wrappedValue: AppUpdateCenter.make())
         // Find menu actions → the originating editor's window (§5.1).
         EditorFindCommandDelivery.installHooks()
     }
@@ -52,6 +54,11 @@ struct PlainsongApp: App {
             if #available(macOS 27.0, *) { SidebarCommands() }
             InspectorToggleCommands(menuState: inspectorMenuState)
             PlainsongCommands(menuBarState: menuBarState)
+            if let checkForUpdates = updateCenter.checkForUpdatesModel {
+                CommandGroup(after: .appInfo) {
+                    CheckForUpdatesButton(model: checkForUpdates)
+                }
+            }
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase != .active else { return }
@@ -59,7 +66,7 @@ struct PlainsongApp: App {
         }
 
         Settings {
-            SettingsView()
+            SettingsView(updateSettings: updateCenter.settingsModel)
                 .environmentObject(appState)
                 .tint(.accentColor)
         }

@@ -6,13 +6,17 @@ import SwiftUI
 /// footers that explain what a control changes instead of separate help text.
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
+    var updateSettings: UpdateSettingsModel?
 
     var body: some View {
         TabView {
-            GeneralSettingsPane(preferences: appState.preferences)
-                .tabItem {
-                    Label("General", systemImage: "gearshape")
-                }
+            GeneralSettingsPane(
+                preferences: appState.preferences,
+                updateSettings: updateSettings
+            )
+            .tabItem {
+                Label("General", systemImage: "gearshape")
+            }
 
             EditorSettingsPane(preferences: appState.preferences)
                 .tabItem {
@@ -35,6 +39,7 @@ struct SettingsView: View {
 
 private struct GeneralSettingsPane: View {
     @ObservedObject var preferences: PlainsongPreferences
+    var updateSettings: UpdateSettingsModel?
 
     var body: some View {
         Form {
@@ -98,9 +103,13 @@ private struct GeneralSettingsPane: View {
             } footer: {
                 SettingsFooter("Plainsong saves automatically once you pause typing for this long.")
             }
+
+            if let updateSettings {
+                UpdateSettingsSection(model: updateSettings)
+            }
         }
         .formStyle(.grouped)
-        .frame(height: 214)
+        .frame(height: updateSettings == nil ? 214 : 420)
     }
 
     private func chooseDefaultFolder() {
@@ -113,6 +122,32 @@ private struct GeneralSettingsPane: View {
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
         try? preferences.setDefaultFolderURL(url)
+    }
+}
+
+/// Observes the updater model so Sparkle's permission prompt can move the toggles.
+private struct UpdateSettingsSection: View {
+    @ObservedObject var model: UpdateSettingsModel
+
+    var body: some View {
+        Section {
+            Toggle("Automatically check for updates", isOn: Binding(
+                get: { model.automaticallyChecksForUpdates },
+                set: { model.setAutomaticallyChecksForUpdates($0) }
+            ))
+            Toggle("Automatically download and install updates", isOn: Binding(
+                get: { model.automaticallyDownloadsUpdates },
+                set: { model.setAutomaticallyDownloadsUpdates($0) }
+            ))
+            Toggle("Receive beta updates", isOn: Binding(
+                get: { model.receivesBetaUpdates },
+                set: { model.setReceivesBetaUpdates($0) }
+            ))
+        } footer: {
+            SettingsFooter(
+                "Beta updates include prereleases. Automatic download stays off until you turn it on."
+            )
+        }
     }
 }
 

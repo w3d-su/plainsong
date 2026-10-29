@@ -46,6 +46,7 @@ test: test-packages test-hosted test-preview
 # App/Plainsong.entitlements.
 test-packages: generate
 	$(MAKE) test-f2-tooling
+	Scripts/check-sparkle-layering.sh
 	@set -e; for pkg in $(PACKAGES); do \
 		echo "==> swift test: $$pkg"; \
 		(cd Packages/$$pkg && swift test); \

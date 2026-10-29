@@ -124,3 +124,72 @@ Full `make test` is recorded in `/private/tmp/pr141-make-test.log` with isolated
 a fixed result bundle and the shared test lock; its result and final exact-head hosted CI
 are reported in the PR body after completion. Functional CI-mode runs do not close idle
 performance or owner-only acceptance gates.
+
+## R21 audit — 2026-10-29
+
+Read-only audit of `main` at `88e3a773d54ad0b46bc10fe8f5fd6c14e971cfaa`; no CI rerun,
+test execution or product change. Result: **root cause still unknown, no recurrence.**
+`docs/risk-register.md` lowers R21 to Low as an accepted residual.
+
+- Coverage: the 288 CI workflow runs created from 2026-10-04T00:00Z through
+  2026-10-28T17:54Z (the audit snapshot; three later successful runs that day are not
+  included); 56 failed attempts across 55 runs (including attempts hidden by successful
+  reruns) and 57 cancelled runs; 136 failed/cancelled job logs; 58 retained
+  `plainsong-ci-failure-*` artifacts from 42 runs, each checked against GitHub's SHA-256 and
+  ZIP CRC, none executed.
+- Denominator: 225 of the 288 runs reached a hosted test step that includes
+  PerformanceTests (the combined `build-and-test` test step, or `hosted (ui-performance)`
+  after sharding), and 196 completed it successfully. The other runs were docs-only (hosted
+  jobs skipped since #183), cancelled before it, or failed earlier. 32 runs predate the
+  2026-10-04T17:02Z merge of `1e91ee4` and used the old path without preflight. Artifacts are
+  kept 14 days, so the 89 runs created before 2026-10-15 (39 of them failed or cancelled)
+  were classified from job logs only; the 58 retained artifacts cover the later part of the
+  window.
+- Resource preflight: all 18 retained manifests pass (67 entries, or 28 under that branch's
+  older contract). No ENOENT/EIO preflight failure.
+- xcresult: all 17 complete bundles decode, with failures outside R21. 21 bundles from
+  cancelled execution lack `Info.plist`; that is incomplete evidence, not CAS corruption.
+- The only resource-read signature, [37176591675/a1](https://github.com/w3d-su/plainsong/actions/runs/37176591675?attempt=1),
+  is the relative-URL regression corrected in PR #141 above, with no CAS error.
+- Every other failed attempt is a known non-R21 failure (Replace/Find timeouts, ExportPDF
+  visible `scrollY` 900→899, compile/lint errors, WorkspaceFileTree timing, PreviewKit
+  network-control and teardown, EditorKit geometry).
+- Environment: every retained summary reports image `20260907.0337.1`, Xcode 16.4 (16F6),
+  37–43 GiB free and `ulimit -n` 10240. These are other runs' failure-time values and do not
+  rule out a transient condition on 2026-09-29.
+- Original incident (job log still downloadable): attempt 1 of
+  [36590521567](https://github.com/w3d-su/plainsong/actions/runs/36590521567?attempt=1) at
+  `1c3a4d7` used the combined `xcodebuild test` action with shared
+  `~/Library/Developer/Xcode/DerivedData/Plainsong-…`. Resources were copied at 15:43:42Z;
+  at 15:50:16–15:50:44Z the `perf-500kb.md` read failed (`NSPOSIXErrorDomain` 92, EILSEQ),
+  `preview/index.html` lookup failed, log archive creation could not read `version.plist`,
+  `FileBackedCASDatabase` rename failed with ENOENT, and `LogStoreManifest.plist` could not
+  be saved. Several unrelated file operations under one DerivedData tree failed within
+  ~30 s. CI now uses a per-run/attempt/shard DerivedData path under `RUNNER_TEMP` and splits
+  build-for-testing from test-without-building. Hosted runners were already ephemeral per
+  job, and one job still shares one tree on the same APFS volume, so this does not remove
+  the hypothesized sharing and is not a mitigation for it. The 32 pre-`1e91ee4` runs on the
+  old path did not recur either. The Low rating rests only on non-recurrence.
+- Public trackers: exact-string GitHub searches for `FileBackedCASDatabase` + `rename failed`
+  (including `actions/runner-images`) returned no match; Apple Developer Forums search was
+  blocked by a verification page, so Apple-side coverage is incomplete.
+
+Before the incident, 378 CI runs (234 successful) were created without this signature.
+
+Recurrence signature (raise R21 back to Medium): a hosted `FileBackedCASDatabase` rename
+failure; a resource preflight failure with ENOENT, EIO or EILSEQ; or a PerformanceTests
+bundle-resource read failing with an `NSPOSIXErrorDomain` error that is not a known
+URL-construction regression such as the #141 relative-URL case.
+
+Deferred evidence-only captures, to add if the signature recurs (no retry, rerun or budget
+change; local `make test` unchanged with CI variables unset; uploads stay in the controlled
+runner-temp directory):
+
+1. Failing resource and CAS source/destination: stat (device, inode, mode, flags),
+   `ls -ldOe@`, ACLs and xattrs, the exact errno and absolute URL/base spelling, from
+   allowlisted paths derived from the CI bundle.
+2. UTC start/end and exit status per stage (build-for-testing, preflight,
+   test-without-building), plus failure-time open-descriptor counts and a bounded process
+   snapshot of `xcodebuild`, `xctest` and `testmanagerd`.
+3. xcresult finalization/inspection exit status and stderr, and whether `Info.plist`
+   exists, decoding a working copy so the retained original is unchanged.
