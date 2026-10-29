@@ -15,28 +15,40 @@ extension AppState {
         let pruning = workspaceScanPruning(root: selectedRoot)
         workspaceReloadTask?.cancel()
 
-        workspaceReloadTask = Task { @MainActor [weak self, scanner] in
+        let context = workspaceRootContext
+        // The root owns the task. Resolve a live participant after each suspension so the
+        // scan survives the initiating window leaving a root that another window still owns.
+        workspaceReloadTask = Task { @MainActor [weak self, weak context, scanner] in
             do {
                 let capture = try await scanner.snapshotCapture(root: selectedRoot, pruning: pruning)
-                guard let self else { return }
-                try await reloadWorkspaceCapture(
-                    root: selectedRoot,
-                    scanner: scanner,
-                    initialCapture: capture,
-                    generation: generation,
-                    selectFirstIfNeeded: selectFirstIfNeeded
-                )
-                guard isCurrentWorkspaceReload(root: selectedRoot, generation: generation) else {
-                    return
+                while let context, !Task.isCancelled, context.workspaceGeneration == generation {
+                    guard let facade = context.facades.first ?? self,
+                          facade.workspaceRootContext === context
+                    else { return }
+                    do {
+                        try await facade.reloadWorkspaceCapture(
+                            root: selectedRoot,
+                            scanner: scanner,
+                            initialCapture: capture,
+                            generation: generation,
+                            selectFirstIfNeeded: selectFirstIfNeeded && facade === self
+                        )
+                        return
+                    } catch is CancellationError {
+                        guard facade.workspaceRootContext !== context || facade.workspaceRootURL == nil else {
+                            return
+                        }
+                    }
                 }
             } catch is CancellationError {
-                // A newer reload, workspace switch, or close invalidated this scan.
+                // A newer reload or the last root release invalidated this scan.
             } catch {
-                guard let self else { return }
-                guard isCurrentWorkspaceReload(root: selectedRoot, generation: generation) else {
-                    return
-                }
-                present(error, title: errorTitle)
+                guard let context,
+                      let facade = context.facades.first ?? self,
+                      facade.workspaceRootContext === context,
+                      facade.isCurrentWorkspaceReload(root: selectedRoot, generation: generation)
+                else { return }
+                facade.present(error, title: errorTitle)
             }
         }
     }
@@ -103,7 +115,7 @@ extension AppState {
     /// first file activates; their root-relative paths name the *old* root and must not
     /// keep, say, `node_modules/pkg` alive in the new one.
     func workspaceScanPruning(root: URL) -> WorkspaceScanPruning {
-        guard !showAllFiles else { return .none }
+        guard !sharedWorkspaceFacades.contains(where: \.showAllFiles) else { return .none }
         let rootPrefixes = Set(Self.pathSpellings(of: root).map { $0.hasSuffix("/") ? $0 : $0 + "/" })
         func namesScannedRoot(_ authority: WorkspaceFileSystemRootAuthority) -> Bool {
             [authority.originalRootURL, authority.canonicalRootURL].contains { url in
@@ -140,13 +152,16 @@ extension AppState {
     }
 
     func advanceWorkspaceGeneration() -> UInt64 {
-        retainActiveWorkspaceSearchRefreshIntent()
-        invalidateWorkspaceSearchForWorkspaceGenerationAdvance()
+        let facades = sharedWorkspaceFacades
+        for facade in facades {
+            facade.retainActiveWorkspaceSearchRefreshIntent()
+            facade.invalidateWorkspaceSearchForWorkspaceGenerationAdvance()
+        }
         precondition(workspaceGeneration < .max, "Workspace generation exhausted")
         workspaceGeneration += 1
-        // Only rebind an already-pending pre-authority query; active-query reload refresh is
-        // carried separately by `workspaceSearchRefreshIntent`, never inferred from UI text.
-        rebindPendingWorkspaceSearchUIResumeAfterGenerationAdvance()
+        for facade in facades {
+            facade.rebindPendingWorkspaceSearchUIResumeAfterGenerationAdvance()
+        }
         return workspaceGeneration
     }
 
@@ -195,4 +210,3 @@ extension AppState {
             && workspaceRootURL.map { exactFileURLSpellingMatches($0, root) } == true
     }
 }
-

@@ -17,6 +17,9 @@ extension AppState {
         guard workspaceMutationNamespaceDepth == 0 else {
             workspaceMutationRefreshPending = true
             workspaceMutationExternalRefreshPending = true
+            if workspaceMutationRefreshRootAuthority == nil {
+                workspaceMutationRefreshRootAuthority = workspaceSearchRootAuthority
+            }
             if let rootAuthority = workspaceMutationRefreshRootAuthority
                 ?? workspaceSearchRootAuthority
             {

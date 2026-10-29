@@ -51,7 +51,7 @@ extension AppState {
             case .missing:
                 tree.selectNode(id: nil)
             case .unrelated:
-                if tree.selectedNode == nil {
+                if tree.selectedNode == nil, sharedWorkspaceFacades.count == 1 {
                     tree.selectNode(id: firstEditableNode(in: tree.root)?.id)
                 }
             }
@@ -126,6 +126,10 @@ extension AppState {
         resumeWorkspaceSearchRefreshIntentIfNeeded(
             installedRootAuthority: capture.rootAuthority
         )
+        let context = workspaceRootContext
+        for peer in context.facades where peer !== self {
+            try await peer.reconcileSharedWorkspaceWindow(context: context, generation: generation)
+        }
     }
 
     func resumeWorkspaceSearchRefreshIntentIfNeeded(
@@ -179,7 +183,6 @@ extension AppState {
         }
         return preparedFile
     }
-
 }
 
 enum WorkspaceReloadRetry: Error {
@@ -191,4 +194,3 @@ enum PreparedWorkspaceReloadCurrentDocumentDisposition {
     case missing(session: DocumentSession, key: URL)
     case unrelated
 }
-

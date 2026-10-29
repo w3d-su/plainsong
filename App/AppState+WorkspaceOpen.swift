@@ -3,75 +3,65 @@ import Foundation
 import MarkdownCore
 import WorkspaceKit
 
-/// Lets a `WorkspaceEventWatcher` handler refer to the watcher it was installed on,
-/// which cannot be captured while the watcher is being initialized. `watcher` is written
-/// once on the main actor before `start()` and read on the watcher's serial queue and on
-/// the main actor; the only mutation is that single assignment, so the box is sent safely.
-private final class WorkspaceEventWatcherBox: @unchecked Sendable {
-    weak var watcher: WorkspaceEventWatcher?
-}
-
 extension AppState {
     func openWorkspace(url: URL, rememberAsLastOpened: Bool) throws {
         try refuseWindowFileOpenIfNeeded()
-        // Keep the chosen root's literal spelling until descriptor capture proves its canonical
-        // physical location. Standardizing here loses precomposed Unicode before WS3B's
-        // authority layer can retain it.
-        let root = url
-        try closeWorkspaceForReplacement()
-        workspaceAccess = SecurityScopedAccess.startAccessing(root)
-        workspaceRootURL = root
+        if let shared = matchingWorkspaceRoot(for: url) {
+            if shared === workspaceRootContext, workspaceRootURL != nil {
+                return
+            }
+            try validateWorkspaceRootInstallation(url: url, sharing: shared)
+            try closeWorkspaceForReplacement()
+            workspaceRootContext = shared
+            connectWorkspaceRootContext()
+            let root = shared.registrationAuthority!.originalRootURL
+            workspaceRootURL = root
+            shared.attach(self)
+            installSharedWorkspaceTreeIfReady()
+            rememberWorkspaceIfNeeded(url, remember: rememberAsLastOpened)
+            return
+        }
+
+        // Preflight before retiring the outgoing workspace or starting the new scope.
+        try validateWorkspaceRootInstallation(url: url, sharing: nil)
+        let access = registry.workspaceScopeStarter(url)
+        let authority: WorkspaceFileSystemRootAuthority
+        do {
+            authority = try WorkspaceFileSystemRootAuthority(rootURL: url)
+            try validateWorkspaceRootInstallation(url: authority.canonicalRootURL, sharing: nil)
+            try closeWorkspaceForReplacement()
+        } catch {
+            access.stop()
+            throw error
+        }
+        let context = workspaceRootContext
+        context.registrationAuthority = authority
+        registry.workspaceRoots[authority] = WorkspaceRootReference(context: context)
+        workspaceAccess = access
+        workspaceRootURL = url
+        context.attach(self)
         workspaceTree = WorkspaceFileTree(
             root: WorkspaceFileNode(
                 id: "__workspace_root__",
-                name: root.lastPathComponent,
+                name: url.lastPathComponent,
                 relativePath: "",
                 kind: .directory,
                 contentModificationDate: nil
             )
         )
-
-        if rememberAsLastOpened {
-            rememberLastOpenedFile(root)
-            rememberRecentItem(root)
-        }
-
-        let watcherBox = WorkspaceEventWatcherBox()
-        let watcher = WorkspaceEventWatcher(rootURL: root) { [weak self, watcherBox, root] in
-            Task { @MainActor [weak self] in
-                // The watcher's stop() boundary only guarantees no handler *begins*
-                // afterwards; a handler that began just before it still hops here.
-                // Drop a delivery whose watcher was replaced or stopped meanwhile.
-                guard let self else { return }
-                let watcher = watcherBox.watcher
-                let dropReason: String? = if watcher !== workspaceWatcher {
-                    "replaced"
-                } else if watcher == nil || watcher?.isStopped == true {
-                    "stopped"
-                } else if !(workspaceRootURL.map { self.exactFileURLSpellingMatches($0, root) } ?? false) {
-                    "rootChanged"
-                } else {
-                    nil
-                }
-                // One call site for the decision trace and the refresh, so the resulting
-                // handleExternalChange entry proves the fileID/line forwarding end to end.
-                let site: (fileID: StaticString, line: UInt) = (#fileID, #line)
-                traceWorkspaceWatcherDelivery(
-                    dropReason: dropReason, watcher: watcher, fileID: site.fileID, line: site.line
-                )
-                guard dropReason == nil else { return }
-                refreshWorkspaceAfterFileSystemChange(fileID: site.fileID, line: site.line)
-            }
-        }
-        watcherBox.watcher = watcher
-        workspaceWatcher = watcher
-        workspaceWatcher?.start()
-
+        rememberWorkspaceIfNeeded(url, remember: rememberAsLastOpened)
+        startSharedWorkspaceWatcher(root: url)
         scheduleWorkspaceReload(
-            root: root,
+            root: url,
             selectFirstIfNeeded: true,
             errorTitle: "Could Not Open Workspace"
         )
+    }
+
+    private func rememberWorkspaceIfNeeded(_ root: URL, remember: Bool) {
+        guard remember else { return }
+        rememberLastOpenedFile(root)
+        rememberRecentItem(root)
     }
 
     func activateFileSession(url: URL) throws {
@@ -176,6 +166,7 @@ extension AppState {
             synchronizeWorkspaceTreeSelection(for: session)
         }
         cancelPendingEditorNavigationIfNeeded()
+        transferEditorWriterForAdoption(of: session)
         shownSession = session
         releaseUnreferencedSessionOwnership(for: previousSession)
         clearPromptsNotMatchingCurrentDocument()

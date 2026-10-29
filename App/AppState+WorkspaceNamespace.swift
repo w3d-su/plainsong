@@ -34,8 +34,10 @@ extension AppState {
         _ = advanceWorkspaceGeneration()
         workspaceReloadTask?.cancel()
         workspaceReloadTask = nil
-        completionWorkspaceTask?.cancel()
-        completionWorkspaceTask = nil
+        for facade in sharedWorkspaceFacades {
+            facade.completionWorkspaceTask?.cancel()
+            facade.completionWorkspaceTask = nil
+        }
         var seen: Set<ObjectIdentifier> = []
         for session in sessions where seen.insert(ObjectIdentifier(session)).inserted {
             let sessionIdentity = ObjectIdentifier(session)
@@ -60,7 +62,18 @@ extension AppState {
     }
 
     func drainWorkspaceMutationRefreshIfNeeded() {
-        guard workspaceMutationRefreshPending else { return }
+        guard workspaceMutationNamespaceDepth == 0 else { return }
+        var contexts = registry.activeWorkspaceRoots
+        if !contexts.contains(where: { $0 === workspaceRootContext }) {
+            contexts.append(workspaceRootContext)
+        }
+        for context in contexts where context.workspaceMutationRefreshPending {
+            let facade = context.facades.first ?? (context === workspaceRootContext ? self : nil)
+            facade?.drainThisWorkspaceMutationRefresh()
+        }
+    }
+
+    private func drainThisWorkspaceMutationRefresh() {
         workspaceMutationRefreshPending = false
         let inspectManagedSessions = workspaceMutationExternalRefreshPending
         workspaceMutationExternalRefreshPending = false
@@ -75,5 +88,4 @@ extension AppState {
             refreshWorkspaceAfterFileSystemChange()
         }
     }
-
 }

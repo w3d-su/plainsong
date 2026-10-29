@@ -6,15 +6,36 @@ import WorkspaceKit
 /// authority, generation, security scope, watcher, deferred refresh, image-placement fence,
 /// and thumbnail fan-out per root. Nothing here is published.
 ///
-/// Windows PR B1: `AppState` owns the only instance and forwards every property under its
-/// original name (`AppState+WorkspaceRootForwarding.swift`). Reference counting by the
-/// windows that share a root is PR D1.
+/// The registry retains one context per canonical physical root. Its weak window list
+/// supplies reference counting and refresh recipients without retaining a closed façade.
 @MainActor
 final class WorkspaceRootContext {
     /// Set by `AppState.init`; records an Export as HTML… context change. Until then a call
     /// goes to `UnwiredContainerHook`.
     var onExportHTMLContextChange: @MainActor (ExportHTMLStopReason, StaticString, UInt) -> Void = { _, fileID, line in
         UnwiredContainerHook.report("WorkspaceRootContext.onExportHTMLContextChange", fileID: fileID, line: line)
+    }
+
+    struct WindowReference {
+        weak var facade: AppState?
+    }
+
+    var registrationAuthority: WorkspaceFileSystemRootAuthority?
+    var windows: [WindowReference] = []
+
+    var facades: [AppState] {
+        windows.compactMap(\.facade).filter {
+            $0.workspaceRootContext === self && $0.workspaceRootURL != nil
+        }
+    }
+
+    func attach(_ facade: AppState) {
+        windows.removeAll { $0.facade == nil || $0.facade === facade }
+        windows.append(WindowReference(facade: facade))
+    }
+
+    func detach(_ facade: AppState) {
+        windows.removeAll { $0.facade == nil || $0.facade === facade }
     }
 
     var workspaceSnapshot: WorkspaceFileSnapshot?
@@ -33,7 +54,9 @@ final class WorkspaceRootContext {
     var workspaceReloadPostPrepareHook: (@MainActor () throws -> Void)?
     var workspaceAccess: SecurityScopedResourceAccess? {
         didSet {
-            if oldValue !== workspaceAccess { noteExportHTMLContextChange(.workspaceChanged) }
+            if oldValue !== workspaceAccess {
+                noteExportHTMLContextChange(.workspaceChanged)
+            }
         }
     }
 

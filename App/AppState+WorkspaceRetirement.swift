@@ -26,6 +26,10 @@ extension AppState {
         if let recovery = nextWorkspaceMutationRecovery() {
             throw WorkspaceMutationError.indeterminateSession(recovery.sourceURL)
         }
+        if workspaceRootURL != nil, workspaceRootContext.facades.contains(where: { $0 !== self }) {
+            detachSharedWorkspaceRoot()
+            return
+        }
         // D1b: preflight and release only this root. Another root's fence, quarantine,
         // or conflict must not block, and must not be swept up with this close.
         let rootSessions = workspaceSessionsForRootPreflight()
@@ -222,6 +226,12 @@ private extension AppState {
             sessions: sessions,
             retirementPlans: retirementPlans
         )
+        let context = workspaceRootContext
+        context.detach(self)
+        if let authority = context.registrationAuthority {
+            registry.workspaceRoots[authority] = nil
+            context.registrationAuthority = nil
+        }
     }
 
     func transferWorkspaceAuthority(

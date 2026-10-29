@@ -28,10 +28,15 @@ extension AppState {
             return
         }
 
-        registry.editorInstallationWindows[installation] = RegisteredWindowState(window: windowState)
+        editorInstallationWindows[installation] = RegisteredWindowState(window: windowState)
         editorBindingInstallations[installation] = session
         let sessionIdentity = ObjectIdentifier(session)
-        if editorWriterInstallations[sessionIdentity] == nil {
+        if shownSession === session {
+            transferEditorWriterForAdoption(of: session)
+        }
+        if editorWriterInstallations[sessionIdentity] == nil,
+           !supersededEditorWriterInstallations.contains(installation)
+        {
             editorWriterInstallations[sessionIdentity] = installation
         }
         if let canonicalURL = retiredCanonicalURL(for: session),
@@ -64,7 +69,8 @@ extension AppState {
         }
         editorDocumentSourceSynchronizers[installation] = nil
         editorBindingInstallations[installation] = nil
-        registry.editorInstallationWindows[installation] = nil
+        editorInstallationWindows[installation] = nil
+        supersededEditorWriterInstallations.remove(installation)
         if !isEditorDocumentBindingInstalled(expectedBindingID, session: session),
            !registry.isWarmSession(session),
            isRetiredEditorSession(session) || !registry.isShownByAnyWindow(session)
@@ -103,6 +109,7 @@ extension AppState {
             revision: session.version
         )
         guard installation.bindingID == expectedBindingID,
+              !supersededEditorWriterInstallations.contains(installation),
               isAuthorizedEditorDocumentBinding(installation, session: session)
         else {
             return .rejected(currentSnapshot)
@@ -209,5 +216,4 @@ extension AppState {
             session: session
         )
     }
-
 }
