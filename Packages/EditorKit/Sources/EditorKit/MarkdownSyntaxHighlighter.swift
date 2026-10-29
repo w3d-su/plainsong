@@ -26,13 +26,17 @@ actor MarkdownHighlightService {
         fileKind: FileKind,
         visibleRange: NSRange,
         theme: MarkdownEditorTheme,
+        customTheme: CustomThemeDocument? = nil,
         fontName: String,
         fontSize: CGFloat,
         developmentPresentation: MarkdownEditorDevelopmentPresentation = .source,
         selection: NSRange? = nil
     ) -> MarkdownHighlightResult {
+        let syntaxTheme = customTheme.map {
+            MarkdownSyntaxTheme.resolving($0, builtIn: theme)
+        } ?? MarkdownSyntaxTheme.builtIn(theme)
         let highlighter = MarkdownSyntaxHighlighter(
-            theme: .builtIn(theme),
+            theme: syntaxTheme,
             baseFont: MarkdownSyntaxHighlighter.editorFont(named: fontName, size: fontSize)
         )
         return highlighter.highlight(

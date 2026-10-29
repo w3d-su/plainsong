@@ -157,14 +157,7 @@ private struct EditorSettingsPane: View {
                     }
                 }
 
-                Picker("Theme", selection: Binding(
-                    get: { preferences.editorTheme },
-                    set: { preferences.setEditorTheme($0) }
-                )) {
-                    ForEach(MarkdownEditorTheme.allCases) { theme in
-                        Text(theme.displayName).tag(theme)
-                    }
-                }
+                EditorThemeSettings(preferences: preferences)
 
                 Toggle("Show line numbers", isOn: Binding(
                     get: { preferences.showsLineNumbers },
@@ -202,7 +195,7 @@ private struct EditorSettingsPane: View {
             }
         }
         .formStyle(.grouped)
-        .frame(height: 404)
+        .frame(height: 468)
     }
 }
 

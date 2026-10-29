@@ -1,0 +1,138 @@
+import AppKit
+import EditorKit
+import MarkdownCore
+@testable import Plainsong
+import XCTest
+
+@MainActor
+final class EditorThemeImportTests: XCTestCase {
+    func testImportCopiesIntoTheThemeDirectoryAndReplacePromptGatesOverwrite() throws {
+        let fixture = try Fixture()
+        let original = Data("""
+        {"schemaVersion":1,"id":"solarized-ink","name":"Solarized Ink","light":{"editor":{"text":"#112233"}}}
+        """.utf8)
+
+        let source = fixture.write("solar.json", original)
+        var prompts = 0
+        fixture.preferences.confirmEditorThemeReplacement = { identifier, name in
+            prompts += 1
+            XCTAssertEqual(identifier, "solarized-ink")
+            XCTAssertEqual(name, "Solarized Ink")
+            return false
+        }
+
+        let imported = try fixture.preferences.importEditorTheme(from: source)
+        guard case let .imported(document) = imported else {
+            return XCTFail("expected import")
+        }
+        XCTAssertEqual(document.id, "solarized-ink")
+        XCTAssertEqual(prompts, 0)
+        let stored = fixture.directory.appendingPathComponent("solarized-ink.json")
+        XCTAssertEqual(try Data(contentsOf: stored), original)
+        XCTAssertEqual(fixture.preferences.editorThemeIdentifier, "solarized-ink")
+        XCTAssertNil(fixture.preferences.userDefaults.data(forKey: "Plainsong.settings.editorThemeBookmark"))
+        XCTAssertFalse(fixture.preferences.userDefaults.dictionaryRepresentation().keys.contains {
+            $0.localizedCaseInsensitiveContains("bookmark") && $0.localizedCaseInsensitiveContains("theme")
+        })
+
+        let replacement = Data("""
+        {"schemaVersion":1,"id":"solarized-ink","name":"Solarized Ink","light":{"editor":{"text":"#AABBCC"}}}
+        """.utf8)
+
+        let replacementURL = fixture.write("replacement.json", replacement)
+        let declined = try fixture.preferences.importEditorTheme(from: replacementURL)
+        XCTAssertEqual(declined, .replacementDeclined(id: "solarized-ink"))
+        XCTAssertEqual(prompts, 1)
+        XCTAssertEqual(try Data(contentsOf: stored), original)
+
+        fixture.preferences.confirmEditorThemeReplacement = { _, _ in true }
+        let replaced = try fixture.preferences.importEditorTheme(from: replacementURL)
+        guard case .imported = replaced else {
+            return XCTFail("expected replacement")
+        }
+        XCTAssertEqual(try Data(contentsOf: stored), replacement)
+        var red: CGFloat = -1
+        NSAppearance(named: .aqua)?.performAsCurrentDrawingAppearance {
+            red = fixture.preferences.resolvedEditorSyntaxTheme.textColor.cgColor.components?.first ?? -1
+        }
+        XCTAssertEqual(red, 0xAA / 255, accuracy: 0.02)
+    }
+
+    func testRevealTargetsTheContainerCopyAndRemoveMovesItToTheTrash() throws {
+        let fixture = try Fixture()
+        let source = fixture.write(
+            "ink.json",
+            Data("""
+            {"schemaVersion":1,"id":"ink","name":"Ink","light":{}}
+            """.utf8)
+        )
+        _ = try fixture.preferences.importEditorTheme(from: source)
+        var revealed: URL?
+        fixture.preferences.revealEditorThemeFile = { revealed = $0 }
+        fixture.preferences.revealSelectedEditorTheme()
+        XCTAssertEqual(revealed, fixture.directory.appendingPathComponent("ink.json"))
+
+        let trashed = try fixture.preferences.removeSelectedEditorTheme()
+        XCTAssertFalse(FileManager.default
+            .fileExists(atPath: fixture.directory.appendingPathComponent("ink.json").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: trashed.path))
+        XCTAssertEqual(fixture.preferences.editorThemeIdentifier, "standard")
+        XCTAssertEqual(fixture.preferences.editorTheme, .standard)
+    }
+
+    func testInvalidStoredThemeFallsBackWithoutAModalAndKeepsTheIdentifier() throws {
+        let fixture = try Fixture()
+        let identifier = "broken-ink"
+        try Data("{".utf8).write(to: fixture.directory.appendingPathComponent("\(identifier).json"))
+        fixture.preferences.userDefaults.set(identifier, forKey: PlainsongPreferences.Keys.editorTheme)
+        let reloaded = PlainsongPreferences(
+            userDefaults: fixture.preferences.userDefaults,
+            editorThemeLibrary: fixture.library
+        )
+
+        XCTAssertEqual(reloaded.editorThemeIdentifier, identifier)
+        XCTAssertEqual(reloaded.editorTheme, .standard)
+        XCTAssertEqual(reloaded.resolvedEditorSyntaxTheme.textColor, MarkdownSyntaxTheme.standard.textColor)
+        XCTAssertEqual(
+            reloaded.editorThemeFallbackNotice,
+            PlainsongPreferences.editorThemeFallbackNotice(for: identifier)
+        )
+        XCTAssertNil(NSApp.modalWindow)
+        XCTAssertEqual(reloaded.userDefaults.string(forKey: PlainsongPreferences.Keys.editorTheme), identifier)
+
+        reloaded.dismissEditorThemeFallbackNotice()
+        XCTAssertNil(reloaded.editorThemeFallbackNotice)
+        XCTAssertEqual(reloaded.userDefaults.string(forKey: PlainsongPreferences.Keys.editorTheme), identifier)
+    }
+
+    func testReplacePromptOffersReplaceAndCancel() {
+        let alert = CustomThemeReplacePrompt.alert(identifier: "ink", name: "Ink")
+        XCTAssertEqual(alert.messageText, "Replace theme \"Ink\"?")
+        XCTAssertEqual(alert.buttons.map(\.title), ["Replace", "Cancel"])
+    }
+
+    @MainActor
+    private struct Fixture {
+        let directory: URL
+        let library: EditorThemeLibrary
+        let preferences: PlainsongPreferences
+
+        init() throws {
+            directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("plainsong-themes-\(UUID().uuidString)", isDirectory: true)
+                .appendingPathComponent("Library/Application Support/Plainsong/Themes", isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            library = EditorThemeLibrary(directory: directory)
+            let suiteName = "PlainsongEditorThemes.\(UUID().uuidString)"
+            let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+            defaults.removePersistentDomain(forName: suiteName)
+            preferences = PlainsongPreferences(userDefaults: defaults, editorThemeLibrary: library)
+        }
+
+        func write(_ name: String, _ data: Data) -> URL {
+            let url = directory.deletingLastPathComponent().appendingPathComponent(name)
+            try! data.write(to: url)
+            return url
+        }
+    }
+}
