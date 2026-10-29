@@ -53,6 +53,16 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
         )
         self.assertEqual(self.violations(), [])
 
+    def test_export_adapters_can_name_webkit_but_cannot_construct_web_views(self):
+        for path in sorted(CHECKER["ALLOWED_IMPORTS"]):
+            with self.subTest(path=path):
+                self.write_source(path, "import WebKit\nfunc host(_ view: WKWebView) {}\n")
+                self.assertEqual(self.violations(), [])
+                self.write_source(path, "import WebKit\nlet view = WKWebView()\n")
+                self.assertIn(f"{path}:2: WKWebView must be created by PreviewController",
+                              self.violations())
+                (self.root / path).unlink()
+
     def test_rejects_construction_in_each_production_layer(self):
         for path in ["App/QuickLook.swift", "AppIOS/Print.swift",
                      "Packages/Other/Sources/Other/Preview.swift",

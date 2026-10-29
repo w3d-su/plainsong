@@ -35,6 +35,10 @@ struct EditorWorkspace: View {
                 WYSIWYGFallbackBanner(message: fallbackMessage)
             }
 
+            if let themeNotice = appState.preferences.editorThemeFallbackNotice {
+                EditorThemeFallbackBanner(message: themeNotice)
+            }
+
             if appState.editorFindHost.ui.isBarVisible {
                 EditorFindBar()
             }
@@ -121,6 +125,8 @@ private struct DocumentEditor: View {
             fontName: appState.preferences.editorFontName,
             fontSize: CGFloat(appState.preferences.editorFontSize),
             editorTheme: appState.preferences.editorTheme,
+            syntaxTheme: appState.preferences.resolvedEditorSyntaxTheme,
+            customTheme: appState.preferences.selectedCustomEditorTheme,
             appearanceID: appState.preferences.editorAppearanceID,
             showsLineNumbers: appState.preferences.showsLineNumbers,
             focusRequestID: appState.editorFocusRequestID,

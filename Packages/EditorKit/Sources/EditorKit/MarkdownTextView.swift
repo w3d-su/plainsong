@@ -19,6 +19,7 @@ struct MarkdownTextView: NSViewRepresentable {
     private let styledText: HighlightedText?
     private let showsLineNumbers: Bool
     private let editorTheme: MarkdownEditorTheme
+    private let syntaxTheme: MarkdownSyntaxTheme
     private let focusRequestID: Int
     let documentIdentity: EditorDocumentIdentity?
     private let documentBindingID: EditorDocumentBindingID?
@@ -45,6 +46,7 @@ struct MarkdownTextView: NSViewRepresentable {
         selection: Binding<NSRange?>,
         showsLineNumbers: Bool,
         editorTheme: MarkdownEditorTheme = .standard,
+        syntaxTheme: MarkdownSyntaxTheme? = nil,
         focusRequestID: Int = 0,
         documentIdentity: EditorDocumentIdentity? = nil,
         documentBindingID: EditorDocumentBindingID? = nil,
@@ -70,6 +72,7 @@ struct MarkdownTextView: NSViewRepresentable {
         self.styledText = styledText
         self.showsLineNumbers = showsLineNumbers
         self.editorTheme = editorTheme
+        self.syntaxTheme = syntaxTheme ?? MarkdownSyntaxTheme.builtIn(editorTheme)
         self.focusRequestID = focusRequestID
         self.documentIdentity = documentIdentity
         self.documentBindingID = documentBindingID
@@ -104,9 +107,9 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.textDelegate = context.coordinator
         textView.highlightSelectedLine = true
         textView.isHorizontallyResizable = false
-        textView.setLineNumberGutterStyle(.init(showing: showsLineNumbers, theme: editorTheme, font: font))
         textView.textSelection = NSRange()
         textView.font = font
+        applyEditorChrome(to: textView)
 
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.setParagraphStyle(.default)
@@ -174,6 +177,9 @@ struct MarkdownTextView: NSViewRepresentable {
                 in: textView,
                 coordinator: coordinator
             )
+        } else {
+            // A theme change must recolor even when marked text defers document installation.
+            applyEditorChrome(to: textView)
         }
         coordinator.isUserEditing = false
         // No unconditional needsLayout/needsDisplay here: forcing a relayout pass on
@@ -274,7 +280,7 @@ struct MarkdownTextView: NSViewRepresentable {
         if textView.font.fontName != font.fontName || textView.font.pointSize != font.pointSize {
             textView.font = font
         }
-        textView.setLineNumberGutterStyle(.init(showing: showsLineNumbers, theme: editorTheme, font: font))
+        applyEditorChrome(to: textView)
         coordinator.applyPendingNavigationIfPossible(in: textView)
         coordinator.isUserEditing = false
     }
@@ -372,6 +378,15 @@ struct MarkdownTextView: NSViewRepresentable {
             return false
         }
         return ExactUTF16Text.matches(textStorage.string, candidate)
+    }
+
+    func applyEditorChrome(to textView: MarkdownSTTextView) {
+        EditorSyntaxThemeChrome.apply(
+            syntaxTheme,
+            showsLineNumbers: showsLineNumbers,
+            font: font,
+            to: textView
+        )
     }
 
     func makeCoordinator() -> Coordinator {

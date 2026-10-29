@@ -63,18 +63,45 @@ enum IOSWorkspacePathAuthority {
         return parts.contains { $0 == ".." || $0.isEmpty }
     }
 
+    /// One path component beside the document. Traversal, hidden names, control and
+    /// bidirectional-formatting characters (which can disguise a name), names longer than
+    /// NAME_MAX (255 UTF-8 bytes), and empty input stay on the default `assets` folder.
+    /// Unlike the Mac `images/posts` form, iOS takes one folder name, not a path.
+    static func normalizedAssetDirectory(_ name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty || trimmed == "." || trimmed == ".." || trimmed.hasPrefix(".") {
+            return "assets"
+        }
+        if trimmed.contains("/") || trimmed.contains("\\") || trimmed.utf8.contains(0) {
+            return "assets"
+        }
+        if trimmed.unicodeScalars.contains(where: isRefusedFolderScalar) {
+            return "assets"
+        }
+        if trimmed.utf8.count > 255 {
+            return "assets"
+        }
+        return trimmed
+    }
+
+    private static func isRefusedFolderScalar(_ scalar: Unicode.Scalar) -> Bool {
+        scalar.value < 0x20 || (0x7F ... 0x9F).contains(scalar.value) || scalar.properties.isBidiControl
+    }
+
     /// Document-parent-relative asset leaf. This never climbs to the grant parent.
     static func assetPaths(
         documentRelativePath: String,
         preferredFilename: String,
-        operationID: UUID
+        operationID: UUID,
+        assetFolder: String = "assets"
     ) -> (rootRelative: String, markdownRelative: String)? {
         guard WorkspaceRelativePath(spelling: documentRelativePath) != nil else { return nil }
         guard let leaf = assetLeafName(preferredFilename) else { return nil }
+        let folder = normalizedAssetDirectory(assetFolder)
         let parent = parentSpelling(documentRelativePath)
-        let directory = childSpelling(parent: parent, name: "assets")
+        let directory = childSpelling(parent: parent, name: folder)
         let rootRelative = childSpelling(parent: directory, name: leaf)
-        let markdownRelative = childSpelling(parent: "assets", name: leaf)
+        let markdownRelative = childSpelling(parent: folder, name: leaf)
         guard rootRelative != documentRelativePath else { return nil }
         _ = operationID
         return (rootRelative, markdownRelative)
@@ -84,12 +111,15 @@ enum IOSWorkspacePathAuthority {
         documentRelativePath: String,
         preferredFilename: String,
         operationID: UUID,
-        exists: (String) -> Bool
+        exists: (String) -> Bool,
+        assetFolder: String = "assets"
     ) -> (rootRelative: String, markdownRelative: String)? {
+        let folder = normalizedAssetDirectory(assetFolder)
         guard var paths = assetPaths(
             documentRelativePath: documentRelativePath,
             preferredFilename: preferredFilename,
-            operationID: operationID
+            operationID: operationID,
+            assetFolder: folder
         ) else {
             return nil
         }
@@ -99,9 +129,9 @@ enum IOSWorkspacePathAuthority {
         let token = String(operationID.uuidString.prefix(8))
         let name = uniqueName(assetLeafName(preferredFilename) ?? preferredFilename, token: token)
         let parent = parentSpelling(documentRelativePath)
-        let directory = childSpelling(parent: parent, name: "assets")
+        let directory = childSpelling(parent: parent, name: folder)
         paths.rootRelative = childSpelling(parent: directory, name: name)
-        paths.markdownRelative = childSpelling(parent: "assets", name: name)
+        paths.markdownRelative = childSpelling(parent: folder, name: name)
         if exists(paths.rootRelative) || paths.rootRelative == documentRelativePath {
             return nil
         }
@@ -133,5 +163,13 @@ enum IOSWorkspacePathAuthority {
             return "\(base)-\(token)"
         }
         return "\(base)-\(token).\(ext)"
+    }
+}
+
+/// The image-folder name settings may store. Anything that could leave the
+/// document's parent is replaced with `assets`.
+public enum IOSAssetDirectory {
+    public static func normalized(_ name: String) -> String {
+        IOSWorkspacePathAuthority.normalizedAssetDirectory(name)
     }
 }

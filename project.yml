@@ -20,7 +20,8 @@ packages:
     from: 6.2.2
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle.git
-    exactVersion: 2.10.0
+    # Tag 2.10.0. A moved tag must not be able to swap the binary.
+    revision: eef1a539a373c1f1a320624b1130fc5de7b2e100
   EditorKit:
     path: Packages/EditorKit
   PreviewKit:
@@ -79,7 +80,8 @@ targets:
         # targets are never stripped (a command-line STRIP_* override strips them
         # too and fails the build).
         PLAINSONG_STRIP_SHIPPED_BINARY: NO
-        # NO does not create or start the updater. YES is the full Sparkle path.
+        # NO does not create or start the updater. YES constructs Sparkle, but U1's
+        # empty key makes startUpdater fail closed until U2 fills the feed and key.
         PLAINSONG_UPDATES_ENABLED: NO
       configs:
         Release:
@@ -96,6 +98,8 @@ targets:
         NSHumanReadableCopyright: "© 2026 w3d-su"
         NSHighResolutionCapable: true
         PLAINSONG_UPDATES_ENABLED: "$(PLAINSONG_UPDATES_ENABLED)"
+        # Kept on disabled builds. Inert while the updater is not created; the
+        # matching mach-lookup exceptions are a Mac App Store review item.
         SUEnableInstallerLauncherService: true
         SUFeedURL: ""
         SUPublicEDKey: ""
@@ -135,6 +139,7 @@ targets:
         com.apple.security.files.bookmarks.app-scope: true
         com.apple.security.network.client: true
         com.apple.security.print: true
+        # Present even when updates are disabled. See the 2026-10-29 decision.
         com.apple.security.temporary-exception.mach-lookup.global-name:
           - "$(PRODUCT_BUNDLE_IDENTIFIER)-spks"
           - "$(PRODUCT_BUNDLE_IDENTIFIER)-spki"
@@ -240,6 +245,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ios
         PRODUCT_NAME: PlainsongIOS
         TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_STYLE: Automatic
     info:
       path: AppIOS/Info.plist
@@ -278,7 +285,10 @@ targets:
             UTTypeTagSpecification:
               public.filename-extension:
                 - mdx
-        UILaunchScreen: {}
+        CFBundleDisplayName: Plainsong
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen:
+          UIColorName: LaunchBackground
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations:

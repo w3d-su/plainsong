@@ -54,9 +54,13 @@ final class UpdateSettingsModel: ObservableObject {
 
     func setAutomaticallyChecksForUpdates(_ isOn: Bool) {
         client.automaticallyChecksForUpdates = isOn
+        if !isOn {
+            client.automaticallyDownloadsUpdates = false
+        }
     }
 
     func setAutomaticallyDownloadsUpdates(_ isOn: Bool) {
+        guard client.automaticallyChecksForUpdates else { return }
         client.automaticallyDownloadsUpdates = isOn
     }
 

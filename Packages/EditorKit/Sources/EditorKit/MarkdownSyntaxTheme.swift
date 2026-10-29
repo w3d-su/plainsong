@@ -34,6 +34,11 @@ public struct MarkdownSyntaxTheme {
     public var tsxTagColor: NSColor
     public var tsxAttributeColor: NSColor
     public var tsxPunctuationColor: NSColor
+    public var backgroundColor: NSColor
+    public var selectionColor: NSColor
+    public var caretColor: NSColor
+    /// Nil means the gutter track follows the editor background, which is the built-in behavior.
+    public var gutterBackgroundColor: NSColor?
 
     public init(
         textColor: NSColor,
@@ -49,7 +54,11 @@ public struct MarkdownSyntaxTheme {
         tsxStringColor: NSColor,
         tsxTagColor: NSColor,
         tsxAttributeColor: NSColor,
-        tsxPunctuationColor: NSColor
+        tsxPunctuationColor: NSColor,
+        backgroundColor: NSColor = .textBackgroundColor,
+        selectionColor: NSColor = .selectedTextBackgroundColor,
+        caretColor: NSColor = .textInsertionPointColor,
+        gutterBackgroundColor: NSColor? = nil
     ) {
         self.textColor = textColor
         self.mutedColor = mutedColor
@@ -65,6 +74,10 @@ public struct MarkdownSyntaxTheme {
         self.tsxTagColor = tsxTagColor
         self.tsxAttributeColor = tsxAttributeColor
         self.tsxPunctuationColor = tsxPunctuationColor
+        self.backgroundColor = backgroundColor
+        self.selectionColor = selectionColor
+        self.caretColor = caretColor
+        self.gutterBackgroundColor = gutterBackgroundColor
     }
 
     public static var standard: MarkdownSyntaxTheme {

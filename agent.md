@@ -62,14 +62,15 @@ projects such as Astro/Next.js content directories).
 | Structure parsing (outline, etc.) | Reuse the tree-sitter syntax tree. Optionally [swift-markdown](https://github.com/swiftlang/swift-markdown) for export tasks. | Avoid two parsers driving the same UI. |
 | Preview | `WKWebView` + local JS bundle built with **esbuild** from `preview-src/` | No remote network access by default (strict CSP). |
 | Preview JS pipeline | unified: `remark-parse`, `remark-gfm`, `remark-frontmatter`, `remark-math`, `remark-mdx` (mdx only) → `rehype`, `rehype-katex`, `highlight.js` for fences; `mermaid` for ```mermaid fences; `morphdom` for incremental DOM patching | unified/remark is the standard 2026 pipeline and the only realistic path to MDX support. |
-| Persistence of prefs | `UserDefaults` + built-in theme IDs; custom theme/user CSS imports deferred | |
+| Persistence of prefs | `UserDefaults` + built-in and imported editor color themes; user CSS deferred | |
 | Project generation | **XcodeGen** (`project.yml` committed; `.xcodeproj` is generated, never hand-edited) | pbxproj diffs are hostile to LLM collaboration. |
 | Lint/format | SwiftFormat + SwiftLint (configs committed) | |
-| Updates | [Sparkle](https://github.com/sparkle-project/Sparkle) 2.10.0, App target only | Exact pin. `PLAINSONG_UPDATES_ENABLED` defaults to NO, so the app does not create or start `SPUUpdater` and makes no update request. Packages must not import Sparkle. |
+| Updates | [Sparkle](https://github.com/sparkle-project/Sparkle) 2.10.0, App target only | Pinned to revision `eef1a539a373c1f1a320624b1130fc5de7b2e100` (tag 2.10.0). `PLAINSONG_UPDATES_ENABLED` defaults to NO, so the app does not create or start `SPUUpdater` and makes no update request. Packages must not import Sparkle. |
 | JS tooling | Node 20+, npm, esbuild, vitest (preview pipeline unit tests) | |
 
 **Dependency policy:** keep the dependency list short. Adding any new Swift package or npm
-package requires a Decision Log entry explaining why.
+package requires a `docs/decisions/` entry explaining why. `docs/decision-log.md` is the
+archive and does not take new rows.
 
 ---
 
@@ -255,6 +256,10 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 - An active workspace search refreshes for document edits only after a 500 ms typing
   pause, and only while the Search navigator shows (an edit made while Files shows
   refreshes when Search shows again); typing never resets the search state.
+- An open iOS folder search reuses cached reads on root refreshes with the same tree,
+  debouncing provider notices. A per-file content notice drops only that path; changed
+  trees and explicit searches read again. In-flight reads cannot restore an invalidated
+  cache entry, including a size or encoding refusal.
 - Each workspace window has its own `AppState` façade, `WindowState`, and
   `WorkspaceRootContext`, and they share one `AppDocumentRegistry`. One preview is
   created per visible document pane. A scene gets the app-owned façade whenever no open
@@ -454,7 +459,7 @@ republishes only when its value changes literally.
   controller. `make lint` is a textual guard for production Swift and Objective-C, not a
   Swift parser. It scans all non-test targets from the resolved `project.yml` spec and
   package `Sources` directories, including a new extension target outside App/AppIOS.
-  WebKit imports are limited to PreviewKit and the two export files that only name
+  WebKit imports are limited to PreviewKit and the three export adapters that only name
   WebKit types. SwiftUI `WebView` and `WebPage` calls are rejected. Direct `WKWebView`
   and `WKWebViewConfiguration` calls are allowed only in the controller's two factory
   files. Aliases, subclasses, `.self`, bare `.init`, inferred `.init`,
@@ -669,9 +674,25 @@ attempt without a Decision Log entry.
 
 ## 11. Theming & Settings
 
-- **Editor themes:** two built-ins wired through Settings and applied live. Custom JSON
-  theme files in Application Support are deferred until a separate import/validation
-  design exists.
+- **Editor themes:** two built-ins (`standard`, `graphite`) plus imported color themes.
+  Settings › Editor imports a JSON file (`NSOpenPanel`) and copies the validated bytes
+  into the sandbox container at `Application Support/Plainsong/Themes/<id>.json`. No
+  bookmark is kept. Re-importing an id asks before replacing that copy. Reveal in Finder
+  and Remove act on the copy; Remove moves it to the Trash. Schema v1 is colors only
+  (`#RRGGBB` or `#RRGGBBAA`, 64 KiB, closed keys): an unknown field rejects the whole
+  file, and a missing slot inherits the built-in. Names are trimmed, NFC-normalized,
+  at most 128 Unicode scalars, and cannot contain control, format, or line-break
+  characters or start with a combining mark. A name must contain at least one scalar
+  other than whitespace, a default-ignorable character, or the braille blank.
+  Imported themes are in their own picker section. The picker shows `name (id)` when
+  a name matches a built-in or another imported theme. `text`, `caret`, and
+  `background` must be opaque. While Increase
+  Contrast is on, the editor uses the built-in colors. An unreadable selected theme
+  falls back to Plainsong for that launch with a non-modal notice and keeps the stored id.
+  Switching themes recolors the open editor without reloading the document. Fonts, user
+  CSS, and Mermaid colors from tokens stay deferred. The design is
+  `docs/custom-themes-design.md`; preview tokens in the same file are validated and
+  stored but not applied until the `setThemeTokens` bridge.
 - **Preview themes:** bundled CSS variables for system/light/dark preview themes, paired
   with the editor settings bridge. User CSS overrides are deferred until a separate
   sanitizer/design exists.
@@ -680,7 +701,9 @@ attempt without a Decision Log entry.
   and beta updates), Editor (font, size, line numbers, typewriter sync), Preview (theme,
   allow remote images), Files (image-paste asset folder pattern, default extension
   `.md`/`.mdx`). Plainsong > Check for Updates… and those update toggles stay hidden
-  while `PLAINSONG_UPDATES_ENABLED` is NO.
+  while `PLAINSONG_UPDATES_ENABLED` is NO. When updates are enabled, the automatic
+  download toggle is disabled, and that preference is turned off, while automatic
+  checks are off.
 
 ---
 
@@ -889,15 +912,25 @@ make format           # swiftformat . && swiftlint --fix
   the Homebrew version differs; CI is authoritative. Bumping the pin means updating the
   version + SHA-256 in `ci.yml`, the Makefile constant, and reformatting the tree in the
   same PR if rule behavior changed.
+- The preview CI job verifies every pinned acceptance resource against the committed
+  bytes before installing preview dependencies. Regenerated resources must update
+  `IOSAcceptanceTests/Resources/acceptance-resource-manifest.txt` in the same PR.
 - Xcode 16+. `.xcodeproj` is generated — **never hand-edit, never commit pbxproj
   conflicts; edit `project.yml`.**
 - Code signing: "Sign to Run Locally" for dev; hardened runtime + notarization scripted
   later (Phase 3, direct distribution first, App Store optional).
 - `Scripts/release.sh` re-signs Sparkle innermost first: `Installer.xpc`,
   `Downloader.xpc` (`--preserve-metadata=entitlements`), `Autoupdate`, `Updater.app`,
-  and `Sparkle.framework`, then the app. It never uses `--deep`. The Developer ID path
-  adds `-o runtime --timestamp`. Both paths then run `codesign --verify --strict` on
-  each nested item and the app.
+  and `Sparkle.framework`, then the app. Signing never uses `--deep`. The Developer ID
+  path adds `-o runtime --timestamp`. Both paths then run `codesign --verify --strict`
+  on each nested item and `codesign --verify --deep --strict` on the finished app
+  (verification only). A shipped plist whose `PLAINSONG_UPDATES_ENABLED` is not `NO`
+  must have a 32-byte EdDSA key, the expected HTTPS feed, `SURequireSignedFeed`, and
+  `SUVerifyUpdateBeforeExtraction`. The key check matches Sparkle 2.10.0: trim
+  Foundation's whitespace set only, require padding, and reject interior
+  whitespace. Non-zero trailing base64 bits are accepted. The feed check strips
+  quotes only. CI runs the guard on the Debug Info.plist after the ui-performance
+  `make build`.
 
 ---
 

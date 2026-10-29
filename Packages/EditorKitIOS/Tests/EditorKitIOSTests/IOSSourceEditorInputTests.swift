@@ -86,4 +86,24 @@ final class IOSSourceEditorInputTests: XCTestCase {
         XCTAssertEqual(table.textView.textStorage.string, applied)
         XCTAssertNotEqual(table.textView.textStorage.string, raw)
     }
+
+    @MainActor
+    func testDeferredStatisticsRepublishTheEditorSnapshot() async {
+        let harness = IOSEditorHarness(text: "hello")
+        let republished = expectation(description: "deferred statistics republished")
+        republished.assertForOverFulfill = false
+        let observation = harness.controller.observe { event in
+            guard case let .snapshotChanged(snapshot) = event else { return }
+            if snapshot.document.text == "hello!",
+               snapshot.document.statistics == TextStatistics(text: "hello!")
+            {
+                republished.fulfill()
+            }
+        }
+        defer { observation.cancel() }
+        harness.placeCaret(at: iosUTF16("hello"))
+        harness.textView.insertText("!")
+        await fulfillment(of: [republished], timeout: 2)
+        XCTAssertEqual(harness.session.statistics, TextStatistics(text: "hello!"))
+    }
 }

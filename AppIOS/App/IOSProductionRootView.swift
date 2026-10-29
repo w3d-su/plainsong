@@ -5,10 +5,12 @@ import UIKit
 /// the editor, document store, access service, or web view.
 struct IOSProductionRootView: View {
     @StateObject private var launch = IOSProductionLaunch()
+    @StateObject private var preferences = IOSAppPreferences()
 
     var body: some View {
         if let runtime = launch.runtime {
-            IOSProductionSceneView(runtime: runtime)
+            IOSProductionSceneView(runtime: runtime, preferences: preferences)
+                .environment(\.plainsongPreferences, preferences)
         } else {
             ContentUnavailableView {
                 Label("Couldn't Start Plainsong", systemImage: "exclamationmark.triangle")
@@ -37,15 +39,20 @@ private final class IOSProductionLaunch: ObservableObject {
 
 private struct IOSProductionSceneView: View {
     @ObservedObject var runtime: IOSProductionRuntime
+    @ObservedObject var preferences: IOSAppPreferences
     @ObservedObject var authoring: IOSAuthoringController
     @ObservedObject var recents: IOSRecentPresentationController
+    @ObservedObject var exporter: IOSDocumentExportController
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.colorScheme) private var colorScheme
     @State private var presentedRecentID: UUID?
 
-    init(runtime: IOSProductionRuntime) {
+    init(runtime: IOSProductionRuntime, preferences: IOSAppPreferences) {
         self.runtime = runtime
+        self.preferences = preferences
         _authoring = ObservedObject(wrappedValue: runtime.authoring)
         _recents = ObservedObject(wrappedValue: runtime.recentPresentation)
+        _exporter = ObservedObject(wrappedValue: runtime.exporter)
     }
 
     var body: some View {
@@ -105,9 +112,27 @@ private struct IOSProductionSceneView: View {
             .onAppear {
                 runtime.setSceneActive(scenePhase == .active)
                 runtime.startObserving()
+                runtime.apply(preferences, colorScheme: colorScheme)
             }
             .onDisappear { runtime.stopObserving() }
             .onChange(of: scenePhase) { _, phase in runtime.setSceneActive(phase == .active) }
+            .onChange(of: colorScheme) { _, scheme in
+                runtime.apply(preferences, colorScheme: scheme)
+            }
+            .onChange(of: preferences.generation) { _, _ in
+                runtime.apply(preferences, colorScheme: colorScheme)
+            }
+            .onChange(of: exporter.status) { _, status in
+                runtime.scene.exportStatus = status
+            }
+            .fileExporter(
+                isPresented: $exporter.isPresented,
+                document: exporter.file,
+                contentType: exporter.contentType,
+                defaultFilename: exporter.filename
+            ) { result in
+                exporter.finishPresentation(result)
+            }
             .onOpenURL { url in Task { await runtime.openURL(url) } }
     }
 }

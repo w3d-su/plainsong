@@ -2,7 +2,7 @@
 """Keep production WebKit construction behind PreviewController's network policy.
 
 This is a textual guard, not a Swift parser. It rejects WebKit imports outside
-PreviewKit and the two export files that only name WebKit types, SwiftUI
+PreviewKit and the three export adapters that only name WebKit types, SwiftUI
 WebView and WebPage calls anywhere in production sources, and, inside the
 import allowlist, direct constructors other than PreviewController's two
 factories. Aliases, subclasses, metatype references, inferred `.init`,
@@ -25,6 +25,7 @@ import sys
 ALLOWED_IMPORTS = {
     "App/AppState+ExportHTML.swift",
     "App/ExportHTMLOperation.swift",
+    "AppIOS/Features/Export/IOSDocumentExport.swift",
 }
 ALLOWED_CONSTRUCTORS = {
     "Packages/PreviewKit/Sources/PreviewKit/PreviewController.swift": {"WKWebView"},

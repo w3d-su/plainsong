@@ -1,10 +1,10 @@
 # Custom Themes and User CSS — Design Draft
 
-> **Status: DRAFT, 2026-10-29. Spec only; no code, no checked gate.** Current rule
-> (agent.md §11, Decision Log 2026-06-24): two built-in editor themes and bundled
-> system/light/dark preview themes; custom theme JSON and user CSS are deferred "until a
-> separate import/validation design exists". This is that design. It takes effect only
-> after owner approval and a Decision Log entry in the first implementation PR.
+> **Status: owner decisions accepted 2026-10-29.** Token colors only, unknown fields
+> reject the whole schema v1 file, colors only (no fonts), and Mermaid colors stay a
+> follow-up. The decision record is `docs/decisions/2026-10-29-editor-custom-themes.md`.
+> PR B implements editor themes (T1-T3). Preview tokens in the same file are validated
+> and stored, but `setThemeTokens` and `PROTOCOL_VERSION` 9 stay deferred.
 
 ## 1. Problem
 
@@ -55,13 +55,24 @@ One JSON file defines both editor and preview colors:
 
 ### 3.2 Validation (strict, reject the whole file)
 
-- ≤ 64 KiB, UTF-8, `JSONDecoder` into a closed struct; `schemaVersion` must be `1`.
+- ≤ 64 KiB, UTF-8, a closed walk of the JSON object rather than `JSONDecoder`;
+  `schemaVersion` must be `1`. `JSONDecoder` would drop unknown fields, which this
+  schema must reject. Duplicate keys, and nesting deeper than a palette, are rejected
+  before `JSONSerialization`.
 - Unknown keys reject [owner: strict for v1, so typos surface; a later schema can relax].
 - Values: `#RRGGBB` or `#RRGGBBAA` only. No names, `rgb()`, `var()` or other CSS text,
-  so preview values can never carry CSS syntax.
-- `id`: `[a-z0-9-]{1,64}`, must not collide with a built-in; `name`: 1–64 characters.
-- Contrast is **warned, not enforced**: Settings shows a notice when text/background or
-  code text/code background falls below 4.5:1.
+  so preview values can never carry CSS syntax. `text`, `caret`, and `background` must
+  be opaque (`#RRGGBB`, or `#RRGGBBAA` whose alpha is `FF`).
+- `id`: `[a-z0-9-]{1,64}`, must not collide with a built-in. `name` is trimmed,
+  NFC-normalized, 1–128 Unicode scalars, and cannot contain control, format, or
+  line-break characters or start with a combining mark. At least one scalar must be
+  neither whitespace, a default-ignorable character, nor the braille blank U+2800.
+  Imported themes are listed in their own picker section. The picker shows `name (id)`
+  when that name matches a built-in display name, or another imported theme, without
+  regard to case.
+- Contrast is **warned, not enforced** (gate T7): Settings will show a notice when
+  text/background or code text/code background falls below 4.5:1. Until that warning
+  exists, an editor theme resolves to the built-in palette while Increase Contrast is on.
 
 Validation is a pure MarkdownCore function with table tests; App owns file I/O.
 
@@ -126,7 +137,7 @@ Prerequisites before user CSS is implemented, each its own gate:
 
 | Alternative | Why not |
 |---|---|
-| Ship user CSS first (Typora-style) | Largest risk surface; bypasses the remote-image privacy switch today (§4) |
+| Ship user CSS first (Typora-style) | Still requires separate CSS sanitization and layout/export gates (§4) |
 | Separate files for editor and preview themes | Two imports for one look; harder to keep light/dark consistent |
 | Import VS Code / TextMate themes | Their scopes do not map onto our 14 Markdown slots; partial imports look broken |
 | Store themes by bookmark to the user's file | Live editing would be nice, but needs watching and re-validation; copy-on-import is simpler and sandbox-friendly |
@@ -143,7 +154,7 @@ Prerequisites before user CSS is implemented, each its own gate:
 | **T5 preview apply** | vitest + hosted: tokens apply per appearance, built-ins send empty maps, Mermaid still re-renders on appearance change |
 | **T6 export** | HTML/PDF freeze custom token values; E3 tests extended |
 | **T7 accessibility** | Contrast warning shown below 4.5:1; Settings controls keyboard/VoiceOver reachable (owner smoke) |
-| **T8 docs** | agent.md §11, README, Decision Log entry; ship two sample theme files in `docs/themes/` |
+| **T8 docs** | agent.md §11, README, a file in `docs/decisions/`; ship two sample theme files in `docs/themes/` |
 
 ## 7. PR plan
 
@@ -151,12 +162,15 @@ Prerequisites before user CSS is implemented, each its own gate:
 - **B** — T1 + T2 + T3 (editor-only themes; preview keeps built-ins).
 - **C** — T4 + T5 + T6 (preview tokens and export).
 - **D** — T7 + T8.
-- User CSS: a separate spec after the remaining §4 prerequisites. Premise 1 landed as the
-  content-rule network block, not as a second CSP document.
+- User CSS: a separate spec after the remaining §4 prerequisites. Premise 1 is complete
+  through the content-rule network block; the static CSP still permits opted-in images.
 
 ## 8. Owner decisions
 
-- Token themes only for 1.0, user CSS deferred?
-- Strict rejection of unknown keys in schema v1?
-- Do custom themes also need font choices (family/size per slot), or colors only?
-- Mermaid colors from tokens in v1 or a follow-up?
+Accepted 2026-10-29. The record is
+`docs/decisions/2026-10-29-editor-custom-themes.md`.
+
+- Token themes only for 1.0. User CSS stays deferred.
+- Schema v1 rejects the whole file on an unknown field.
+- Colors only. Themes do not choose fonts.
+- Mermaid colors stay a follow-up, not v1.

@@ -56,6 +56,7 @@ struct IOSWorkspaceBrowserView: View {
                     }
                     .accessibilityIdentifier("plainsong.ios.browser.refresh")
                 }
+                IOSSettingsLink()
             }
         }
     }

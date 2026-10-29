@@ -56,8 +56,8 @@ before the page loads. `make lint` is a textual guard over production Swift and
 Objective-C sources, not a Swift parser. It uses the existing XcodeGen tool to resolve
 `project.yml` and scans every non-test target source path, plus package `Sources`, so a
 new Quick Look or print target is scanned even when it lives outside App/AppIOS. No YAML
-parser dependency is added. It rejects a WebKit import outside PreviewKit and the two
-export files that only name WebKit types. It rejects SwiftUI `WebView` and
+parser dependency is added. It rejects a WebKit import outside PreviewKit and the three
+export adapters that only name WebKit types. It rejects SwiftUI `WebView` and
 `WebPage` calls. Direct `WKWebView` and `WKWebViewConfiguration` calls are allowed only
 in the controller's two factory files. Aliases, subclasses, `.self`, bare `.init`,
 inferred `.init`, `type(of:).init` (the metatype is not known textually), and

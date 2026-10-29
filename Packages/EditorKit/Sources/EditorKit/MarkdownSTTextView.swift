@@ -18,6 +18,49 @@ final class MarkdownSTTextView: STTextView {
     /// EditorKit's line-number gutter, tiled by `EditorScrollView`. STTextView's own gutter
     /// (`showsLineNumbers`) stays off.
     var lineNumberGutter: EditorLineNumberGutterView?
+    /// Selection overlay color. The built-in system color needs no extra painting.
+    var editorSelectionColor: NSColor? {
+        didSet {
+            guard editorSelectionColor != oldValue else { return }
+            refreshEditorSelectionColor()
+        }
+    }
+
+    var selectionColorRefresh: Task<Void, Never>?
+    var observesEditorSelectionColor = false
+    var editorSelectionColorObserver: NSObjectProtocol?
+    var isEnforcingSelectionColor = false
+    var enforcesCustomSelectionColor = false
+    /// STTextView's selection container. It is created with the text view, so one lookup
+    /// is enough; a missing container is remembered too, or a renamed view would make
+    /// every layout scan the document again. Highlight views themselves are rebuilt.
+    weak var cachedEditorSelectionContainer: NSView?
+    var didResolveEditorSelectionContainer = false
+    var selectionHighlightTreeScans = 0
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshEditorSelectionColor()
+    }
+
+    override func layout() {
+        super.layout()
+        // Viewport layout rebuilds selection overlays with the system color.
+        // Repaint only while a custom color is in force; built-in typing stays a flag check.
+        guard !isEnforcingSelectionColor else { return }
+        let usesCustomSelection = editorSelectionColor != nil
+            && editorSelectionColor != .selectedTextBackgroundColor
+        guard usesCustomSelection || enforcesCustomSelectionColor else { return }
+        isEnforcingSelectionColor = true
+        defer { isEnforcingSelectionColor = false }
+        if usesCustomSelection, let editorSelectionColor {
+            paintEditorSelectionColor(editorSelectionColor)
+            enforcesCustomSelectionColor = true
+        } else {
+            releaseCustomSelectionTint(in: self)
+            enforcesCustomSelectionColor = false
+        }
+    }
 
     /// STTextView's scroll view setup, on the scroll view that tiles the line-number gutter.
     override static func scrollableTextView(frame: NSRect = .zero) -> NSScrollView {
@@ -144,6 +187,8 @@ final class MarkdownSTTextView: STTextView {
 
         if window != nil {
             windowAttachmentHandler?(self)
+        } else {
+            removeEditorSelectionColorObserver()
         }
     }
 

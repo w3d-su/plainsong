@@ -87,6 +87,11 @@ supported. Live fixture coverage: `Fixtures/math.md`.
   shown only as an image after a structural check. `data:` SVG, inline `<svg>`, and SVG
   in HTML/PDF export are not supported. Remote images are off by default, and enabling
   them allows `https:` images only; a remote SVG is left to WebKit and is not validated.
+- **Editor color themes** can be imported from Settings ▸ Editor. A theme is a JSON
+  palette (`#RRGGBB` or `#RRGGBBAA` only; text, caret, and background must be opaque).
+  Imported themes are listed separately from Plainsong and Graphite. The preview still
+  uses the built-in system, light, and dark palettes. User CSS and per-slot fonts are
+  not supported.
 - **WYSIWYG is Experimental and inline-only** (headings, emphasis/strike, inline code,
   list/quote styling, inline `[text](url)` links, and thumbnails for local PNG/JPEG/GIF/WebP
   images up to 10 MiB in a folder workspace). Reference links, autolinks, remote/SVG/
@@ -102,6 +107,10 @@ supported. Live fixture coverage: `Fixtures/math.md`.
 ## License
 
 Plainsong is open source under the [MIT License](LICENSE).
+The App target also links [Sparkle](https://github.com/sparkle-project/Sparkle) 2.10.0.
+Updates stay off unless `PLAINSONG_UPDATES_ENABLED` is YES. Sparkle is MIT and bundles
+bsdiff, sais-lite, and orlp/ed25519; those notices are in
+[`docs/third-party/Sparkle-2.10.0-LICENSE.txt`](docs/third-party/Sparkle-2.10.0-LICENSE.txt).
 
 Feedback and bug reports: [GitHub Issues](https://github.com/w3d-su/plainsong/issues).
 The app collects no telemetry; alpha builds are distributed as direct downloads

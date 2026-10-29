@@ -48,6 +48,7 @@ test-packages: generate
 	$(MAKE) test-f2-tooling
 	python3 Scripts/test-preview-webview-layering.py
 	Scripts/check-sparkle-layering.sh
+	Scripts/check-shipped-update-configuration.sh --self-test
 	@set -e; for pkg in $(PACKAGES); do \
 		echo "==> swift test: $$pkg"; \
 		(cd Packages/$$pkg && swift test); \

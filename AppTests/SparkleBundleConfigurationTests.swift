@@ -25,16 +25,16 @@ final class SparkleBundleConfigurationTests: XCTestCase {
         XCTAssertNil(info["SUEnableDownloaderService"])
         XCTAssertNil(info["SUEnableSystemProfiling"])
         let updatesFlag = info[PlainsongUpdateConfiguration.enabledKey]
-        XCTAssertNotEqual(updatesFlag as? String, "$(PLAINSONG_UPDATES_ENABLED)")
+        XCTAssertEqual(updatesFlag as? String, "NO")
         XCTAssertFalse(PlainsongUpdateConfiguration.isEnabled(in: bundle))
 
-        let startsBefore = SparkleUpdateClient.startCount
+        let startsBefore = SparkleUpdateClient.constructedCount
         let center = AppUpdateCenter.make(bundle: bundle)
         XCTAssertFalse(center.isEnabled)
         XCTAssertNil(center.settingsModel)
         XCTAssertNil(center.checkForUpdatesModel)
-        XCTAssertEqual(SparkleUpdateClient.startCount, startsBefore)
-        XCTAssertEqual(startsBefore, 0, "launching the default app must not start Sparkle")
+        XCTAssertEqual(SparkleUpdateClient.constructedCount, startsBefore)
+        XCTAssertEqual(startsBefore, 0, "launching the default app must not construct Sparkle")
 
         let entitlements = try entitlementDictionary(bundleURL: bundle.bundleURL)
         let machKey = "com.apple.security.temporary-exception.mach-lookup.global-name"

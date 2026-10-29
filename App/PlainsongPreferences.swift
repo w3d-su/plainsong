@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import EditorKit
 import Foundation
+import MarkdownCore
 import WorkspaceKit
 
 @MainActor
@@ -54,6 +55,10 @@ final class PlainsongPreferences: ObservableObject {
     @Published private(set) var showsLineNumbers: Bool
     @Published private(set) var typewriterSyncEnabled: Bool
     @Published private(set) var editorTheme: MarkdownEditorTheme
+    @Published private(set) var editorThemeIdentifier: String
+    @Published private(set) var importedEditorThemes: [CustomThemeDocument]
+    @Published private(set) var resolvedEditorSyntaxTheme: MarkdownSyntaxTheme
+    @Published private(set) var editorThemeFallbackNotice: String?
     @Published private(set) var previewTheme: PreviewTheme
     @Published private(set) var allowsRemoteImages: Bool
     @Published private(set) var experimentalWYSIWYGEnabled: Bool
@@ -61,11 +66,26 @@ final class PlainsongPreferences: ObservableObject {
     @Published private(set) var defaultFileExtension: DefaultFileExtension
 
     var onChange: (() -> Void)?
+    var confirmEditorThemeReplacement: (String, String) -> Bool
+    var revealEditorThemeFile: (URL) -> Void
 
-    private let userDefaults: UserDefaults
+    let userDefaults: UserDefaults
+    let editorThemeLibrary: EditorThemeLibrary
+    var editorThemeRevision = 0
+    var editorThemeContrastObservation: EditorThemeContrastObservation?
 
-    init(userDefaults: UserDefaults = .standard) {
+    init(
+        userDefaults: UserDefaults = .standard,
+        editorThemeLibrary: EditorThemeLibrary = .production()
+    ) {
         self.userDefaults = userDefaults
+        self.editorThemeLibrary = editorThemeLibrary
+        confirmEditorThemeReplacement = { identifier, name in
+            CustomThemeReplacePrompt.confirm(identifier: identifier, name: name)
+        }
+        revealEditorThemeFile = { url in
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        }
         defaultFolderURL = Self.resolveDefaultFolderURL(from: userDefaults)
         autosaveIntervalSeconds = Self.clampedAutosaveInterval(
             userDefaults.object(forKey: Keys.autosaveIntervalSeconds) as? Double
@@ -79,8 +99,15 @@ final class PlainsongPreferences: ObservableObject {
         )
         showsLineNumbers = userDefaults.object(forKey: Keys.showsLineNumbers) as? Bool ?? true
         typewriterSyncEnabled = userDefaults.object(forKey: Keys.typewriterSyncEnabled) as? Bool ?? true
-        editorTheme = userDefaults.string(forKey: Keys.editorTheme)
-            .flatMap(MarkdownEditorTheme.init(rawValue:)) ?? .standard
+        let storedTheme = StoredEditorTheme.load(
+            library: editorThemeLibrary,
+            identifier: userDefaults.string(forKey: Keys.editorTheme)
+        )
+        importedEditorThemes = storedTheme.themes
+        editorThemeIdentifier = storedTheme.identifier
+        editorTheme = storedTheme.theme
+        resolvedEditorSyntaxTheme = storedTheme.syntaxTheme
+        editorThemeFallbackNotice = storedTheme.notice
         previewTheme = userDefaults.string(forKey: Keys.previewTheme)
             .flatMap(PreviewTheme.init(rawValue:)) ?? .system
         allowsRemoteImages = userDefaults.object(forKey: Keys.allowsRemoteImages) as? Bool ?? false
@@ -91,6 +118,7 @@ final class PlainsongPreferences: ObservableObject {
         )
         defaultFileExtension = userDefaults.string(forKey: Keys.defaultFileExtension)
             .flatMap(DefaultFileExtension.init(rawValue:)) ?? .md
+        observeEditorThemeAccessibilityChanges()
     }
 
     var editorFont: NSFont {
@@ -98,7 +126,7 @@ final class PlainsongPreferences: ObservableObject {
     }
 
     var editorAppearanceID: String {
-        "\(editorTheme.rawValue):\(editorFontName):\(editorFontSize)"
+        "\(editorThemeIdentifier)#\(editorThemeRevision):\(editorFontName):\(editorFontSize)"
     }
 
     func setDefaultFolderURL(_ url: URL?) throws {
@@ -167,11 +195,36 @@ final class PlainsongPreferences: ObservableObject {
     }
 
     func setEditorTheme(_ theme: MarkdownEditorTheme) {
-        guard editorTheme != theme else { return }
+        guard editorTheme != theme || editorThemeIdentifier != theme.rawValue else { return }
+        applyEditorThemeSelection(
+            identifier: theme.rawValue,
+            theme: theme,
+            syntaxTheme: .builtIn(theme),
+            notice: nil
+        )
+    }
 
+    func applyEditorThemeSelection(
+        identifier: String,
+        theme: MarkdownEditorTheme,
+        syntaxTheme: MarkdownSyntaxTheme,
+        notice: String?
+    ) {
         editorTheme = theme
-        userDefaults.set(theme.rawValue, forKey: Keys.editorTheme)
+        editorThemeIdentifier = identifier
+        resolvedEditorSyntaxTheme = syntaxTheme
+        editorThemeFallbackNotice = notice
+        editorThemeRevision &+= 1
+        userDefaults.set(identifier, forKey: Keys.editorTheme)
         notifyDidChange()
+    }
+
+    func setImportedEditorThemes(_ themes: [CustomThemeDocument]) {
+        importedEditorThemes = themes
+    }
+
+    func clearEditorThemeFallbackNotice() {
+        editorThemeFallbackNotice = nil
     }
 
     func setPreviewTheme(_ theme: PreviewTheme) {
@@ -215,7 +268,7 @@ final class PlainsongPreferences: ObservableObject {
         notifyDidChange()
     }
 
-    private func notifyDidChange() {
+    func notifyDidChange() {
         onChange?()
     }
 
@@ -246,7 +299,7 @@ final class PlainsongPreferences: ObservableObject {
         ).standardizedFileURL
     }
 
-    private enum Keys {
+    enum Keys {
         static let defaultFolderBookmarkData = "Plainsong.settings.defaultFolderBookmark"
         static let autosaveIntervalSeconds = "Plainsong.settings.autosaveIntervalSeconds"
         static let editorFontName = "Plainsong.settings.editorFontName"

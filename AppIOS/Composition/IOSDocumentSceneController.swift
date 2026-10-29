@@ -49,6 +49,8 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     var renderTask: Task<Void, Never>?
     var renderedRevision: IOSDocumentRevision?
     lazy var reloadRelay = IOSDocumentReloadRelay(documents: documents, editor: editor)
+    /// `md` or `mdx`. Anything else stays Markdown so a bad setting cannot invent a type.
+    var preferredNewDocumentExtension = "md"
 
     /// Observation can replay `contentRuleUnavailable` before production assigns
     /// `onPreviewUnavailable`. Keep the message until that callback exists.
