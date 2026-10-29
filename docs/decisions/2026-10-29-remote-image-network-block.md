@@ -53,13 +53,17 @@ CSP on the `file://` page is not that defense: with no content rule, the probe s
 recorded `GET` for remote script, font, and stylesheet. Every preview and export
 `WKWebView` has to be created by `PreviewController`, which installs the blocking list
 before the page loads. `make lint` is a textual guard over production Swift and
-Objective-C sources, not a Swift parser. It rejects a WebKit import outside PreviewKit
-and the two export files that only name WebKit types. It rejects SwiftUI `WebView` and
+Objective-C sources, not a Swift parser. It uses the existing XcodeGen tool to resolve
+`project.yml` and scans every non-test target source path, plus package `Sources`, so a
+new Quick Look or print target is scanned even when it lives outside App/AppIOS. No YAML
+parser dependency is added. It rejects a WebKit import outside PreviewKit and the two
+export files that only name WebKit types. It rejects SwiftUI `WebView` and
 `WebPage` calls. Direct `WKWebView` and `WKWebViewConfiguration` calls are allowed only
 in the controller's two factory files. Aliases, subclasses, `.self`, bare `.init`,
 inferred `.init`, `type(of:).init` (the metatype is not known textually), and
 `NSClassFromString` or `objc_getClass` of a `WK` class are rejected too. `.m` and `.mm`
-files are scanned; vendored C headers are not, and test and probe sources are excluded.
+files are scanned; vendored C headers and test targets are excluded. Standalone probes
+are excluded unless a non-test target, such as an app host, lists them as sources.
 Concatenated class names and `removeAllContentRuleLists()` are outside the guard. A
 later print or Quick Look web view cannot rely on the CSP meta element. Link clicks
 are still `preventDefault` plus the `linkClicked` bridge message, so external opening

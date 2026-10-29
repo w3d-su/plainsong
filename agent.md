@@ -452,10 +452,12 @@ republishes only when its value changes literally.
   `WKWebView` is created by `PreviewController` and installs the blocking list before the
   page loads. A new web view, including print or Quick Look, has to go through that
   controller. `make lint` is a textual guard for production Swift and Objective-C, not a
-  Swift parser. WebKit imports are limited to PreviewKit and the two export files that
-  only name WebKit types. SwiftUI `WebView` and `WebPage` calls are rejected. Direct
-  `WKWebView` and `WKWebViewConfiguration` calls are allowed only in the controller's two
-  factory files. Aliases, subclasses, `.self`, bare `.init`, inferred `.init`,
+  Swift parser. It scans all non-test targets from the resolved `project.yml` spec and
+  package `Sources` directories, including a new extension target outside App/AppIOS.
+  WebKit imports are limited to PreviewKit and the two export files that only name
+  WebKit types. SwiftUI `WebView` and `WebPage` calls are rejected. Direct `WKWebView`
+  and `WKWebViewConfiguration` calls are allowed only in the controller's two factory
+  files. Aliases, subclasses, `.self`, bare `.init`, inferred `.init`,
   `type(of:).init`, and dynamic lookup of a `WK` class are rejected as well, including
   `.m` and `.mm` sources. Concatenated class names and `removeAllContentRuleLists()` are
   outside the guard. Link clicks stay in JavaScript (`preventDefault` plus

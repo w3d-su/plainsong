@@ -2,6 +2,7 @@
 """Regression coverage for the production WebKit construction lint gate."""
 
 from pathlib import Path
+import json
 import runpy
 import tempfile
 import unittest
@@ -21,8 +22,8 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(source)
 
-    def violations(self):
-        return CHECKER["find_violations"](self.root)
+    def violations(self, project_spec=None):
+        return CHECKER["find_violations"](self.root, project_spec)
 
     def test_allows_only_the_existing_factory_files(self):
         self.write_source(
@@ -223,6 +224,85 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
         ]))
         self.assertEqual(self.violations(), [
             "App/Legacy.mm:1: import WebKit outside PreviewController",
+        ])
+
+    def test_scans_new_non_test_targets_including_individual_source_files(self):
+        self.write_source("QuickLookPreview/Preview.swift", "import WebKit\n")
+        self.write_source("SharedPrint/Page.swift", "WebPage()\n")
+        self.write_source("Helpers/Host.mm", "@import WebKit;\n")
+        self.write_source("NewUnitTests/Preview.swift", "WKWebView()\n")
+        self.write_source("NewUITests/Preview.swift", "WKWebView()\n")
+        spec = {"targets": {
+            "QuickLook": {"type": "app-extension", "sources": [{"path": "QuickLookPreview"}]},
+            "Print": {"type": "framework", "sources": ["SharedPrint/Page.swift"]},
+            "Host": {"type": "application", "sources": "Helpers"},
+            "Unit": {"type": "bundle.unit-test", "sources": ["NewUnitTests"]},
+            "UI": {"type": "bundle.ui-testing", "sources": [{"path": "NewUITests"}]},
+        }}
+        self.assertEqual(self.violations(spec), [
+            "Helpers/Host.mm:1: import WebKit outside PreviewController",
+            "QuickLookPreview/Preview.swift:1: import WebKit outside PreviewController",
+            "SharedPrint/Page.swift:1: SwiftUI WebPage bypasses the PreviewController constructor",
+        ])
+
+    def test_reads_target_templates_through_the_resolved_xcodegen_spec(self):
+        self.write_source("QuickLookPreview/Preview.swift", "import WebKit\n")
+        self.write_source("project.yml", json.dumps({
+            "name": "Fixture",
+            "targetTemplates": {"Extension": {
+                "type": "app-extension", "platform": "macOS",
+                "sources": [{"path": "QuickLookPreview"}],
+            }},
+            "targets": {"QuickLook": {"templates": ["Extension"]}},
+        }))
+        self.assertEqual(self.violations(), [
+            "QuickLookPreview/Preview.swift:1: import WebKit outside PreviewController",
+        ])
+
+    def test_single_line_quotes_do_not_hide_code_after_a_newline(self):
+        self.write_source("App/Regex.swift", "\n".join([
+            'let expression = /"/',
+            'WKWebView()',
+            'let rawExpression = #/"/#',
+            'WKWebViewConfiguration()',
+        ]))
+        self.write_source("App/Legacy.m", "\n".join([
+            "int quote = '\"';",
+            '[[WKWebView alloc] init];',
+        ]))
+        self.assertEqual(self.violations(), [
+            "App/Legacy.m:2: WKWebView must be created by PreviewController",
+            "App/Regex.swift:2: WKWebView must be created by PreviewController",
+            "App/Regex.swift:4: WKWebViewConfiguration must be created by PreviewController",
+        ])
+
+    def test_rejects_access_level_and_same_line_swift_imports(self):
+        imports = [
+            "public import WebKit", "package import WebKit", "internal import WebKit",
+            "fileprivate import WebKit", "private import WebKit",
+            "@_exported public import WebKit", "import Foundation; import WebKit",
+            "import Foundation; internal import class WebKit.WKNavigationDelegate",
+        ]
+        for index, source in enumerate(imports):
+            path = f"App/Imports{index}.swift"
+            self.write_source(path, source)
+        self.assertEqual(self.violations(), [
+            f"App/Imports{index}.swift:1: import WebKit outside PreviewController"
+            for index in range(len(imports))
+        ])
+
+    def test_rejects_objective_c_includes_without_flagging_comments(self):
+        self.write_source("App/Legacy.mm", "\n".join([
+            '#include <WebKit/WebKit.h>',
+            '# include "WebKit/WKNavigationDelegate.h"',
+            '// #include <WebKit/WebKit.h>',
+            '/*',
+            '#include "WebKit/WebKit.h"',
+            '*/',
+        ]))
+        self.assertEqual(self.violations(), [
+            "App/Legacy.mm:1: import WebKit outside PreviewController",
+            "App/Legacy.mm:2: import WebKit outside PreviewController",
         ])
 
     def test_current_repository_has_no_violations(self):

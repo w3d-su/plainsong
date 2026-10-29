@@ -7,7 +7,8 @@ WebView and WebPage calls anywhere in production sources, and, inside the
 import allowlist, direct constructors other than PreviewController's two
 factories. Aliases, subclasses, metatype references, inferred `.init`,
 `type(of:).init`, and dynamic lookup of a WK class are rejected too.
-Objective-C `.m` and `.mm` sources are scanned; vendored C headers are not.
+Source roots include every non-test target in the resolved XcodeGen spec and
+package Sources. Objective-C `.m` and `.mm` are scanned; vendored C headers are not.
 
 Comments and string literals are ignored, except that a string passed to
 `NSClassFromString` or `objc_getClass` is still inspected. Concatenated class
@@ -15,7 +16,9 @@ names and `removeAllContentRuleLists()` are outside this check.
 """
 
 from pathlib import Path
+import json
 import re
+import subprocess
 import sys
 
 
@@ -51,11 +54,12 @@ WEBKIT_TOKEN = re.compile(r"\bWKWebView(?:Configuration)?\b")
 SWIFTUI_WEB = re.compile(r"\b(WebView|WebPage)\s*\(")
 TYPEOF_INIT = re.compile(r"\btype\s*\(\s*of\s*:\s*[^()\n]{0,180}\)\s*\.\s*init\b")
 IMPORT_WEBKIT = re.compile(
-    r"(?m)^[ \t]*(?:@[A-Za-z_][A-Za-z0-9_]*(?:\([^)\n]*\))?[ \t]+)*"
+    r"(?m)(?:^|;)[ \t]*(?:@[A-Za-z_][A-Za-z0-9_]*(?:\([^)\n]*\))?[ \t]+)*"
+    r"(?:(?:public|package|internal|fileprivate|private)[ \t]+)?"
     r"import[ \t]+(?:(?:struct|class|enum|func|var|typealias|let)[ \t]+)?WebKit\b"
 )
 IMPORT_WEBKIT_OBJC = re.compile(
-    r'(?m)^[ \t]*#\s*import[ \t]+(?:<WebKit/|"WebKit/)|'
+    r'(?m)^[ \t]*#\s*(?:import|include)[ \t]+(?:<WebKit/|"WebKit/)|'
     r"^[ \t]*@import[ \t]+WebKit\b"
 )
 DYNAMIC_LOOKUP = re.compile(r"\b(NSClassFromString|objc_getClass)\s*\(")
@@ -150,6 +154,9 @@ class ScannedSource:
         index += open_len
         line_is_blank = False
         while index < len(text):
+            if not multiline and text[index] in "\r\n":
+                self.literals[quote - hashes] = text[content_start:index]
+                return index
             if self._interpolation_at(index, hashes):
                 marker = 1 + hashes
                 self._blank(index, index + marker + 1)
@@ -234,20 +241,43 @@ def dynamic_name_is_webkit(scanned, index):
     return content is not None and content.startswith("WK")
 
 
-def find_violations(root: Path) -> list[str]:
+def read_project_spec(root):
+    manifest = root / "project.yml"
+    if not manifest.exists():
+        return {"targets": {}}
+    result = subprocess.run(
+        ["xcodegen", "dump", "--type", "parsed-json", "--spec", str(manifest)],
+        cwd=root, check=True, capture_output=True, text=True,
+    )
+    return json.loads(result.stdout)
+
+
+def find_violations(root: Path, project_spec=None) -> list[str]:
+    if project_spec is None:
+        project_spec = read_project_spec(root)
     source_roots = [root / "App", root / "AppIOS"]
+    for target in project_spec["targets"].values():
+        if target["type"] in {"bundle.unit-test", "bundle.ui-testing"}:
+            continue
+        sources = target.get("sources", [])
+        if isinstance(sources, str):
+            sources = [sources]
+        for source in sources:
+            source_roots.append(root / (source if isinstance(source, str) else source["path"]))
     packages = root / "Packages"
     if packages.exists():
         source_roots.extend(sorted(path for path in packages.glob("*/Sources") if path.is_dir()))
-    violations = []
+    paths = set()
     for source_root in source_roots:
-        if not source_root.exists():
-            continue
-        paths = [path for path in source_root.rglob("*")
-                 if path.is_file() and path.suffix in SOURCE_SUFFIXES]
-        for path in sorted(paths):
-            relative = path.relative_to(root).as_posix()
-            scan_source(relative, path.read_text(), violations)
+        if source_root.is_file() and source_root.suffix in SOURCE_SUFFIXES:
+            paths.add(source_root)
+        elif source_root.is_dir():
+            paths.update(path for path in source_root.rglob("*")
+                         if path.is_file() and path.suffix in SOURCE_SUFFIXES)
+    violations = []
+    for path in sorted(paths):
+        relative = path.relative_to(root).as_posix()
+        scan_source(relative, path.read_text(), violations)
     unique = []
     seen = set()
     for violation in sorted(violations, key=violation_key):
