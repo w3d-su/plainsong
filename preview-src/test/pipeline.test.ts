@@ -3,6 +3,7 @@ import kitchenSink from "../../Fixtures/kitchen-sink.md?raw";
 import kitchenSinkMdx from "../../Fixtures/kitchen-sink.mdx?raw";
 import mdxSyntaxError from "../../Fixtures/mdx-syntax-error.mdx?raw";
 import { mdxErrorBannerHtml } from "../src/mdx-error";
+import { rewriteImageSources } from "../src/image-rewrite";
 import { renderMarkdown, renderMdx } from "../src/pipeline";
 
 describe("markdown preview pipeline", () => {
@@ -16,6 +17,27 @@ describe("markdown preview pipeline", () => {
     expect(html).toContain('<h1 id="plainsong-heading-title" data-line="1">Title</h1>');
     expect(html).toContain('<p data-line="3">Paragraph</p>');
     expect(html).toContain('data-line="5"');
+  });
+
+  it("keeps a workspace SVG as an image and rewrites it to a scoped asset URL", async () => {
+    const container = document.createElement("div");
+    container.innerHTML = await renderMarkdown("![Logo](../images/logo.svg)\n\n![Upper](Diagram.SVG)\n");
+    rewriteImageSources(container, "content/posts", false, "root-1");
+    const sources = Array.from(container.querySelectorAll("img"), (image) => image.getAttribute("src"));
+    expect(sources).toEqual([
+      "asset://content/images/logo.svg?plainsong-root=root-1",
+      "asset://content/posts/Diagram.SVG?plainsong-root=root-1",
+    ]);
+    expect(container.querySelector("svg")).toBeNull();
+  });
+
+  it("drops raw inline SVG markup", async () => {
+    const html = await renderMarkdown(
+      '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><circle r="4"/></svg>\n\nAfter\n',
+    );
+    expect(html.toLowerCase()).not.toContain("<svg");
+    expect(html).not.toContain("onload");
+    expect(html).toContain("After");
   });
 });
 

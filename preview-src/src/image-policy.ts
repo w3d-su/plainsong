@@ -27,6 +27,8 @@ export function imageSourcePolicy(
   }
 
   if (isWorkspaceRelativeURL(trimmed)) {
+    // `.svg` is not special: a workspace image rewrites like a raster file.
+    // `data:image/svg+xml` stays out of allowedDataImageMediaTypes.
     const assetPath = workspaceRelativeAssetPath(trimmed, baseDir);
     return { action: "rewrite", src: scopedAssetURL(`asset://${assetURLPath(assetPath)}`, assetRootID) };
   }

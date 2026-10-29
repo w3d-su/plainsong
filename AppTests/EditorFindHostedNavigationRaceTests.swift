@@ -14,7 +14,7 @@ extension EditorFindHostedGateTests {
         appState.setLayoutMode(.sourceOnly)
         appState.openExternalFile(fixture.root)
         try await waitUntil("workspace document opens") {
-            appState.currentDocument.fileURL?.lastPathComponent == "post.md"
+            appState.shownSession.fileURL?.lastPathComponent == "post.md"
                 && appState.isWorkspaceSearchReady
         }
         appState.workspaceWatcher?.stop()
@@ -39,8 +39,8 @@ extension EditorFindHostedGateTests {
                 && appState.workspaceInstalledCaptureGeneration == appState.workspaceGeneration
         }
         let editor = try XCTUnwrap(editorTextView(in: window))
-        XCTAssertEqual(appState.currentDocument.text, source)
-        XCTAssertEqual(appState.currentDocument.version, 0)
+        XCTAssertEqual(appState.shownSession.text, source)
+        XCTAssertEqual(appState.shownSession.version, 0)
         XCTAssertEqual(appState.editorFindHost.controller.queryGeneration, generation)
         XCTAssertEqual(appState.editorNavigationCommand, command)
         XCTAssertFalse(editor.undoManager?.canUndo == true)
@@ -63,7 +63,7 @@ extension EditorFindHostedGateTests {
         let appState = hosted.appState
         let watcher = try XCTUnwrap(appState.workspaceWatcher)
         try await waitForHostedReplaceObservationQuiescence(hosted)
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let identity = ObjectIdentifier(session)
         let authorityGeneration = appState.editorReplaceAuthorityGeneration
         let diskGeneration = appState.currentExternalDiskEventGeneration(for: session)
@@ -111,7 +111,7 @@ extension EditorFindHostedGateTests {
         // late real FSEvent cannot deliver into a later test's workspace state.
         defer { watcher.stop() }
         try await waitForHostedReplaceObservationQuiescence(hosted)
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let identity = ObjectIdentifier(session)
         let authorityGeneration = appState.editorReplaceAuthorityGeneration
         let diskGeneration = appState.currentExternalDiskEventGeneration(for: session)

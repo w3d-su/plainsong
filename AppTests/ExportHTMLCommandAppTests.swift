@@ -34,7 +34,7 @@ final class ExportHTMLCommandAppTests: XCTestCase {
         XCTAssertTrue(html.contains("data:image/png;base64,"), "the workspace image must be embedded")
         XCTAssertEqual(try operationSiblings(in: fixture.exportsDirectory), [])
         XCTAssertEqual(DocumentState(fixture.session), documentBefore)
-        XCTAssertTrue(fixture.appState.currentDocument === fixture.session)
+        XCTAssertTrue(fixture.appState.shownSession === fixture.session)
         XCTAssertEqual(fixture.appState.recentItemURLs, recentsBefore)
         XCTAssertEqual(fixture.appState.exportHTMLNotice?.title, "Exported as HTML")
         XCTAssertNil(fixture.appState.exportHTMLOperations.activeOperationID)
@@ -230,7 +230,7 @@ extension ExportHTMLCommandAppTests {
         let read = try MarkdownFileStore().loadResult(at: location)
         let session = DocumentSession(text: text, url: documentURL)
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "ExportHTMLTests-\(UUID().uuidString)"))
-        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false, userDefaults: defaults)
+        let appState = AppState(shownSession: session, shouldRestoreLastOpenedFile: false, userDefaults: defaults)
         let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 800, height: 600),
                               styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false

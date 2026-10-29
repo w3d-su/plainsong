@@ -324,7 +324,7 @@ extension AppState {
                 isDirty: false
             )
             detachedSessionURLs.remove(canonicalURL)
-            if session === currentDocument {
+            if session === shownSession {
                 missingFilePrompt = nil
                 notifyEditorFindExternalContentDidReplace()
             }
@@ -345,9 +345,11 @@ extension AppState {
         pendingExternalTexts[canonicalURL] = observation.file.text
         pendingExternalFileVersions[canonicalURL] = observation
         cancelAutosave(for: session)
-        if session === currentDocument {
-            missingFilePrompt = nil
-            externalChangePrompt = ExternalChangePrompt(fileURL: canonicalURL)
+        // The banner belongs to every window showing this file, not the façade whose
+        // watcher happened to observe the disk (W2 bullet 3).
+        for window in registry.connectedWindows where window.shownSession === session {
+            window.missingFilePrompt = nil
+            window.externalChangePrompt = ExternalChangePrompt(fileURL: canonicalURL)
         }
     }
 

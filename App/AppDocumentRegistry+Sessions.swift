@@ -37,6 +37,11 @@ extension AppDocumentRegistry {
         registeredWindows.append(RegisteredWindowState(window: window))
     }
 
+    /// Removes a closed sibling window from every inventory (`KeyWindowRouter.closeFacade`).
+    func unregister(_ window: WindowState) {
+        registeredWindows.removeAll { $0.window == nil || $0.window === window }
+    }
+
     var connectedWindows: [WindowState] {
         registeredWindows.compactMap(\.window)
     }

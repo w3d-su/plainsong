@@ -23,7 +23,7 @@ final class WorkspaceSearchHostedActivationTests: XCTestCase {
         appState.setLayoutMode(.sourceOnly)
         appState.openExternalFile(fixture.root)
         try await waitUntil("workspace opens the current file and is search-ready") {
-            appState.currentDocument.fileURL?.lastPathComponent == "a-current.md"
+            appState.shownSession.fileURL?.lastPathComponent == "a-current.md"
                 && appState.isWorkspaceSearchReady
         }
 
@@ -44,7 +44,7 @@ final class WorkspaceSearchHostedActivationTests: XCTestCase {
             appState.workspaceSearchState.fileResults.first { $0.relativePath == "z-other.md" }
         )
         XCTAssertNotNil(otherResult.fileAuthority, "production search results must carry file authority")
-        XCTAssertEqual(appState.currentDocument.fileURL?.lastPathComponent, "a-current.md")
+        XCTAssertEqual(appState.shownSession.fileURL?.lastPathComponent, "a-current.md")
         XCTAssertEqual(
             WorkspaceSearchSelectionNavigation.orderedRowIDs(in: resultsPresentation(appState)).count,
             1,
@@ -74,7 +74,7 @@ final class WorkspaceSearchHostedActivationTests: XCTestCase {
         appState.setLayoutMode(.sourceOnly)
         appState.openExternalFile(fixture.root)
         try await waitUntil("workspace opens and is search-ready") {
-            appState.currentDocument.fileURL?.lastPathComponent == "a.md"
+            appState.shownSession.fileURL?.lastPathComponent == "a.md"
                 && appState.isWorkspaceSearchReady
         }
 

@@ -158,7 +158,7 @@ enum EditorFindPerformanceSupport {
             fileKind: .markdown
         )
         let appState = AppState(
-            currentDocument: session,
+            shownSession: session,
             shouldRestoreLastOpenedFile: false,
             userDefaults: defaults
         )

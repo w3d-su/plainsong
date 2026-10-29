@@ -9,10 +9,10 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
     func testSwitchReleasesUnboundUntitledOwnershipBeforeIdentityCanBeReused() throws {
         let fixture = try SessionStateCleanupFixture()
         defer { fixture.cleanUp() }
-        let appState = fixture.makeAppState(currentDocument: DocumentSession())
+        let appState = fixture.makeAppState(shownSession: DocumentSession())
         weak var initialSession: DocumentSession?
-        initialSession = appState.currentDocument
-        let initialIdentity = ObjectIdentifier(appState.currentDocument)
+        initialSession = appState.shownSession
+        let initialIdentity = ObjectIdentifier(appState.shownSession)
         XCTAssertEqual(
             appState.unanchoredManagedSessionOwnershipProofs[initialIdentity],
             .unavailable(fileURL: nil)
@@ -23,14 +23,14 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
 
         XCTAssertNil(initialSession)
         XCTAssertNil(appState.unanchoredManagedSessionOwnershipProofs[initialIdentity])
-        XCTAssertEqual(appState.sessionStateURL(for: appState.currentDocument), fixture.url("post.md"))
+        XCTAssertEqual(appState.sessionStateURL(for: appState.shownSession), fixture.url("post.md"))
     }
 
     func testSwitchRetainsBoundUntitledOwnershipUntilRegistrationIsRemoved() throws {
         let fixture = try SessionStateCleanupFixture()
         defer { fixture.cleanUp() }
         let initialSession = DocumentSession()
-        let appState = fixture.makeAppState(currentDocument: initialSession)
+        let appState = fixture.makeAppState(shownSession: initialSession)
         let initialIdentity = ObjectIdentifier(initialSession)
         let binding = appState.editorDocumentBinding(for: initialSession)
         try "disk".write(to: fixture.url("post.md"), atomically: false, encoding: .utf8)
@@ -49,7 +49,7 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
     func testStopTrackingReleasesUnreferencedRecoveryOwnershipBeforeIdentityCanBeReused() throws {
         let fixture = try SessionStateCleanupFixture()
         defer { fixture.cleanUp() }
-        let appState = fixture.makeAppState(currentDocument: DocumentSession())
+        let appState = fixture.makeAppState(shownSession: DocumentSession())
         weak var recoverySession: DocumentSession?
         recoverySession = try stopTrackingRestoredRecovery(in: appState, fixture: fixture)
         let recoveryIdentity = try ObjectIdentifier(XCTUnwrap(recoverySession))
@@ -59,13 +59,13 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
 
         XCTAssertNil(recoverySession)
         XCTAssertNil(appState.unanchoredManagedSessionOwnershipProofs[recoveryIdentity])
-        XCTAssertEqual(appState.sessionStateURL(for: appState.currentDocument), fixture.url("post.md"))
+        XCTAssertEqual(appState.sessionStateURL(for: appState.shownSession), fixture.url("post.md"))
     }
 
     func testStopTrackingRetainsBoundRecoveryOwnershipUntilRegistrationIsRemoved() throws {
         let fixture = try SessionStateCleanupFixture()
         defer { fixture.cleanUp() }
-        let appState = fixture.makeAppState(currentDocument: DocumentSession())
+        let appState = fixture.makeAppState(shownSession: DocumentSession())
         let recoverySession = try stopTrackingRestoredRecovery(in: appState, fixture: fixture)
         let recoveryIdentity = ObjectIdentifier(recoverySession)
         let binding = appState.editorDocumentBinding(for: recoverySession)
@@ -99,7 +99,7 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
         )
         appState.pendingWorkspaceMutationTextRecoveryRecords = [record]
         appState.restoreWorkspaceMutationTextRecoveryIfNeeded()
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let sessionIdentity = ObjectIdentifier(session)
         XCTAssertEqual(
             appState.unanchoredManagedSessionOwnershipProofs[sessionIdentity],
@@ -116,7 +116,7 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
 
         XCTAssertNil(appState.workspaceMutationTextRecoveryContexts[sessionIdentity])
         XCTAssertNil(appState.workspaceMutationTextRecoverySessions[record.id])
-        XCTAssertTrue(appState.currentDocument === session)
+        XCTAssertTrue(appState.shownSession === session)
         XCTAssertEqual(
             appState.unanchoredManagedSessionOwnershipProofs[sessionIdentity],
             .unavailable(fileURL: missingURL)
@@ -127,14 +127,14 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
     func testAllDirtyEvictionSavesFailOncePerPassAndRetainUnsavedText() throws {
         let fixture = try SessionStateCleanupFixture()
         defer { fixture.cleanUp() }
-        let appState = fixture.makeAppState(currentDocument: DocumentSession())
+        let appState = fixture.makeAppState(shownSession: DocumentSession())
         var sessions: [DocumentSession] = []
         for index in 0 ..< 9 {
             try "disk \(index)".write(to: fixture.url("\(index).md"), atomically: false, encoding: .utf8)
         }
         for index in 0 ..< 8 {
             try appState.activateFileSession(url: fixture.url("\(index).md"))
-            let session = appState.currentDocument
+            let session = appState.shownSession
             appState.replaceDocumentText("unsaved \(index)")
             appState.cancelAutosave(for: session)
             XCTAssertEqual(appState.sessionStateURL(for: session), session.fileURL)
@@ -174,13 +174,13 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
     func testEvictionContinuesPastFailedSaveToCleanCandidate() throws {
         let fixture = try SessionStateCleanupFixture()
         defer { fixture.cleanUp() }
-        let appState = fixture.makeAppState(currentDocument: DocumentSession())
+        let appState = fixture.makeAppState(shownSession: DocumentSession())
         appState.sessionPolicy = .init(limit: 2)
         for index in 0 ..< 3 {
             try "disk \(index)".write(to: fixture.url("\(index).md"), atomically: false, encoding: .utf8)
         }
         try appState.activateFileSession(url: fixture.url("0.md"))
-        let dirty = appState.currentDocument
+        let dirty = appState.shownSession
         appState.replaceDocumentText("unsaved")
         appState.cancelAutosave(for: dirty)
         try appState.activateFileSession(url: fixture.url("1.md"))
@@ -208,7 +208,7 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
             fileKind: .markdown,
             isDirty: true
         )
-        let appState = fixture.makeAppState(currentDocument: recovery)
+        let appState = fixture.makeAppState(shownSession: recovery)
 
         try "Replacement text".write(
             to: originalURL,
@@ -284,7 +284,7 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
             url: originalURL,
             fileKind: .markdown
         )
-        let appState = fixture.makeAppState(currentDocument: replacement)
+        let appState = fixture.makeAppState(shownSession: replacement)
         let recovery = DocumentSession(
             text: "Recovery text",
             url: originalURL,
@@ -365,9 +365,9 @@ private final class SessionStateCleanupFixture {
         rootURL.appendingPathComponent(relativePath)
     }
 
-    func makeAppState(currentDocument: DocumentSession) -> AppState {
+    func makeAppState(shownSession: DocumentSession) -> AppState {
         AppState(
-            currentDocument: currentDocument,
+            shownSession: shownSession,
             lastOpenedFileStore: SessionStateCleanupLastOpenedFileStore(),
             recentItemStore: SessionStateCleanupRecentItemStore(),
             workspaceMutationOperationRecoveryStore: operationRecoveryStore,

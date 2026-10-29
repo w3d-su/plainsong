@@ -19,7 +19,7 @@ extension EditorFindHostedGateTests {
         state.openExternalFile(fixture.root)
         try await waitUntil("workspace capture installs") {
             state.workspaceInstalledCaptureGeneration == state.workspaceGeneration
-                && state.currentDocument.fileURL?.lastPathComponent == "a.md"
+                && state.shownSession.fileURL?.lastPathComponent == "a.md"
         }
         let host = makeWorkspaceHost(appState: state, shellOverride: shell)
         registerTeardown(host: host, fixture: fixture)
@@ -53,12 +53,12 @@ extension EditorFindHostedGateTests {
             // Route through the real window so its hit view and drag recognizer participate.
             host.window.sendEvent(down)
             try await waitUntil("filename click opens \(file)") {
-                state.currentDocument.fileURL?.lastPathComponent == file
+                state.shownSession.fileURL?.lastPathComponent == file
                     && state.workspaceTree?.selectedNode?.name == file
                     && list.selectedRow == index
             }
             XCTAssertEqual(state.workspaceTree?.selectedNode?.name, file)
-            XCTAssertEqual(state.currentDocument.text, file == "a.md" ? "alpha" : "beta")
+            XCTAssertEqual(state.shownSession.text, file == "a.md" ? "alpha" : "beta")
             XCTAssertEqual(list.selectedRow, index)
             let deferral = try XCTUnwrap(FilesSelectionDeferral.latestDebugInstance)
             XCTAssertEqual(deferral.issued, pick + 1, "Native selection and the filename tap must enqueue once")
@@ -84,17 +84,17 @@ extension EditorFindHostedGateTests {
         state.openExternalFile(fixture.root)
         try await waitUntil("workspace capture installs") {
             state.workspaceInstalledCaptureGeneration == state.workspaceGeneration
-                && state.currentDocument.fileURL?.lastPathComponent == "a.md"
+                && state.shownSession.fileURL?.lastPathComponent == "a.md"
         }
         state.workspaceWatcher?.stop()
-        let previousDocument = state.currentDocument
+        let previousDocument = state.shownSession
         let previousSelection = state.workspaceTree?.selectedNodeID
         let nodeID = try XCTUnwrap(state.workspaceTree?.root.children.first { $0.name == "b.md" }?.id)
         let destination = fixture.root.appendingPathComponent("b.md")
         try Data([0xFF]).write(to: destination)
         state.selectWorkspaceNode(id: nodeID, requestingEditorFocus: false)
-        XCTAssertTrue(state.currentDocument === previousDocument)
-        XCTAssertEqual(state.currentDocument.text, "alpha")
+        XCTAssertTrue(state.shownSession === previousDocument)
+        XCTAssertEqual(state.shownSession.text, "alpha")
         XCTAssertNotNil(state.presentedError)
         XCTAssertEqual(state.workspaceTree?.selectedNodeID, previousSelection,
                        "A failed open must not highlight the unopened file or suppress a retry")
@@ -102,7 +102,7 @@ extension EditorFindHostedGateTests {
         try "recovered beta".write(to: destination, atomically: false, encoding: .utf8)
         state.selectWorkspaceNode(id: nodeID, requestingEditorFocus: false)
         XCTAssertEqual(state.workspaceTree?.selectedNodeID, nodeID)
-        XCTAssertEqual(state.currentDocument.text, "recovered beta")
+        XCTAssertEqual(state.shownSession.text, "recovered beta")
         XCTAssertNil(state.presentedError)
     }
 }
@@ -112,7 +112,7 @@ extension EditorFindHostedGateTests {
     func testNativeFilesSlowReadKeepsMainActorResponsiveAndNewestPickWins() async throws {
         let fixture = try await makeReadyFilesSwitchFixture()
         let state = fixture.appState
-        let original = state.currentDocument
+        let original = state.shownSession
         original.replaceText("alpha unsaved", refreshStatistics: false)
         let bID = try XCTUnwrap(state.workspaceTree?.root.children.first { $0.name == "b.md" }?.id)
         let cID = try XCTUnwrap(state.workspaceTree?.root.children.first { $0.name == "c.md" }?.id)
@@ -123,25 +123,25 @@ extension EditorFindHostedGateTests {
         deferral.open(id: bID, requestingEditorFocus: false, pickWindow: nil, appState: state) {}
         try await waitUntil("first file read is held off the main thread") { read.isHeld }
         XCTAssertFalse(read.ranOnMainThread)
-        XCTAssertTrue(state.currentDocument === original)
+        XCTAssertTrue(state.shownSession === original)
         deferral.open(id: cID, requestingEditorFocus: false, pickWindow: nil, appState: state) {}
         try await waitUntil("newest pick opens while the previous read is still held") {
-            state.currentDocument.fileURL?.lastPathComponent == "c.md" && deferral.pendingID == nil
+            state.shownSession.fileURL?.lastPathComponent == "c.md" && deferral.pendingID == nil
         }
         XCTAssertTrue(read.isHeld)
-        XCTAssertEqual(state.currentDocument.text, "gamma")
+        XCTAssertEqual(state.shownSession.text, "gamma")
         read.release()
         try await waitUntil("cancelled older read exits") { read.didExit }
         try await Task.sleep(nanoseconds: 50_000_000)
-        XCTAssertEqual(state.currentDocument.fileURL?.lastPathComponent, "c.md")
+        XCTAssertEqual(state.shownSession.fileURL?.lastPathComponent, "c.md")
         XCTAssertEqual(state.workspaceTree?.selectedNodeID, cID)
         XCTAssertEqual(original.text, "alpha unsaved")
         XCTAssertTrue(original.isDirty)
         let aID = try XCTUnwrap(state.workspaceTree?.root.children.first { $0.name == "a.md" }?.id)
         XCTAssertTrue(state.selectWorkspaceNode(id: aID, requestingEditorFocus: false))
-        XCTAssertTrue(state.currentDocument === original)
-        XCTAssertEqual(state.currentDocument.text, "alpha unsaved")
-        XCTAssertTrue(state.currentDocument.isDirty)
+        XCTAssertTrue(state.shownSession === original)
+        XCTAssertEqual(state.shownSession.text, "alpha unsaved")
+        XCTAssertTrue(state.shownSession.isDirty)
         XCTAssertFalse(deferral.openAttempts.contains { $0.id == bID && $0.landed })
         XCTAssertNil(state.presentedError)
     }
@@ -149,14 +149,14 @@ extension EditorFindHostedGateTests {
     func testNativeFilesCancelledPickNeverStartsAnOpen() async throws {
         let fixture = try await makeReadyFilesSwitchFixture()
         let state = fixture.appState
-        let original = state.currentDocument
+        let original = state.shownSession
         let previousSelection = state.workspaceTree?.selectedNodeID
         let bID = try XCTUnwrap(state.workspaceTree?.root.children.first { $0.name == "b.md" }?.id)
         let deferral = FilesSelectionDeferral()
         deferral.open(id: bID, requestingEditorFocus: true, pickWindow: nil, appState: state) {}
         deferral.cancelPendingOpen()
         try await Task.sleep(nanoseconds: 50_000_000)
-        XCTAssertTrue(state.currentDocument === original)
+        XCTAssertTrue(state.shownSession === original)
         XCTAssertEqual(state.workspaceTree?.selectedNodeID, previousSelection)
         XCTAssertTrue(deferral.openAttempts.isEmpty)
         XCTAssertNil(deferral.pendingID)
@@ -165,7 +165,7 @@ extension EditorFindHostedGateTests {
     func testNativeFilesCancellingAnInFlightReadKeepsTheCurrentDocument() async throws {
         let fixture = try await makeReadyFilesSwitchFixture()
         let state = fixture.appState
-        let original = state.currentDocument
+        let original = state.shownSession
         let previousSelection = state.workspaceTree?.selectedNodeID
         let focusBefore = state.editorFocusRequestID
         let bID = try XCTUnwrap(state.workspaceTree?.root.children.first { $0.name == "b.md" }?.id)
@@ -179,7 +179,7 @@ extension EditorFindHostedGateTests {
         read.release()
         try await waitUntil("cancelled file read exits") { read.didExit }
         try await Task.sleep(nanoseconds: 50_000_000)
-        XCTAssertTrue(state.currentDocument === original)
+        XCTAssertTrue(state.shownSession === original)
         XCTAssertEqual(state.workspaceTree?.selectedNodeID, previousSelection)
         XCTAssertEqual(state.editorFocusRequestID, focusBefore)
         XCTAssertNil(deferral.pendingID)
@@ -189,7 +189,7 @@ extension EditorFindHostedGateTests {
     func testNativeFilesFailedDeferredReadDropsHighlightAndCanBeRetried() async throws {
         let fixture = try await makeReadyFilesSwitchFixture()
         let state = fixture.appState
-        let original = state.currentDocument
+        let original = state.shownSession
         let previousSelection = state.workspaceTree?.selectedNodeID
         let bID = try XCTUnwrap(state.workspaceTree?.root.children.first { $0.name == "b.md" }?.id)
         let destination = fixture.root.appendingPathComponent("b.md")
@@ -200,7 +200,7 @@ extension EditorFindHostedGateTests {
             dropped = true
         }
         try await waitUntil("failed read requests highlight restoration") { dropped }
-        XCTAssertTrue(state.currentDocument === original)
+        XCTAssertTrue(state.shownSession === original)
         XCTAssertEqual(state.workspaceTree?.selectedNodeID, previousSelection)
         XCTAssertNil(deferral.pendingID)
         XCTAssertNotNil(state.presentedError)
@@ -208,9 +208,9 @@ extension EditorFindHostedGateTests {
         try "recovered beta".write(to: destination, atomically: false, encoding: .utf8)
         deferral.open(id: bID, requestingEditorFocus: false, pickWindow: nil, appState: state) {}
         try await waitUntil("the same row can be retried after a failed read") {
-            state.currentDocument.fileURL?.lastPathComponent == "b.md" && deferral.pendingID == nil
+            state.shownSession.fileURL?.lastPathComponent == "b.md" && deferral.pendingID == nil
         }
-        XCTAssertEqual(state.currentDocument.text, "recovered beta")
+        XCTAssertEqual(state.shownSession.text, "recovered beta")
         XCTAssertEqual(state.workspaceTree?.selectedNodeID, bID)
         XCTAssertNil(state.presentedError)
     }
@@ -218,7 +218,7 @@ extension EditorFindHostedGateTests {
     func testNativeFilesReadRetriesWhenItsWorkspaceCaptureWasSuperseded() async throws {
         let fixture = try await makeReadyFilesSwitchFixture()
         let state = fixture.appState
-        let original = state.currentDocument
+        let original = state.shownSession
         let bID = try XCTUnwrap(state.workspaceTree?.root.children.first { $0.name == "b.md" }?.id)
         let read = HeldFilesSelectionRead()
         defer { read.release() }
@@ -232,10 +232,10 @@ extension EditorFindHostedGateTests {
             state.workspaceGeneration > generation
                 && state.workspaceInstalledCaptureGeneration == state.workspaceGeneration
         }
-        XCTAssertTrue(state.currentDocument === original)
+        XCTAssertTrue(state.shownSession === original)
         read.release()
         try await waitUntil("pick retries against the installed capture") {
-            state.currentDocument.fileURL?.lastPathComponent == "b.md" && deferral.pendingID == nil
+            state.shownSession.fileURL?.lastPathComponent == "b.md" && deferral.pendingID == nil
         }
         XCTAssertEqual(state.workspaceTree?.selectedNodeID, bID)
         XCTAssertEqual(deferral.openAttempts.filter { $0.id == bID && $0.landed }.count, 1)
@@ -248,9 +248,9 @@ extension EditorFindHostedGateTests {
         let aID = try XCTUnwrap(state.workspaceTree?.root.children.first { $0.name == "a.md" }?.id)
         let bID = try XCTUnwrap(state.workspaceTree?.root.children.first { $0.name == "b.md" }?.id)
         XCTAssertTrue(state.selectWorkspaceNode(id: bID, requestingEditorFocus: false))
-        let cached = state.currentDocument
+        let cached = state.shownSession
         XCTAssertTrue(state.selectWorkspaceNode(id: aID, requestingEditorFocus: false))
-        let original = state.currentDocument
+        let original = state.shownSession
         let read = try await state.prepareWorkspaceNodeSelection(id: bID)
         let prepared = try XCTUnwrap(read)
         let destination = fixture.root.appendingPathComponent("b.md")
@@ -260,11 +260,11 @@ extension EditorFindHostedGateTests {
             cached.text == "newer disk beta" && !cached.isDirty
         }
         XCTAssertFalse(try state.commitWorkspaceNodeSelection(prepared, requestingEditorFocus: false))
-        XCTAssertTrue(state.currentDocument === original)
+        XCTAssertTrue(state.shownSession === original)
         XCTAssertEqual(cached.text, "newer disk beta")
         XCTAssertTrue(state.selectWorkspaceNode(id: bID, requestingEditorFocus: false))
-        XCTAssertTrue(state.currentDocument === cached)
-        XCTAssertEqual(state.currentDocument.text, "newer disk beta")
+        XCTAssertTrue(state.shownSession === cached)
+        XCTAssertEqual(state.shownSession.text, "newer disk beta")
         XCTAssertNil(state.presentedError)
     }
 
@@ -274,10 +274,10 @@ extension EditorFindHostedGateTests {
         let aID = try XCTUnwrap(state.workspaceTree?.root.children.first { $0.name == "a.md" }?.id)
         let bID = try XCTUnwrap(state.workspaceTree?.root.children.first { $0.name == "b.md" }?.id)
         XCTAssertTrue(state.selectWorkspaceNode(id: bID, requestingEditorFocus: false))
-        let cached = state.currentDocument
+        let cached = state.shownSession
         state.applyDocumentText("saved beta", to: cached)
         XCTAssertTrue(state.selectWorkspaceNode(id: aID, requestingEditorFocus: false))
-        let original = state.currentDocument
+        let original = state.shownSession
         let read = try await state.prepareWorkspaceNodeSelection(id: bID)
         let prepared = try XCTUnwrap(read)
         let version = cached.version
@@ -285,13 +285,13 @@ extension EditorFindHostedGateTests {
         XCTAssertEqual(cached.version, version, "Saving does not advance the source revision")
         XCTAssertFalse(cached.isDirty)
         XCTAssertFalse(try state.commitWorkspaceNodeSelection(prepared, requestingEditorFocus: false))
-        XCTAssertTrue(state.currentDocument === original)
+        XCTAssertTrue(state.shownSession === original)
         XCTAssertEqual(cached.text, "saved beta")
         XCTAssertEqual(try String(contentsOf: fixture.root.appendingPathComponent("b.md"), encoding: .utf8),
                        "saved beta")
         XCTAssertTrue(state.selectWorkspaceNode(id: bID, requestingEditorFocus: false))
-        XCTAssertTrue(state.currentDocument === cached)
-        XCTAssertEqual(state.currentDocument.text, "saved beta")
+        XCTAssertTrue(state.shownSession === cached)
+        XCTAssertEqual(state.shownSession.text, "saved beta")
         XCTAssertNil(state.presentedError)
     }
 
@@ -310,7 +310,7 @@ extension EditorFindHostedGateTests {
         state.openExternalFile(fixture.root)
         try await waitUntil("workspace capture installs") {
             state.workspaceInstalledCaptureGeneration == state.workspaceGeneration
-                && state.currentDocument.fileURL?.lastPathComponent == "a.md"
+                && state.shownSession.fileURL?.lastPathComponent == "a.md"
         }
         state.workspaceWatcher?.stop()
         return fixture

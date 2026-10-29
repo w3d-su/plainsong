@@ -76,7 +76,7 @@ final class FilesSelectionDeferral {
         pickResponder = pickWindow?.firstResponder
         self.pickEvent = pickEvent
         requestsEditorFocus = requestingEditorFocus
-        let pickedDocument = appState.currentDocument
+        let pickedDocument = appState.shownSession
         let pickedRoot = appState.workspaceRootURL
         openTask = Task { @MainActor [weak self] in
             guard let self, !Task.isCancelled, sequence == issued else { return }
@@ -89,7 +89,7 @@ final class FilesSelectionDeferral {
             #endif
             for _ in 0 ..< attemptLimit {
                 guard !Task.isCancelled, sequence == issued,
-                      appState.currentDocument === pickedDocument,
+                      appState.shownSession === pickedDocument,
                       appState.workspaceRootURL == pickedRoot
                 else { break }
                 let generation = appState.workspaceGeneration
@@ -106,7 +106,7 @@ final class FilesSelectionDeferral {
                     // A read can outlive a newer click, workspace change, document
                     // activation, or unmount. None may let the stale result open a file.
                     guard !Task.isCancelled, sequence == issued,
-                          appState.currentDocument === pickedDocument,
+                          appState.shownSession === pickedDocument,
                           appState.workspaceRootURL == pickedRoot
                     else { break }
                     if let prepared {
@@ -122,7 +122,7 @@ final class FilesSelectionDeferral {
                     break
                 } catch {
                     guard !Task.isCancelled, sequence == issued,
-                          appState.currentDocument === pickedDocument,
+                          appState.shownSession === pickedDocument,
                           appState.workspaceRootURL == pickedRoot
                     else { break }
                     if generation == appState.workspaceGeneration {

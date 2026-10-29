@@ -42,7 +42,7 @@ extension AppState {
     func reloadExternallyChangedFile() {
         guard let prompt = externalChangePrompt else { return }
         let key = prompt.fileURL
-        let session = currentDocument
+        let session = shownSession
         guard let stateURL = sessionStateURL(for: session),
               exactFileURLSpellingMatches(stateURL, key)
         else {
@@ -75,7 +75,7 @@ extension AppState {
     func keepMineForExternallyChangedFile() {
         guard let prompt = externalChangePrompt else { return }
         let key = prompt.fileURL
-        let session = currentDocument
+        let session = shownSession
         guard let stateURL = sessionStateURL(for: session),
               exactFileURLSpellingMatches(stateURL, key)
         else {
@@ -176,7 +176,7 @@ extension AppState {
         fileID: StaticString = #fileID,
         line: UInt = #line
     ) {
-        handleExternalChange(for: currentDocument, fileID: fileID, line: line)
+        handleExternalChange(for: shownSession, fileID: fileID, line: line)
     }
 
     func handleExternalChange(
@@ -219,7 +219,7 @@ extension AppState {
                 diskEventGeneration: diskEventGeneration
             ) else { return }
             restartExternalResolutionIfNeeded(for: session)
-            if session === currentDocument {
+            if session === shownSession {
                 restoreRecoveryPrompt(for: session)
             }
             return
@@ -373,7 +373,7 @@ extension AppState {
             )
         }
 
-        guard session === currentDocument else { return }
+        guard session === shownSession else { return }
         restoreRecoveryPrompt(for: session)
     }
 
@@ -601,7 +601,7 @@ private extension AppState {
             abortExternalResolutionAfterUnexpectedSourceChange(for: session)
             return
         }
-        if session === currentDocument {
+        if session === shownSession {
             notifyEditorFindExternalContentDidReplace()
         }
         let acceptedSourceSnapshot = EditorDocumentSourceSnapshot(
@@ -648,7 +648,7 @@ private extension AppState {
         )
         sessionPolicy.updateDirtyState(for: application.canonicalURL, isDirty: false)
         cancelAutosave(for: session)
-        if session === currentDocument {
+        if session === shownSession {
             scheduleCompletionWorkspaceRefresh()
             restartActiveWorkspaceSearchWithFreshOverlays()
         }
@@ -762,7 +762,7 @@ private extension AppState {
         by session: DocumentSession,
         canonicalURL: URL
     ) {
-        guard currentDocument === session,
+        guard shownSession === session,
               let prompt = externalChangePrompt,
               exactFileURLSpellingMatches(prompt.fileURL, canonicalURL)
         else {
@@ -903,7 +903,7 @@ private extension AppState {
             return
         }
 
-        if session === currentDocument {
+        if session === shownSession {
             notifyEditorFindExternalContentDidReplace()
         }
         clearExternalChangeConflict(at: canonicalURL)
@@ -914,7 +914,7 @@ private extension AppState {
             canonicalURL: canonicalURL
         )
         sessionPolicy.updateDirtyState(for: canonicalURL, isDirty: false)
-        if session === currentDocument {
+        if session === shownSession {
             missingFilePrompt = nil
             externalChangePrompt = nil
             scheduleCompletionWorkspaceRefresh()

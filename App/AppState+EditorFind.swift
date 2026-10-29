@@ -228,7 +228,7 @@ extension AppState {
         ensureEditorFindSessionObserverInstalled()
         refreshEditorFindCaretFromResponderIfPossible()
         let selection = currentEditorSelectionUTF16()
-        let text = currentDocument.text as NSString
+        let text = shownSession.text as NSString
         guard selection.location != NSNotFound,
               selection.length > 0,
               NSMaxRange(selection) <= text.length
@@ -301,8 +301,8 @@ extension AppState {
         }
         let binding = EditorFindDocumentBinding(
             identity: activeEditorDocumentIdentity,
-            text: currentDocument.text,
-            revision: UInt64(max(0, currentDocument.version))
+            text: shownSession.text,
+            revision: UInt64(max(0, shownSession.version))
         )
         if editorFindHost.controller.documentBinding.identity != binding.identity {
             editorFindHost.controller.rebindDocument(binding)

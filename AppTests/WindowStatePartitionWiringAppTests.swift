@@ -16,7 +16,7 @@ final class WindowStatePartitionWiringAppTests: XCTestCase {
         let recorder = UnwiredContainerHookRecorder()
         defer { recorder.stop() }
         let window = WindowState(
-            currentDocument: DocumentSession(text: "bare"),
+            shownSession: DocumentSession(text: "bare"),
             layoutMode: .sourceOnly,
             wysiwygFallbackMessage: nil,
             replaceAuthority: EditorReplaceAuthorityState()
@@ -30,7 +30,7 @@ final class WindowStatePartitionWiringAppTests: XCTestCase {
         let authority = recorder.reports(for: "WindowState.onEditorReplaceAuthorityInputChange")
         XCTAssertEqual(authority.count, 4)
         XCTAssertEqual(Set(authority.map(\.line)).count, 4, "Each report names its own hooked property")
-        // `currentDocument` and `workspaceRootURL` also record an export context change.
+        // `shownSession` and `workspaceRootURL` also record an export context change.
         let export = recorder.reports(for: "WindowState.onExportHTMLContextChange")
         XCTAssertEqual(export.count, 2)
         XCTAssertEqual(Set(export.map(\.line)).count, 2)

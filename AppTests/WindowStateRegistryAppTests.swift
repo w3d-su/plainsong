@@ -65,7 +65,7 @@ final class WindowStateRegistryAppTests: XCTestCase {
         let fixture = try SecondWindowRegistryFixture.make(testCase: self)
         let appState = fixture.appState
         let untitled = DocumentSession(text: "untitled draft")
-        fixture.secondWindow.currentDocument = untitled
+        fixture.secondWindow.shownSession = untitled
 
         XCTAssertTrue(appState.isManagedEditorSession(untitled))
         XCTAssertTrue(appState.workspaceMutationManagedSessions().contains { $0 === untitled })
@@ -239,7 +239,7 @@ final class WindowStateRegistryAppTests: XCTestCase {
             XCTAssertThrowsError(try fixture.appState.saveDetachedCurrentDocument(to: destination), destination.path)
         }
         XCTAssertEqual(try fixture.text(at: fixture.secondURL), "second on disk")
-        XCTAssertTrue(fixture.appState.currentDocument === detached)
+        XCTAssertTrue(fixture.appState.shownSession === detached)
 
         fixture.hideSecond()
 
@@ -298,7 +298,7 @@ final class WindowStateRegistryAppTests: XCTestCase {
     func testAnUntitledRecordlessDocumentInASecondWindowFailsSaveCopyClosed() throws {
         let fixture = try SecondWindowRegistryFixture.make(testCase: self)
         _ = try fixture.showDetachedSessionInSharedWindow()
-        fixture.secondWindow.currentDocument = DocumentSession(text: "untitled draft")
+        fixture.secondWindow.shownSession = DocumentSession(text: "untitled draft")
 
         XCTAssertThrowsError(
             try fixture.appState.saveDetachedCurrentDocument(to: fixture.root.appendingPathComponent("free.md"))
@@ -363,7 +363,9 @@ final class WindowStateRegistryAppTests: XCTestCase {
         fixture.appState.pendingEditorSourceInstallations[installation] = fixture.second
 
         XCTAssertFalse(fixture.appState.prepareForTermination())
-        XCTAssertNotNil(fixture.appState.presentedError)
+        XCTAssertNil(fixture.appState.presentedError)
+        XCTAssertNotNil(fixture.secondWindow.presentedError)
+        XCTAssertTrue(KeyWindowRouter.shared.focusedWindowState === fixture.secondWindow)
 
         fixture.appState.pendingEditorSourceInstallations[installation] = nil
         fixture.hideSecond()

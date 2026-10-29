@@ -39,7 +39,8 @@ final class WindowStatePartitionAppTests: XCTestCase {
             Self.storedPropertyNames(of: appState.registry),
             // `registeredWindows` is B2's window list for inventories (§3.4 I2).
             WindowStatePartitionInventory.registry.union(["onEditorReplaceAuthorityInputChange",
-                                                          "replaceAuthority", "registeredWindows"])
+                                                          "replaceAuthority", "registeredWindows",
+                                                          "menuEnablementDidChange"])
         )
         XCTAssertEqual(
             WindowStatePartitionInventory.window.count + WindowStatePartitionInventory.root.count
@@ -88,7 +89,7 @@ final class WindowStatePartitionAppTests: XCTestCase {
         XCTAssertEqual(cases.count, 32, "Each input through the façade and through its container")
 
         for mutation in cases {
-            let session = appState.currentDocument
+            let session = appState.shownSession
             let record = EditorReplaceAuthorizationRecord()
             let authorization = appState.makeEditorReplaceCommitAuthorization(
                 stamp: appState.currentEditorReplaceAuthorityStamp(for: session),
@@ -104,7 +105,7 @@ final class WindowStatePartitionAppTests: XCTestCase {
             XCTAssertFalse(authorization.allowsCommit(), label)
             XCTAssertEqual(
                 record.refusal,
-                mutation.input == "currentDocument" ? .notCurrentSession : .authoritySuperseded,
+                mutation.input == "shownSession" ? .notCurrentSession : .authoritySuperseded,
                 label
             )
         }
@@ -125,7 +126,7 @@ final class WindowStatePartitionAppTests: XCTestCase {
         let appState = AppState(shouldRestoreLastOpenedFile: false)
         appState.exportHTMLOperations.activeOperationID = 1
 
-        appState.windowState.currentDocument = DocumentSession(text: "other")
+        appState.windowState.shownSession = DocumentSession(text: "other")
 
         XCTAssertEqual(appState.exportHTMLOperations.contextStopReason, .documentChanged)
     }
@@ -135,7 +136,7 @@ final class WindowStatePartitionAppTests: XCTestCase {
         let appState = AppState(shouldRestoreLastOpenedFile: false)
         appState.exportHTMLOperations.activeOperationID = 1
 
-        appState.currentDocument = appState.currentDocument
+        appState.shownSession = appState.shownSession
 
         XCTAssertNil(appState.exportHTMLOperations.contextStopReason)
     }

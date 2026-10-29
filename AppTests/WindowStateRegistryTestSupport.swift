@@ -47,7 +47,7 @@ struct SecondWindowRegistryFixture {
         let first = DocumentSession(text: "first on disk", url: firstURL, fileKind: .markdown)
         let second = DocumentSession(text: "second on disk", url: secondURL, fileKind: .markdown)
         let third = DocumentSession(text: "third on disk", url: thirdURL, fileKind: .markdown)
-        let appState = AppState(currentDocument: first, shouldRestoreLastOpenedFile: false)
+        let appState = AppState(shownSession: first, shouldRestoreLastOpenedFile: false)
         appState.workspaceRootURL = root
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
@@ -64,14 +64,14 @@ struct SecondWindowRegistryFixture {
         }
 
         let secondWindow = WindowState(
-            currentDocument: DocumentSession(),
+            shownSession: DocumentSession(),
             layoutMode: .sourceOnly,
             wysiwygFallbackMessage: nil,
             replaceAuthority: appState.registry.replaceAuthority
         )
         // Connected before it receives any input (`UnwiredContainerHook`).
         appState.connect(secondWindow)
-        secondWindow.currentDocument = second
+        secondWindow.shownSession = second
         precondition(!appState.registry.isWarmSession(second))
         return SecondWindowRegistryFixture(
             root: root,
@@ -92,7 +92,7 @@ struct SecondWindowRegistryFixture {
     /// Takes `second` off window 2 by showing `third` there, so no inventory lists `second`.
     /// (An untitled document with no ownership record would make Save Copy fail closed.)
     func hideSecond() {
-        secondWindow.currentDocument = third
+        secondWindow.shownSession = third
     }
 
     func text(at url: URL) throws -> String {
@@ -113,7 +113,7 @@ struct SecondWindowRegistryFixture {
             identity: read.metadata.identity,
             sha256Digest: read.sha256Digest
         )
-        appState.currentDocument = session
+        appState.shownSession = session
         appState.detachedSessionURLs.insert(missingURL)
         appState.missingFilePrompt = AppState.MissingFilePrompt(fileURL: missingURL)
         return session

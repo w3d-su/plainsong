@@ -22,7 +22,7 @@ extension AppState {
     }
 
     private var isExportHTMLFileBacked: Bool {
-        currentDocument.fileURL.map { ["md", "mdx"].contains($0.pathExtension.lowercased()) } ?? false
+        shownSession.fileURL.map { ["md", "mdx"].contains($0.pathExtension.lowercased()) } ?? false
     }
 
     static let exportHTMLWindowRegistered = Notification.Name("plainsong-export-document-window-registered")
@@ -109,7 +109,7 @@ extension AppState {
     func captureExportHTMLSnapshot(
         product: ExportCommandProduct = .html
     ) -> Result<ExportHTMLOperationSnapshot, ExportHTMLStopReason> {
-        let session = currentDocument
+        let session = shownSession
         guard isExportHTMLFileBacked else {
             return .failure(.untitledDocument)
         }
@@ -154,7 +154,7 @@ extension AppState {
             return .documentChanged
         }
         guard let session = snapshot.session,
-              session === currentDocument,
+              session === shownSession,
               session.version == snapshot.textChange.version,
               session.fileKind == snapshot.textChange.fileKind,
               exportHTMLURLsMatch(session.fileURL, snapshot.textChange.fileURL),

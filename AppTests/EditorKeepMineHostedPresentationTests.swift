@@ -69,7 +69,7 @@ extension EditorFindHostedGateTests {
             layoutMode: .wysiwyg
         )
         let appState = hosted.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let editor = try hostedEditor(hosted)
         let storage = try XCTUnwrap(MarkdownTextView.textStorage(of: editor))
         let coordinator = try XCTUnwrap(editor.textDelegate as? MarkdownTextViewCoordinator)
@@ -129,7 +129,7 @@ extension EditorFindHostedGateTests {
             layoutMode: .wysiwyg
         )
         let appState = hosted.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let editor = try hostedEditor(hosted)
         let storage = try XCTUnwrap(MarkdownTextView.textStorage(of: editor))
         let coordinator = try XCTUnwrap(editor.textDelegate as? MarkdownTextViewCoordinator)
@@ -179,7 +179,7 @@ extension EditorFindHostedGateTests {
             layoutMode: .wysiwyg
         )
         let appState = hosted.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let editor = try hostedEditor(hosted)
         let storage = try XCTUnwrap(MarkdownTextView.textStorage(of: editor))
         let coordinator = try XCTUnwrap(editor.textDelegate as? MarkdownTextViewCoordinator)
@@ -251,7 +251,7 @@ extension EditorFindHostedGateTests {
         }
         try await settleReconciledHighlight(coordinator)
         XCTAssertTrue(ExactUTF16Text.matches(storage.string, local))
-        XCTAssertEqual(appState.currentDocument.text, local)
+        XCTAssertEqual(appState.shownSession.text, local)
         XCTAssertNil(appState.externalChangePrompt)
         XCTAssertFalse(editor.undoManager?.canUndo == true)
         XCTAssertFalse(editor.undoManager?.canRedo == true)
@@ -270,7 +270,7 @@ extension EditorFindHostedGateTests {
         match: NSRange
     ) async throws {
         let appState = hosted.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let local = session.text
         let editor = try hostedEditor(hosted)
         let storage = try XCTUnwrap(MarkdownTextView.textStorage(of: editor))

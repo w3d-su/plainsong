@@ -123,7 +123,7 @@ extension EditorFindPerformanceSupport {
                 updateProbe: updateProbe
             )
             _ = try await waitForWorkspaceUpdate(in: harness) {
-                $0.isBarVisible && $0.documentRevision == app.appState.currentDocument.version
+                $0.isBarVisible && $0.documentRevision == app.appState.shownSession.version
             }
             return harness
         } catch {
@@ -197,7 +197,7 @@ private struct EditorFindPerformanceWorkspaceRoot: View {
     var body: some View {
         let ui = appState.editorFindHost.ui
         let snapshot = EditorFindPerformanceSupport.WorkspaceUpdateSnapshot(
-            documentRevision: appState.currentDocument.version,
+            documentRevision: appState.shownSession.version,
             isBarVisible: ui.isBarVisible,
             queryText: ui.queryText,
             hasActiveQuery: ui.hasActiveQuery,

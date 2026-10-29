@@ -33,7 +33,7 @@ extension EditorFindHostedGateTests {
         let editor = try hostedEditor(hosted)
         let before = EditorReplaceEffectSnapshot(app, textView: editor)
         state.willCommitForTesting = {
-            let identity = ObjectIdentifier(app.currentDocument)
+            let identity = ObjectIdentifier(app.shownSession)
             app.workspaceMutationWriteFences.insert(identity)
             app.workspaceMutationWriteFences.remove(identity)
         }
@@ -101,16 +101,16 @@ extension EditorFindHostedGateTests {
             }
         }
         defer { NotificationCenter.default.removeObserver(observer) }
-        let revision = app.currentDocument.version
+        let revision = app.shownSession.version
         let result = await app.performEditorReplaceAll(replacement: "NEW")
         guard case .delivered(.replaced) = result else {
             return XCTFail("the admitted native batch must complete, got \(result)")
         }
         XCTAssertTrue(observed.cancelledDuringAuthorizedWrite, "cancellation must occur inside the writer closure")
-        XCTAssertEqual(app.currentDocument.text, "NEW one NEW two")
-        XCTAssertEqual(app.currentDocument.version, revision + 1)
+        XCTAssertEqual(app.shownSession.text, "NEW one NEW two")
+        XCTAssertEqual(app.shownSession.version, revision + 1)
         editor.undoManager?.undo()
-        XCTAssertEqual(app.currentDocument.text, "hit one hit two")
+        XCTAssertEqual(app.shownSession.text, "hit one hit two")
         XCTAssertFalse(editor.undoManager?.canUndo == true)
     }
 
@@ -140,19 +140,19 @@ extension EditorFindHostedGateTests {
         XCTAssertEqual(EditorReplaceEffectSnapshot(app, textView: editor), beforeRecompute)
         hold.release()
         try await waitUntil("refused recompute produces only a Find retained set") { controller.session != nil }
-        XCTAssertEqual(app.currentDocument.text, "hit one hit two")
+        XCTAssertEqual(app.shownSession.text, "hit one hit two")
         XCTAssertEqual(controller.replacementScheduleCount, 0)
         XCTAssertFalse(editor.undoManager?.canUndo == true)
 
         // An App revision that Find has not yet observed refuses the retained set.
-        app.currentDocument.replaceText("hit one hit two!", refreshStatistics: false)
+        app.shownSession.replaceText("hit one hit two!", refreshStatistics: false)
         let beforeStale = EditorReplaceEffectSnapshot(app, textView: editor)
         let stale = await app.performEditorReplaceAll(replacement: "NEW")
         XCTAssertEqual(stale, .superseded)
         try assertHostedBatchDidNotWrite(hosted, since: beforeStale)
         XCTAssertFalse(app.editorFindHost.replaceBatch.isPreparing)
         try await waitUntil("stale refusal requests a counter-only recount") {
-            controller.documentBinding.revision == UInt64(app.currentDocument.version)
+            controller.documentBinding.revision == UInt64(app.shownSession.version)
                 && controller.session != nil
         }
         if case .navigate? = app.editorNavigationCommand {

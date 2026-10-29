@@ -62,7 +62,7 @@ extension ExportHTMLCommandAppTests {
             try await XCTUnwrap(fixture.appState.exportCurrentDocumentAsHTML()).value
             XCTAssertEqual(recorder.results.count, 1)
             XCTAssertEqual(DocumentState(fixture.session), documentBefore)
-            XCTAssertTrue(fixture.appState.currentDocument === fixture.session)
+            XCTAssertTrue(fixture.appState.shownSession === fixture.session)
             XCTAssertEqual(mounted.textView.textSelection, selectionBefore)
             XCTAssertEqual(mounted.scrollView.contentView.bounds.origin, scrollBefore)
             XCTAssertEqual(mounted.textView.text, documentBefore.text)
@@ -133,7 +133,7 @@ extension ExportHTMLCommandAppTests {
                 XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
             }
             XCTAssertEqual(DocumentState(fixture.session), documentBefore)
-            XCTAssertTrue(fixture.appState.currentDocument === fixture.session)
+            XCTAssertTrue(fixture.appState.shownSession === fixture.session)
             XCTAssertEqual(mounted.textView.textSelection, selectionBefore)
             XCTAssertEqual(mounted.scrollView.contentView.bounds.origin, scrollBefore)
             XCTAssertEqual(fixture.appState.recentItemURLs, recents)

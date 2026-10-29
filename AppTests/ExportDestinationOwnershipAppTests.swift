@@ -189,7 +189,7 @@ final class ExportDestinationOwnershipAppTests: XCTestCase {
                 disposition: .createNew,
                 bytes: Data("<p>untitled</p>".utf8)
             ),
-            exportSource: untitledApp.currentDocument
+            exportSource: untitledApp.shownSession
         )
         guard case .committed = outcome else {
             return XCTFail("an unowned destination must commit: \(outcome)")
@@ -331,7 +331,7 @@ extension ExportDestinationOwnershipAppTests {
             fileKind: .markdown,
             isDirty: true
         )
-        let appState = AppState(currentDocument: ownedSession, shouldRestoreLastOpenedFile: false)
+        let appState = AppState(shownSession: ownedSession, shouldRestoreLastOpenedFile: false)
         appState.workspaceRootURL = root
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1

@@ -13,6 +13,7 @@ public final class PreviewController: NSObject, ObservableObject {
     public var onCheckboxToggled: ((Int, Bool, Int, DocumentSession) -> Void)?
     var renderCompletionObserver: ((RenderCompletePayload) -> Void)?
     var externalURLOpenerOverrideForTesting: (@MainActor (URL) -> Void)?
+    var onNavigationDecisionForTesting: (@MainActor (URL?, WKNavigationActionPolicy) -> Void)?
 
     let assetSchemeHandler: AssetURLSchemeHandler
     let eventHub = PreviewEventHub()
@@ -88,8 +89,6 @@ public final class PreviewController: NSObject, ObservableObject {
         initialReadinessScheduler: @escaping PreviewInitialReadiness.Scheduler = PreviewInitialReadiness.schedule,
         pageLoadOverrideForTesting: (@MainActor (WKWebView, URL?) -> WKNavigation?)? = nil
     ) {
-        let configuration = WKWebViewConfiguration()
-        let userContentController = WKUserContentController()
         let assetSchemeHandler = AssetURLSchemeHandler()
         let scriptMessageProxy = ScriptMessageProxy()
         let previewIndexURL = previewIndexURL?.standardizedFileURL
@@ -101,16 +100,12 @@ public final class PreviewController: NSObject, ObservableObject {
             }
         #endif
 
-        userContentController.add(scriptMessageProxy, name: "bridge")
-        if let contentRuleList {
-            userContentController.add(contentRuleList)
-        }
-        if let websiteDataStore {
-            configuration.websiteDataStore = websiteDataStore
-        }
-        configuration.userContentController = userContentController
-        configuration.setURLSchemeHandler(assetSchemeHandler, forURLScheme: "asset")
-        configuration.preferences.isElementFullscreenEnabled = false
+        let configuration = Self.webViewConfiguration(
+            assetSchemeHandler: assetSchemeHandler,
+            bridgeHandler: scriptMessageProxy,
+            contentRuleList: contentRuleList,
+            websiteDataStore: websiteDataStore
+        )
 
         webView = WKWebView(frame: .zero, configuration: configuration)
         self.assetSchemeHandler = assetSchemeHandler
@@ -464,6 +459,7 @@ extension PreviewController: WKNavigationDelegate {
         decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void
     ) {
         let policy = Self.navigationPolicy(for: navigationAction.request.url, previewIndexURL: previewIndexURL)
+        onNavigationDecisionForTesting?(navigationAction.request.url, policy)
         decisionHandler(policy)
     }
 

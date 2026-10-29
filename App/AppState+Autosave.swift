@@ -15,13 +15,19 @@ extension AppState {
             do {
                 try save(session: session)
             } catch {
-                present(error, title: "Could Not Save Changes")
+                present(error, title: "Could Not Save Changes", for: session)
             }
         }
     }
 
     func scheduleAutosave() {
-        let session = currentDocument
+        let session = shownSession
+        // The shared foreground task belongs to the home façade. Other windows use the
+        // per-session background task so they cannot cancel the home document's timer.
+        guard KeyWindowRouter.shared.isHome(self) else {
+            scheduleBackgroundAutosave(for: session)
+            return
+        }
         cancelBackgroundAutosave(for: session)
         autosaveTask?.cancel()
         guard canAutosaveCurrentDocument else { return }
@@ -31,7 +37,7 @@ extension AppState {
             do {
                 try await Task.sleep(nanoseconds: delayNanoseconds)
                 guard !Task.isCancelled, let self, let session,
-                      currentDocument === session
+                      shownSession === session
                 else {
                     return
                 }
@@ -44,16 +50,19 @@ extension AppState {
     }
 
     func scheduleAutosave(for session: DocumentSession) {
-        guard session !== currentDocument else {
-            scheduleAutosave()
+        guard session === shownSession, KeyWindowRouter.shared.isHome(self) else {
+            scheduleBackgroundAutosave(for: session)
             return
         }
-
-        scheduleBackgroundAutosave(for: session)
+        scheduleAutosave()
     }
 
     func moveCurrentAutosaveToBackground(for session: DocumentSession) {
-        guard session === currentDocument else { return }
+        guard session === shownSession else { return }
+        guard KeyWindowRouter.shared.isHome(self) else {
+            scheduleBackgroundAutosave(for: session)
+            return
+        }
         let shouldReschedule = autosaveTask != nil && session.isDirty
         autosaveTask?.cancel()
         autosaveTask = nil
@@ -86,14 +95,17 @@ extension AppState {
             do {
                 try save(session: session)
             } catch {
-                present(error, title: "Autosave Failed")
+                present(error, title: "Autosave Failed", for: session)
             }
         }
         sessionAutosaveTasks[sessionIdentity] = SessionBackgroundTask(token: token, task: task)
     }
 
+    /// Any window may cancel: the shared foreground task always belongs to the home façade's
+    /// document, which a sibling's watcher or reload can be acting on.
     func cancelAutosave(for session: DocumentSession) {
-        if session === currentDocument {
+        let home = KeyWindowRouter.shared.home(for: registry) ?? self
+        if home.shownSession === session {
             autosaveTask?.cancel()
             autosaveTask = nil
         }
@@ -115,7 +127,7 @@ extension AppState {
         // operation. Remove the handle before `save` cancels any pending autosave so
         // the currently firing task does not cancel itself and abort its own write.
         autosaveTask = nil
-        guard currentDocument.isDirty, canAutosaveCurrentDocument else { return }
+        guard shownSession.isDirty, canAutosaveCurrentDocument else { return }
 
         do {
             try saveCurrentDocument()
@@ -125,7 +137,7 @@ extension AppState {
     }
 
     private var canAutosaveCurrentDocument: Bool {
-        canAutosave(session: currentDocument)
+        canAutosave(session: shownSession)
     }
 
     func canAutosave(session: DocumentSession) -> Bool {

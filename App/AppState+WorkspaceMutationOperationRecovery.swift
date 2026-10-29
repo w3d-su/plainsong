@@ -499,8 +499,8 @@ extension AppState {
             throw AppStateError.workspaceMutationRecoveryUnavailable(
                 url
                     ?? workspaceRootURL
-                    ?? sessionStateURL(for: currentDocument)
-                    ?? currentDocument.fileURL
+                    ?? sessionStateURL(for: shownSession)
+                    ?? shownSession.fileURL
                     ?? URL(fileURLWithPath: "/")
             )
         }

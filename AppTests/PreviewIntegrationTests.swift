@@ -30,7 +30,7 @@ final class PreviewIntegrationTests: XCTestCase {
     func testRetainedCheckboxCannotWriteToSameVersionReplacementDocument() async throws {
         let first = DocumentSession(text: "- [ ] first", fileKind: .markdown)
         let replacement = DocumentSession(text: "- [ ] second\n<Component", fileKind: .mdx)
-        let appState = AppState(currentDocument: first, shouldRestoreLastOpenedFile: false)
+        let appState = AppState(shownSession: first, shouldRestoreLastOpenedFile: false)
         let controller = PreviewController()
         defer { controller.shutdownForTesting() }
         var callbacks = 0
@@ -91,7 +91,7 @@ final class PreviewIntegrationTests: XCTestCase {
         let url = URL(fileURLWithPath: "/tmp/preview-checkbox-identity.md")
         let original = DocumentSession(text: "- [ ] old", url: url, fileKind: .markdown)
         let reopened = DocumentSession(text: "- [ ] new", url: url, fileKind: .markdown)
-        let appState = AppState(currentDocument: reopened, shouldRestoreLastOpenedFile: false)
+        let appState = AppState(shownSession: reopened, shouldRestoreLastOpenedFile: false)
         appState.setTaskCheckbox(line: 1, checked: true, version: original.version, in: original)
         XCTAssertEqual(reopened.text, "- [ ] new")
         XCTAssertFalse(reopened.isDirty)

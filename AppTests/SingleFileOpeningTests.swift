@@ -38,17 +38,17 @@ final class SingleFileOpeningTests: XCTestCase {
         XCTAssertTrue(state.hasOpenDocument)
         XCTAssertNil(state.workspaceRootURL)
         XCTAssertNil(state.presentedError)
-        XCTAssertEqual(state.currentDocument.text, "# Original\n")
-        let observation = try state.observeRetainedFileVersion(for: state.currentDocument)
+        XCTAssertEqual(state.shownSession.text, "# Original\n")
+        let observation = try state.observeRetainedFileVersion(for: state.shownSession)
         let preparedAuthority = try XCTUnwrap(observation.preparedImageAssetAuthority)
         XCTAssertEqual(observation.file.text, "# Original\n")
         try preparedAuthority.validateLoadedIdentityAndNamespace(observation.identity)
 
         state.replaceDocumentText("# Saved\n")
-        state.cancelAutosave(for: state.currentDocument)
+        state.cancelAutosave(for: state.shownSession)
         try state.saveCurrentDocument()
 
-        XCTAssertFalse(state.currentDocument.isDirty)
+        XCTAssertFalse(state.shownSession.isDirty)
         XCTAssertEqual(try String(contentsOf: fileURL, encoding: .utf8), "# Saved\n")
     }
 }

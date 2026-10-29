@@ -43,9 +43,9 @@ extension EditorFindHostedGateTests {
         )
         state.selectWorkspaceNode(id: aNode.id)
         try await waitUntil("a.md opens through the symlinked root") {
-            state.currentDocument.fileURL?.lastPathComponent == "a.md"
+            state.shownSession.fileURL?.lastPathComponent == "a.md"
         }
-        let fileURL = try XCTUnwrap(state.currentDocument.fileURL)
+        let fileURL = try XCTUnwrap(state.shownSession.fileURL)
         NSLog(
             "SYMLINK-EVIDENCE fileURL=\(fileURL.path(percentEncoded: false)) root=\(root.path(percentEncoded: false))"
         )
@@ -72,9 +72,9 @@ extension EditorFindHostedGateTests {
         let bNode = try XCTUnwrap(cafeFolder.children.first { $0.name == "b.md" })
         state.selectWorkspaceNode(id: bNode.id)
         try await waitUntil("b.md opens through the symlinked root") {
-            state.currentDocument.fileURL?.lastPathComponent == "b.md"
+            state.shownSession.fileURL?.lastPathComponent == "b.md"
         }
-        let bURL = try XCTUnwrap(state.currentDocument.fileURL)
+        let bURL = try XCTUnwrap(state.shownSession.fileURL)
         XCTAssertEqual(JumpBarMenus.relativePath(of: bURL, under: root), bNode.relativePath)
 
         let bMenu = try XCTUnwrap(JumpBarMenus.folderMenu(

@@ -3,6 +3,8 @@ import Foundation
 @MainActor
 extension AppState {
     var workspaceMutationRecoveryBannerPlacement: WorkspaceMutationRecoveryBannerPlacement {
+        // The load-failure fence is app-global. The banner has one home window (§3.2).
+        guard KeyWindowRouter.shared.isHome(self) else { return .hidden }
         if hasWorkspaceMutationRecoveryLoadFailure {
             return .global
         }
@@ -43,8 +45,8 @@ extension AppState {
             throw AppStateError.workspaceMutationRecoveryUnavailable(
                 url
                     ?? workspaceRootURL
-                    ?? sessionStateURL(for: currentDocument)
-                    ?? currentDocument.fileURL
+                    ?? sessionStateURL(for: shownSession)
+                    ?? shownSession.fileURL
                     ?? URL(fileURLWithPath: "/")
             )
         }

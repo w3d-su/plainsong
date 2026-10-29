@@ -36,7 +36,7 @@
             XCTAssertFalse(appState.userDefaults === UserDefaults.standard)
 
             appState.restoreLastOpenedFileIfNeeded()
-            XCTAssertNil(appState.currentDocument.fileURL)
+            XCTAssertNil(appState.shownSession.fileURL)
             XCTAssertNil(appState.presentedError)
         }
 

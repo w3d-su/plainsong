@@ -12,10 +12,23 @@ final class PlainsongApplicationDelegate: NSObject, NSApplicationDelegate {
 
     weak var appState: AppState? {
         didSet {
-            PlainsongAppServices.appState = appState
             #if DEBUG
                 handleDebugFixtureRequestIfNeeded()
             #endif
+        }
+    }
+
+    func applicationWillFinishLaunching(_: Notification) {
+        // Before SwiftUI creates the first window, so no window is created tab-capable.
+        KeyWindowRouter.disableAutomaticWindowTabbing()
+    }
+
+    func applicationDidFinishLaunching(_: Notification) {
+        // End launch suppression after yielding. A scene that claimed the owner still
+        // gets its bounded attach wait even if its metadata callback has not run yet.
+        Task { @MainActor in
+            await Task.yield()
+            WorkspaceSceneReopener.shared.noteLaunchSettled()
         }
     }
 
@@ -28,6 +41,9 @@ final class PlainsongApplicationDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_: Notification) {
+        // `applicationShouldTerminate` already flushed. This app-global flush is a backstop
+        // for a terminate path that skipped it.
+        appState?.flushAutosaveIfNeeded()
         PlainsongWorkspaceSearchHotKey.tearDown()
         #if DEBUG
             _ = cleanUpDebugEditorFindFixtureIfNeeded()
