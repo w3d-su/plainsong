@@ -4,9 +4,11 @@
 chose the recommended default. Finder Open With, a Dock drop, and the other external-open
 paths reuse the frontmost workspace window when it has no document and no root. Otherwise
 they open a new window. Resolve that window by AppKit z-order before activation; do not
-wait for `didBecomeKey`. WD1 and WD2 take precedence: an open that names a file or a root
-already shown focuses that owner, or attaches to the shared root, instead of using this
-rule. Exactly one window acts, and no blank scene is left behind. D2 implements this.
+wait for `didBecomeKey`. WD1 takes precedence: an open that names a file already shown
+focuses that owner. For a root that is already open, WD2 decides the context and this
+rule decides the window: the chosen window attaches to the shared root context instead
+of creating a second one. Exactly one window acts, and no blank scene is left behind.
+D2 implements this.
 Creation stays guarded until that PR. Recorded in §9.1.
 
 Alternatives: always reusing the frontmost workspace window was rejected, because it would
