@@ -6,7 +6,8 @@ item is still replaced, because ⌘N stays New File.
 
 Those three commands now call `openWindow(id:)` on the workspace `WindowGroup` when no
 admitting façade has a window. The action runs when that scene attaches the app-owned
-façade. A second command while the scene is opening joins the same queue. Several
+façade. A later file command replaces an earlier one instead of joining a queue;
+see `docs/decisions/2026-10-29-windows-reopen-queue-retry.md`. Several
 visible windows and no key window still do not guess and do not open another window.
 Save, Find, and export keep the nil target, so a closed window does not become the
 command target.

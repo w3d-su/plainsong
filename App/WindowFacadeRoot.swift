@@ -48,13 +48,20 @@ struct WindowFacadeRoot: View {
 final class WorkspaceSceneReopener {
     static let shared = WorkspaceSceneReopener()
     static let sceneID = "workspace"
+    /// An `openWindow` that never attaches must not leave every later command queued.
+    private static let openTimeout: Duration = .seconds(3)
 
     private weak var retainedOwner: AppState?
     private var openScene: (() -> Void)?
-    private var pending: [(AppState) -> Void] = []
+    /// File commands coalesce. Replaying several of them would stack Open panels.
+    private var pendingFileCommand: ((AppState) -> Void)?
+    /// Quit refusals stay beside the file command; a later Open must not drop one.
+    private var pendingPresentations: [(AppState) -> Void] = []
     private var opening = false
+    private var openGeneration: UInt = 0
     /// The first SwiftUI scene appears on its own. A command before that attach must
-    /// wait for it instead of opening a second scene.
+    /// wait for it instead of opening a second scene. Launch clears this on the next
+    /// turn if no scene attached, so a missing launch window cannot wait forever.
     private var awaitingFirstScene = true
 
     private init() {}
@@ -93,18 +100,16 @@ final class WorkspaceSceneReopener {
             action(target)
             return
         }
+        // Settings or About may be key. New, Open, and Open Recent still use the only
+        // workspace window, and come forward so the result is not left behind it.
         if attached.count == 1 {
-            action(attached[0])
+            let facade = attached[0]
+            KeyWindowRouter.shared.focus(facade.windowState)
+            action(facade)
             return
         }
         if attached.count > 1 { return }
-        pending.append(action)
-        guard !awaitingFirstScene, admitting.isEmpty, !opening else {
-            opening = true
-            return
-        }
-        opening = true
-        openScene()
+        enqueue(fileCommand: action, owner: owner)
     }
 
     /// Shows `error` on a visible home window, or on the owner after its scene is opened
@@ -118,43 +123,100 @@ final class WorkspaceSceneReopener {
             KeyWindowRouter.shared.focus(home.windowState)
             return true
         }
-        pending.append { facade in
+        enqueue(presentation: { facade in
             facade.presentedError = error
             KeyWindowRouter.shared.focus(facade.windowState)
-        }
-        guard !awaitingFirstScene, admittingFacades(of: owner).isEmpty, !opening else {
-            opening = true
-            return true
-        }
-        opening = true
-        openScene?()
+        }, owner: owner)
         return true
     }
 
     func noteAttached(_ facade: AppState) {
         awaitingFirstScene = false
         guard opening, facade === retainedOwner, WindowOpenAdmission.admits(facade.windowState) else { return }
+        openGeneration &+= 1
         opening = false
-        let actions = pending
-        pending.removeAll()
-        for action in actions {
-            action(facade)
+        let command = pendingFileCommand
+        let presentations = pendingPresentations
+        pendingFileCommand = nil
+        pendingPresentations.removeAll()
+        for presentation in presentations {
+            presentation(facade)
         }
+        command?(facade)
+    }
+
+    /// Called one turn after launch. A window SwiftUI already created wins; otherwise a
+    /// command that was waiting on the launch scene may open one.
+    func noteLaunchSettled() {
+        guard awaitingFirstScene else { return }
+        awaitingFirstScene = false
+        // The app-owned façade is tracked before its first window exists, so an empty
+        // façade list is the wrong signal. No attached window means launch made none.
+        guard opening, let owner = retainedOwner, !hasAttachedAdmittingWindow(owner) else { return }
+        openScene?()
     }
 
     #if DEBUG
         func resetForTesting() {
             retainedOwner = nil
             openScene = nil
-            pending.removeAll()
+            pendingFileCommand = nil
+            pendingPresentations.removeAll()
             opening = false
+            openGeneration &+= 1
             awaitingFirstScene = true
         }
+
+        func expireOpeningForTesting() {
+            expireOpening(generation: openGeneration)
+        }
     #endif
+
+    private func enqueue(
+        fileCommand: ((AppState) -> Void)? = nil,
+        presentation: ((AppState) -> Void)? = nil,
+        owner: AppState
+    ) {
+        if let fileCommand {
+            pendingFileCommand = fileCommand
+        }
+        if let presentation {
+            pendingPresentations.append(presentation)
+        }
+        let shouldOpen = !opening && !awaitingFirstScene && !hasAttachedAdmittingWindow(owner)
+        if !opening {
+            opening = true
+            armOpenTimeout()
+        }
+        if shouldOpen {
+            openScene?()
+        }
+    }
+
+    private func armOpenTimeout() {
+        openGeneration &+= 1
+        let generation = openGeneration
+        Task { @MainActor in
+            try? await Task.sleep(for: Self.openTimeout)
+            self.expireOpening(generation: generation)
+        }
+    }
+
+    private func expireOpening(generation: UInt) {
+        guard opening, openGeneration == generation else { return }
+        opening = false
+        pendingFileCommand = nil
+        pendingPresentations.removeAll()
+        awaitingFirstScene = false
+    }
 
     private func admittingFacades(of owner: AppState) -> [AppState] {
         KeyWindowRouter.shared.facades(in: owner.registry).filter {
             WindowOpenAdmission.admits($0.windowState)
         }
+    }
+
+    private func hasAttachedAdmittingWindow(_ owner: AppState) -> Bool {
+        admittingFacades(of: owner).contains { KeyWindowRouter.shared.hasAttachedWindow($0) }
     }
 }

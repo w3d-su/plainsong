@@ -280,21 +280,21 @@ final class WindowFacadeLifecycleAppTests: XCTestCase {
         XCTAssertFalse(KeyWindowRouter.shared.hasAttachedWindow(owner))
 
         var opened = 0
-        var ran = 0
+        var ran: [Int] = []
         WorkspaceSceneReopener.shared.performFileCommand(openScene: { opened += 1 }, action: { facade in
             XCTAssertTrue(facade === owner)
-            ran += 1
+            ran.append(1)
         })
         XCTAssertEqual(opened, 1)
-        XCTAssertEqual(ran, 0, "the command waits until the new scene attaches the owner")
+        XCTAssertTrue(ran.isEmpty, "the command waits until the new scene attaches the owner")
         WorkspaceSceneReopener.shared.performFileCommand(openScene: { opened += 1 }, action: { _ in
-            ran += 1
+            ran.append(2)
         })
         XCTAssertEqual(opened, 1, "a second command does not open another scene")
 
         _ = WindowFacadeHolder(owner: owner)
         KeyWindowRouter.shared.attach(makeWindow(), to: owner)
-        XCTAssertEqual(ran, 2)
+        XCTAssertEqual(ran, [2], "only the latest file command runs")
         XCTAssertTrue(KeyWindowRouter.shared.menuTarget(defaultFacade: nil) === owner)
     }
 

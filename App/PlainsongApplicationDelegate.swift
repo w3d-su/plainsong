@@ -23,6 +23,15 @@ final class PlainsongApplicationDelegate: NSObject, NSApplicationDelegate {
         KeyWindowRouter.disableAutomaticWindowTabbing()
     }
 
+    func applicationDidFinishLaunching(_: Notification) {
+        // The next turn, not this one: SwiftUI may still be attaching the launch window.
+        // If that window never comes, a File command waiting on it may open the scene.
+        Task { @MainActor in
+            await Task.yield()
+            WorkspaceSceneReopener.shared.noteLaunchSettled()
+        }
+    }
+
     func applicationDidBecomeActive(_: Notification) {
         PlainsongWorkspaceSearchHotKey.activate()
     }
