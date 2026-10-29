@@ -867,6 +867,9 @@ make format           # swiftformat . && swiftlint --fix
   the Homebrew version differs; CI is authoritative. Bumping the pin means updating the
   version + SHA-256 in `ci.yml`, the Makefile constant, and reformatting the tree in the
   same PR if rule behavior changed.
+- The preview CI job verifies every pinned acceptance resource against the committed
+  bytes before installing preview dependencies. Regenerated resources must update
+  `IOSAcceptanceTests/Resources/acceptance-resource-manifest.txt` in the same PR.
 - Xcode 16+. `.xcodeproj` is generated — **never hand-edit, never commit pbxproj
   conflicts; edit `project.yml`.**
 - Code signing: "Sign to Run Locally" for dev; hardened runtime + notarization scripted

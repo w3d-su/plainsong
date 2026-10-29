@@ -206,9 +206,8 @@ extension IOSSourceEditorController {
         guard !ExactSourceFragment.matches(current, installation.session.text) else { return }
         installation.session.replaceTextFromAuthorizedEditor(current, refreshStatistics: false)
         let version = installation.session.version
-        // Count off the main actor, then hop back. Awaiting the utility task from the
-        // main actor can stall: word breaking may need the main thread while this actor
-        // is suspended inside that await, so the snapshot never republishes.
+        // Count off the main actor; drop the result if the session's version or text
+        // changed before it returns to the main actor.
         Task.detached(priority: .utility) { [weak self] in
             let statistics = TextStatistics(text: current)
             await self?.republishDeferredStatistics(statistics, version: version, text: current)

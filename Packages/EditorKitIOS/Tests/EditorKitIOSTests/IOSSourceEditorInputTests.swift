@@ -88,28 +88,22 @@ final class IOSSourceEditorInputTests: XCTestCase {
     }
 
     @MainActor
-    func testDeferredStatisticsRepublishTheEditorSnapshot() async throws {
+    func testDeferredStatisticsRepublishTheEditorSnapshot() async {
         let harness = IOSEditorHarness(text: "hello")
-        var published = false
+        let republished = expectation(description: "deferred statistics republished")
+        republished.assertForOverFulfill = false
         let observation = harness.controller.observe { event in
             guard case let .snapshotChanged(snapshot) = event else { return }
             if snapshot.document.text == "hello!",
                snapshot.document.statistics == TextStatistics(text: "hello!")
             {
-                published = true
+                republished.fulfill()
             }
         }
         defer { observation.cancel() }
         harness.placeCaret(at: iosUTF16("hello"))
         harness.textView.insertText("!")
-        let deadline = Date().addingTimeInterval(2)
-        while !published, Date() < deadline {
-            // Sleep alone does not service the main queue on the hosted runner, so the
-            // deferred statistics hop never lands. Yield, then drain the main run loop.
-            await Task.yield()
-            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.02))
-        }
-        XCTAssertTrue(published)
+        await fulfillment(of: [republished], timeout: 2)
         XCTAssertEqual(harness.session.statistics, TextStatistics(text: "hello!"))
     }
 }
