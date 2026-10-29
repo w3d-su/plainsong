@@ -70,7 +70,8 @@ public final class PreviewController: NSObject, ObservableObject {
     private(set) var workspaceAssetRootURL: URL?
     var exportAssetRootURL: URL?
     /// The grant authority of the newest provider render (iOS), or nil after a Mac render.
-    /// HTML export reads local images through the installed reader with it.
+    /// Live preview and export both install it. HTML export reads local images through
+    /// the installed reader with that authority; the live controller does not export.
     var exportAssetAccess: PreviewAssetAccessContext?
 
     override public convenience init() {

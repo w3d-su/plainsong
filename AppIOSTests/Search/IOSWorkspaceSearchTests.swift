@@ -274,9 +274,134 @@ final class IOSWorkspaceSearchTests: XCTestCase {
         XCTAssertEqual(controller.sections.map(\.relativePath), ["a.md"])
     }
 
+    func testSearchStopsReadingAfterTheMatchCap() async {
+        let controller = IOSWorkspaceSearchController(maximumMatchesPerFile: 5, maximumMatchesPerQuery: 1)
+        var reads: [String] = []
+        let extras = (0 ..< 30).map { ShellFixtures.entry(String(format: "p%02d.md", $0)) }
+        let environment = IOSWorkspaceSearchEnvironment(
+            scope: .directory,
+            entries: [ShellFixtures.entry("a.md")] + extras,
+            openDocument: nil,
+            read: { location async throws -> String in
+                reads.append(location.relativePath)
+                return location.relativePath == "a.md" ? "hit" : "none"
+            }
+        )
+        await controller.searchNow(query: "hit", environment: environment)
+        XCTAssertEqual(controller.sections.map(\.relativePath), ["a.md"])
+        XCTAssertEqual(reads.count, 1 + IOSWorkspaceSearchLimits.truncationProbeFiles, reads.joined(separator: ","))
+        XCTAssertTrue(controller.statusText.contains("Later files were not searched"), controller.statusText)
+        XCTAssertFalse(controller.statusText.contains("Showing the first"), controller.statusText)
+
+        reads.removeAll()
+        let proving = IOSWorkspaceSearchController(maximumMatchesPerFile: 5, maximumMatchesPerQuery: 1)
+        let untouched = (0 ..< 20).map { ShellFixtures.entry(String(format: "z%02d.md", $0)) }
+        let provingEnvironment = IOSWorkspaceSearchEnvironment(
+            scope: .directory,
+            entries: [ShellFixtures.entry("a.md"), ShellFixtures.entry("b.md")] + untouched,
+            openDocument: nil,
+            read: { location async throws -> String in
+                reads.append(location.relativePath)
+                return location.relativePath == "a.md" || location.relativePath == "b.md" ? "hit" : "none"
+            }
+        )
+        await proving.searchNow(query: "hit", environment: provingEnvironment)
+        XCTAssertEqual(reads, ["a.md", "b.md"])
+        XCTAssertTrue(proving.statusText.contains("Showing the first 1 matches"), proving.statusText)
+        XCTAssertFalse(proving.statusText.contains("Later files were not searched"), proving.statusText)
+    }
+
+    func testExternalFileChangeDropsTheCachedReadAndASameTreeRefreshReadsAgain() async {
+        let entry = ShellFixtures.entry("posts/b.md")
+        let workspace = SearchWorkspaceDouble()
+        var text = "old hit"
+        var reads = 0
+        let facade = FakeSceneFacade(
+            snapshot: ShellFixtures.sceneSnapshot(workspace: ShellFixtures.workspace(entries: [entry])),
+            capabilities: IOSSceneCapabilities(
+                editor: nil, documents: nil, workspace: workspace, preview: nil, assets: nil
+            )
+        )
+        let scene = IOSShellSceneState(
+            facade: facade,
+            surfaces: IOSShellFeatureSurfaces(
+                currentGrant: { ShellFixtures.grant() },
+                readWorkspaceDocument: { _ in
+                    reads += 1
+                    return text
+                }
+            )
+        )
+        scene.startObserving()
+        defer { scene.stopObserving() }
+        scene.presentWorkspaceSearch()
+        await scene.workspaceSearch.searchNow(query: "hit", environment: scene.workspaceSearchEnvironment())
+        XCTAssertEqual(reads, 1)
+        XCTAssertEqual(scene.workspaceSearch.sections.map(\.relativePath), ["posts/b.md"])
+
+        text = "fresh hit"
+        workspace.emit(.resourceChanged(entry.location))
+        await waitForIdle(scene.workspaceSearch)
+        XCTAssertEqual(reads, 2)
+        XCTAssertEqual(scene.workspaceSearch.sections.first?.hits.map(\.matchedText), ["hit"])
+
+        text = "fresh"
+        let refreshed = IOSWorkspaceSnapshot(
+            workspaceID: entry.location.workspaceID,
+            accessGeneration: entry.location.accessGeneration,
+            requestID: UUID(),
+            entries: [entry]
+        )
+        workspace.emit(.snapshotChanged(refreshed))
+        await waitForIdle(scene.workspaceSearch)
+        XCTAssertEqual(reads, 3, "a same-tree refresh cannot keep search text from before the refresh")
+        XCTAssertTrue(scene.workspaceSearch.sections.isEmpty)
+    }
+
     private func waitForIdle(_ controller: IOSWorkspaceSearchController) async {
         for _ in 0 ..< 200 where controller.isSearching {
             try? await Task.sleep(for: .milliseconds(10))
         }
+    }
+}
+
+@MainActor
+private final class SearchWorkspaceDouble: IOSWorkspaceAccessProviding {
+    private var observations: [(FakeObservation, @MainActor (IOSWorkspaceEvent) -> Void)] = []
+
+    func emit(_ event: IOSWorkspaceEvent) {
+        for (token, handler) in observations where !token.isCancelled {
+            handler(event)
+        }
+    }
+
+    func observe(_ handler: @escaping @MainActor (IOSWorkspaceEvent) -> Void) -> any IOSObservation {
+        let token = FakeObservation()
+        observations.append((token, handler))
+        return token
+    }
+
+    func open(selectedURL _: URL, scope _: IOSWorkspaceScope) async throws -> IOSWorkspaceGrant {
+        throw IOSWorkspaceFailure.unavailable
+    }
+
+    func restore(bookmark _: Data, scope _: IOSWorkspaceScope) async throws -> IOSWorkspaceGrant {
+        throw IOSWorkspaceFailure.unavailable
+    }
+
+    func acquireLease(for _: IOSWorkspaceGrant) throws -> any IOSWorkspaceAccessLease {
+        throw IOSWorkspaceFailure.unavailable
+    }
+
+    func invalidate(_: IOSWorkspaceIdentity) -> UInt64 {
+        0
+    }
+
+    func snapshot(for _: IOSWorkspaceIdentity) -> IOSWorkspaceSnapshot? {
+        nil
+    }
+
+    func refresh(_: IOSWorkspaceGrant) async throws -> IOSWorkspaceSnapshot {
+        throw IOSWorkspaceFailure.unavailable
     }
 }

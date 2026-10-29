@@ -19,13 +19,15 @@ live preview. The Mac path (`renderForExport(_:)`) is unchanged.
 
 The iOS exporter also uses the Mac export controller (`makeHTMLExportController`: HTTP(S)
 content rule, non-persistent data store). Print renders light and plans pages for the
-locale's default paper (US Letter or A4, system printable area), like the Mac imageable
-aspect. HTML and PDF freeze `system` to the appearance at invocation. The export is
+locale's default paper (US Letter or A4) with a fixed half-inch margin
+(`docs/decisions/2026-10-29-ios-review-follow-up.md`). HTML and PDF freeze `system` to the appearance at invocation. The export is
 cancelled on scene shutdown, observer teardown and document change, and checks the
 document after every await.
 
 Folder search keeps disk reads for re-searches that the open buffer's edits trigger
-(bounded to 32 MiB of text). A tree change or a new search reads every file again.
+(bounded to 32 MiB of text). A tree change, an explicit search, or a same-tree refresh reads every file again.
+A changed path drops only that cached read
+(`docs/decisions/2026-10-29-ios-review-follow-up.md`).
 Matching runs off the main actor.
 
 Alternatives: keep the Mac root context and teach the iOS reader to accept it (rejected:

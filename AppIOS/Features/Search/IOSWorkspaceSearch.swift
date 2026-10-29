@@ -13,6 +13,10 @@ enum IOSWorkspaceSearchLimits {
     static let maximumMatchesPerFile = 200
     static let maximumMatchesPerQuery = 2000
     static let maximumFiles = 5000
+    /// After the match cap, read at most this many later files to see whether another
+    /// match exists. The rest stay unread, and the status says so instead of claiming
+    /// the cap was proven.
+    static let truncationProbeFiles = 8
 }
 
 struct IOSWorkspaceSearchOpenDocument: Equatable {
@@ -56,6 +60,9 @@ struct IOSWorkspaceSearchProgress: Equatable {
     var skippedUnavailable = 0
     var skippedOther = 0
     var stoppedAfterFileLimit = false
+    /// The match cap was reached and later files were left unread. This is not proof
+    /// that another match exists.
+    var stoppedBeforeRemainingFiles = false
     var folderChanged = false
 }
 
@@ -84,6 +91,9 @@ enum IOSWorkspaceSearchStatus {
         var notes: [String] = []
         if progress.queryTruncated {
             notes.append("Showing the first \(progress.matchLimit) matches")
+        }
+        if progress.stoppedBeforeRemainingFiles {
+            notes.append("Later files were not searched")
         }
         if progress.stoppedAfterFileLimit {
             notes.append("Stopped after \(IOSWorkspaceSearchLimits.maximumFiles) files")
@@ -184,7 +194,8 @@ final class IOSWorkspaceSearchController: ObservableObject {
     private var task: Task<Void, Never>?
     private var generation: UInt64 = 0
     /// Disk reads from the last searches, reused only when the editor buffer changed.
-    /// A tree change or an explicit search reads every file again.
+    /// A tree change, an explicit search, or a workspace refresh reads every file again.
+    /// A provider change drops that one path so the next search cannot reuse stale text.
     private var readCache = IOSWorkspaceSearchReadCache()
 
     init(
@@ -275,6 +286,15 @@ final class IOSWorkspaceSearchController: ObservableObject {
         if isSearching { isSearching = false }
     }
 
+    /// Drops one cached read. The open search, if any, is rescheduled by the caller.
+    func invalidateCachedRead(_ location: IOSFileLocation) {
+        readCache.remove(location)
+    }
+
+    func invalidateCachedReads() {
+        readCache.removeAll()
+    }
+
     var cachedReadCountForTesting: Int {
         readCache.count
     }
@@ -289,6 +309,20 @@ final class IOSWorkspaceSearchController: ObservableObject {
         return nil
     }
 
+    private struct SearchPass {
+        var produced: [IOSWorkspaceSearchSection] = []
+        var matchCount = 0
+        var skippedLarge = 0
+        var skippedEncoding = 0
+        var skippedUnavailable = 0
+        var skippedOther = 0
+        var queryTruncated = false
+        var stoppedBeforeRemainingFiles = false
+        var folderChanged = false
+        var seenPaths: [String: Int] = [:]
+        var probesAfterCap = 0
+    }
+
     private func run(
         token: UInt64,
         query: TextSearchQuery,
@@ -300,98 +334,27 @@ final class IOSWorkspaceSearchController: ObservableObject {
         if stoppedAfterFileLimit {
             ready = Array(ready.prefix(IOSWorkspaceSearchLimits.maximumFiles))
         }
-        var produced: [IOSWorkspaceSearchSection] = []
-        var matchCount = 0
-        var skippedLarge = 0
-        var skippedEncoding = 0
-        var skippedUnavailable = classified.unavailable
-        var skippedOther = 0
-        var queryTruncated = false
-        var folderChanged = false
-        var seenPaths: [String: Int] = [:]
-
+        var pass = SearchPass(skippedUnavailable: classified.unavailable)
         if let open = environment.openDocument {
             readCache.remove(open)
         }
         for entry in ready {
             if Task.isCancelled || generation != token { return }
-            let loaded = await load(entry, environment: environment, token: token)
-            if matchCount >= maximumMatchesPerQuery {
-                // Report truncation only when a further match really exists.
-                if case let .text(text) = loaded {
-                    let found = await Task.detached(priority: .userInitiated) {
-                        IOSWorkspaceTextSearch.containsMatch(in: text, query: query)
-                    }.value
-                    if Task.isCancelled || generation != token { return }
-                    if found {
-                        queryTruncated = true
-                        break
-                    }
-                } else if case .cancelled = loaded {
-                    return
-                }
-                continue
-            }
-            switch loaded {
-            case .cancelled:
-                return
-            case .folderChanged:
-                folderChanged = true
-            case .tooLarge:
-                skippedLarge += 1
-            case .unsupportedEncoding:
-                skippedEncoding += 1
-            case .unavailable:
-                skippedUnavailable += 1
-            case .failed:
-                skippedOther += 1
-            case let .text(text):
-                let remaining = maximumMatchesPerQuery - matchCount
-                let perFile = maximumMatchesPerFile
-                // Matching runs off the main actor; only reads and publishing stay here.
-                let found = await Task.detached(priority: .userInitiated) {
-                    IOSWorkspaceTextSearch.hits(in: text, query: query, fileLimit: perFile, remaining: remaining)
-                }.value
-                if Task.isCancelled || generation != token { return }
-                matchCount += found.hits.count
-                if found.truncated, remaining <= maximumMatchesPerFile {
-                    queryTruncated = true
-                }
-                if !found.hits.isEmpty {
-                    produced.append(Self.section(
-                        entry,
-                        hits: found.hits,
-                        truncated: found.truncated && matchCount < maximumMatchesPerQuery,
-                        seenPaths: &seenPaths
-                    ))
-                }
-            }
-            publish(token: token, sections: produced, progress: IOSWorkspaceSearchProgress(
-                matchCount: matchCount,
-                searching: true,
-                queryTruncated: queryTruncated,
-                matchLimit: maximumMatchesPerQuery,
-                skippedLarge: skippedLarge,
-                skippedEncoding: skippedEncoding,
-                skippedUnavailable: skippedUnavailable,
-                skippedOther: skippedOther,
+            let keepGoing = await visit(
+                entry,
+                token: token,
+                query: query,
+                environment: environment,
                 stoppedAfterFileLimit: stoppedAfterFileLimit,
-                folderChanged: folderChanged
-            ))
-            if folderChanged || queryTruncated { break }
+                pass: &pass
+            )
+            if !keepGoing { break }
         }
-        publish(token: token, sections: produced, progress: IOSWorkspaceSearchProgress(
-            matchCount: matchCount,
-            searching: false,
-            queryTruncated: queryTruncated,
-            matchLimit: maximumMatchesPerQuery,
-            skippedLarge: skippedLarge,
-            skippedEncoding: skippedEncoding,
-            skippedUnavailable: skippedUnavailable,
-            skippedOther: skippedOther,
-            stoppedAfterFileLimit: stoppedAfterFileLimit,
-            folderChanged: folderChanged
-        ))
+        publish(
+            token: token,
+            sections: pass.produced,
+            progress: progress(pass, searching: false, stoppedAfterFileLimit: stoppedAfterFileLimit)
+        )
     }
 
     private static func section(
@@ -457,9 +420,13 @@ final class IOSWorkspaceSearchController: ObservableObject {
         if let cached = readCache.load(entry.location) {
             return cached
         }
+        let epoch = readCache.epoch
         do {
             let text = try await environment.read(entry.location)
             if Task.isCancelled || generation != token { return .cancelled }
+            // A provider change during this read wins. Returning the text still lets
+            // this pass publish, and the rescheduled search reads the file again.
+            guard readCache.epoch == epoch else { return .text(text) }
             readCache.store(.text(text), for: entry.location)
             return .text(text)
         } catch is CancellationError {
@@ -484,5 +451,125 @@ final class IOSWorkspaceSearchController: ObservableObject {
         } catch {
             return .failed
         }
+    }
+}
+
+extension IOSWorkspaceSearchController {
+    /// Returns false when the search should stop. A capped file is only probed.
+    private func visit(
+        _ entry: IOSWorkspaceEntry,
+        token: UInt64,
+        query: TextSearchQuery,
+        environment: IOSWorkspaceSearchEnvironment,
+        stoppedAfterFileLimit: Bool,
+        pass: inout SearchPass
+    ) async -> Bool {
+        let capped = pass.matchCount >= maximumMatchesPerQuery
+        if capped, pass.probesAfterCap >= IOSWorkspaceSearchLimits.truncationProbeFiles {
+            pass.stoppedBeforeRemainingFiles = true
+            return false
+        }
+        if capped { pass.probesAfterCap += 1 }
+        let loaded = await load(entry, environment: environment, token: token)
+        if capped {
+            return await probe(loaded, query: query, token: token, pass: &pass)
+        }
+        guard await record(loaded, entry: entry, query: query, token: token, pass: &pass) else { return false }
+        publish(
+            token: token,
+            sections: pass.produced,
+            progress: progress(pass, searching: true, stoppedAfterFileLimit: stoppedAfterFileLimit)
+        )
+        return !pass.folderChanged && !pass.queryTruncated
+    }
+
+    private func probe(
+        _ loaded: Load,
+        query: TextSearchQuery,
+        token: UInt64,
+        pass: inout SearchPass
+    ) async -> Bool {
+        guard case let .text(text) = loaded else {
+            if case .cancelled = loaded { return false }
+            return true
+        }
+        let found = await Task.detached(priority: .userInitiated) {
+            IOSWorkspaceTextSearch.containsMatch(in: text, query: query)
+        }.value
+        if Task.isCancelled || generation != token { return false }
+        if found {
+            pass.queryTruncated = true
+            return false
+        }
+        return true
+    }
+
+    private func record(
+        _ loaded: Load,
+        entry: IOSWorkspaceEntry,
+        query: TextSearchQuery,
+        token: UInt64,
+        pass: inout SearchPass
+    ) async -> Bool {
+        switch loaded {
+        case .cancelled:
+            return false
+        case .folderChanged:
+            pass.folderChanged = true
+        case .tooLarge:
+            pass.skippedLarge += 1
+        case .unsupportedEncoding:
+            pass.skippedEncoding += 1
+        case .unavailable:
+            pass.skippedUnavailable += 1
+        case .failed:
+            pass.skippedOther += 1
+        case let .text(text):
+            let remaining = maximumMatchesPerQuery - pass.matchCount
+            let perFile = maximumMatchesPerFile
+            // Matching stays off the main actor; only the read and this update do not.
+            let found = await Task.detached(priority: .userInitiated) {
+                IOSWorkspaceTextSearch.hits(
+                    in: text,
+                    query: query,
+                    fileLimit: perFile,
+                    remaining: remaining
+                )
+            }.value
+            if Task.isCancelled || generation != token { return false }
+            pass.matchCount += found.hits.count
+            if found.truncated, remaining <= maximumMatchesPerFile {
+                pass.queryTruncated = true
+            }
+            if !found.hits.isEmpty {
+                pass.produced.append(Self.section(
+                    entry,
+                    hits: found.hits,
+                    truncated: found.truncated && pass.matchCount < maximumMatchesPerQuery,
+                    seenPaths: &pass.seenPaths
+                ))
+            }
+        }
+        return true
+    }
+
+    private func progress(
+        _ pass: SearchPass,
+        searching: Bool,
+        stoppedAfterFileLimit: Bool
+    ) -> IOSWorkspaceSearchProgress {
+        IOSWorkspaceSearchProgress(
+            matchCount: pass.matchCount,
+            searching: searching,
+            queryTruncated: pass.queryTruncated,
+            matchLimit: maximumMatchesPerQuery,
+            skippedLarge: pass.skippedLarge,
+            skippedEncoding: pass.skippedEncoding,
+            skippedUnavailable: pass.skippedUnavailable,
+            skippedOther: pass.skippedOther,
+            stoppedAfterFileLimit: stoppedAfterFileLimit,
+            stoppedBeforeRemainingFiles: pass.stoppedBeforeRemainingFiles,
+            folderChanged: pass.folderChanged
+        )
     }
 }

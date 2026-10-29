@@ -40,6 +40,7 @@ final class IOSShellSceneState: ObservableObject {
 
     private var facadeObservation: (any IOSObservation)?
     private var editorObservation: (any IOSObservation)?
+    private var workspaceObservation: (any IOSObservation)?
     private var observedEditorID: ObjectIdentifier?
     private var lastContentWidth: CGFloat = 0
     private var lastPrefersRegularWidth = false
@@ -67,6 +68,7 @@ final class IOSShellSceneState: ObservableObject {
         facadeObservation = facade.observe { [weak self] snapshot in
             self?.apply(sceneSnapshot: snapshot)
         }
+        observeWorkspaceIfNeeded()
         observeEditorIfNeeded()
         republishChrome()
     }
@@ -77,6 +79,8 @@ final class IOSShellSceneState: ObservableObject {
         facadeObservation = nil
         editorObservation?.cancel()
         editorObservation = nil
+        workspaceObservation?.cancel()
+        workspaceObservation = nil
         observedEditorID = nil
         isObserving = false
         workspaceSearch.cancel()
@@ -140,6 +144,47 @@ final class IOSShellSceneState: ObservableObject {
             }
         }
         republishChrome()
+    }
+
+    private func observeWorkspaceIfNeeded() {
+        workspaceObservation?.cancel()
+        workspaceObservation = facade.capabilities.workspace?.observe { [weak self] event in
+            self?.handle(workspaceEvent: event)
+        }
+    }
+
+    /// The tree projection ignores a refresh request ID, and a file can change without a
+    /// new tree. Those events drop cached search text; an open search reads again.
+    private func handle(workspaceEvent event: IOSWorkspaceEvent) {
+        switch event {
+        case let .resourceChanged(location):
+            guard let current = workspaceSnapshot,
+                  location.workspaceID == current.workspaceID,
+                  location.accessGeneration == current.accessGeneration
+            else { return }
+            workspaceSearch.invalidateCachedRead(location)
+            researchOpenFolder(reusingReads: true)
+        case let .snapshotChanged(snapshot):
+            guard let current = workspaceSnapshot,
+                  snapshot.workspaceID == current.workspaceID,
+                  snapshot.accessGeneration == current.accessGeneration,
+                  snapshot.requestID != current.requestID,
+                  IOSShellWorkspaceProjection.matches(current, snapshot)
+            else { return }
+            workspaceSearch.invalidateCachedReads()
+            researchOpenFolder(reusingReads: false)
+        case .invalidated, .unavailable:
+            break
+        }
+    }
+
+    private func researchOpenFolder(reusingReads: Bool) {
+        guard presentation == .workspaceSearch, workspaceSearch.hasQuery else { return }
+        workspaceSearch.scheduleSearch(
+            environment: workspaceSearchEnvironment(),
+            immediate: true,
+            reusingReads: reusingReads
+        )
     }
 
     private func republishChrome() {

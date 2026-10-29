@@ -1,4 +1,5 @@
 import Foundation
+import PDFKit
 @testable import PlainsongIOS
 import UIKit
 import WorkspaceKitIOS
@@ -30,6 +31,7 @@ final class IOSDocumentExportGrantTests: XCTestCase {
 
         XCTAssertTrue(data.starts(with: Data("%PDF".utf8)))
         XCTAssertEqual(fixture.runtime.exporter.completionNote ?? "", "")
+        try assertPDFDrawsTheTealImage(data)
     }
 
     func testSingleFileGrantExportUsesAPlaceholder() async throws {
@@ -44,6 +46,77 @@ final class IOSDocumentExportGrantTests: XCTestCase {
     }
 
     private static let omittedImageTag = #"<span class="export-image-placeholder" role="img""#
+
+    /// The HTML omission note only proves the placeholder step. The PDF has to contain
+    /// the image resource and a pixel from the teal fixture.
+    private func assertPDFDrawsTheTealImage(_ data: Data) throws {
+        let document = try XCTUnwrap(PDFDocument(data: data))
+        let page = try XCTUnwrap(document.page(at: 0))
+        let reference = try XCTUnwrap(page.pageRef)
+        XCTAssertTrue(pageHasImageXObject(reference), "the local image must be drawn into the PDF")
+        let bounds = page.bounds(for: .mediaBox)
+        let scale: CGFloat = 2
+        let size = CGSize(width: bounds.width * scale, height: bounds.height * scale)
+        let rendered = UIGraphicsImageRenderer(size: size).image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            context.cgContext.translateBy(x: 0, y: size.height)
+            context.cgContext.scaleBy(x: scale, y: -scale)
+            page.draw(with: .mediaBox, to: context.cgContext)
+        }
+        let teal = try tealPixelCount(in: XCTUnwrap(rendered.cgImage))
+        XCTAssertGreaterThan(teal, 0, "the exported PDF should still show the teal image")
+    }
+
+    private func pageHasImageXObject(_ page: CGPDFPage) -> Bool {
+        guard let dictionary = page.dictionary else { return false }
+        var resources: CGPDFDictionaryRef?
+        guard CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources), let resources else { return false }
+        var xobjects: CGPDFDictionaryRef?
+        guard CGPDFDictionaryGetDictionary(resources, "XObject", &xobjects), let xobjects else { return false }
+        var found = false
+        withUnsafeMutablePointer(to: &found) { pointer in
+            CGPDFDictionaryApplyFunction(xobjects, { _, object, info in
+                guard let info else { return }
+                var stream: CGPDFStreamRef?
+                guard CGPDFObjectGetValue(object, .stream, &stream), let stream else { return }
+                guard let streamDictionary = CGPDFStreamGetDictionary(stream) else { return }
+                var subtype: UnsafePointer<CChar>?
+                guard CGPDFDictionaryGetName(streamDictionary, "Subtype", &subtype), let subtype else { return }
+                if String(cString: subtype) == "Image" {
+                    info.assumingMemoryBound(to: Bool.self).pointee = true
+                }
+            }, pointer)
+        }
+        return found
+    }
+
+    private func tealPixelCount(in image: CGImage) -> Int {
+        let width = image.width
+        let height = image.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let space = CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: space,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return 0 }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        var count = 0
+        for offset in stride(from: 0, to: pixels.count, by: 4) {
+            let red = Int(pixels[offset])
+            let green = Int(pixels[offset + 1])
+            let blue = Int(pixels[offset + 2])
+            if red < 90, green > 80, blue > 80, green > red + 30, blue > red + 30 {
+                count += 1
+            }
+        }
+        return count
+    }
 
     private func export(_ kind: IOSDocumentExportKind, runtime: IOSProductionRuntime) async throws -> String {
         try await String(decoding: exportData(kind, runtime: runtime), as: UTF8.self)

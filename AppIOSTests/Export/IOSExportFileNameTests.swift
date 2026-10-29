@@ -122,7 +122,7 @@ final class IOSDocumentExportSmokeTests: XCTestCase {
         XCTAssertNil(failure, failure ?? "")
         let job = try XCTUnwrap(printed)
         XCTAssertTrue(job.data.starts(with: Data("%PDF".utf8)))
-        XCTAssertEqual(job.job, "Hello.pdf")
+        XCTAssertEqual(job.job, "Hello")
         XCTAssertNil(exporter.file, "Print never opens the file exporter")
         let planned = try XCTUnwrap(aspect)
         XCTAssertEqual(planned, IOSPrintPage.defaultImageableAspect(), accuracy: 0.0001)
@@ -180,6 +180,79 @@ final class IOSDocumentExportSmokeTests: XCTestCase {
         XCTAssertNil(exporter.file)
         XCTAssertFalse(exporter.isPresented)
     }
+
+    func testCancelLetsTheNextExportStartAndIgnoresTheOldRun() async {
+        let exporter = IOSDocumentExportController()
+        let gate = ExportResumeGate()
+        let replacementGate = ExportResumeGate()
+        var entered = false
+        var resumed = false
+        exporter.onPrepareForTesting = {
+            entered = true
+            await gate.wait()
+            resumed = true
+        }
+        let source = DocumentTextChange(
+            text: "# Hello\n",
+            version: 1,
+            fileKind: .markdown,
+            fileURL: URL(fileURLWithPath: "/tmp/Hello.md")
+        )
+        exporter.begin(.html, source: source, assetAccess: nil, theme: "light", assetReader: nil)
+        for _ in 0 ..< 100 where !entered {
+            await Task.yield()
+        }
+        XCTAssertTrue(entered)
+        exporter.cancel()
+        XCTAssertFalse(exporter.isRunning)
+        XCTAssertNil(exporter.status)
+
+        var replacementEntered = false
+        var replacementResumed = false
+        exporter.onPrepareForTesting = {
+            replacementEntered = true
+            await replacementGate.wait()
+            replacementResumed = true
+        }
+        exporter.begin(.html, source: source, assetAccess: nil, theme: "light", assetReader: nil)
+        XCTAssertTrue(exporter.isRunning)
+        XCTAssertEqual(exporter.status, "Preparing HTML…")
+        for _ in 0 ..< 100 where !replacementEntered {
+            await Task.yield()
+        }
+        XCTAssertTrue(replacementEntered)
+        gate.resume()
+        for _ in 0 ..< 100 where !resumed {
+            await Task.yield()
+        }
+        XCTAssertTrue(resumed)
+        XCTAssertTrue(exporter.isRunning, "the cancelled run must not clear the export that replaced it")
+        XCTAssertEqual(exporter.status, "Preparing HTML…")
+        exporter.cancel()
+        replacementGate.resume()
+        for _ in 0 ..< 100 where !replacementResumed {
+            await Task.yield()
+        }
+        XCTAssertTrue(replacementResumed)
+        XCTAssertFalse(exporter.isRunning)
+        XCTAssertNil(exporter.file)
+        XCTAssertFalse(exporter.isPresented)
+    }
+}
+
+@MainActor
+private final class ExportResumeGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        await withCheckedContinuation { continuation = $0 }
+    }
+
+    func resume() {
+        let continuation = continuation
+        self.continuation = nil
+        continuation?.resume()
+    }
 }
 
 final class IOSExportThemeTests: XCTestCase {
@@ -200,5 +273,16 @@ final class IOSExportThemeTests: XCTestCase {
             accuracy: 0.0001
         )
         XCTAssertNil(IOSPrintPage.imageableAspect(printableRect: .zero))
+        let letter = IOSPrintPage.defaultImageableRect(locale: Locale(identifier: "en_US"))
+        XCTAssertEqual(letter, CGRect(x: 36, y: 36, width: 540, height: 720))
+        XCTAssertEqual(
+            IOSPrintPage.defaultImageableAspect(locale: Locale(identifier: "en_US")),
+            720.0 / 540.0,
+            accuracy: 0.0001
+        )
+        let a4 = IOSPrintPage.defaultImageableRect(locale: Locale(identifier: "zh_TW"))
+        XCTAssertEqual(a4.origin, CGPoint(x: 36, y: 36))
+        XCTAssertEqual(a4.width, IOSPrintPage.a4.width - 72, accuracy: 0.001)
+        XCTAssertEqual(a4.height, IOSPrintPage.a4.height - 72, accuracy: 0.001)
     }
 }

@@ -109,14 +109,29 @@ enum IOSExportTheme {
 }
 
 /// The paper aspect a printed PDF is planned for (Mac: `exportPrintPageAspect`). iOS asks
-/// for paper only once the print panel is up, so the plan uses the system's best match for
-/// the locale's default sheet: US Letter where the locale measures in US units, A4 otherwise.
+/// for paper only once the print panel is up, so the plan uses the locale's default sheet:
+/// US Letter where the locale measures in US units, A4 otherwise. The printable area is a
+/// fixed half-inch margin. `UIPrintPaper.bestPaper` is not given an empty paper list; that
+/// result is undocumented. Choosing another sheet in the panel scales this PDF. It does
+/// not plan the pages again.
 enum IOSPrintPage {
     static let letter = CGSize(width: 612, height: 792)
     static let a4 = CGSize(width: 595.2, height: 841.8)
+    /// Half an inch, in PDF points.
+    static let margin: CGFloat = 36
 
     static func defaultPaperSize(locale: Locale = .current) -> CGSize {
         locale.measurementSystem == .us ? letter : a4
+    }
+
+    static func defaultImageableRect(locale: Locale = .current) -> CGRect {
+        let size = defaultPaperSize(locale: locale)
+        return CGRect(
+            x: margin,
+            y: margin,
+            width: size.width - (margin * 2),
+            height: size.height - (margin * 2)
+        )
     }
 
     static func imageableAspect(printableRect: CGRect) -> CGFloat? {
@@ -124,11 +139,9 @@ enum IOSPrintPage {
         return printableRect.height / printableRect.width
     }
 
-    @MainActor
     static func defaultImageableAspect(locale: Locale = .current) -> CGFloat {
-        let size = defaultPaperSize(locale: locale)
-        let paper = UIPrintPaper.bestPaper(forPageSize: size, withPapersFrom: [])
-        return imageableAspect(printableRect: paper.printableRect) ?? size.height / size.width
+        let rect = defaultImageableRect(locale: locale)
+        return rect.height / rect.width
     }
 }
 
@@ -153,11 +166,18 @@ final class IOSDocumentExportController: ObservableObject {
     var presentPrintOverride: ((Data, String, String) -> Void)?
     /// Test seam: observes the paper aspect a printed PDF was planned for.
     var onPrintAspect: ((CGFloat) -> Void)?
+    /// Test seam: suspends a run before it builds the preview.
+    var onPrepareForTesting: (@MainActor () async -> Void)?
+    private var runID: UInt64 = 0
 
-    /// Stops a running export. Nothing it was preparing is presented afterwards.
+    /// Stops a running export and lets another begin immediately. The stopped run's
+    /// cleanup cannot clear the newer one.
     func cancel() {
         task?.cancel()
         task = nil
+        runID &+= 1
+        isRunning = false
+        status = nil
     }
 
     func begin(
@@ -169,11 +189,14 @@ final class IOSDocumentExportController: ObservableObject {
         isCurrent: @escaping @MainActor () -> Bool = { true }
     ) {
         guard !isRunning else { return }
+        runID &+= 1
+        let id = runID
         isRunning = true
         status = kind == .html ? "Preparing HTML…" : "Preparing PDF…"
         task?.cancel()
         task = Task { [weak self] in
             await self?.run(
+                id,
                 kind,
                 source: source,
                 assetAccess: assetAccess,
@@ -201,6 +224,7 @@ final class IOSDocumentExportController: ObservableObject {
 
     // swiftlint:disable:next function_body_length cyclomatic_complexity
     private func run(
+        _ runID: UInt64,
         _ kind: IOSDocumentExportKind,
         source: DocumentTextChange,
         assetAccess: PreviewAssetAccessContext?,
@@ -209,11 +233,17 @@ final class IOSDocumentExportController: ObservableObject {
         isCurrent: @MainActor () -> Bool
     ) async {
         defer {
-            isRunning = false
-            status = nil
+            if self.runID == runID {
+                isRunning = false
+                status = nil
+            }
         }
         func stopped() -> Bool {
-            Task.isCancelled || !isCurrent()
+            self.runID != runID || Task.isCancelled || !isCurrent()
+        }
+        if let onPrepareForTesting {
+            await onPrepareForTesting()
+            if stopped() { return }
         }
         let preview: PreviewController
         do {
@@ -306,10 +336,12 @@ final class IOSDocumentExportController: ObservableObject {
         contentType = kind.contentType
         let note = notes.joined(separator: " ")
         if kind == .print {
+            let jobName = (name as NSString).deletingPathExtension
+            let visibleJob = jobName.isEmpty ? name : jobName
             if let presentPrintOverride {
-                presentPrintOverride(bytes, name, note)
+                presentPrintOverride(bytes, visibleJob, note)
             } else {
-                presentPrint(bytes, jobName: name, note: note)
+                presentPrint(bytes, jobName: visibleJob, note: note)
             }
             return
         }
