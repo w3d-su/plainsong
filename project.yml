@@ -18,6 +18,9 @@ packages:
   Yams:
     url: https://github.com/jpsim/Yams.git
     from: 6.2.2
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle.git
+    exactVersion: 2.10.0
   EditorKit:
     path: Packages/EditorKit
   PreviewKit:
@@ -59,6 +62,8 @@ targets:
       - package: EditorKit
       - package: PreviewKit
       - package: WorkspaceKit
+      - package: Sparkle
+        product: Sparkle
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor
@@ -74,6 +79,8 @@ targets:
         # targets are never stripped (a command-line STRIP_* override strips them
         # too and fails the build).
         PLAINSONG_STRIP_SHIPPED_BINARY: NO
+        # NO does not create or start the updater. YES is the full Sparkle path.
+        PLAINSONG_UPDATES_ENABLED: NO
       configs:
         Release:
           DEPLOYMENT_POSTPROCESSING: $(PLAINSONG_STRIP_SHIPPED_BINARY)
@@ -88,6 +95,10 @@ targets:
         LSApplicationCategoryType: public.app-category.productivity
         NSHumanReadableCopyright: "© 2026 w3d-su"
         NSHighResolutionCapable: true
+        PLAINSONG_UPDATES_ENABLED: "$(PLAINSONG_UPDATES_ENABLED)"
+        SUEnableInstallerLauncherService: true
+        SUFeedURL: ""
+        SUPublicEDKey: ""
         CFBundleDocumentTypes:
           - CFBundleTypeName: Markdown Document
             CFBundleTypeRole: Editor
@@ -124,6 +135,9 @@ targets:
         com.apple.security.files.bookmarks.app-scope: true
         com.apple.security.network.client: true
         com.apple.security.print: true
+        com.apple.security.temporary-exception.mach-lookup.global-name:
+          - "$(PRODUCT_BUNDLE_IDENTIFIER)-spks"
+          - "$(PRODUCT_BUNDLE_IDENTIFIER)-spki"
     scheme:
       testTargets:
         - PlainsongUITests
