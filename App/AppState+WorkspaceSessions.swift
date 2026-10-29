@@ -153,9 +153,11 @@ extension AppState {
     }
 
     func firstUnretirableExternalConflict(
-        excluding retiredSessions: Set<ObjectIdentifier>
+        excluding retiredSessions: Set<ObjectIdentifier>,
+        among candidates: [DocumentSession]? = nil
     ) -> URL? {
-        registry.sessions(from: [.warmCache, .fileBackedWindowDocuments])
+        let pool = candidates ?? registry.sessions(from: [.warmCache, .fileBackedWindowDocuments])
+        return pool
             .filter { !retiredSessions.contains(ObjectIdentifier($0)) }
             .compactMap { session -> URL? in
                 guard session.isDirty,
@@ -367,7 +369,9 @@ extension AppState {
             let eviction = pending[nextIndex]
             nextIndex += 1
             guard let session = registry.warmSession(at: eviction.url) else { continue }
-            if finishSessionEviction(eviction, session: session) { continue }
+            if finishSessionEviction(eviction, session: session) {
+                continue
+            }
 
             // A failed or fenced candidate stays protected for this entire pass.
             // If every candidate fails, retain the over-limit cache until a later pass.

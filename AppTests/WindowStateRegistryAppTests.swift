@@ -334,7 +334,8 @@ final class WindowStateRegistryAppTests: XCTestCase {
         XCTAssertEqual(appState.pendingExternalTexts[fixture.secondURL], "changed on disk")
         XCTAssertTrue(appState.detachedSessionURLs.contains(fixture.secondURL))
 
-        // A quarantined write in window 2 refuses the close instead of being pruned.
+        // A quarantined write for the file window 2 shows does not block this root's
+        // close, and the close does not prune it (W3 bullet 7, D1b).
         let quarantined = try SecondWindowRegistryFixture.make(testCase: self)
         let write = WorkspaceIndeterminateFileWrite(
             reason: .durabilityFailed,
@@ -342,7 +343,8 @@ final class WindowStateRegistryAppTests: XCTestCase {
             recoveryArtifact: .none
         )
         quarantined.appState.indeterminateSessionWrites[ObjectIdentifier(quarantined.second)] = write
-        XCTAssertThrowsError(try quarantined.appState.closeWorkspaceForReplacement())
+        XCTAssertNoThrow(try quarantined.appState.closeWorkspaceForReplacement())
+        XCTAssertNil(quarantined.appState.workspaceRootURL)
         XCTAssertEqual(quarantined.appState.indeterminateSessionWrites[ObjectIdentifier(quarantined.second)], write)
 
         let control = try SecondWindowRegistryFixture.make(testCase: self)

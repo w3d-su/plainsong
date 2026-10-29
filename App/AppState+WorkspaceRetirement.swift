@@ -26,7 +26,9 @@ extension AppState {
         if let recovery = nextWorkspaceMutationRecovery() {
             throw WorkspaceMutationError.indeterminateSession(recovery.sourceURL)
         }
-        let sessionsToClose = workspaceSessionsForClosure()
+        // D1b: preflight and release only this root. Another root's fence, quarantine,
+        // or conflict must not block, and must not be swept up with this close.
+        let sessionsToClose = workspaceSessionsForRootRelease()
         if let quarantinedSession = sessionsToClose.first(where: {
             indeterminateWorkspaceMutationSessions.contains(ObjectIdentifier($0))
         }) {
@@ -41,12 +43,13 @@ extension AppState {
         var retiringSessionIdentities = Set(retirementPlans.map {
             ObjectIdentifier($0.session)
         })
-        retiringSessionIdentities.formUnion(retiredEditorDocumentSessions.values.map {
-            ObjectIdentifier($0.session)
+        retiringSessionIdentities.formUnion(retiredEditorDocumentSessions.values.compactMap { retirement in
+            sessionsToClose.contains { $0 === retirement.session } ? ObjectIdentifier(retirement.session) : nil
         })
 
         if let conflictURL = firstUnretirableExternalConflict(
-            excluding: retiringSessionIdentities
+            excluding: retiringSessionIdentities,
+            among: sessionsToClose
         ) {
             throw AppStateError.unresolvedExternalChange(conflictURL)
         }
@@ -89,14 +92,49 @@ extension AppState {
 
 @MainActor
 private extension AppState {
-    func workspaceSessionsForClosure() -> [DocumentSession] {
+    /// Sessions this close may retire: retained authority or installed membership in the
+    /// closing root, except a session another window still shows or installs.
+    func workspaceSessionsForRootRelease() -> [DocumentSession] {
         registry.sessions(from: [
             .warmCache, .retired, .editorBindings, .editorInstallations, .mutationRecovery, .fileBackedWindowDocuments,
-        ]).sorted { first, second in
+        ]).filter { session in
+            sessionBelongsToClosingRoot(session) && !isPreservedForAnotherWindow(session)
+        }.sorted { first, second in
             sessionClosureIdentity(first).utf8.lexicographicallyPrecedes(
                 sessionClosureIdentity(second).utf8
             )
         }
+    }
+
+    func sessionBelongsToClosingRoot(_ session: DocumentSession) -> Bool {
+        guard let authority = workspaceSearchRootAuthority else { return false }
+        if let location = retainedManagedSessionLocation(for: session),
+           location.rootAuthority == authority
+        {
+            return true
+        }
+        if case let .proven(proof)? = unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)],
+           proof.installedWorkspaceLocation?.rootAuthority == authority
+        {
+            return true
+        }
+        return false
+    }
+
+    /// The closing window's own document still releases with its root. Another window's
+    /// shown session, or a live installation that window holds, stays out of the set.
+    func isPreservedForAnotherWindow(_ session: DocumentSession) -> Bool {
+        if registry.connectedWindows.contains(where: { window in
+            window !== windowState && window.shownSession === session
+        }) {
+            return true
+        }
+        if shownSession !== session,
+           editorBindingInstallations.values.contains(where: { $0 === session })
+        {
+            return true
+        }
+        return false
     }
 
     func sessionClosureIdentity(_ session: DocumentSession) -> String {
@@ -226,13 +264,17 @@ private extension AppState {
             statisticsTask?.cancel()
             statisticsTask = nil
         }
-        cancelWorkspaceSessionTasks(excluding: retainedSessionIdentities)
-        for session in sessions
-            where !retainedSessionIdentities.contains(ObjectIdentifier(session))
-        {
+        for session in sessions where !retainedSessionIdentities.contains(ObjectIdentifier(session)) {
+            let sessionIdentity = ObjectIdentifier(session)
+            sessionAutosaveTasks.removeValue(forKey: sessionIdentity)?.task.cancel()
+            sessionStatisticsTasks.removeValue(forKey: sessionIdentity)?.task.cancel()
             removeEditorDocumentBindingRegistration(for: session)
         }
-        registry.removeAllWarmSessions()
+        for session in sessions {
+            guard let url = sessionStateURL(for: session) else { continue }
+            registry.setWarmSession(nil, at: url)
+            sessionPolicy.remove(url)
+        }
         for session in sessions
             where !proofRetainedSessionIdentities.contains(ObjectIdentifier(session))
         {
@@ -243,8 +285,7 @@ private extension AppState {
             indeterminateSessionWrites[sessionIdentity] = nil
             indeterminateSessionWriteContexts[sessionIdentity] = nil
         }
-        sessionPolicy = WorkspaceSessionLRUPolicy(limit: 8)
-        retainMetadataOnlyForRetiredEditorSessions()
+        pruneMetadataAfterRootRelease(releasing: sessions)
         externalChangePrompt = nil
         missingFilePrompt = nil
         indeterminateFileWriteReconciliationPrompt = nil
@@ -256,6 +297,62 @@ private extension AppState {
         for plan in retirementPlans {
             finishRetiredEditorDocumentSessionIfPossible(for: plan.session)
         }
+    }
+
+    /// Drops metadata for sessions this root released. Sessions outside the release set
+    /// keep fences, bindings, proofs, quarantine, detached URLs, and external versions,
+    /// including other roots and standalone warm sessions.
+    func pruneMetadataAfterRootRelease(releasing releasedSessions: [DocumentSession]) {
+        let releasedIdentities = Set(releasedSessions.map(ObjectIdentifier.init))
+        var retainedSessions = registry.sessions(from: [
+            .warmCache, .retired, .editorBindings, .editorInstallations,
+            .mutationRecovery, .fileBackedWindowDocuments,
+        ]).filter { !releasedIdentities.contains(ObjectIdentifier($0)) }
+        retainedSessions.append(contentsOf: registry.sessions(from: [
+            .retired, .mutationRecovery, .fileBackedWindowDocuments,
+        ]))
+        retainedSessions.append(contentsOf: registry.sessions(from: [
+            .warmCache, .editorBindings, .editorInstallations, .mutationRecovery,
+        ]).filter { session in
+            indeterminateWorkspaceMutationSessions.contains(ObjectIdentifier(session))
+        })
+        var seen: Set<ObjectIdentifier> = []
+        retainedSessions = retainedSessions.filter { seen.insert(ObjectIdentifier($0)).inserted }
+        let retainedURLs = Set(retainedSessions.compactMap(sessionStateURL(for:)))
+        let retainedSessionIdentities = Set(retainedSessions.map(ObjectIdentifier.init))
+        pendingExternalTexts = pendingExternalTexts.filter { retainedURLs.contains($0.key) }
+        pendingExternalFileVersions = pendingExternalFileVersions.filter {
+            retainedURLs.contains($0.key)
+        }
+        deferredExternalChangeResolutions = deferredExternalChangeResolutions.filter {
+            retainedURLs.contains($0.key)
+        }
+        externalResolutionIntentCaptures = externalResolutionIntentCaptures.filter {
+            retainedURLs.contains($0.key)
+        }
+        lastKnownDiskHashes = lastKnownDiskHashes.filter { retainedURLs.contains($0.key) }
+        lastKnownDiskModificationDates = lastKnownDiskModificationDates.filter {
+            retainedURLs.contains($0.key)
+        }
+        detachedSessionURLs = Set(detachedSessionURLs.filter(retainedURLs.contains))
+        anchoredSessionFileBindings = anchoredSessionFileBindings.filter {
+            retainedSessionIdentities.contains($0.key)
+        }
+        unanchoredManagedSessionOwnershipProofs = unanchoredManagedSessionOwnershipProofs.filter {
+            retainedSessionIdentities.contains($0.key)
+        }
+        editorImageAssetDocumentAuthorities = editorImageAssetDocumentAuthorities.filter {
+            retainedSessionIdentities.contains($0.key)
+        }
+        indeterminateSessionWrites = indeterminateSessionWrites.filter {
+            retainedSessionIdentities.contains($0.key)
+        }
+        indeterminateSessionWriteContexts = indeterminateSessionWriteContexts.filter {
+            retainedSessionIdentities.contains($0.key)
+        }
+        indeterminateWorkspaceMutationSessions = Set(
+            indeterminateWorkspaceMutationSessions.filter(retainedSessionIdentities.contains)
+        )
     }
 }
 
