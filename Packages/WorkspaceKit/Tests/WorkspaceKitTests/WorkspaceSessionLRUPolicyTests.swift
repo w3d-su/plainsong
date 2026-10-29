@@ -104,4 +104,115 @@ final class WorkspaceSessionLRUPolicyTests: XCTestCase {
         )
         XCTAssertEqual(policy.warmURLsInLeastRecentOrder, [candidateURL])
     }
+
+    func testInstalledSessionsDoNotCountTowardWarmCapacity() {
+        var policy = WorkspaceSessionLRUPolicy(limit: 8)
+        let installed = (0 ..< 3).map { URL(fileURLWithPath: "/tmp/installed-\($0).md") }
+        let installedURLs = Set(installed)
+        for url in installed {
+            XCTAssertTrue(policy.access(url, isDirty: false, installedURLs: installedURLs).isEmpty)
+        }
+        let warm = (0 ..< 8).map { URL(fileURLWithPath: "/tmp/warm-\($0).md") }
+        for url in warm {
+            XCTAssertTrue(policy.access(url, isDirty: false, installedURLs: installedURLs).isEmpty)
+        }
+
+        XCTAssertEqual(policy.warmURLsInLeastRecentOrder, installed + warm)
+
+        let extra = URL(fileURLWithPath: "/tmp/extra.md")
+        let evictions = policy.access(extra, isDirty: false, installedURLs: installedURLs)
+
+        XCTAssertEqual(evictions.map(\.url), [warm[0]])
+        XCTAssertEqual(
+            policy.warmURLsInLeastRecentOrder,
+            installed + Array(warm.dropFirst()) + [extra]
+        )
+    }
+
+    func testProtectedSessionsStillCountBesideInstalledSessions() {
+        var policy = WorkspaceSessionLRUPolicy(limit: 2)
+        let installed = URL(fileURLWithPath: "/tmp/installed.md")
+        let protected = URL(fileURLWithPath: "/tmp/protected.md")
+        let warm = URL(fileURLWithPath: "/tmp/warm.md")
+        let incoming = URL(fileURLWithPath: "/tmp/incoming.md")
+        let installedURLs: Set<URL> = [installed]
+        let protectedURLs: Set<URL> = [protected]
+
+        XCTAssertTrue(policy.access(
+            installed,
+            isDirty: false,
+            protectedURLs: protectedURLs,
+            installedURLs: installedURLs
+        ).isEmpty)
+        XCTAssertTrue(policy.access(
+            protected,
+            isDirty: false,
+            protectedURLs: protectedURLs,
+            installedURLs: installedURLs
+        ).isEmpty)
+        XCTAssertTrue(policy.access(
+            warm,
+            isDirty: false,
+            protectedURLs: protectedURLs,
+            installedURLs: installedURLs
+        ).isEmpty)
+
+        let evictions = policy.access(
+            incoming,
+            isDirty: false,
+            protectedURLs: protectedURLs,
+            installedURLs: installedURLs
+        )
+
+        XCTAssertEqual(evictions.map(\.url), [warm])
+        XCTAssertEqual(policy.warmURLsInLeastRecentOrder, [installed, protected, incoming])
+    }
+
+    func testProtectedURLsOutsideTheCacheDoNotFreeWarmCapacity() {
+        var policy = WorkspaceSessionLRUPolicy(limit: 1)
+        let warm = URL(fileURLWithPath: "/tmp/warm.md")
+        let incoming = URL(fileURLWithPath: "/tmp/incoming.md")
+        let absent = URL(fileURLWithPath: "/tmp/absent.md")
+
+        XCTAssertTrue(policy.access(warm, isDirty: false).isEmpty)
+        XCTAssertEqual(
+            policy.access(incoming, isDirty: false, protectedURLs: [absent]).map(\.url),
+            [warm]
+        )
+        XCTAssertEqual(policy.warmURLsInLeastRecentOrder, [incoming])
+    }
+
+    func testFailedOrFencedProtectionRetainsTheOverLimitCache() {
+        var policy = WorkspaceSessionLRUPolicy(limit: 1)
+        let fenced = URL(fileURLWithPath: "/tmp/fenced.md")
+        let retained = URL(fileURLWithPath: "/tmp/retained.md")
+        let protectedURLs: Set<URL> = [fenced, retained]
+
+        XCTAssertTrue(policy.access(fenced, isDirty: true, protectedURLs: [fenced]).isEmpty)
+        XCTAssertTrue(policy.access(
+            retained,
+            isDirty: true,
+            protectedURLs: protectedURLs
+        ).isEmpty)
+        XCTAssertTrue(policy.trim(protectedURLs: protectedURLs).isEmpty)
+        XCTAssertEqual(policy.warmURLsInLeastRecentOrder, [fenced, retained])
+        XCTAssertEqual(policy.dirtyState(for: fenced), true)
+        XCTAssertEqual(policy.dirtyState(for: retained), true)
+    }
+
+    func testTrimKeepsInstalledSessionsOutsideWarmCapacity() {
+        var policy = WorkspaceSessionLRUPolicy(limit: 1)
+        let installed = URL(fileURLWithPath: "/tmp/installed.md")
+        let warm = URL(fileURLWithPath: "/tmp/warm.md")
+
+        XCTAssertTrue(policy.access(installed, isDirty: false, installedURLs: [installed]).isEmpty)
+        XCTAssertTrue(policy.access(warm, isDirty: true, installedURLs: [installed]).isEmpty)
+        XCTAssertTrue(policy.trim(installedURLs: [installed]).isEmpty)
+        XCTAssertEqual(
+            policy.trim(),
+            [WorkspaceSessionEviction(url: installed, requiresSave: false)]
+        )
+        XCTAssertEqual(policy.warmURLsInLeastRecentOrder, [warm])
+        XCTAssertEqual(policy.dirtyState(for: warm), true)
+    }
 }

@@ -291,7 +291,12 @@ extension AppState {
             .unavailable(fileURL: record.originalURL)
         detachedSessionURLs.insert(record.originalURL)
         handleSessionEvictions(
-            sessionPolicy.access(record.originalURL, isDirty: true)
+            sessionPolicy.access(
+                record.originalURL,
+                isDirty: true,
+                protectedURLs: protectedSessionURLs(),
+                installedURLs: installedSessionURLs()
+            )
         )
         setCurrentDocument(session, synchronizingWorkspaceTree: false)
         restoreRecoveryPrompt(for: session)

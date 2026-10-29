@@ -42,7 +42,11 @@ final class WindowStateRegistryAppTests: XCTestCase {
             XCTAssertTrue(sessions.contains { $0 === fixture.second }, name)
             XCTAssertTrue(sessions.contains { $0 === fixture.first }, name)
         }
-        XCTAssertTrue(appState.protectedSessionURLs().contains(fixture.secondURL), "LRU protection")
+        XCTAssertTrue(appState.installedSessionURLs().contains(fixture.secondURL), "shown session is installed")
+        XCTAssertFalse(
+            appState.protectedSessionURLs().contains(fixture.secondURL),
+            "a shown session does not use protected capacity"
+        )
         XCTAssertTrue(appState.isManagedEditorSession(fixture.second))
         XCTAssertTrue(
             appState.isAddressableExternalResolutionSession(fixture.second, canonicalURL: fixture.secondURL)
@@ -53,6 +57,7 @@ final class WindowStateRegistryAppTests: XCTestCase {
         for (name, sessions) in inventories() {
             XCTAssertFalse(sessions.contains { $0 === fixture.second }, "\(name) control")
         }
+        XCTAssertFalse(appState.installedSessionURLs().contains(fixture.secondURL))
         XCTAssertFalse(appState.protectedSessionURLs().contains(fixture.secondURL))
         XCTAssertFalse(appState.isManagedEditorSession(fixture.second))
         XCTAssertFalse(

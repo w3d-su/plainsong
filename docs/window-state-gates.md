@@ -2,7 +2,8 @@
 
 > **Status: Windows PRs B1 (#223), B2 (#224), and C (#230) implement §10's B and C rows.**
 > D1-0 (#236) records WD1, WD2, WD3, WD6 (LRU only), WD7, and WD8,
-> and splits D1 into D1a, D1b, and D1c. None of D1a, D1b, or D1c is implemented.
+> and splits D1 into D1a, D1b, and D1c. D1a implements W11 bullet 3: installed
+> documents stay outside the global LRU capacity of 8 and cannot be evicted.
 > Each workspace window has its own `AppState` façade over a `WindowState` and a
 > `WorkspaceRootContext`. Those façades share one `AppDocumentRegistry`. `KeyWindowRouter`
 > resolves the key façade. Creation stays guarded until D2, and native tabbing stays off
@@ -10,7 +11,7 @@
 > only window and reopening it keeps working. Checked: all W1 bullets, W2 bullet 5, W3
 > bullets 1–6 and 8, and all W5 bullets. W2 bullets 1–3 have a production-path hosted test
 > but stay open until D2 tests two mounted `WorkspaceWindow`s. W0's hosted probes are
-> recorded; its owner-smoke boxes stay open for D2. D1a, D1b, D1c, and D2 are not done. WD5 and
+> recorded; its owner-smoke boxes stay open for D2. D1b, D1c, and D2 are not done. WD5 and
 > WD6's residency and budget half stay open. §12.2 assigns later `agent.md`
 > edits; §9 assigns owner-decision deadlines. Check gates only with named-test or
 > owner-recorded evidence in the implementation commit.
@@ -482,15 +483,15 @@ macOS 14 path (for example `WindowGroup(for:)` presented values as record keys, 
 
 ### 7.1 Warm-session LRU (WD6)
 
-The LRU stays **global**: 8 warm sessions plus every installed current document. Today
-protected entries count toward the limit
-(`Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSessionLRUPolicy.swift:94-100`), so
-N windows would leave 8 − N warm slots. PR D1a adds a separate `installedURLs` input:
-installed entries do not count toward warm capacity and cannot be evicted. Keep
-`protectedURLs` counting toward capacity for failed-eviction, fenced, quarantined, and
-retired candidates (`App/AppState+WorkspaceSessions.swift:372-418`); verify both policies
-with named tests. Do not subtract the whole protected set from capacity. A per-window LRU is rejected: it costs 8·N
-sessions, and a session warm in two windows would still need one cross-window owner.
+The LRU stays **global**: 8 warm sessions plus every installed current document.
+Installed documents do not count toward warm capacity and cannot be evicted
+(`Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSessionLRUPolicy.swift:98-134`,
+`App/AppState+WorkspaceSessions.swift:391-406`). Other `protectedURLs` still count
+toward capacity for failed-eviction, fenced, quarantined, and retired candidates
+(`App/AppState+WorkspaceSessions.swift:408-430`); a trim that cannot evict keeps the
+over-limit cache. Do not subtract the whole protected set from capacity. A per-window
+LRU is rejected: it costs 8·N sessions, and a session warm in two windows would still
+need one cross-window owner.
 
 ### 7.2 Preview residency (WD6)
 
@@ -698,7 +699,7 @@ C's fallback. W8 then verifies D2's routing to an existing or new window under W
   - Bullet 2 (B1): stayed open for B2. B1 runs the command and classifies every hit in its PR. Consumers still read through the façade, which B2 migrates. The `-E '\b…\b'` form this bullet first gave matches nothing with macOS git 2.56: its POSIX ERE has no `\b`, so the gate would pass vacuously. Use `-w` or `-P`.
 - Evidence (B2):
   - Bullet 3: every §2.3 consumer takes its sessions from `AppDocumentRegistry.sessions(from:)` or its window and warm-cache predicates (`App/AppDocumentRegistry+Sessions.swift`). `WindowStateRegistryAppTests` connects a second `WindowState` and shows it a session that no cache, retirement, binding, or recovery holds. Each test then hides that session again as a control. The fifteen named tests:
-    - `testOwnershipInventoriesIncludeASessionOnlyASecondWindowShows`: mutation-managed, Save Copy, and termination inventories, LRU protection, and addressability.
+    - `testOwnershipInventoriesIncludeASessionOnlyASecondWindowShows`: mutation-managed, Save Copy, and termination inventories, the installed LRU exemption, and addressability.
     - `testAnUntitledDocumentInASecondWindowIsOwned`: untitled ownership.
     - `testAutosaveFlushSavesADirtySessionOnlyASecondWindowShows` and `testAutosaveOfAHiddenSessionIsRefused`.
     - `testAWindowPromptBlocksOnlyItsFilesSaveInEveryWindow`.
@@ -828,8 +829,10 @@ scheduling root cause remains unknown. This is an additional gate, not closure b
 
 - [ ] The §7.3 configuration stays under 400 MB host RSS. Helper RSS and the per-preview host delta are recorded. *Perf measurement in `docs/perf/YYYY-MM-DD-<slug>.md`.*
 - [ ] Hidden previews beyond two are torn down after the grace period (controller released), and visible previews are never torn down. *Named hosted test.*
-- [ ] Separate installedURLs allows 8 warm sessions plus installed ones; other protectedURLs still count and failed/fenced evictions retain the over-limit cache. `testZZZMemoryWithEightWarmSessionsAndTwoLiveWebViewsStaysUnderBudget` still passes. *Named policy/hosted/perf tests.*
-- Evidence: _open_
+- [x] Separate installedURLs allows 8 warm sessions plus installed ones; other protectedURLs still count and failed/fenced evictions retain the over-limit cache. `testZZZMemoryWithEightWarmSessionsAndTwoLiveWebViewsStaysUnderBudget` still passes. *Named policy/hosted/perf tests.*
+- Evidence:
+  - Bullets 1–2 stay open for G.
+  - Bullet 3: `WorkspaceSessionLRUPolicyTests/testInstalledSessionsDoNotCountTowardWarmCapacity`, `testProtectedSessionsStillCountBesideInstalledSessions`, `testProtectedURLsOutsideTheCacheDoNotFreeWarmCapacity`, `testFailedOrFencedProtectionRetainsTheOverLimitCache`, and `testTrimKeepsInstalledSessionsOutsideWarmCapacity` cover capacity, protected entries that still count, and a fenced over-limit cache. `WindowSessionLRUInstalledAppTests/testTwoFacadesShowingDocumentsKeepEightWarmSessions` keeps 8 warm sessions while two façades each show a document. `testEditorBindingInstallationDoesNotCountTowardWarmCapacity` keeps an editor-binding installation outside that capacity. `AppStateSessionStateCleanupTests/testAllDirtyEvictionSavesFailOncePerPassAndRetainUnsavedText` retains unsaved text when every candidate save fails, and `testEvictionContinuesPastFailedSaveToCleanCandidate` continues past that failure. `PerformanceBudgetTests/testZZZMemoryWithEightWarmSessionsAndTwoLiveWebViewsStaysUnderBudget` still passes.
 
 ### W12 — Typing latency
 

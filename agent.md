@@ -261,7 +261,11 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   trees and explicit searches read again. In-flight reads cannot restore an invalidated
   cache entry, including a size or encoding refusal.
 - Each workspace window has its own `AppState` façade, `WindowState`, and
-  `WorkspaceRootContext`, and they share one `AppDocumentRegistry`. One preview is
+  `WorkspaceRootContext`, and they share one `AppDocumentRegistry`. The warm-session
+  LRU is one global cache: 8 warm sessions plus every installed document. An installed
+  document is an editor-binding installation or any connected window's shown session;
+  it does not count toward the 8 and cannot be evicted. Other protected sessions still
+  count toward the 8 and cannot be evicted. One preview is
   created per visible document pane. A scene gets the app-owned façade whenever no open
   scene shows it, so closing the only window and reopening it works. A scene opened while
   another shows that façade refuses file and root opens and closes itself until PR D2, and
@@ -278,7 +282,7 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   native List selection alone misses those clicks on macOS 15. Publish the tree
   selection only after activation succeeds; a failed read keeps the current file selected
   and allows retrying the same row. Multiple open
-  `DocumentSession`s kept warm in an LRU (target 8) so switching files is instant.
+  `DocumentSession`s stay in that global LRU, so switching files is instant.
   A failed or fenced eviction candidate is retained and protected for the whole trim
   pass; each candidate is tried at most once per pass. The cache may exceed 8 while
   saves cannot complete, preserving unsaved content until a later trim can succeed.

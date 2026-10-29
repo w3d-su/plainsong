@@ -129,10 +129,12 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
         defer { fixture.cleanUp() }
         let appState = fixture.makeAppState(shownSession: DocumentSession())
         var sessions: [DocumentSession] = []
-        for index in 0 ..< 9 {
+        // The shown document is installed and does not consume one of the 8 warm slots,
+        // so nine dirty background sessions are what pushes the cache over the limit.
+        for index in 0 ..< 10 {
             try "disk \(index)".write(to: fixture.url("\(index).md"), atomically: false, encoding: .utf8)
         }
-        for index in 0 ..< 8 {
+        for index in 0 ..< 9 {
             try appState.activateFileSession(url: fixture.url("\(index).md"))
             let session = appState.shownSession
             appState.replaceDocumentText("unsaved \(index)")
@@ -150,10 +152,10 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
             }
             throw CocoaError(.fileWriteNoPermission)
         }
-        try appState.activateFileSession(url: fixture.url("8.md"))
-        XCTAssertEqual(attempts.count, 8)
+        try appState.activateFileSession(url: fixture.url("9.md"))
+        XCTAssertEqual(attempts.count, 9)
         XCTAssertTrue(attempts.values.allSatisfy { $0 == 1 })
-        XCTAssertEqual(appState.registry.sessionCache.count, 9)
+        XCTAssertEqual(appState.registry.sessionCache.count, 10)
         XCTAssertEqual(Set(appState.sessionPolicy.warmURLsInLeastRecentOrder), Set(appState.registry.sessionCache.keys))
         XCTAssertEqual(appState.presentedError?.title, "Could Not Save Warm File")
         for (index, session) in sessions.enumerated() {
@@ -166,8 +168,8 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
         // The next independent pass may retry after storage recovers and restore the normal limit.
         appState.anchoredFileSaveOverride = nil
         appState.reconcileSessionPolicyAfterEditorLeaseChange()
-        XCTAssertEqual(appState.registry.sessionCache.count, 8)
-        XCTAssertEqual(appState.sessionPolicy.warmURLsInLeastRecentOrder.count, 8)
+        XCTAssertEqual(appState.registry.sessionCache.count, 9)
+        XCTAssertEqual(appState.sessionPolicy.warmURLsInLeastRecentOrder.count, 9)
         XCTAssertEqual(sessions.filter { !$0.isDirty }.count, 1)
     }
 
@@ -176,7 +178,7 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
         defer { fixture.cleanUp() }
         let appState = fixture.makeAppState(shownSession: DocumentSession())
         appState.sessionPolicy = .init(limit: 2)
-        for index in 0 ..< 3 {
+        for index in 0 ..< 4 {
             try "disk \(index)".write(to: fixture.url("\(index).md"), atomically: false, encoding: .utf8)
         }
         try appState.activateFileSession(url: fixture.url("0.md"))
@@ -184,17 +186,22 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
         appState.replaceDocumentText("unsaved")
         appState.cancelAutosave(for: dirty)
         try appState.activateFileSession(url: fixture.url("1.md"))
+        try appState.activateFileSession(url: fixture.url("2.md"))
         var attempts = 0
         appState.anchoredFileSaveOverride = { _, _, _ in
             attempts += 1
             throw CocoaError(.fileWriteNoPermission)
         }
-        try appState.activateFileSession(url: fixture.url("2.md"))
+        // The shown file is installed capacity. Three background sessions over a limit of
+        // two make the failed dirty save stay, then the next clean candidate leave.
+        try appState.activateFileSession(url: fixture.url("3.md"))
         XCTAssertEqual(attempts, 1)
-        XCTAssertEqual(appState.registry.sessionCache.count, 2)
+        XCTAssertEqual(appState.registry.sessionCache.count, 3)
         XCTAssertTrue(try appState.registry.sessionCache[XCTUnwrap(dirty.fileURL)] === dirty)
         XCTAssertNil(appState.registry.sessionCache[fixture.url("1.md")])
+        XCTAssertNotNil(appState.registry.sessionCache[fixture.url("2.md")])
         XCTAssertTrue(dirty.isDirty)
+        XCTAssertEqual(appState.shownSession.fileURL, fixture.url("3.md"))
     }
 
     func testDetachedRecoverySaveCopyPreservesReplacementURLState() throws {

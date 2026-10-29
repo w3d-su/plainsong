@@ -34,7 +34,8 @@ public struct WorkspaceSessionLRUPolicy: Sendable, Equatable {
     public mutating func access(
         _ url: URL,
         isDirty: Bool,
-        protectedURLs: Set<URL> = []
+        protectedURLs: Set<URL> = [],
+        installedURLs: Set<URL> = []
     ) -> [WorkspaceSessionEviction] {
         // Session maps use the retained lexical URL spelling. `standardizedFileURL` silently
         // rewrites NFC to NFD on macOS, collapsing distinct exact locations and returning an
@@ -42,7 +43,7 @@ public struct WorkspaceSessionLRUPolicy: Sendable, Equatable {
         let key = url
         entries[key] = Entry(isDirty: isDirty)
         refreshRecency(for: key)
-        return enforceLimit(protectedURLs: protectedURLs)
+        return enforceLimit(protectedURLs: protectedURLs, installedURLs: installedURLs)
     }
 
     public mutating func updateDirtyState(for url: URL, isDirty: Bool) {
@@ -82,8 +83,11 @@ public struct WorkspaceSessionLRUPolicy: Sendable, Equatable {
         leastRecentURLs[recencyIndex] = destinationURL
     }
 
-    public mutating func trim(protectedURLs: Set<URL> = []) -> [WorkspaceSessionEviction] {
-        enforceLimit(protectedURLs: protectedURLs)
+    public mutating func trim(
+        protectedURLs: Set<URL> = [],
+        installedURLs: Set<URL> = []
+    ) -> [WorkspaceSessionEviction] {
+        enforceLimit(protectedURLs: protectedURLs, installedURLs: installedURLs)
     }
 
     private mutating func refreshRecency(for url: URL) {
@@ -91,12 +95,19 @@ public struct WorkspaceSessionLRUPolicy: Sendable, Equatable {
         leastRecentURLs.append(url)
     }
 
-    private mutating func enforceLimit(protectedURLs: Set<URL>) -> [WorkspaceSessionEviction] {
+    /// Installed entries stay tracked, never count toward `limit`, and are never evicted.
+    /// Protected entries are never evicted but still consume `limit`. A protected URL that is
+    /// not cached does not free a slot, and a pass that cannot find an evictable entry keeps
+    /// the over-limit cache.
+    private mutating func enforceLimit(
+        protectedURLs: Set<URL>,
+        installedURLs: Set<URL>
+    ) -> [WorkspaceSessionEviction] {
         var evictions: [WorkspaceSessionEviction] = []
 
-        while leastRecentURLs.count > limit {
-            guard let evictionIndex = leastRecentURLs.firstIndex(where: {
-                !protectedURLs.contains($0)
+        while countableSessionCount(excluding: installedURLs) > limit {
+            guard let evictionIndex = leastRecentURLs.firstIndex(where: { url in
+                !installedURLs.contains(url) && !protectedURLs.contains(url)
             }) else {
                 break
             }
@@ -111,6 +122,14 @@ public struct WorkspaceSessionLRUPolicy: Sendable, Equatable {
         }
 
         return evictions
+    }
+
+    private func countableSessionCount(excluding installedURLs: Set<URL>) -> Int {
+        leastRecentURLs.reduce(into: 0) { count, url in
+            if !installedURLs.contains(url) {
+                count += 1
+            }
+        }
     }
 
     private struct Entry: Equatable {
