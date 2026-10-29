@@ -256,6 +256,26 @@ final class CustomThemeValidationTests: XCTestCase {
         )
     }
 
+    func testTrimmedCombiningPrefixesAreRejected() throws {
+        for name in [" \u{0301}Ink", "\u{00A0}\u{0301}Ink", "\u{3000}\u{20DD}Ink"] {
+            XCTAssertEqual(try CustomThemeValidation.validate(json(base(name: name))), .failure(.name))
+        }
+    }
+
+    func testNameRequiresAVisibleScalarAndKeepsVariationSelectorsAfterABase() throws {
+        for name in ["\u{115F}", "\u{1160}", "\u{3164}", "\u{FFA0}", "\u{2800}",
+                     " \u{3164}\u{2800} "]
+        {
+            XCTAssertEqual(try CustomThemeValidation.validate(json(base(name: name))), .failure(.name))
+        }
+        for name in ["\u{3164}Ink", "Ink\u{3164}", "\u{2764}\u{FE0F} Ink"] {
+            XCTAssertEqual(try validate(base(name: name)).name, name)
+        }
+        for name in ["In\u{200C}k", "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}"] {
+            XCTAssertEqual(try CustomThemeValidation.validate(json(base(name: name))), .failure(.name))
+        }
+    }
+
     func testEmptyDarkPaletteInheritsAndHostileJSONIsRejected() throws {
         let document = try validate([
             "schemaVersion": 1,

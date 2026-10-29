@@ -44,6 +44,15 @@ the current line), so a custom selection color is still painted onto
 `STSelectionHighlightView`. Layout repaints only that selection container, which lives
 for the life of the text view, instead of walking every layout fragment on each keystroke.
 
+Names must also contain a scalar that is neither whitespace, a Unicode default-ignorable
+code point, nor the braille blank U+2800. This rejects names consisting only of Hangul
+fillers or blank symbols while retaining a filler beside visible text, such as
+U+3164 followed by "Ink". Variation selectors after a visible base remain accepted.
+Schema v1 deliberately rejects every format character, including ZWJ and ZWNJ. That
+conservative rule also rejects joined emoji and names in scripts that require joiners.
+Context-sensitive joiner support would need its own validation policy; it is not
+silently introduced through an exception to the v1 format-character rule.
+
 Missing editor slots inherit the built-in `standard` colors, which are already dynamic
 system colors. An omitted `dark` object inherits the built-in dark appearance for every
 slot. The new `gutter` slot is the gutter track. When it is omitted, the gutter still

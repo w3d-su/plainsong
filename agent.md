@@ -654,9 +654,11 @@ attempt without a Decision Log entry.
   (`#RRGGBB` or `#RRGGBBAA`, 64 KiB, closed keys): an unknown field rejects the whole
   file, and a missing slot inherits the built-in. Names are trimmed, NFC-normalized,
   at most 128 Unicode scalars, and cannot contain control, format, or line-break
-  characters or start with a combining mark. Imported themes are in their own picker
-  section. The picker shows `name (id)` when a name matches a built-in or another
-  imported theme. `text`, `caret`, and `background` must be opaque. While Increase
+  characters or start with a combining mark. A name must contain at least one scalar
+  other than whitespace, a default-ignorable character, or the braille blank.
+  Imported themes are in their own picker section. The picker shows `name (id)` when
+  a name matches a built-in or another imported theme. `text`, `caret`, and
+  `background` must be opaque. While Increase
   Contrast is on, the editor uses the built-in colors. An unreadable selected theme
   falls back to Plainsong for that launch with a non-modal notice and keeps the stored id.
   Switching themes recolors the open editor without reloading the document. Fonts, user

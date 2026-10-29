@@ -56,7 +56,7 @@ enum EditorThemeValidationMessage {
         case let .reservedIdentifier(identifier):
             "\"\(identifier)\" is a built-in theme id."
         case .name:
-            "Theme names must be 1-128 Unicode scalars after trimming, with no control, "
+            "Theme names must include visible text and be 1-128 Unicode scalars after trimming, with no control, "
                 + "format, or line-break characters, and cannot start with a combining mark."
         case let .color(field):
             "\"\(field)\" must be a #RRGGBB or #RRGGBBAA color."

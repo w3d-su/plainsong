@@ -370,6 +370,13 @@ public enum CustomThemeValidation {
             return nil
         }
         let scalars = normalized.unicodeScalars
+        guard scalars.contains(where: {
+            !$0.properties.isDefaultIgnorableCodePoint
+                && !$0.properties.isWhitespace
+                && $0.value != 0x2800
+        }) else {
+            return nil
+        }
         let hasHiddenScalar = scalars.contains { scalar in
             switch scalar.properties.generalCategory {
             case .control, .format, .lineSeparator, .paragraphSeparator:
