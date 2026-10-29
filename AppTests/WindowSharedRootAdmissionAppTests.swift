@@ -93,4 +93,27 @@ final class WindowSharedRootAdmissionAppTests: SharedRootAppTestCase {
         XCTAssertEqual(scopeStarts, 0)
         binding.onLifecycle(.revoked(installation))
     }
+
+    func testDelayedStandaloneInstallationStillRefusesAfterItsWindowOpensAnotherRoot() async throws {
+        let root = try makeRoot("root")
+        let other = try makeRoot("other")
+        try primary.activateFileSession(url: root.appendingPathComponent("a.md"))
+        let session = primary.shownSession
+        let binding = primary.editorDocumentBinding(for: session)
+        let installation = EditorDocumentBindingInstallation(
+            bindingID: binding.id, installationID: EditorDocumentBindingInstallationID()
+        )
+        binding.onLifecycle(.installed(installation))
+        defer { binding.onLifecycle(.revoked(installation)) }
+        try await open(primary, root: other)
+        XCTAssertFalse(primary.shownSession === session)
+        XCTAssertTrue(primary.editorBindingInstallations[installation] === session)
+
+        XCTAssertThrowsError(try second.openWorkspace(url: root, rememberAsLastOpened: false))
+
+        XCTAssertNil(second.workspaceRootURL)
+        XCTAssertNil(second.workspaceAccess)
+        XCTAssertEqual(scopeStarts, 1)
+        XCTAssertEqual(primary.workspaceRootURL, other)
+    }
 }

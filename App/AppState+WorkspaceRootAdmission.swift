@@ -28,7 +28,7 @@ extension AppState {
                 )
             }
         }
-        for window in registry.connectedWindows where window !== windowState && window.workspaceRootURL == nil {
+        for window in registry.connectedWindows where window !== windowState {
             var sessions = [window.shownSession]
             sessions += registry.editorBindingInstallations.compactMap { installation, session in
                 registry.editorInstallationWindows[installation]?.window === window ? session : nil
@@ -37,6 +37,11 @@ extension AppState {
                 guard let file = retainedManagedSessionLocation(for: session)?.fileURL ?? session.fileURL,
                       Self.isDescendant(file, of: url)
                 else { continue }
+                // A window can already be on another root while its standalone editor
+                // still awaits teardown. Classify the file, not just the window's mode.
+                if let installedRoot = window.workspaceRootURL, Self.isDescendant(file, of: installedRoot) {
+                    continue
+                }
                 throw WorkspaceRootOpenConflict(
                     message: "This folder contains a file open independently in another window.",
                     target: RegisteredWindowState(window: window)
