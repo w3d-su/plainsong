@@ -1307,6 +1307,7 @@ extension AppState {
                 stopTrackingWorkspaceMutationTextRecovery(for: session)
             case .keepEditorCopy, .showEditorCopy:
                 setCurrentDocument(session)
+                reconcileSessionPolicyAfterEditorLeaseChange()
                 restoreRecoveryPrompt(for: session)
             }
             return
@@ -1324,6 +1325,7 @@ extension AppState {
                 return
             }
             setCurrentDocument(session)
+            reconcileSessionPolicyAfterEditorLeaseChange()
             restoreRecoveryPrompt(for: session)
         case .stopTracking:
             guard recovery.remainingSessions.isEmpty else {
@@ -1403,6 +1405,9 @@ extension AppState {
         if let recovery = nextWorkspaceMutationRecovery() {
             if let nextSession = recovery.remainingSessions.first {
                 setCurrentDocument(nextSession)
+                // The previous shown document is countable now. Trim before the
+                // next access, matching text-recovery admission.
+                reconcileSessionPolicyAfterEditorLeaseChange()
                 restoreRecoveryPrompt(for: nextSession)
             } else {
                 refreshWorkspaceMutationReconciliationPrompt()
@@ -1411,6 +1416,7 @@ extension AppState {
         }
         if let nextSession = nextWorkspaceMutationTextRecoverySession() {
             setCurrentDocument(nextSession)
+            reconcileSessionPolicyAfterEditorLeaseChange()
             restoreRecoveryPrompt(for: nextSession)
             return
         }

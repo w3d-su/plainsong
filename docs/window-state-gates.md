@@ -2,7 +2,8 @@
 
 > **Status: Windows PRs B1 (#223), B2 (#224), and C (#230) implement §10's B and C rows.**
 > D1-0 (#236) records WD1, WD2, WD3, WD6 (LRU only), WD7, and WD8,
-> and splits D1 into D1a, D1b, and D1c. None of D1a, D1b, or D1c is implemented.
+> and splits D1 into D1a, D1b, and D1c. D1a implements W11 bullet 3: installed
+> documents stay outside the global LRU capacity of 8 and cannot be evicted.
 > Each workspace window has its own `AppState` façade over a `WindowState` and a
 > `WorkspaceRootContext`. Those façades share one `AppDocumentRegistry`. `KeyWindowRouter`
 > resolves the key façade. Creation stays guarded until D2, and native tabbing stays off
@@ -10,7 +11,7 @@
 > only window and reopening it keeps working. Checked: all W1 bullets, W2 bullet 5, W3
 > bullets 1–6 and 8, and all W5 bullets. W2 bullets 1–3 have a production-path hosted test
 > but stay open until D2 tests two mounted `WorkspaceWindow`s. W0's hosted probes are
-> recorded; its owner-smoke boxes stay open for D2. D1a, D1b, D1c, and D2 are not done. WD5 and
+> recorded; its owner-smoke boxes stay open for D2. D1b, D1c, and D2 are not done. WD5 and
 > WD6's residency and budget half stay open. §12.2 assigns later `agent.md`
 > edits; §9 assigns owner-decision deadlines. Check gates only with named-test or
 > owner-recorded evidence in the implementation commit.
@@ -92,7 +93,7 @@ in two editors (§4.1 b), or bridge changes (`PROTOCOL_VERSION` stays unchanged)
 | A non-writer installation converges only at its next writer activation (`.synchronize`). | `App/AppState+EditorBinding.swift:433-441` | There is no live cross-view propagation. |
 | Reload and Keep Mine synchronize every live installation before finalizing. | `App/AppState+ExternalChanges.swift:147-160` | Already multi-installation. |
 | Undo is per text view. | `Packages/EditorKit/Package.swift:13` pins STTextView 2.4.1. That version's initializer gives each view its own `CoalescingUndoManager`, and `STTextView+Undo.swift` returns it unless a delegate supplies one (dependency source, not in this repository). No `undoManager(for:)` exists in `Packages`. | Two editors on one session would hold two undo stacks. |
-| One LRU, limit 8. Protected URLs still count toward the limit. Every editor installation is protected. | `App/AppDocumentRegistry.swift:111-115`, `Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSessionLRUPolicy.swift:28-31`, `:94-100`, `App/AppState+WorkspaceSessions.swift:362-381`, `:387-418` | With N windows, only 8 − N warm slots remain (§7.1). |
+| One global LRU, limit 8, plus every installed document. Installed documents do not count and cannot be evicted. Other protected URLs still count and cannot be evicted. | `App/AppDocumentRegistry.swift:113-118`, `Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSessionLRUPolicy.swift:98-134`, `App/AppState+WorkspaceSessions.swift:391-430` | D1a (§7.1). N shown documents no longer consume the 8 warm slots. |
 | Autosave: a foreground task bound to `currentDocument`, background tasks per session, a flush over all sessions. | `App/AppState+Autosave.swift:6-21`, `:23-44`, `:64-93`, `:131-153` | The foreground/background split assumes one current document. |
 | Every `WorkspaceWindow` flushes when **any** window resigns key (no `object:` filter). | `App/Views/WorkspaceWindow.swift` (`WorkspaceWindowContent.onReceive`) | N windows mean N flushes per resign. |
 | The external-change and missing-file prompts are single values for the current document. Switching clears them. | `App/WindowState.swift:66-75`, `App/AppState+ExternalChanges.swift:42-55`, `App/AppState+Workspace.swift:496-499` | They are per-window projections of per-file state. |
@@ -404,6 +405,12 @@ In order (closing a tab is closing a window):
    session is retained under step 1, never saved through that prompt. A saved session stays warm.
 3. **Revoke:** use the installation-release path (`App/AppState+EditorBinding.swift:361-405`)
    to release the writer and reconcile the LRU; validate all retention before committing close.
+   A window's shown session leaves `installedSessionURLs` only when that window leaves
+   `.windowDocuments`. Dropping its weak `registeredWindows` entry does not trim, so the
+   cache can stay over the limit until the next access. D2 calls
+   `reconcileSessionPolicyAfterEditorLeaseChange()` only after the window has left
+   `.windowDocuments`, and names a test for that trim. D1a does not: production still
+   cannot close a second window.
 4. **Release:** on the last root-window reference, select registry sessions whose retained
    authority or installed membership belongs to **this root**, excluding any session still
    installed by any window. Preflight only that set; retirement must keep protected sessions.
@@ -482,15 +489,15 @@ macOS 14 path (for example `WindowGroup(for:)` presented values as record keys, 
 
 ### 7.1 Warm-session LRU (WD6)
 
-The LRU stays **global**: 8 warm sessions plus every installed current document. Today
-protected entries count toward the limit
-(`Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSessionLRUPolicy.swift:94-100`), so
-N windows would leave 8 − N warm slots. PR D1a adds a separate `installedURLs` input:
-installed entries do not count toward warm capacity and cannot be evicted. Keep
-`protectedURLs` counting toward capacity for failed-eviction, fenced, quarantined, and
-retired candidates (`App/AppState+WorkspaceSessions.swift:372-418`); verify both policies
-with named tests. Do not subtract the whole protected set from capacity. A per-window LRU is rejected: it costs 8·N
-sessions, and a session warm in two windows would still need one cross-window owner.
+The LRU stays **global**: 8 warm sessions plus every installed current document.
+Installed documents do not count toward warm capacity and cannot be evicted
+(`Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSessionLRUPolicy.swift:98-134`,
+`App/AppState+WorkspaceSessions.swift:391-406`). Other `protectedURLs` still count
+toward capacity for failed-eviction, fenced, quarantined, and retired candidates
+(`App/AppState+WorkspaceSessions.swift:408-430`); a trim that cannot evict keeps the
+over-limit cache. Do not subtract the whole protected set from capacity. A per-window
+LRU is rejected: it costs 8·N sessions, and a session warm in two windows would still
+need one cross-window owner.
 
 ### 7.2 Preview residency (WD6)
 
@@ -510,8 +517,8 @@ sessions, and a session warm in two windows would still need one cross-window ow
 
 ### 7.3 Restated §12 memory budget (proposal)
 
-< 400 MB host RSS: 8 warm sessions, 4 windows, 2 visible settled previews, 2 hidden windows
-past teardown. Record host delta per preview and helper RSS diagnostics in
+< 400 MB host RSS: 8 warm sessions plus 4 installed documents (one shown document per
+window), 4 windows, 2 visible settled previews, 2 hidden windows past teardown. Record host delta per preview and helper RSS diagnostics in
 `docs/perf/YYYY-MM-DD-<slug>.md`;
 keep the two-webview test (`PerformanceTests/PerformanceBudgetTests.swift:325`).
 
@@ -592,7 +599,7 @@ Find, and Export F/G's File commands and Print (`docs/export-gates.md:879-880`).
 | **D1a — installed LRU capacity** | Add `installedURLs` to `WorkspaceSessionLRUPolicy` access and trim (W11 bullet 3, §7.1). Installed documents, derived from today's installation protection plus every connected window's shown session, do not count toward the limit of 8 and cannot be evicted. Other `protectedURLs` still count. A failed or fenced eviction still retains an over-limit cache (`agent.md` §5). `testZZZMemoryWithEightWarmSessionsAndTwoLiveWebViewsStaysUnderBudget` still passes. No user window creation; `WindowOpenAdmission` and disallowed tabbing stay as C left them. | W11 bullet 3 | **Yes**: eviction can drop session text |
 | **D1b — root-scoped release** | Replace the global sweep in `clearClosedWorkspaceState`. Do not call `cancelWorkspaceSessionTasks(excluding:)`, the `removeEditorDocumentBindingRegistration` loop, `registry.removeAllWarmSessions()`, the reset to a new LRU policy, or the global `retainMetadataOnlyForRetiredEditorSessions` prune unchanged. The release set is the registry sessions whose retained authority or installed membership belongs to this root, minus any session any window still shows or installs. Preflight only that set: another root's fenced, quarantined, or conflicted session must not block this release, while the global transaction and store-load fences still do. Filter `firstUnretirableExternalConflict` to this root. Remove only that set's cache and LRU entries, preserving everyone else's recency, and prune metadata only for the retired sessions. Keep fences, bindings, proofs, quarantine, detached URLs, and pending external text and versions of every other session, including other roots and standalone warm sessions. Write the tests first and show each failing on `main`: one named hosted test per W3 bullet 7 item and per W6 bullet 5 item (including a window that shows a file from another root), plus W6 bullets 4 and 6. No user window creation; retain C guards. | W3 bullet 7; W6 bullets 4–6 | **Yes**: retirement and quarantine |
 | **D1c — shared root context** | The registry keeps one `WorkspaceRootContext` per canonical root, reference-counted by windows (WD2 i; iv stays forbidden). Opening a root already open attaches to that context: one security-scope start, one watcher, and one scan per refresh. Each window still owns its whole filtered tree, Show All Files, expansion, selection, reload disposition, and search; only the scan snapshot and generation are shared. A watcher event or a mutation refresh reconciles every window on that root and refreshes each window's active search. Deferred refresh is per root: an R2 watcher event during an R1 namespace transaction stays queued and is serviced on drain, and drain services every queued root. The image-placement count stays per root under the app-wide transaction lock. The last release runs D1b's release; retained authority may keep the scope alive. §4.3 refusals happen before root installation and offer to show the other window (`KeyWindowRouter` focus): an ancestor or descendant root, and a root containing a standalone file installed in another window. Routing a single file inside an open root needs WD1 and WD7 and stays with D2, so W6 bullet 8b stays open. Adopting a warm session into window 2 after window 1 switched away transfers the writer synchronously; window 1's stale installation cannot publish, and a delayed SwiftUI teardown cannot revoke the new writer. The delayed-teardown hosted test drives the editor-binding writer-release and revoked-installation lifecycle through admitted façade fixtures, without mounting a `WorkspaceWindow`. If `App/AppState+Workspace.swift` or another touched file would pass about 400 lines, the first commit is a mechanical split with no behavior change. A typing A/B in `docs/perf/` shows the fan-out adds no per-keystroke work. No user window creation, no `WindowOpenAdmission` change, and tabbing stays disallowed. | W6 bullets 1–3, 7, 8a, and 9; W4 bullets 3–4 | **Yes**: mutation, shared scope, quarantine |
-| **D2 — routing and window lifecycle** | WD1 focus policy, New Window, external-open routing, guarded opens and close lifecycle (WD3/WD7/WD8). Mount two production `WorkspaceWindow`s and complete the independent-document, different-root, and external-banner hosted tests left open by C. Record W0 bullets 1–4 owner smoke on the guarded build before removing C fallback; remove it only after these paths pass. Restoration-record removal stays with E after WD5. | W0 bullets 1–4 (owner smoke); W2 bullets 1–3; W4 bullets 1–2; W6 bullet 8b; W7 bullets 1–5; W8 | **Yes**: ownership and close retention |
+| **D2 — routing and window lifecycle** | WD1 focus policy, New Window, external-open routing, guarded opens and close lifecycle (WD3/WD7/WD8). Mount two production `WorkspaceWindow`s and complete the independent-document, different-root, and external-banner hosted tests left open by C. Record W0 bullets 1–4 owner smoke on the guarded build before removing C fallback; remove it only after these paths pass. Restoration-record removal stays with E after WD5. After the closing window leaves `.windowDocuments`, call `reconcileSessionPolicyAfterEditorLeaseChange()` and name a test that its shown session no longer keeps the installed exemption (§6.2 step 3). | W0 bullets 1–4 (owner smoke); W2 bullets 1–3; W4 bullets 1–2; W6 bullet 8b; W7 bullets 1–5; W8 | **Yes**: ownership and close retention |
 | **F — native tabs** | Enable tabbing; New Tab, titles, merge/move. W0 must prove New Tab joins the key group. Closing a tab uses D2's lifecycle; E adds restoration-record removal and G adds background-tab residency. | W0 bullet 5 (tab identity/New Tab); W10 bullets 1–3 | No |
 | **E — restoration** | After F and the WD5 decision: restoration/migration, missing-item handling, tab-group/order records and restoration. A user close removes its record; a quit keeps it. | W7 bullet 6; W9 | **Yes (light)**: bookmarks |
 | **G — residency/acceptance** | Preview residency, dual-window XCUITest, memory/typing measurements, accessibility; no bridge changes. | W2 bullet 4; W10 bullet 4; W11 bullets 1–2; W12; W13 | No |
@@ -698,7 +705,7 @@ C's fallback. W8 then verifies D2's routing to an existing or new window under W
   - Bullet 2 (B1): stayed open for B2. B1 runs the command and classifies every hit in its PR. Consumers still read through the façade, which B2 migrates. The `-E '\b…\b'` form this bullet first gave matches nothing with macOS git 2.56: its POSIX ERE has no `\b`, so the gate would pass vacuously. Use `-w` or `-P`.
 - Evidence (B2):
   - Bullet 3: every §2.3 consumer takes its sessions from `AppDocumentRegistry.sessions(from:)` or its window and warm-cache predicates (`App/AppDocumentRegistry+Sessions.swift`). `WindowStateRegistryAppTests` connects a second `WindowState` and shows it a session that no cache, retirement, binding, or recovery holds. Each test then hides that session again as a control. The fifteen named tests:
-    - `testOwnershipInventoriesIncludeASessionOnlyASecondWindowShows`: mutation-managed, Save Copy, and termination inventories, LRU protection, and addressability.
+    - `testOwnershipInventoriesIncludeASessionOnlyASecondWindowShows`: mutation-managed, Save Copy, and termination inventories, the installed LRU exemption, and addressability.
     - `testAnUntitledDocumentInASecondWindowIsOwned`: untitled ownership.
     - `testAutosaveFlushSavesADirtySessionOnlyASecondWindowShows` and `testAutosaveOfAHiddenSessionIsRefused`.
     - `testAWindowPromptBlocksOnlyItsFilesSaveInEveryWindow`.
@@ -828,8 +835,12 @@ scheduling root cause remains unknown. This is an additional gate, not closure b
 
 - [ ] The §7.3 configuration stays under 400 MB host RSS. Helper RSS and the per-preview host delta are recorded. *Perf measurement in `docs/perf/YYYY-MM-DD-<slug>.md`.*
 - [ ] Hidden previews beyond two are torn down after the grace period (controller released), and visible previews are never torn down. *Named hosted test.*
-- [ ] Separate installedURLs allows 8 warm sessions plus installed ones; other protectedURLs still count and failed/fenced evictions retain the over-limit cache. `testZZZMemoryWithEightWarmSessionsAndTwoLiveWebViewsStaysUnderBudget` still passes. *Named policy/hosted/perf tests.*
-- Evidence: _open_
+- [x] Separate installedURLs allows 8 warm sessions plus installed ones; other protectedURLs still count and failed/fenced evictions retain the over-limit cache. *Named policy/hosted tests.*
+- Evidence:
+  - Bullets 1–2 stay open for G. Bullet 1 owns the §7.3 RSS ceiling, 8 warm sessions plus 4 installed documents, one shown document per window. `PerformanceBudgetTests/testZZZMemoryWithEightWarmSessionsAndTwoLiveWebViewsStaysUnderBudget` still passes, but it builds its own 8 `DocumentSession`s (`PerformanceTests/PerformanceBudgetTests.swift:325`, `:586-595`) and never admits them through the LRU, so it is not evidence of that ceiling.
+  - Bullet 3: `WorkspaceSessionLRUPolicyTests/testInstalledSessionsDoNotCountTowardWarmCapacity`, `testProtectedSessionsStillCountBesideInstalledSessions`, `testProtectedURLsOutsideTheCacheDoNotFreeWarmCapacity`, `testFailedOrFencedProtectionRetainsTheOverLimitCache`, `testTrimKeepsInstalledSessionsOutsideWarmCapacity`, and `testInstalledAndProtectedURLDoesNotCountTowardWarmCapacity` cover capacity, protected entries that still count, a URL that is both installed and protected, and a fenced over-limit cache. `WindowSessionLRUInstalledAppTests/testTwoFacadesShowingDocumentsKeepEightWarmSessions` keeps 8 warm sessions while two façades each show a document. `testEditorBindingInstallationDoesNotCountTowardWarmCapacity` keeps an editor-binding installation outside that capacity. `testRevokingTheOldestEditorInstallationEvictsThatSession` and `testRevokingANewerEditorInstallationEvictsTheOldestCountableSession` install and revoke through the editor-binding lifecycle, then trim at `App/AppState+EditorBinding.swift:396`. `AppStateSessionStateCleanupTests/testTextRecoveryAccessTreatsTheRestoredSessionAsInstalled` admits a restored document only after it is shown. `testPromotingTextRecoveryTrimsThePreviousShownSession` trims when promotion makes the previous shown document countable. `testAllDirtyEvictionSavesFailOncePerPassAndRetainUnsavedText` retains unsaved text when every candidate save fails, and `testEvictionContinuesPastFailedSaveToCleanCandidate` continues past that failure.
+
+- D1a recovery-action follow-up (2026-10-30): `WindowRecoveryLRUTrimAppTests/testShowTextRecoveryCopyTrimsThePreviousShownSession`, `testKeepTextRecoveryCopyTrimsThePreviousShownSession`, and `testShowMutationRecoveryCopyTrimsThePreviousShownSession` exercise the secondary actions with a full one-slot warm cache. All three fail before the fix (`/tmp/plainsong-d1a-review-evidence/trim-repro-2.xcresult`, six assertions), then verify immediate oldest-countable eviction without altering preserved recovery text. The repaired run passes all 146 recovery-action, installed-LRU, session-cleanup and workspace data-integrity tests (`trim-fixed-1.xcresult`). The initial fixture compilation error is retained in `trim-repro-1.xcresult`.
 
 ### W12 — Typing latency
 

@@ -512,7 +512,8 @@ extension AppState {
         let evictions = sessionPolicy.access(
             url,
             isDirty: isDirty,
-            protectedURLs: protectedSessionURLs()
+            protectedURLs: protectedSessionURLs(),
+            installedURLs: installedSessionURLs()
         )
         handleSessionEvictions(evictions)
     }
