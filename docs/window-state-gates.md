@@ -10,7 +10,7 @@
 > only window and reopening it keeps working. Checked: all W1 bullets, W2 bullet 5, W3
 > bullets 1–6 and 8, and all W5 bullets. W2 bullets 1–3 have a production-path hosted test
 > but stay open until D2 tests two mounted `WorkspaceWindow`s. W0's hosted probes are
-> recorded; its owner-smoke boxes stay open. D1a, D1b, D1c, and D2 are not done. WD5 and
+> recorded; its owner-smoke boxes stay open for D2. D1a, D1b, D1c, and D2 are not done. WD5 and
 > WD6's residency and budget half stay open. §12.2 assigns later `agent.md`
 > edits; §9 assigns owner-decision deadlines. Check gates only with named-test or
 > owner-recorded evidence in the implementation commit.
@@ -415,7 +415,8 @@ In order (closing a tab is closing a window):
    remain alive until their sessions can safely retire (`App/AppStateSupportingTypes.swift:143-218`).
 5. **Cancel** window tasks and invalidate its preview
    (`Packages/PreviewKit/Sources/PreviewKit/PreviewController.swift:249-271`).
-6. **Remove** its restoration record on user close only (§6.3).
+6. **Remove** its restoration record on user close only (E, after WD5; §6.4). D2
+   implements steps 1–5; E adds this record-removal step.
 
 Failed or fenced eviction candidates remain protected for the pass; an over-limit cache
 is allowed (`App/AppState+WorkspaceSessions.swift:362-381`). New File creates a file first
@@ -473,8 +474,9 @@ macOS 14 path (for example `WindowGroup(for:)` presented values as record keys, 
 - Each AppKit tab is a window with its own WindowState; no custom tab model.
 - C disallows tabbing via `tabbingMode = .disallowed` or `allowsAutomaticWindowTabbing = false`
   and guards creation paths. F enables `.automatic` (system Prefer tabs); ⌘T joins the key group.
-- Merge/move/drag preserve the window object and state (W0); titles follow §8, hidden tabs
-  follow §7.2 residency, close follows §6.2, and E restores tab-group order (§6.4).
+- Merge/move/drag preserve the window object and state (W0); titles follow §8. F uses
+  D2's close lifecycle (§6.2 steps 1–5); E adds restoration-record removal and restores
+  tab-group order (§6.4). G adds §7.2 residency for hidden tabs after WD6's residency decision.
 
 ## 7. Performance and memory
 
@@ -585,15 +587,15 @@ Find, and Export F/G's File commands and Print (`docs/export-gates.md:879-880`).
 | **B1 — types and forwarding** | Registry/root/window types and behavior-neutral forwarding façade; preserve all authority hooks, the 298 direct AppTests initializers, and existing APIs. No inventory logic change or new publish; still shared one-window behavior. | W0 inventory; W1 partition/hooks/regressions | **Yes**: authority/recovery storage moves |
 | **L — window chrome** | Native `NavigationSplitView` sidebar, document column, Xcode-style inspector and toolbar (§10.1). Chrome plus `SidebarCommands` (27+) and `InspectorToggleCommands`; only the reviewed navigator focus parameter in `AppState+Workspace.swift`; no Find or export-banner file changes. Inspector user intent and width are scene state. | R17 launch stability; hosted suite unchanged | No |
 | **B2 — registry enumeration** | Migrate all session consumers under I2, with explicit list extras and operation filters. Preserve one-window behavior; prove no missed direct reads by grep. | W1 enumerator/grep; W3 registry fixtures | **Yes**: ownership, pruning, fences |
-| **C — independent state/routing, creation guarded** | Per-window state; deduplicated menus; remove singleton, retargeting every window-scoped `currentDocument` read that B2 left on the shared window to its operation's `WindowState` (I2); route hot key and all Find hooks, including Escape. Disallow native tabs until F. Close W0 bullet 2; disable or route **every** W0-bullet-1 path to the existing window, including system menus and onOpenURL scene creation. Any unavoidable second WindowState fails closed on **any** file/root open until D2. Hosted test fixtures may bypass only creation guards. | W0 external-open + creation-guard/close probes; W2 façade probes (partial; mounted-window bullets 1–3 close in D2); W3/W5 hosted bullets; W2 bullet 5 I2 `currentDocument` grep | **Yes**: cross-window authority |
+| **C — independent state/routing, creation guarded** | Per-window state; deduplicated menus; remove singleton, retargeting every window-scoped `currentDocument` read that B2 left on the shared window to its operation's `WindowState` (I2); route hot key and all Find hooks, including Escape. Disallow native tabs until F. Record W0 hosted probes; the remaining owner smoke belongs to D2. Disable or route **every** W0-bullet-1 path to the existing window, including system menus and onOpenURL scene creation. Any unavoidable second WindowState fails closed on **any** file/root open until D2. Hosted test fixtures may bypass only creation guards. | W0 external-open + creation-guard/close probes; W2 façade probes (partial; mounted-window bullets 1–3 close in D2); W3/W5 hosted bullets; W2 bullet 5 I2 `currentDocument` grep | **Yes**: cross-window authority |
 | **D1-0 — decisions** | Record WD1, WD2, WD3, WD6's LRU half, WD7, and WD8 (§9.1), and split the old D1 row into D1a, D1b, and D1c. No code and no checked box. | None | No |
 | **D1a — installed LRU capacity** | Add `installedURLs` to `WorkspaceSessionLRUPolicy` access and trim (W11 bullet 3, §7.1). Installed documents, derived from today's installation protection plus every connected window's shown session, do not count toward the limit of 8 and cannot be evicted. Other `protectedURLs` still count. A failed or fenced eviction still retains an over-limit cache (`agent.md` §5). `testZZZMemoryWithEightWarmSessionsAndTwoLiveWebViewsStaysUnderBudget` still passes. No user window creation; `WindowOpenAdmission` and disallowed tabbing stay as C left them. | W11 bullet 3 | **Yes**: eviction can drop session text |
 | **D1b — root-scoped release** | Replace the global sweep in `clearClosedWorkspaceState`. Do not call `cancelWorkspaceSessionTasks(excluding:)`, the `removeEditorDocumentBindingRegistration` loop, `registry.removeAllWarmSessions()`, the reset to a new LRU policy, or the global `retainMetadataOnlyForRetiredEditorSessions` prune unchanged. The release set is the registry sessions whose retained authority or installed membership belongs to this root, minus any session any window still shows or installs. Preflight only that set: another root's fenced, quarantined, or conflicted session must not block this release, while the global transaction and store-load fences still do. Filter `firstUnretirableExternalConflict` to this root. Remove only that set's cache and LRU entries, preserving everyone else's recency, and prune metadata only for the retired sessions. Keep fences, bindings, proofs, quarantine, detached URLs, and pending external text and versions of every other session, including other roots and standalone warm sessions. Write the tests first and show each failing on `main`: one named hosted test per W3 bullet 7 item and per W6 bullet 5 item (including a window that shows a file from another root), plus W6 bullets 4 and 6. No user window creation; retain C guards. | W3 bullet 7; W6 bullets 4–6 | **Yes**: retirement and quarantine |
-| **D1c — shared root context** | The registry keeps one `WorkspaceRootContext` per canonical root, reference-counted by windows (WD2 i; iv stays forbidden). Opening a root already open attaches to that context: one security-scope start, one watcher, and one scan per refresh. Each window still owns its whole filtered tree, Show All Files, expansion, selection, reload disposition, and search; only the scan snapshot and generation are shared. A watcher event or a mutation refresh reconciles every window on that root and refreshes each window's active search. Deferred refresh is per root: an R2 watcher event during an R1 namespace transaction stays queued and is serviced on drain, and drain services every queued root. The image-placement count stays per root under the app-wide transaction lock. The last release runs D1b's release; retained authority may keep the scope alive. §4.3 refusals happen before root installation and offer to show the other window (`KeyWindowRouter` focus): an ancestor or descendant root, and a root containing a standalone file installed in another window. Routing a single file inside an open root needs WD1 and WD7 and stays with D2, so W6 bullet 8b stays open. Adopting a warm session into window 2 after window 1 switched away transfers the writer synchronously; window 1's stale installation cannot publish, and a delayed SwiftUI teardown cannot revoke the new writer. If `App/AppState+Workspace.swift` or another touched file would pass about 400 lines, the first commit is a mechanical split with no behavior change. A typing A/B in `docs/perf/` shows the fan-out adds no per-keystroke work. No user window creation, no `WindowOpenAdmission` change, and tabbing stays disallowed. | W6 bullets 1–3, 7, 8a, and 9; W4 bullets 3–4 | **Yes**: mutation, shared scope, quarantine |
-| **D2 — routing and window lifecycle** | WD1 focus policy, New Window, external-open routing, guarded opens and close lifecycle (WD3/WD7/WD8). Mount two production `WorkspaceWindow`s and complete the independent-document, different-root, and external-banner hosted tests left open by C. Remove C fallback only after these paths pass. | W2 bullets 1–3; W4 bullets 1–2; W6 bullet 8b; W7; W8 | **Yes**: ownership and close retention |
-| **F — native tabs** | Enable tabbing; New Tab, titles, merge/move. W0 must prove New Tab joins the key group. | W0 tab identity/New Tab; W10 | No |
-| **E — restoration** | After F: restoration/migration, missing-item handling, tab-group/order records and restoration. | W9 | **Yes (light)**: bookmarks |
-| **G — residency/acceptance** | Preview residency, dual-window XCUITest, memory/typing measurements, accessibility; no bridge changes. | W2 bullet 4; W11 bullets 1–2; W12; W13 | No |
+| **D1c — shared root context** | The registry keeps one `WorkspaceRootContext` per canonical root, reference-counted by windows (WD2 i; iv stays forbidden). Opening a root already open attaches to that context: one security-scope start, one watcher, and one scan per refresh. Each window still owns its whole filtered tree, Show All Files, expansion, selection, reload disposition, and search; only the scan snapshot and generation are shared. A watcher event or a mutation refresh reconciles every window on that root and refreshes each window's active search. Deferred refresh is per root: an R2 watcher event during an R1 namespace transaction stays queued and is serviced on drain, and drain services every queued root. The image-placement count stays per root under the app-wide transaction lock. The last release runs D1b's release; retained authority may keep the scope alive. §4.3 refusals happen before root installation and offer to show the other window (`KeyWindowRouter` focus): an ancestor or descendant root, and a root containing a standalone file installed in another window. Routing a single file inside an open root needs WD1 and WD7 and stays with D2, so W6 bullet 8b stays open. Adopting a warm session into window 2 after window 1 switched away transfers the writer synchronously; window 1's stale installation cannot publish, and a delayed SwiftUI teardown cannot revoke the new writer. The delayed-teardown hosted test drives the editor-binding writer-release and revoked-installation lifecycle through admitted façade fixtures, without mounting a `WorkspaceWindow`. If `App/AppState+Workspace.swift` or another touched file would pass about 400 lines, the first commit is a mechanical split with no behavior change. A typing A/B in `docs/perf/` shows the fan-out adds no per-keystroke work. No user window creation, no `WindowOpenAdmission` change, and tabbing stays disallowed. | W6 bullets 1–3, 7, 8a, and 9; W4 bullets 3–4 | **Yes**: mutation, shared scope, quarantine |
+| **D2 — routing and window lifecycle** | WD1 focus policy, New Window, external-open routing, guarded opens and close lifecycle (WD3/WD7/WD8). Mount two production `WorkspaceWindow`s and complete the independent-document, different-root, and external-banner hosted tests left open by C. Record W0 bullets 1–4 owner smoke on the guarded build before removing C fallback; remove it only after these paths pass. Restoration-record removal stays with E after WD5. | W0 bullets 1–4 (owner smoke); W2 bullets 1–3; W4 bullets 1–2; W6 bullet 8b; W7 bullets 1–5; W8 | **Yes**: ownership and close retention |
+| **F — native tabs** | Enable tabbing; New Tab, titles, merge/move. W0 must prove New Tab joins the key group. Closing a tab uses D2's lifecycle; E adds restoration-record removal and G adds background-tab residency. | W0 bullet 5 (tab identity/New Tab); W10 bullets 1–3 | No |
+| **E — restoration** | After F and the WD5 decision: restoration/migration, missing-item handling, tab-group/order records and restoration. A user close removes its record; a quit keeps it. | W7 bullet 6; W9 | **Yes (light)**: bookmarks |
+| **G — residency/acceptance** | Preview residency, dual-window XCUITest, memory/typing measurements, accessibility; no bridge changes. | W2 bullet 4; W10 bullet 4; W11 bullets 1–2; W12; W13 | No |
 
 Order: {L, B1} → B2 → C → D1-0 → D1a → D1b → D1c → D2 → F → E → G. D1-0 is docs only. D1a, D1b, and D1c replace the single D1 row and land in that order. E follows F because it restores tab order.
 L lands before B1; its narrow navigator focus parameter must be preserved when B1 forwards activation. Both L and B1 must land before B2.
@@ -663,10 +665,13 @@ recorded in the closing commit.
 
 ### W0 — Baseline inventory and mechanism probe
 
+D2 owns the remaining owner smoke for bullets 1–4 on the guarded build, before removing
+C's fallback. W8 then verifies D2's routing to an existing or new window under WD1/WD7.
+
 - [ ] Inventory second-window paths on the shipped build: tab-bar "+", Show Tab Bar, Merge All Windows, Finder Open With, Dock drop, and onOpenURL-created scenes. Include system-provided menu shortcuts in the ⇧⌘N/⌘T collision check. *Owner smoke.*
-- [ ] Chosen external-open mechanism delivers every Finder/Dock open to exactly one existing window, with no blank scene. Close in **PR C**. *Hosted probe + owner smoke.*
+- [ ] Chosen external-open mechanism delivers every Finder/Dock open to exactly one existing window, with no blank scene. C records the hosted probe; D2 records the remaining owner smoke. *Hosted probe + owner smoke.*
 - [ ] **PR C guard:** tabbing disallowed until F; every first-bullet creation path disabled/routed to the existing window. If a second WindowState still appears, every file/root open there refuses until D2. *Named hosted tests + owner smoke covering each path.*
-- [ ] With SwiftUI owning the delegate, the chosen `windowShouldClose` interception safely vetoes/defers close without breaking scene teardown. Close before C ships. *Hosted probe + owner smoke.*
+- [ ] With SwiftUI owning the delegate, the chosen `windowShouldClose` interception safely vetoes/defers close without breaking scene teardown. Owner smoke before D2 relies on it. *Hosted probe + owner smoke.*
 - [ ] WindowState identity survives tab merge/move and `openWindow`; command creation gives a fresh state, and New Tab ⌘T joins the key window's group. Close before F relies on it. *Hosted probe + owner smoke.*
 - Evidence: B1 re-ran the §2.1 code inventory at its head. No `handlesExternalEvents`, `openWindow`, `tabbingMode`, `allowsAutomaticWindowTabbing`, `newWindowForTab`, focused-value, restoration, or `applicationShouldTerminateAfterLastWindowClosed` use exists outside PR L's `@SceneStorage`. `CommandGroup(replacing: .newItem)` still removes New Window. Bullet 1 still needs the owner smoke on a shipped build. Bullet 5 stays open until F.
 - Evidence (C, hosted only): boxes above stay open because each one still needs owner smoke.
@@ -743,7 +748,7 @@ recorded in the closing commit.
 
 - [ ] Every §5.2 entry point that targets a file current in another window focuses that window and creates no second installation. *Named hosted tests, one per entry point.*
 - [ ] Hard links and case or NFC/NFD aliases count as the same file. *Named hosted test.*
-- [ ] Every session has ≤ 1 writer always and ≤ 1 live installation after SwiftUI teardown settles. Adoption revokes the old writer synchronously; late teardown cannot revoke the new writer. *Debug assertions + named hosted test with delayed teardown.*
+- [ ] Every session has ≤ 1 writer always and ≤ 1 live installation after SwiftUI teardown settles. Adoption revokes the old writer synchronously; late teardown cannot revoke the new writer. *Debug assertions + named hosted test with delayed teardown (D1c).* Drive the delayed writer-release and revoked-installation events through the editor-binding installation-release path on admitted façade fixtures; a mounted `WorkspaceWindow` is not required.
 - [ ] A warm session adopted by window 2 after window 1 switched away transfers the writer; window 1's stale installation cannot publish. *Named hosted test.*
 - Evidence: _open_
 
@@ -792,7 +797,7 @@ scheduling root cause remains unknown. This is an additional gate, not closure b
 - [ ] Closing the last window leaves the app running. *Owner smoke.*
 - [ ] The installation is revoked, the writer released, and the LRU reconciled; a failed eviction candidate is still retained (§5). *Named hosted test.*
 - [ ] The preview controller is invalidated and released (its weak reference becomes `nil`). *Named hosted test.*
-- [ ] A user close removes the restoration record; a quit does not. *Named hosted test.*
+- [ ] A user close removes the restoration record; a quit does not. *Named hosted test (E, after WD5).*
 - Evidence: _open_
 
 ### W8 — External-open and ⌘N routing
@@ -815,8 +820,8 @@ scheduling root cause remains unknown. This is an additional gate, not closure b
 
 - [ ] New Tab ⌘T joins the key window's group, and every W2 bullet holds between tabs. *Named hosted test + owner smoke.*
 - [ ] Merge All Windows, Move Tab to New Window, and dragging a tab keep each tab's document, selection, undo stack, and Find state. *Owner smoke.*
-- [ ] Tab titles are unique per §8, and closing a tab follows §6.2. *Named hosted test.*
-- [ ] A background tab's preview follows §7.2 residency. *Named hosted test.*
+- [ ] Tab titles are unique per §8, and closing a tab follows §6.2 steps 1–5. E adds restoration-record removal under W7 bullet 6. *Named hosted test (F).*
+- [ ] A background tab's preview follows §7.2 residency. *Named hosted test (G, after WD6's residency decision).*
 - Evidence: _open_
 
 ### W11 — Memory
