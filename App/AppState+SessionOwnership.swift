@@ -93,6 +93,7 @@ extension AppState {
     /// external read, or quarantine must keep the original fail-closed state until it
     /// releases the session.
     func releaseUnreferencedSessionOwnership(for session: DocumentSession) {
+        releaseRetainedWorkspaceAuthorityIfUnreferenced(for: session)
         let sessionIdentity = ObjectIdentifier(session)
         guard !registry.isShownByAnyWindow(session),
               case .unavailable? = unanchoredManagedSessionOwnershipProofs[sessionIdentity],

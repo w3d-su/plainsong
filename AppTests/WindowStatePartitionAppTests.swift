@@ -40,7 +40,8 @@ final class WindowStatePartitionAppTests: XCTestCase {
             // `registeredWindows` is B2's window list for inventories (§3.4 I2).
             WindowStatePartitionInventory.registry.union(["onEditorReplaceAuthorityInputChange",
                                                           "replaceAuthority", "registeredWindows",
-                                                          "menuEnablementDidChange"])
+                                                          "menuEnablementDidChange", "editorInstallationWindows",
+                                                          "retainedWorkspaceAuthorityOwners"])
         )
         XCTAssertEqual(
             WindowStatePartitionInventory.window.count + WindowStatePartitionInventory.root.count

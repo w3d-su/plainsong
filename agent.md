@@ -270,8 +270,14 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   created per visible document pane. A scene gets the app-owned façade whenever no open
   scene shows it, so closing the only window and reopening it works. A scene opened while
   another shows that façade refuses file and root opens and closes itself until PR D2, and
-  native tabbing stays off until PR F. Same-file focus (WD1), shared-root
-  release (WD2), and a user-facing New Window (D2) are not implemented yet.
+  native tabbing stays off until PR F. Closing a root releases only that root's
+  eligible sessions. Another root, a standalone warm session, and any session
+  another window shows or installs stay warm with their tasks, metadata, and LRU
+  recency (D1b). Last-root preflight includes every session belonging to that root,
+  including a session another window preserves. Preserved sessions retain the original
+  security scope until eviction or final ownership release. Editor installations record
+  their owning window, so delayed teardown in the closing window uses retirement. Same-file focus (WD1), one shared root context (D1c), and a
+  user-facing New Window (D2) are not implemented yet.
 - With no attached workspace window, New File, Open, and Open Recent wait for a scene
   that has claimed the owner. A three-second attach timeout lets the next command retry;
   a tracked façade alone does not establish that a scene exists.

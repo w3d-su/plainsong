@@ -134,6 +134,7 @@ extension AppState {
         for installation in discardedInstallations {
             pendingEditorSourceInstallations[installation] = nil
             editorBindingInstallations[installation] = nil
+            registry.editorInstallationWindows[installation] = nil
         }
         editorWriterInstallations[sessionIdentity] = nil
         externalDiskInspectionTasks.removeValue(forKey: sessionIdentity)?.task.cancel()
@@ -153,9 +154,11 @@ extension AppState {
     }
 
     func firstUnretirableExternalConflict(
-        excluding retiredSessions: Set<ObjectIdentifier>
+        excluding retiredSessions: Set<ObjectIdentifier>,
+        among candidates: [DocumentSession]? = nil
     ) -> URL? {
-        registry.sessions(from: [.warmCache, .fileBackedWindowDocuments])
+        let pool = candidates ?? registry.sessions(from: [.warmCache, .fileBackedWindowDocuments])
+        return pool
             .filter { !retiredSessions.contains(ObjectIdentifier($0)) }
             .compactMap { session -> URL? in
                 guard session.isDirty,
@@ -507,6 +510,7 @@ private extension AppState {
         if !isRetiredEditorSession(session) {
             removeEditorDocumentBindingRegistration(for: session)
         }
+        releaseRetainedWorkspaceAuthorityIfUnreferenced(for: session)
         return true
     }
 
