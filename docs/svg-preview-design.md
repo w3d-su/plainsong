@@ -148,8 +148,9 @@ DOM, so they inherit the result. Export CSP already allows `data:` images.
 - Decided in PR B: SVG byte cap 1 MiB, 50,000 elements, depth 256 (S6 may still tune
   them); `data:image/svg+xml` stays blocked in v1.
 - Pending: remote `https:` SVG. Recommended for v1: leave it unblocked and documented
-  (remote images are opt-in and render in the same image mode). The macOS 27 probe saw
-  four `CONNECT`s and no successful decode; macOS 15.7.9 CI saw one `CONNECT`.
+  (remote images are opt-in and render in the same image mode). With it on, the probe
+  records at least one `CONNECT` (four on macOS 27, one on macOS 15.7.9 CI). Its proxy
+  answers `403` and closes the socket, so this shows the request, not a completed fetch.
   An `.svg` extension filter would not work;
   a real control is a separate gate that proxies remote images through a native scheme
   and validates or rejects SVG by MIME type.

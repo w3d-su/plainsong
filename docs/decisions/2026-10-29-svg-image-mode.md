@@ -46,10 +46,12 @@ the navigation policy and the page CSP (`default-src 'none'`).
 (`AssetURLPolicy.loadAsset` remains the raster export gate). WYSIWYG does not thumbnail
 SVG. Remote `https:` SVG is not specially blocked or validated (owner decision pending).
 With Allow Remote Images off, that probe records no connection. With it on, WebKit
-sends a `CONNECT` for the remote image. The macOS 27 run saw four and did not observe
-a successful decode; the macOS 15.7.9 CI run of this test saw one. It would render in
-the same image mode as any remote image. Filtering by `.svg` would not help (`a.png` can
-answer `image/svg+xml`); a real control is a separate gate that proxies remote images
+sends at least one `CONNECT` (four on macOS 27, one on macOS 15.7.9 CI). The probe
+proxy answers `403` and closes the socket before a tunnel exists, so the count is
+retry behavior and the probe shows the request policy, not how a fetched remote SVG
+renders. Left unchanged, it would be handled like any other remote image. Filtering
+by `.svg` would not help (`a.png` can answer `image/svg+xml`); a real control is a
+separate gate that proxies remote images
 through a native scheme, checks the MIME type, and validates or rejects SVG.
 
 ## Why
