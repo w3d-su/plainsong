@@ -451,14 +451,20 @@ republishes only when its value changes literally.
   not stop remote script, style, or font; the content rule does. Every preview and export
   `WKWebView` is created by `PreviewController` and installs the blocking list before the
   page loads. A new web view, including print or Quick Look, has to go through that
-  controller. `make lint` checks production Swift sources and permits direct WebKit
-  construction only in the controller's two factory files. Link clicks stay in JavaScript
-  (`preventDefault` plus `linkClicked`), so the rule does not take over external opening. If the blocking list fails to compile,
-  the preview page is not loaded and the failure is shown. That result is not cached.
-  The same controller tries again once, off the typing path, and again when another
-  document is shown. If only the https-image exception fails, the preference is treated
-  as off. Export keeps the blocking list for its whole life and will not tell JavaScript
-  that remote images are allowed.
+  controller. `make lint` is a textual guard for production Swift and Objective-C, not a
+  Swift parser. WebKit imports are limited to PreviewKit and the two export files that
+  only name WebKit types. SwiftUI `WebView` and `WebPage` calls are rejected. Direct
+  `WKWebView` and `WKWebViewConfiguration` calls are allowed only in the controller's two
+  factory files. Aliases, subclasses, `.self`, bare `.init`, inferred `.init`,
+  `type(of:).init`, and dynamic lookup of a `WK` class are rejected as well, including
+  `.m` and `.mm` sources. Concatenated class names and `removeAllContentRuleLists()` are
+  outside the guard. Link clicks stay in JavaScript (`preventDefault` plus
+  `linkClicked`), so the rule does not take over external opening. If the blocking list
+  fails to compile, the preview page is not loaded and the failure is shown. That result
+  is not cached. The same controller tries again once, off the typing path, and again
+  when another document is shown. If only the https-image exception fails, the preference
+  is treated as off. Export keeps the blocking list for its whole life and will not tell
+  JavaScript that remote images are allowed.
 - **Local assets:** custom scheme `asset://` via `WKURLSchemeHandler`. JS rewrites
   relative image/link `src` to `asset://<workspace-relative-path>`; the handler resolves
   against the current file's directory / workspace root. Render payloads carry an opaque

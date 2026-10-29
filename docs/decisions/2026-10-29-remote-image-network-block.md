@@ -52,12 +52,18 @@ The rule blocks remote script, style, font, fetch, and navigation in both states
 CSP on the `file://` page is not that defense: with no content rule, the probe still
 recorded `GET` for remote script, font, and stylesheet. Every preview and export
 `WKWebView` has to be created by `PreviewController`, which installs the blocking list
-before the page loads. `make lint` scans production Swift sources and rejects direct
-`WKWebView` and `WKWebViewConfiguration` construction outside the controller's two
-specific factory files; test and probe sources are excluded. A later print or Quick
-Look web view cannot rely on the CSP meta element. Link clicks are still `preventDefault`
-plus the `linkClicked` bridge message, so external opening does not depend on the web view
-navigating.
+before the page loads. `make lint` is a textual guard over production Swift and
+Objective-C sources, not a Swift parser. It rejects a WebKit import outside PreviewKit
+and the two export files that only name WebKit types. It rejects SwiftUI `WebView` and
+`WebPage` calls. Direct `WKWebView` and `WKWebViewConfiguration` calls are allowed only
+in the controller's two factory files. Aliases, subclasses, `.self`, bare `.init`,
+inferred `.init`, `type(of:).init` (the metatype is not known textually), and
+`NSClassFromString` or `objc_getClass` of a `WK` class are rejected too. `.m` and `.mm`
+files are scanned; vendored C headers are not, and test and probe sources are excluded.
+Concatenated class names and `removeAllContentRuleLists()` are outside the guard. A
+later print or Quick Look web view cannot rely on the CSP meta element. Link clicks
+are still `preventDefault` plus the `linkClicked` bridge message, so external opening
+does not depend on the web view navigating.
 
 ## Why this shape
 
