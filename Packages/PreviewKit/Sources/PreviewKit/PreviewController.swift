@@ -68,6 +68,15 @@ public final class PreviewController: NSObject, ObservableObject {
     var pendingExportRender: PendingExportRender?
     private(set) var theme = "system"
     private(set) var allowRemoteImages = false
+    /// Nil for the export controller, which keeps the blocking list it was created with,
+    /// and nil until compilation finishes when this controller had to wait for it.
+    var liveRemoteImageRules: PreviewRemoteImageRules?
+    var activeContentRuleList: WKContentRuleList?
+    /// The blocking list failed to compile. The page stays unloaded so nothing can be fetched.
+    var remoteImageNetworkUnavailable = false
+    /// True while the first compilation is still outstanding. The requested switch is kept
+    /// and applied when the lists arrive, so creation does not block the main queue.
+    let awaitsRemoteImageRules: Bool
     private(set) var workspaceAssetRootURL: URL?
     var exportAssetRootURL: URL?
 
@@ -83,8 +92,29 @@ public final class PreviewController: NSObject, ObservableObject {
         recoversFromWebContentTermination: Bool = false,
         retriesSilentInitialLoad: Bool = PreviewInitialReadiness.retriesSilentInitialLoadByDefault,
         initialReadinessScheduler: @escaping PreviewInitialReadiness.Scheduler = PreviewInitialReadiness.schedule,
-        pageLoadOverrideForTesting: (@MainActor (WKWebView, URL?) -> WKNavigation?)? = nil
+        pageLoadOverrideForTesting: (@MainActor (WKWebView, URL?) -> WKNavigation?)? = nil,
+        remoteImageRules: PreviewRemoteImageRules? = nil
     ) {
+        let resolvedLiveRules: PreviewRemoteImageRules?
+        let installedRule: WKContentRuleList?
+        let waitsForRules: Bool
+        if let contentRuleList {
+            resolvedLiveRules = nil
+            installedRule = contentRuleList
+            waitsForRules = false
+        } else if let remoteImageRules {
+            resolvedLiveRules = remoteImageRules
+            installedRule = remoteImageRules.blockAll
+            waitsForRules = false
+        } else if let cached = PreviewRemoteImageRuleStore.cachedRules() {
+            resolvedLiveRules = cached
+            installedRule = cached.blockAll
+            waitsForRules = false
+        } else {
+            resolvedLiveRules = nil
+            installedRule = nil
+            waitsForRules = true
+        }
         let assetSchemeHandler = AssetURLSchemeHandler()
         let scriptMessageProxy = ScriptMessageProxy()
         let previewIndexURL = previewIndexURL?.standardizedFileURL
@@ -99,7 +129,7 @@ public final class PreviewController: NSObject, ObservableObject {
         let configuration = Self.webViewConfiguration(
             assetSchemeHandler: assetSchemeHandler,
             bridgeHandler: scriptMessageProxy,
-            contentRuleList: contentRuleList,
+            contentRuleList: installedRule,
             websiteDataStore: websiteDataStore
         )
 
@@ -111,6 +141,11 @@ public final class PreviewController: NSObject, ObservableObject {
         self.initialReadinessScheduler = initialReadinessScheduler
         self.retriesSilentInitialLoad = retriesSilentInitialLoad
         self.pageLoadOverrideForTesting = pageLoadOverrideForTesting
+        liveRemoteImageRules = resolvedLiveRules
+        activeContentRuleList = installedRule
+        remoteImageNetworkUnavailable = !waitsForRules && contentRuleList == nil
+            && installedRule == nil
+        awaitsRemoteImageRules = waitsForRules
 
         super.init()
 
@@ -120,8 +155,14 @@ public final class PreviewController: NSObject, ObservableObject {
         assetSchemeHandler.onCurrentFailure = { [weak self] failure in
             self?.emitPreviewEvent(.failed(failure))
         }
-        loadPreviewPage()
-        startInitialReadinessWatchdog()
+        if waitsForRules {
+            PreviewRemoteImageRuleStore.whenReady { [weak self] rules in
+                self?.applyCompiledRemoteImageRules(rules)
+            }
+        } else if !remoteImageNetworkUnavailable {
+            loadPreviewPage()
+            startInitialReadinessWatchdog()
+        }
     }
 
     /// Injects 06's leased reader. Production iOS composition stays with the integrator.
@@ -302,7 +343,9 @@ public final class PreviewController: NSObject, ObservableObject {
         guard isReady else { return }
         send(.setTheme(SetThemePayload(theme: theme, allowRemoteImages: allowRemoteImages)))
     }
+}
 
+extension PreviewController {
     func receive(_ message: BridgeMessage) {
         switch message {
         case let .ready(payload):
@@ -414,8 +457,13 @@ public extension PreviewController {
     }
 
     func setAllowsRemoteImages(_ allowRemoteImages: Bool) {
-        guard allowRemoteImages != self.allowRemoteImages else { return }
-        self.allowRemoteImages = allowRemoteImages
+        if awaitsRemoteImageRules, liveRemoteImageRules == nil {
+            self.allowRemoteImages = allowRemoteImages
+            return
+        }
+        let enforced = enforcedRemoteImageAllowance(allowRemoteImages)
+        guard enforced != self.allowRemoteImages else { return }
+        self.allowRemoteImages = enforced
         sendPreviewSettings()
     }
 
@@ -569,7 +617,27 @@ extension PreviewController {
         ))
     }
 
+    /// File-private: `PreviewRemoteImageRules` is internal, so a public method cannot take it.
+    private func applyCompiledRemoteImageRules(_ rules: PreviewRemoteImageRules) {
+        guard !isInvalidated, liveRemoteImageRules == nil else { return }
+        liveRemoteImageRules = rules
+        let allowed = allowRemoteImages && rules.httpsImages != nil && rules.blockAll != nil
+        allowRemoteImages = allowed
+        guard let rule = rules.rule(allowingHTTPSImages: allowed) else {
+            remoteImageNetworkUnavailable = true
+            return
+        }
+        webView.configuration.userContentController.add(rule)
+        activeContentRuleList = rule
+        loadPreviewPage()
+        startInitialReadinessWatchdog()
+    }
+
     func loadPreviewPage(stoppingCurrentLoad: Bool = false) {
+        // Fail closed: never parse the page while no content rule is installed.
+        // The first controller compiles asynchronously, and a reload during that
+        // wait must not open a window with the static `img-src https:` CSP alone.
+        guard activeContentRuleList != nil, !remoteImageNetworkUnavailable else { return }
         pageLoadGeneration = UUID()
         currentPageNavigation = nil
         if stoppingCurrentLoad {

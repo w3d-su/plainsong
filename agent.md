@@ -440,10 +440,17 @@ republishes only when its value changes literally.
   arrives, and accepts only a protocol match from the current page generation.
 - **Security:** strict CSP (`default-src 'none'; script-src 'self'; style-src 'self'
   'unsafe-inline'; img-src asset: data: https:`), `isElementFullscreenEnabled` off, and
-  no remote loads by default. The preview JS removes remote image `src` values unless
-  the user enables the Allow Remote Images preference; that preference permits only
-  `https:` images and does not relax script, style, navigation, or non-image network
-  behavior.
+  no remote loads by default. Two layers enforce Allow Remote Images. The JS layer still
+  removes remote `<img>` `src` values unless the preference is on, and even then it
+  permits only `https:` images. The network layer is a WebKit content rule compiled once
+  on the first preview controller (`WKContentRuleListStore`) and swapped without
+  reloading the page: off blocks every `http:`/`https:` subresource; on blocks every
+  `http:`/`https:` load except `https:` images. Script, style, font, navigation, and
+  fetch are unchanged.
+  Link clicks stay in JavaScript (`preventDefault` plus `linkClicked`), so the rule does
+  not take over external opening. If the blocking list fails to compile, the preview
+  page is not loaded. If only the https-image exception fails, the preference is treated
+  as off. Export keeps the blocking list for its whole life.
 - **Local assets:** custom scheme `asset://` via `WKURLSchemeHandler`. JS rewrites
   relative image/link `src` to `asset://<workspace-relative-path>`; the handler resolves
   against the current file's directory / workspace root. Render payloads carry an opaque
