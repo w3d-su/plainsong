@@ -27,13 +27,27 @@ enabled = info.get("PLAINSONG_UPDATES_ENABLED")
 if enabled == "NO":
     sys.exit(0)
 
+# Sparkle trims with whitespaceAndNewlineCharacterSet before decoding.
+# These 26 scalars are that set. Python str.strip() also removes
+# U+001C-U+001F, which Foundation keeps and then rejects. U+200B is in
+# the Foundation set even though its Unicode category is Cf, not Z.
+SPARKLE_WHITESPACE = (
+    "\t\n\v\f\r \u0085\u00a0\u1680"
+    "\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009"
+    "\u200a\u200b\u2028\u2029\u202f\u205f\u3000"
+)
+
+def sparkle_trim(value):
+    return value.strip(SPARKLE_WHITESPACE)
+
 def decoded_length(value):
     # Sparkle 2.10.0 decode(): trim ends only, then
     # initWithBase64EncodedString:options:0. Missing padding and interior
-    # whitespace are invalid. Do not repair either.
+    # whitespace are invalid. Do not repair either. Non-zero trailing bits
+    # are accepted: NSData options 0 returns the same 32 bytes.
     if not isinstance(value, str):
         return None
-    stripped = value.strip()
+    stripped = sparkle_trim(value)
     if not stripped or len(stripped) % 4 != 0:
         return None
     try:
@@ -91,7 +105,8 @@ short_key = base64.b64encode(b"\x11" * 31).decode("ascii")
 
 def write(name, payload):
     with open(os.path.join(root, name), "wb") as handle:
-        plistlib.dump(payload, handle)
+        # Binary plists can hold the U+001F case. XML rejects control characters.
+        plistlib.dump(payload, handle, fmt=plistlib.FMT_BINARY)
 
 write("disabled.plist", {
     "PLAINSONG_UPDATES_ENABLED": "NO",
@@ -183,6 +198,29 @@ write("quoted-feed.plist", {
     "SURequireSignedFeed": True,
     "SUVerifyUpdateBeforeExtraction": True,
 })
+write("unit-separator-key.plist", {
+    "PLAINSONG_UPDATES_ENABLED": "YES",
+    "SUFeedURL": expected,
+    "SUPublicEDKey": good_key + "\x1f",
+    "SURequireSignedFeed": True,
+    "SUVerifyUpdateBeforeExtraction": True,
+})
+write("zero-width-space-key.plist", {
+    "PLAINSONG_UPDATES_ENABLED": "YES",
+    "SUFeedURL": expected,
+    "SUPublicEDKey": "\u200b" + good_key,
+    "SURequireSignedFeed": True,
+    "SUVerifyUpdateBeforeExtraction": True,
+})
+noncanonical = list(good_key)
+noncanonical[42] = "F"
+write("nonzero-tail-key.plist", {
+    "PLAINSONG_UPDATES_ENABLED": "YES",
+    "SUFeedURL": expected,
+    "SUPublicEDKey": "".join(noncanonical),
+    "SURequireSignedFeed": True,
+    "SUVerifyUpdateBeforeExtraction": True,
+})
 PY
     failed=0
     while IFS=$'\t' read -r name expect; do
@@ -215,6 +253,9 @@ inner-space-key.plist	fail
 surrounding-whitespace-key.plist	pass
 padded-feed.plist	fail
 quoted-feed.plist	pass
+unit-separator-key.plist	fail
+zero-width-space-key.plist	pass
+nonzero-tail-key.plist	pass
 CASES
     rm -rf "$tmp"
     if [[ "$failed" -ne 0 ]]; then

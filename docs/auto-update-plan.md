@@ -77,9 +77,11 @@ Sparkle supports sandboxed apps through its XPC services:
   `codesign --verify --deep --strict` (verification only). A shipped plist whose
   `PLAINSONG_UPDATES_ENABLED` is not `NO` must have a 32-byte EdDSA key, the expected
   HTTPS feed (`https://w3d-su.github.io/plainsong/appcast.xml`), `SURequireSignedFeed`,
-  and `SUVerifyUpdateBeforeExtraction`. The key check matches Sparkle's decoder
-  (no padding repair, no interior whitespace). The feed check strips quotes only.
-  CI runs the same guard on the Debug Info.plist after the ui-performance build. The installer-launcher key and the mach-lookup
+  and `SUVerifyUpdateBeforeExtraction`. The key check matches Sparkle's decoder:
+  Foundation's whitespace trim, no padding repair, and no interior whitespace.
+  Non-zero trailing base64 bits are accepted. The feed check strips quotes only.
+  CI runs the same guard on the Debug Info.plist after the ui-performance build.
+  The installer-launcher key and the mach-lookup
   exceptions are present even when the flag is NO. They do not start the updater, and
   the temporary exceptions need a separate pass before a Mac App Store submission.
 

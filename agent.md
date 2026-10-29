@@ -881,8 +881,9 @@ make format           # swiftformat . && swiftlint --fix
   on each nested item and `codesign --verify --deep --strict` on the finished app
   (verification only). A shipped plist whose `PLAINSONG_UPDATES_ENABLED` is not `NO`
   must have a 32-byte EdDSA key, the expected HTTPS feed, `SURequireSignedFeed`, and
-  `SUVerifyUpdateBeforeExtraction`. The key check matches Sparkle 2.10.0: trim the
-  ends only, require padding, and reject interior whitespace. The feed check strips
+  `SUVerifyUpdateBeforeExtraction`. The key check matches Sparkle 2.10.0: trim
+  Foundation's whitespace set only, require padding, and reject interior
+  whitespace. Non-zero trailing base64 bits are accepted. The feed check strips
   quotes only. CI runs the guard on the Debug Info.plist after the ui-performance
   `make build`.
 
