@@ -20,7 +20,11 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     let openDestinationFolder: @MainActor (URL) async throws -> IOSWorkspaceGrant
     var openExternalURL: ((URL) -> Void)?
     var onNavigationFailure: ((String) -> Void)?
-    var onPreviewUnavailable: ((String) -> Void)?
+    var onPreviewUnavailable: ((String) -> Void)? {
+        didSet { deliverPendingPreviewUnavailable() }
+    }
+
+    private var pendingPreviewUnavailableMessage: String?
 
     private(set) var currentGrant: IOSWorkspaceGrant?
     var handle: IOSDocumentHandle?
@@ -45,6 +49,19 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     var renderTask: Task<Void, Never>?
     var renderedRevision: IOSDocumentRevision?
     lazy var reloadRelay = IOSDocumentReloadRelay(documents: documents, editor: editor)
+
+    /// Observation can replay `contentRuleUnavailable` before production assigns
+    /// `onPreviewUnavailable`. Keep the message until that callback exists.
+    func noteContentRuleUnavailable() {
+        pendingPreviewUnavailableMessage = PreviewNetworkPolicyFailure.userMessage
+        deliverPendingPreviewUnavailable()
+    }
+
+    private func deliverPendingPreviewUnavailable() {
+        guard let message = pendingPreviewUnavailableMessage, let onPreviewUnavailable else { return }
+        pendingPreviewUnavailableMessage = nil
+        onPreviewUnavailable(message)
+    }
 
     init(
         documents: any IOSDocumentStore,

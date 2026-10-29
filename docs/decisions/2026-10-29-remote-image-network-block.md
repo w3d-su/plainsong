@@ -30,22 +30,30 @@ together still block, so the overlap fails closed. The existing JavaScript image
 stays as the second layer.
 
 Store identifiers are a prefix plus the first 12 hex characters of the rule source's
-SHA-256, so a changed rule cannot reuse a previously compiled list.
+SHA-256, so a changed rule cannot reuse a previously compiled list. The first compilation
+also deletes every other stored `plainsong-` identifier, except the two current hashes
+and any identifier a test has marked in use. A later source change therefore does not
+leave the previous hash behind.
 
 If the blocking list fails to compile, the preview page is not loaded and the failure is
 reported (`IOSPreviewEvent.contentRuleUnavailable`, a macOS preview-pane message, and an
-iOS alert). That failure is not cached; the next preview controller compiles again. If
-only the https-image list fails, the switch is treated as off and the blocking list stays
-installed. Export uses the blocking list for the controller's whole life, never installs
-the exception, and refuses `setAllowsRemoteImages(true)` at the JavaScript layer too.
+iOS alert). That failure is not cached. The controller that saw it tries once more on
+the next turn of the main queue, and once more when another document is shown. It does
+not compile on every keystroke. If only the https-image list fails, the switch is treated
+as off and the blocking list stays installed. Export uses the blocking list for the
+controller's whole life, never installs the exception, and refuses
+`setAllowsRemoteImages(true)` at the JavaScript layer too.
 That replaces the export-only identifier `plainsong-export-no-http-v1` from
 `2026-10-22-preview-webview-lifecycle.md`; the block action is the same, and the filter
 now also matches `ws:`/`wss:`.
 
-The rule blocks remote script, style, font, fetch, and navigation in both states; their
-CSP and the JS link handling are unchanged. Link clicks are still `preventDefault` plus
-the `linkClicked` bridge message, so external opening does not depend on the web view
-navigating.
+The rule blocks remote script, style, font, fetch, and navigation in both states.
+CSP on the `file://` page is not that defense: with no content rule, the probe still
+recorded `GET` for remote script, font, and stylesheet. Every preview and export
+`WKWebView` has to be created by `PreviewController`, which installs the blocking list
+before the page loads. A later print or Quick Look web view cannot rely on the CSP meta
+element. Link clicks are still `preventDefault` plus the `linkClicked` bridge message,
+so external opening does not depend on the web view navigating.
 
 ## Why this shape
 

@@ -1,4 +1,5 @@
 #if os(macOS)
+    import Foundation
     import MarkdownCore
     import Network
     @testable import PreviewKit
@@ -18,7 +19,8 @@
         }
 
         private func blockedHosts(for token: String) -> [String] {
-            ["svg", "script", "font", "fetch", "style", "http", "import", "iframe", "prefetch", "preconnect"].map {
+            // preconnect connects with no rule, so it stays. iframe and prefetch never connect.
+            ["svg", "script", "font", "fetch", "style", "http", "import", "preconnect"].map {
                 "plainsong-\($0)-\(token).invalid"
             }
         }
@@ -143,18 +145,35 @@
             try await installWave("csp", in: controller.webView)
             let contacted = try await harness.connections(
                 since: baseline,
-                containingAll: ["script", "font", "style", "import"].map { "plainsong-\($0)-csp.invalid" }
+                containingAll: ["script", "font", "style", "import", "preconnect"].map {
+                    "plainsong-\($0)-csp.invalid"
+                }
             )
-            for kind in ["img", "srcset", "picture", "css", "imageset", "script", "font", "style", "import"] {
+            for kind in [
+                "img",
+                "srcset",
+                "picture",
+                "css",
+                "imageset",
+                "script",
+                "font",
+                "style",
+                "import",
+                "preconnect",
+            ] {
                 let host = "plainsong-\(kind)-csp.invalid"
                 XCTAssertTrue(
                     contacted.contains { $0.contains(host) },
                     "CSP alone did not request \(host): \(contacted)"
                 )
             }
-            for kind in ["fetch", "http"] {
+            // fetch and http are silent under CSP. iframe and prefetch are silent with no rule.
+            for kind in ["fetch", "http", "iframe", "prefetch"] {
                 let host = "plainsong-\(kind)-csp.invalid"
-                XCTAssertFalse(contacted.contains { $0.contains(host) }, "CSP should still block \(host): \(contacted)")
+                XCTAssertFalse(
+                    contacted.contains { $0.contains(host) },
+                    "No-rule page unexpectedly requested \(host): \(contacted)"
+                )
             }
         }
 
@@ -184,7 +203,8 @@
             )
             let identifiers = compiled.identifiers
             addTeardownBlock {
-                PreviewRemoteImageRuleStore.removeStoredRules(identifiers: identifiers)
+                PreviewRemoteImageRuleStore.unprotectStoredRules(identifiers)
+                PreviewRemoteImageRuleStore.removeStoredRules(identifiers: identifiers, force: true)
             }
             return compiled.rules
         }

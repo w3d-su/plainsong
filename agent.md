@@ -447,13 +447,17 @@ republishes only when its value changes literally.
   on the first preview controller (`WKContentRuleListStore`) and swapped without
   reloading the page. The next list is added before the previous one is removed, so the
   overlap stays fail-closed. Off blocks every `http:`/`https:` and `ws:`/`wss:` load; on
-  blocks those loads except `https:` images. The rule blocks remote script, style, font,
-  fetch, and navigation in both states; their CSP and the JS link handling are unchanged.
-  Link clicks stay in JavaScript (`preventDefault` plus `linkClicked`), so the rule does
-  not take over external opening. If the blocking list fails to compile, the preview page
-  is not loaded, the failure is shown, and that result is not cached. If only the
-  https-image exception fails, the preference is treated as off. Export keeps the blocking
-  list for its whole life and will not tell JavaScript that remote images are allowed.
+  blocks those loads except `https:` images. On the `file://` preview page that CSP does
+  not stop remote script, style, or font; the content rule does. Every preview and export
+  `WKWebView` is created by `PreviewController` and installs the blocking list before the
+  page loads. A new web view, including print or Quick Look, has to go through that
+  controller. Link clicks stay in JavaScript (`preventDefault` plus `linkClicked`), so
+  the rule does not take over external opening. If the blocking list fails to compile,
+  the preview page is not loaded and the failure is shown. That result is not cached.
+  The same controller tries again once, off the typing path, and again when another
+  document is shown. If only the https-image exception fails, the preference is treated
+  as off. Export keeps the blocking list for its whole life and will not tell JavaScript
+  that remote images are allowed.
 - **Local assets:** custom scheme `asset://` via `WKURLSchemeHandler`. JS rewrites
   relative image/link `src` to `asset://<workspace-relative-path>`; the handler resolves
   against the current file's directory / workspace root. Render payloads carry an opaque

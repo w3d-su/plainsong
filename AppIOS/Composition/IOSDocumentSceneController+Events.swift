@@ -127,7 +127,7 @@ extension IOSDocumentSceneController {
                 openExternalURL?(url)
             }
         case .contentRuleUnavailable:
-            onPreviewUnavailable?(PreviewNetworkPolicyFailure.userMessage)
+            noteContentRuleUnavailable()
         default: break
         }
     }
