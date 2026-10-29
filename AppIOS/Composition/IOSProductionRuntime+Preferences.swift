@@ -10,16 +10,24 @@ extension IOSProductionRuntime {
     func apply(_ preferences: IOSAppPreferences, colorScheme: ColorScheme) {
         previewThemeName = preferences.previewAppearance.rawValue
         systemAppearanceIsDark = colorScheme == .dark
-        let style: UIUserInterfaceStyle = switch preferences.editorAppearance {
+        // System follows the environment. Light and dark force the editor's
+        // traits so dynamic system colors cannot inherit the opposite appearance.
+        let interfaceStyle: UIUserInterfaceStyle
+        let themeStyle: UIUserInterfaceStyle
+        switch preferences.editorAppearance {
         case .system:
-            colorScheme == .dark ? .dark : .light
+            interfaceStyle = .unspecified
+            themeStyle = colorScheme == .dark ? .dark : .light
         case .light:
-            .light
+            interfaceStyle = .light
+            themeStyle = .light
         case .dark:
-            .dark
+            interfaceStyle = .dark
+            themeStyle = .dark
         }
+        editor.applyInterfaceStyle(interfaceStyle)
         let theme = IOSEditorTheme.reading(
-            appearance: style,
+            appearance: themeStyle,
             pointSize: CGFloat(preferences.editorFontSize),
             fontName: preferences.editorFontName,
             palette: preferences.editorPalette

@@ -11,6 +11,10 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
         didSet { applyThemeChrome() }
     }
 
+    /// `.unspecified` follows the host. Light and dark are explicit so dynamic
+    /// colors cannot inherit the opposite system appearance.
+    var forcedInterfaceStyle: UIUserInterfaceStyle = .unspecified
+
     /// Line numbers are presentation only. Source, selection, and statistics ignore them.
     public var showsLineNumbers = true {
         didSet {
@@ -240,19 +244,6 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
         observations.forEach { $0.emit(event) }
     }
 
-    private func applyThemeChrome() {
-        textView.backgroundColor = theme.background
-        applyLineNumberChrome()
-        if textView.markedTextRange != nil {
-            needsBaseStyle = true
-            raisePresentationFloor()
-            return
-        }
-        applyBaseTextStyle()
-        raisePresentationFloor()
-        scheduleHighlight()
-    }
-
     /// Plain paragraphs and new typing use the theme. Syntax paint runs after
     /// this and only restyles token ranges. Source, undo, and marked text stay.
     func applyBaseTextStyle() {
@@ -284,18 +275,19 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
                 storage.addAttributes(
                     [
                         .font: theme.baseFont,
-                        .foregroundColor: theme.baseColor,
+                        .foregroundColor: resolvedAppearanceColor(theme.baseColor),
                     ],
                     range: range
                 )
             }
             storage.endEditing()
         }
+        let baseColor = resolvedAppearanceColor(theme.baseColor)
         textView.font = theme.baseFont
-        textView.textColor = theme.baseColor
+        textView.textColor = baseColor
         var typing = textView.typingAttributes
         typing[.font] = theme.baseFont
-        typing[.foregroundColor] = theme.baseColor
+        typing[.foregroundColor] = baseColor
         textView.typingAttributes = typing
     }
 
@@ -395,6 +387,9 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
         }
         isAdjustingSelection = true
         defer { isAdjustingSelection = false }
-        textView.applyLineNumberGutter(width: metrics.width, background: theme.background)
+        textView.applyLineNumberGutter(
+            width: metrics.width,
+            background: resolvedAppearanceColor(theme.background)
+        )
     }
 }

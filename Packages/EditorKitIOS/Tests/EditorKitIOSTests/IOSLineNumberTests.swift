@@ -1,4 +1,5 @@
 @testable import EditorKitIOS
+import SyntaxKit
 import UIKit
 import XCTest
 
@@ -110,6 +111,118 @@ final class IOSLineNumberGutterTests: XCTestCase {
         XCTAssertEqual(theme.baseFont.pointSize, 16)
         XCTAssertEqual(theme.palette, .graphite)
         XCTAssertEqual(theme.background, .black)
+    }
+
+    func testTrailingNewlineNumbersTheBlankLine() {
+        let harness = IOSEditorHarness(text: "one\ntwo\n")
+        harness.textView.frame.size = CGSize(width: 200, height: 400)
+        XCTAssertEqual(preparedLabels(harness).map(\.number), [1, 2, 3])
+    }
+
+    func testWrappedParagraphDoesNotRepeatTheLineNumber() {
+        let harness = IOSEditorHarness(text: String(repeating: "alpha ", count: 40))
+        harness.textView.frame.size = CGSize(width: 80, height: 400)
+        let numbers = preparedLabels(harness).map(\.number)
+        XCTAssertEqual(numbers, [1])
+    }
+
+    func testForcedLightOverridesADarkHost() throws {
+        let harness = IOSEditorHarness(text: "hello")
+        harness.window.isHidden = true
+        let scene = try XCTUnwrap(harness.window.windowScene)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 200, height: 120)
+        let root = UIViewController()
+        root.overrideUserInterfaceStyle = .dark
+        window.rootViewController = root
+        window.makeKeyAndVisible()
+        root.view.addSubview(harness.textView)
+        harness.textView.frame = root.view.bounds
+        window.layoutIfNeeded()
+        harness.controller.applyInterfaceStyle(.light)
+        harness.controller.theme = IOSEditorTheme.reading(appearance: .light, pointSize: 13)
+        assertLight(harness)
+        harness.controller.theme = IOSEditorTheme.reading(
+            appearance: .light, pointSize: 18, fontName: "Menlo"
+        )
+        assertLight(harness)
+        harness.controller.applyInterfaceStyle(.unspecified)
+        window.layoutIfNeeded()
+        XCTAssertEqual(harness.textView.overrideUserInterfaceStyle, .unspecified)
+        XCTAssertEqual(harness.textView.traitCollection.userInterfaceStyle, .dark)
+        XCTAssertEqual(
+            harness.textView.lineNumberGutter.traitCollection.userInterfaceStyle,
+            .dark
+        )
+        assertFollowsDarkHost(harness)
+    }
+
+    private func assertLight(_ harness: IOSEditorHarness) {
+        XCTAssertEqual(harness.textView.traitCollection.userInterfaceStyle, .light)
+        XCTAssertEqual(
+            harness.textView.lineNumberGutter.traitCollection.userInterfaceStyle,
+            .light
+        )
+        assertPinned(harness.textView.backgroundColor, to: .systemBackground)
+        assertPinned(harness.textView.lineNumberGutter.backgroundColor, to: .systemBackground)
+        assertPinned(harness.textView.textColor, to: .label)
+        let gutter = harness.controller.theme.gutterColor(current: false)
+        assertPinned(harness.controller.resolvedAppearanceColor(gutter), to: gutter)
+        let source = harness.textView.textStorage.string
+        let covered = NSRange(location: 0, length: source.utf16.count)
+        XCTAssertTrue(IOSHighlightPresenter.apply(
+            tokens: [MarkdownSyntaxToken(kind: .inlineCode, range: covered)],
+            coveredRange: covered,
+            expectedFragment: source,
+            theme: harness.controller.theme,
+            to: harness.textView
+        ))
+        let syntax = harness.textView.textStorage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor
+        assertPinned(syntax, to: harness.controller.theme.color(for: .inlineCode))
+    }
+
+    private func assertFollowsDarkHost(_ harness: IOSEditorHarness) {
+        let background = harness.textView.backgroundColor
+        let asHost = background?.resolvedColor(with: harness.textView.traitCollection)
+        let asLight = background?.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+        var hostWhite: CGFloat = -1
+        var lightWhite: CGFloat = -1
+        XCTAssertTrue(asHost?.getWhite(&hostWhite, alpha: nil) == true)
+        XCTAssertTrue(asLight?.getWhite(&lightWhite, alpha: nil) == true)
+        XCTAssertEqual(hostWhite, 0, accuracy: 0.02)
+        XCTAssertEqual(lightWhite, 1, accuracy: 0.02)
+    }
+
+    /// A forced color stays light even when resolved with a dark trait collection.
+    private func assertPinned(
+        _ color: UIColor?,
+        to expected: UIColor,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let light = UITraitCollection(userInterfaceStyle: .light)
+        let dark = UITraitCollection(userInterfaceStyle: .dark)
+        let actual = components(of: color?.resolvedColor(with: dark))
+        let wanted = components(of: expected.resolvedColor(with: light))
+        for (actualValue, wantedValue) in zip(actual, wanted) {
+            XCTAssertEqual(actualValue, wantedValue, accuracy: 0.02, file: file, line: line)
+        }
+    }
+
+    /// Red, green, blue, and alpha; all -1 when the color has no RGB or white form.
+    private func components(of color: UIColor?) -> [CGFloat] {
+        var red: CGFloat = -1
+        var green: CGFloat = -1
+        var blue: CGFloat = -1
+        var alpha: CGFloat = -1
+        if color?.getRed(&red, green: &green, blue: &blue, alpha: &alpha) == true {
+            return [red, green, blue, alpha]
+        }
+        var white: CGFloat = -1
+        if color?.getWhite(&white, alpha: &alpha) == true {
+            return [white, white, white, alpha]
+        }
+        return [red, green, blue, alpha]
     }
 
     private func preparedLabels(_ harness: IOSEditorHarness) -> [IOSLineNumberLabel] {

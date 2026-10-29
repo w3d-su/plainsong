@@ -35,13 +35,13 @@ enum IOSHighlightPresenter {
         }
 
         storage.beginEditing()
-        clearOwnedAttributes(in: coveredRange, storage: storage, restoring: theme)
+        clearOwnedAttributes(in: coveredRange, storage: storage, restoring: theme, on: textView)
         for token in tokens {
             guard let range = intersection(token.range, coveredRange), range.length > 0 else { continue }
             storage.addAttributes(
                 [
                     IOSSyntaxAttribute.key: IOSSyntaxAttribute.token(for: token.kind),
-                    .foregroundColor: theme.color(for: token.kind),
+                    .foregroundColor: paintColor(theme.color(for: token.kind), on: textView),
                     .font: theme.font(for: token.kind),
                 ],
                 range: range
@@ -59,9 +59,15 @@ enum IOSHighlightPresenter {
         guard range.length > 0 else { return }
         textView.suppressesUndoRegistration = true
         textView.textStorage.beginEditing()
-        clearOwnedAttributes(in: range, storage: textView.textStorage, restoring: theme)
+        clearOwnedAttributes(in: range, storage: textView.textStorage, restoring: theme, on: textView)
         textView.textStorage.endEditing()
         textView.suppressesUndoRegistration = false
+    }
+
+    /// Forced light/dark must not leave a dynamic color for TextKit to resolve
+    /// against the host's opposite appearance.
+    private static func paintColor(_ color: UIColor, on textView: IOSMarkdownTextView) -> UIColor {
+        textView.editor?.resolvedAppearanceColor(color) ?? color
     }
 
     /// Drops the syntax key only on ranges that currently carry it, and puts
@@ -70,7 +76,8 @@ enum IOSHighlightPresenter {
     private static func clearOwnedAttributes(
         in range: NSRange,
         storage: NSTextStorage,
-        restoring theme: IOSEditorTheme
+        restoring theme: IOSEditorTheme,
+        on textView: IOSMarkdownTextView
     ) {
         guard range.length > 0, NSMaxRange(range) <= storage.length else { return }
         var owned: [NSRange] = []
@@ -80,7 +87,7 @@ enum IOSHighlightPresenter {
         }
         let baseStyle: [NSAttributedString.Key: Any] = [
             .font: theme.baseFont,
-            .foregroundColor: theme.baseColor,
+            .foregroundColor: paintColor(theme.baseColor, on: textView),
         ]
         for attributeRange in owned {
             storage.removeAttribute(IOSSyntaxAttribute.key, range: attributeRange)
