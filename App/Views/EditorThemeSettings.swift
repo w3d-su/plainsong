@@ -10,8 +10,17 @@ struct EditorThemeSettings: View {
             get: { preferences.editorThemeIdentifier },
             set: { preferences.selectEditorTheme(identifier: $0) }
         )) {
-            ForEach(preferences.editorThemePickerChoices) { choice in
-                Text(choice.name).tag(choice.id)
+            Section("Built-in") {
+                ForEach(preferences.builtInEditorThemeChoices) { choice in
+                    Text(choice.name).tag(choice.id)
+                }
+            }
+            if !preferences.importedEditorThemeChoices.isEmpty {
+                Section("Imported") {
+                    ForEach(preferences.importedEditorThemeChoices) { choice in
+                        Text(choice.name).tag(choice.id)
+                    }
+                }
             }
         }
 

@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import EditorKit
 import MarkdownCore
 @testable import Plainsong
@@ -177,6 +178,29 @@ final class EditorThemeImportTests: XCTestCase {
         XCTAssertEqual(catalog.invalidIdentifiers, Set(["mismatched", "huge", "linked", "folder"]))
     }
 
+    func testLoadCatalogDoesNotBlockOnAFifo() throws {
+        let fixture = try Fixture()
+        let fifo = fixture.directory.appendingPathComponent("pipe.json")
+        XCTAssertEqual(mkfifo(fifo.path, S_IRUSR | S_IWUSR), 0)
+        let catalog = fixture.library.loadCatalog()
+        XCTAssertEqual(catalog.themes, [])
+        XCTAssertTrue(catalog.invalidIdentifiers.contains("pipe"))
+    }
+
+    func testContrastObservationReceivesWorkspaceNotifications() async {
+        let received = expectation(description: "Accessibility display options changed")
+        let observation = EditorThemeContrastObservation {
+            received.fulfill()
+        }
+        defer { withExtendedLifetime(observation) {} }
+
+        NSWorkspace.shared.notificationCenter.post(
+            name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: nil
+        )
+        await fulfillment(of: [received], timeout: 2)
+    }
+
     func testPickerShowsTheIdWhenANameCollides() throws {
         let fixture = try Fixture()
         for (id, name) in [("plainsong-copy", "Plainsong"), ("ink-a", "Ink"), ("ink-b", "ink"), ("solo", "Solo")] {
@@ -192,6 +216,12 @@ final class EditorThemeImportTests: XCTestCase {
         XCTAssertTrue(names.contains("ink (ink-b)"))
         XCTAssertTrue(names.contains("Solo"))
         XCTAssertFalse(names.contains("Solo (solo)"))
+        XCTAssertEqual(
+            fixture.preferences.builtInEditorThemeChoices.map(\.name),
+            ["Plainsong", "Graphite"]
+        )
+        XCTAssertFalse(fixture.preferences.builtInEditorThemeChoices.contains { $0.id == "plainsong-copy" })
+        XCTAssertTrue(fixture.preferences.importedEditorThemeChoices.contains { $0.id == "plainsong-copy" })
     }
 
     @MainActor

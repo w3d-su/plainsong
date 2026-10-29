@@ -64,9 +64,10 @@ One JSON file defines both editor and preview colors:
   so preview values can never carry CSS syntax. `text`, `caret`, and `background` must
   be opaque (`#RRGGBB`, or `#RRGGBBAA` whose alpha is `FF`).
 - `id`: `[a-z0-9-]{1,64}`, must not collide with a built-in. `name` is trimmed,
-  NFC-normalized, 1–128 Unicode scalars, and cannot contain control or format
-  characters. The picker shows `name (id)` when that name matches a built-in display
-  name, or another imported theme, without regard to case.
+  NFC-normalized, 1–128 Unicode scalars, and cannot contain control, format, or
+  line-break characters or start with a combining mark. Imported themes are listed in
+  their own picker section. The picker shows `name (id)` when that name matches a
+  built-in display name, or another imported theme, without regard to case.
 - Contrast is **warned, not enforced** (gate T7): Settings will show a notice when
   text/background or code text/code background falls below 4.5:1. Until that warning
   exists, an editor theme resolves to the built-in palette while Increase Contrast is on.

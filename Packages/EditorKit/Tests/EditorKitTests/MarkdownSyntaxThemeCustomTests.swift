@@ -281,8 +281,8 @@ final class MarkdownSyntaxThemeCustomTests: XCTestCase {
     }
 
     func testIncreaseContrastAndFallbackIdentityDoNotShareANamedColor() throws {
-        let previous = EditorThemeDynamicColor.increaseContrastEnabled
-        defer { EditorThemeDynamicColor.increaseContrastEnabled = previous }
+        let previous = EditorThemeDynamicColor.increaseContrast.withLock { $0 }
+        defer { EditorThemeDynamicColor.increaseContrast.withLock { $0 = previous } }
         // Light text is custom. Light code is omitted, so each fallback must keep its own
         // built-in code color. Dark code is set only to force a named color for that slot.
         let document = try CustomThemeValidation.validate(Data("""
@@ -295,7 +295,7 @@ final class MarkdownSyntaxThemeCustomTests: XCTestCase {
         }
         """.utf8)).get()
 
-        EditorThemeDynamicColor.increaseContrastEnabled = { false }
+        EditorThemeDynamicColor.increaseContrast.withLock { $0 = false }
         let standard = MarkdownSyntaxTheme.resolving(document, builtIn: .standard)
         let graphite = MarkdownSyntaxTheme.resolving(document, builtIn: .graphite)
         let standardCode = components(standard.codeColor, appearance: .aqua)
@@ -313,7 +313,7 @@ final class MarkdownSyntaxThemeCustomTests: XCTestCase {
             || abs(standardCode.blue - graphiteCode.blue) > 0.05
         XCTAssertTrue(distinct, "omitted code color must follow its own built-in fallback")
 
-        EditorThemeDynamicColor.increaseContrastEnabled = { true }
+        EditorThemeDynamicColor.increaseContrast.withLock { $0 = true }
         let contrastedText = components(standard.textColor, appearance: .aqua)
         let builtInText = components(MarkdownSyntaxTheme.standard.textColor, appearance: .aqua)
         XCTAssertEqual(contrastedText.red, builtInText.red, accuracy: 0.02)
@@ -321,7 +321,7 @@ final class MarkdownSyntaxThemeCustomTests: XCTestCase {
         XCTAssertEqual(contrastedText.blue, builtInText.blue, accuracy: 0.02)
 
         // The provider registered above follows the setting. A new name is not required.
-        EditorThemeDynamicColor.increaseContrastEnabled = { false }
+        EditorThemeDynamicColor.increaseContrast.withLock { $0 = false }
         XCTAssertEqual(components(standard.textColor, appearance: .aqua).red, 0x11 / 255, accuracy: 0.01)
     }
 
@@ -329,9 +329,11 @@ final class MarkdownSyntaxThemeCustomTests: XCTestCase {
         let document = try CustomThemeValidation.validate(Data("""
         {"schemaVersion":1,"id":"ink","name":"Ink","light":{"editor":{"text":"#FF0000"}}}
         """.utf8)).get()
-        let previous = EditorThemeResolutionProbe.count
-        defer { EditorThemeResolutionProbe.count = previous }
-        EditorThemeResolutionProbe.count = 0
+        #if DEBUG
+            let previous = EditorThemeResolutionProbe.count.withLock { $0 }
+            defer { EditorThemeResolutionProbe.count.withLock { $0 = previous } }
+            EditorThemeResolutionProbe.count.withLock { $0 = 0 }
+        #endif
         let service = MarkdownHighlightService()
         for _ in 0 ..< 2 {
             _ = await service.highlight(
@@ -344,7 +346,11 @@ final class MarkdownSyntaxThemeCustomTests: XCTestCase {
                 fontSize: 13
             )
         }
-        XCTAssertEqual(EditorThemeResolutionProbe.count, 1)
+        #if DEBUG
+            XCTAssertEqual(EditorThemeResolutionProbe.count.withLock { $0 }, 1)
+        #else
+            throw XCTSkip("The resolution probe is compiled only in debug builds.")
+        #endif
     }
 
     private func selectionHighlight(in view: NSView) -> NSView? {

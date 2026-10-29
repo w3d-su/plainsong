@@ -140,6 +140,9 @@ final class CustomThemeValidationTests: XCTestCase {
             Rejection(label: "control name", payload: base(name: "Ink\u{0007}"), expected: .name),
             Rejection(label: "bidi name", payload: base(name: "\u{202E}Ink"), expected: .name),
             Rejection(label: "zero width name", payload: base(name: "In\u{200B}k"), expected: .name),
+            Rejection(label: "line separator name", payload: base(name: "Ink\u{2028}Two"), expected: .name),
+            Rejection(label: "paragraph separator name", payload: base(name: "In\u{2029}k"), expected: .name),
+            Rejection(label: "combining mark name", payload: base(name: "\u{0301}"), expected: .name),
             Rejection(
                 label: "long name",
                 payload: base(name: String(repeating: "N", count: 129)),
@@ -324,8 +327,12 @@ final class CustomThemeValidationTests: XCTestCase {
             "name": name,
             "light": light ?? {
                 var palette: [String: Any] = [:]
-                if let editor { palette["editor"] = editor }
-                if let preview { palette["preview"] = preview }
+                if let editor {
+                    palette["editor"] = editor
+                }
+                if let preview {
+                    palette["preview"] = preview
+                }
                 return palette
             }(),
         ]

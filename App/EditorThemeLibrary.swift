@@ -56,7 +56,8 @@ enum EditorThemeValidationMessage {
         case let .reservedIdentifier(identifier):
             "\"\(identifier)\" is a built-in theme id."
         case .name:
-            "Theme names must be 1-128 Unicode scalars after trimming, with no control or format characters."
+            "Theme names must be 1-128 Unicode scalars after trimming, with no control, "
+                + "format, or line-break characters, and cannot start with a combining mark."
         case let .color(field):
             "\"\(field)\" must be a #RRGGBB or #RRGGBBAA color."
         case let .nonOpaqueColor(field):
@@ -142,31 +143,27 @@ struct EditorThemeLibrary {
         return .imported(document)
     }
 
-    /// Reads at most 64 KiB + 1 byte. `read(upToCount:)` may return a short read, and a
-    /// size check alone races a file that grows after the stat. `O_NOFOLLOW` rejects a
-    /// symlink swapped in after the resource-value check.
+    /// Reads at most 64 KiB + 1 byte. `O_NOFOLLOW` rejects a symlink, and `O_NONBLOCK`
+    /// keeps a FIFO from stalling the main actor. The open descriptor is checked with
+    /// `fstat`, so a file replaced after the path lookup is not trusted from `resourceValues`.
     func readThemeFile(at url: URL) throws -> Data {
-        let values: URLResourceValues
-        do {
-            values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
-        } catch {
-            throw EditorThemeStoreError.unreadable
-        }
-        guard values.isSymbolicLink != true, values.isRegularFile == true else {
-            throw EditorThemeStoreError.unreadable
-        }
         let maximum = CustomThemeDocument.maximumByteCount
-        if let fileSize = values.fileSize, fileSize > maximum {
-            throw EditorThemeStoreError.invalid(.exceedsMaximumSize(byteCount: fileSize))
-        }
         let descriptor = url.withUnsafeFileSystemRepresentation { representation -> Int32 in
             guard let representation else { return -1 }
-            return Darwin.open(representation, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+            return Darwin.open(representation, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
         }
         guard descriptor >= 0 else {
             throw EditorThemeStoreError.unreadable
         }
         let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        var info = stat()
+        guard fstat(descriptor, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG, info.st_size >= 0 else {
+            throw EditorThemeStoreError.unreadable
+        }
+        let byteCount = Int(clamping: info.st_size)
+        if byteCount > maximum {
+            throw EditorThemeStoreError.invalid(.exceedsMaximumSize(byteCount: byteCount))
+        }
         var data = Data()
         let cap = maximum + 1
         do {

@@ -1,7 +1,14 @@
 import AppKit
 import MarkdownCore
+import os
 
 public extension MarkdownSyntaxTheme {
+    /// Records Increase Contrast for dynamic theme colors. The color provider reads the
+    /// stored flag and does not call `NSWorkspace` or hop to the main thread.
+    static func noteAccessibilityIncreaseContrast(_ enabled: Bool) {
+        EditorThemeDynamicColor.increaseContrast.withLock { $0 = enabled }
+    }
+
     /// Resolves a validated theme onto the built-in palette. Omitted slots keep the built-in
     /// dynamic color. An omitted `gutter` stays `nil` so the gutter track keeps following the
     /// editor background, which is what the gutter drew before this slot existed.
@@ -9,7 +16,9 @@ public extension MarkdownSyntaxTheme {
         _ document: CustomThemeDocument,
         builtIn fallback: MarkdownEditorTheme = .standard
     ) -> MarkdownSyntaxTheme {
-        EditorThemeResolutionProbe.count += 1
+        #if DEBUG
+            EditorThemeResolutionProbe.recordResolve()
+        #endif
         let base = MarkdownSyntaxTheme.builtIn(fallback)
         let light = document.light.editor
         let dark = document.dark?.editor
@@ -82,7 +91,7 @@ enum EditorThemeDynamicColor {
         // The name includes the fallback and hex values, so replacing a theme registers a new color.
         // AppKit keeps the first provider registered for a name.
         return NSColor(name: NSColor.Name(name)) { appearance in
-            if EditorThemeDynamicColor.increaseContrastEnabled() {
+            if EditorThemeDynamicColor.increaseContrast.withLock({ $0 }) {
                 return builtIn
             }
             let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
@@ -93,18 +102,9 @@ enum EditorThemeDynamicColor {
         }
     }
 
-    /// Tests replace this. Production reads the setting when a color is resolved.
-    /// One named color follows Increase Contrast; the name does not change with it.
-    nonisolated(unsafe) static var increaseContrastEnabled: () -> Bool = systemIncreaseContrast
-
-    static func systemIncreaseContrast() -> Bool {
-        if Thread.isMainThread {
-            return NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
-        }
-        return DispatchQueue.main.sync {
-            NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
-        }
-    }
+    /// Written on the main actor when preferences start and when the setting changes.
+    /// A dynamic color can be resolved on any thread, so this is not read from `NSWorkspace`.
+    static let increaseContrast = OSAllocatedUnfairLock(initialState: false)
 
     static func color(hex: String) -> NSColor? {
         let digits = hex.dropFirst()
@@ -151,6 +151,12 @@ enum EditorSyntaxThemeChrome {
     }
 }
 
-enum EditorThemeResolutionProbe {
-    nonisolated(unsafe) static var count = 0
-}
+#if DEBUG
+    enum EditorThemeResolutionProbe {
+        static let count = OSAllocatedUnfairLock(initialState: 0)
+
+        static func recordResolve() {
+            count.withLock { $0 += 1 }
+        }
+    }
+#endif

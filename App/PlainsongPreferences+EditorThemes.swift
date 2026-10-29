@@ -20,8 +20,7 @@ extension PlainsongPreferences {
             identifier: identifier,
             theme: .standard,
             syntaxTheme: MarkdownSyntaxTheme.resolving(document),
-            notice: nil,
-            recordRevision: true
+            notice: nil
         )
     }
 
@@ -43,8 +42,7 @@ extension PlainsongPreferences {
                 identifier: document.id,
                 theme: .standard,
                 syntaxTheme: MarkdownSyntaxTheme.resolving(document),
-                notice: nil,
-                recordRevision: true
+                notice: nil
             )
         }
         return result
@@ -80,8 +78,7 @@ extension PlainsongPreferences {
             identifier: editorThemeIdentifier,
             theme: .standard,
             syntaxTheme: MarkdownSyntaxTheme.resolving(document),
-            notice: editorThemeFallbackNotice,
-            recordRevision: true
+            notice: editorThemeFallbackNotice
         )
     }
 
@@ -128,6 +125,14 @@ extension PlainsongPreferences {
             ))
         }
         return choices
+    }
+
+    var builtInEditorThemeChoices: [EditorThemeChoice] {
+        editorThemePickerChoices.filter { MarkdownEditorTheme(rawValue: $0.id) != nil }
+    }
+
+    var importedEditorThemeChoices: [EditorThemeChoice] {
+        editorThemePickerChoices.filter { MarkdownEditorTheme(rawValue: $0.id) == nil }
     }
 
     func reloadImportedEditorThemes() {
@@ -197,22 +202,30 @@ struct StoredEditorTheme {
 /// Removes the Increase Contrast observer when preferences are released.
 /// `isolated deinit` needs Swift 6.2; CI still compiles this target with Xcode 16.4.
 final class EditorThemeContrastObservation: @unchecked Sendable {
+    private let notificationCenter: NotificationCenter
     private let observer: NSObjectProtocol
 
     @MainActor
     init(onChange: @escaping @MainActor @Sendable () -> Void) {
-        observer = NotificationCenter.default.addObserver(
+        Self.storeIncreaseContrast(NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast)
+        notificationCenter = NSWorkspace.shared.notificationCenter
+        observer = notificationCenter.addObserver(
             forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
-            object: NSWorkspace.shared,
+            object: nil,
             queue: .main
         ) { _ in
             Task { @MainActor in
+                Self.storeIncreaseContrast(NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast)
                 onChange()
             }
         }
     }
 
+    private static func storeIncreaseContrast(_ enabled: Bool) {
+        MarkdownSyntaxTheme.noteAccessibilityIncreaseContrast(enabled)
+    }
+
     deinit {
-        NotificationCenter.default.removeObserver(observer)
+        notificationCenter.removeObserver(observer)
     }
 }

@@ -359,8 +359,8 @@ public enum CustomThemeValidation {
         return .success(colors)
     }
 
-    /// Stores the trimmed NFC form. Callers display that string, so leading spaces cannot
-    /// impersonate a built-in name and bidi/format characters never reach the picker.
+    /// Stores the trimmed NFC form. Callers display that string, so leading spaces,
+    /// line breaks, and a name made only of combining marks never reach the picker.
     private static func normalizedName(_ name: String) -> String? {
         let normalized = name.precomposedStringWithCanonicalMapping
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -369,15 +369,19 @@ public enum CustomThemeValidation {
         else {
             return nil
         }
-        let hasHiddenScalar = normalized.unicodeScalars.contains { scalar in
+        let scalars = normalized.unicodeScalars
+        let hasHiddenScalar = scalars.contains { scalar in
             switch scalar.properties.generalCategory {
-            case .control, .format:
+            case .control, .format, .lineSeparator, .paragraphSeparator:
                 true
             default:
                 false
             }
         }
-        return hasHiddenScalar ? nil : normalized
+        if hasHiddenScalar || scalars.first?.properties.generalCategory == .nonspacingMark {
+            return nil
+        }
+        return normalized
     }
 
     private static func isOpaqueHexColor(_ value: String) -> Bool {

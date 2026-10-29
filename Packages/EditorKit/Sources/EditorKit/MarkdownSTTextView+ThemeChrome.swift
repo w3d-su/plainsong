@@ -99,12 +99,16 @@ extension MarkdownSTTextView {
     }
 
     private func editorSelectionContainer() -> NSView? {
-        if let cachedEditorSelectionContainer {
+        if didResolveEditorSelectionContainer {
             return cachedEditorSelectionContainer
         }
         selectionHighlightTreeScans += 1
         let found = findEditorSelectionContainer(in: self)
         cachedEditorSelectionContainer = found
+        didResolveEditorSelectionContainer = true
+        if found == nil {
+            assertionFailure("STSelectionView not found")
+        }
         return found
     }
 

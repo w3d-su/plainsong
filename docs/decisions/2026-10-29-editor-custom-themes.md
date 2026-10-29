@@ -24,7 +24,6 @@ deleted it. A file that is merely unreadable is different: the stored id stays, 
 editor uses Plainsong for the launch, and a non-modal banner explains why, so fixing the
 file and relaunching picks it up again.
 
-
 A later review tightened the same rules without opening preview or bridge work.
 `text`, `caret`, and `background` must be opaque, so a theme cannot hide the text,
 the caret, or the background. A custom background can still inherit a built-in text
@@ -32,10 +31,16 @@ color; the 4.5:1 warning remains T7. While Increase Contrast is on, editor color
 resolve from the built-in palette.
 
 Names are stored in NFC, trimmed, limited to 128 Unicode scalars, and rejected when
-they contain control or format characters. The picker appends `name (id)` when a name
-collides with a built-in display name or another imported theme. STTextView 2.4.1 does
-not offer a selection-color API (`selectedLineHighlightColor` is the current line), so
-a custom selection color is still painted onto `STSelectionHighlightView`. Layout
+they contain control, format, line-separator, or paragraph-separator characters, or when
+they start with a combining mark. Homoglyphs are not given their own denylist. Imported
+themes are listed in a separate picker section, and the picker still appends `name (id)`
+when a name collides with a built-in display name or another imported theme. Increase
+Contrast is seeded on the main actor and updated from the workspace notification
+center into a lock; theme colors do not read `NSWorkspace` while resolving. A theme file
+is opened without following links and is read only after `fstat` shows a regular file.
+STTextView 2.4.1 does not offer a selection-color API (`selectedLineHighlightColor` is
+the current line), so a custom selection color is still painted onto
+`STSelectionHighlightView`. Layout
 repaints only that selection container, which lives for the life of the text view,
 instead of walking every layout fragment on each keystroke.
 

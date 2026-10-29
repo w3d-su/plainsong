@@ -200,8 +200,7 @@ final class PlainsongPreferences: ObservableObject {
             identifier: theme.rawValue,
             theme: theme,
             syntaxTheme: .builtIn(theme),
-            notice: nil,
-            recordRevision: true
+            notice: nil
         )
     }
 
@@ -209,14 +208,12 @@ final class PlainsongPreferences: ObservableObject {
         identifier: String,
         theme: MarkdownEditorTheme,
         syntaxTheme: MarkdownSyntaxTheme,
-        notice: String?,
-        recordRevision: Bool
+        notice: String?
     ) {
         editorTheme = theme
         editorThemeIdentifier = identifier
         resolvedEditorSyntaxTheme = syntaxTheme
         editorThemeFallbackNotice = notice
-        guard recordRevision else { return }
         editorThemeRevision &+= 1
         userDefaults.set(identifier, forKey: Keys.editorTheme)
         notifyDidChange()
