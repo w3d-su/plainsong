@@ -250,6 +250,10 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 - An active workspace search refreshes for document edits only after a 500 ms typing
   pause, and only while the Search navigator shows (an edit made while Files shows
   refreshes when Search shows again); typing never resets the search state.
+- An open iOS folder search reuses cached reads on root refreshes with the same tree,
+  debouncing provider notices. A per-file content notice drops only that path; changed
+  trees and explicit searches read again. In-flight reads cannot restore an invalidated
+  cache entry, including a size or encoding refusal.
 - Multiple workspace windows are structurally allowed, one preview per editor pane, but
   Phase 1 currently shares one App-scoped `AppState` across the `WindowGroup`. Separate
   windows mirror the same workspace/current document until window-scoped state is built.

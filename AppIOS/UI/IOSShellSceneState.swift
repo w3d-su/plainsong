@@ -153,8 +153,8 @@ final class IOSShellSceneState: ObservableObject {
         }
     }
 
-    /// The tree projection ignores a refresh request ID, and a file can change without a
-    /// new tree. Those events drop cached search text; an open search reads again.
+    /// Content notices drop that path's cached text. Root metadata refreshes with the
+    /// same tree reuse reads and join the debounce instead of rereading the folder.
     private func handle(workspaceEvent event: IOSWorkspaceEvent) {
         switch event {
         case let .resourceChanged(location):
@@ -163,7 +163,7 @@ final class IOSShellSceneState: ObservableObject {
                   location.accessGeneration == current.accessGeneration
             else { return }
             workspaceSearch.invalidateCachedRead(location)
-            researchOpenFolder(reusingReads: true)
+            researchOpenFolder()
         case let .snapshotChanged(snapshot):
             guard let current = workspaceSnapshot,
                   snapshot.workspaceID == current.workspaceID,
@@ -171,19 +171,17 @@ final class IOSShellSceneState: ObservableObject {
                   snapshot.requestID != current.requestID,
                   IOSShellWorkspaceProjection.matches(current, snapshot)
             else { return }
-            workspaceSearch.invalidateCachedReads()
-            researchOpenFolder(reusingReads: false)
+            researchOpenFolder()
         case .invalidated, .unavailable:
             break
         }
     }
 
-    private func researchOpenFolder(reusingReads: Bool) {
+    private func researchOpenFolder() {
         guard presentation == .workspaceSearch, workspaceSearch.hasQuery else { return }
         workspaceSearch.scheduleSearch(
             environment: workspaceSearchEnvironment(),
-            immediate: true,
-            reusingReads: reusingReads
+            reusingReads: true
         )
     }
 

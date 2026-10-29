@@ -193,8 +193,8 @@ final class IOSWorkspaceSearchController: ObservableObject {
     private let maximumMatchesPerQuery: Int
     private var task: Task<Void, Never>?
     private var generation: UInt64 = 0
-    /// Disk reads from the last searches, reused only when the editor buffer changed.
-    /// A tree change, an explicit search, or a workspace refresh reads every file again.
+    /// Disk reads reused for buffer edits and root refreshes with an unchanged tree.
+    /// A tree change or an explicit search reads every file again.
     /// A provider change drops that one path so the next search cannot reuse stale text.
     private var readCache = IOSWorkspaceSearchReadCache()
 
@@ -289,10 +289,6 @@ final class IOSWorkspaceSearchController: ObservableObject {
     /// Drops one cached read. The open search, if any, is rescheduled by the caller.
     func invalidateCachedRead(_ location: IOSFileLocation) {
         readCache.remove(location)
-    }
-
-    func invalidateCachedReads() {
-        readCache.removeAll()
     }
 
     var cachedReadCountForTesting: Int {
@@ -432,10 +428,14 @@ final class IOSWorkspaceSearchController: ObservableObject {
         } catch is CancellationError {
             return .cancelled
         } catch IOSWorkspaceSearchReadError.tooLarge {
-            if generation == token { readCache.store(.tooLarge, for: entry.location) }
+            if generation == token, readCache.epoch == epoch {
+                readCache.store(.tooLarge, for: entry.location)
+            }
             return .tooLarge
         } catch IOSWorkspaceSearchReadError.unsupportedEncoding {
-            if generation == token { readCache.store(.unsupportedEncoding, for: entry.location) }
+            if generation == token, readCache.epoch == epoch {
+                readCache.store(.unsupportedEncoding, for: entry.location)
+            }
             return .unsupportedEncoding
         } catch let failure as IOSWorkspaceFailure {
             switch failure {
@@ -490,8 +490,15 @@ extension IOSWorkspaceSearchController {
         pass: inout SearchPass
     ) async -> Bool {
         guard case let .text(text) = loaded else {
-            if case .cancelled = loaded { return false }
-            return true
+            switch loaded {
+            case .cancelled:
+                return false
+            case .folderChanged:
+                pass.folderChanged = true
+                return false
+            default:
+                return true
+            }
         }
         let found = await Task.detached(priority: .userInitiated) {
             IOSWorkspaceTextSearch.containsMatch(in: text, query: query)

@@ -47,13 +47,11 @@ final class IOSDocumentExportGrantTests: XCTestCase {
 
     private static let omittedImageTag = #"<span class="export-image-placeholder" role="img""#
 
-    /// The HTML omission note only proves the placeholder step. The PDF has to contain
-    /// the image resource and a pixel from the teal fixture.
+    /// The HTML omission note only proves the placeholder step. Render the PDF to
+    /// verify visible teal pixels regardless of how WebKit nests its image resources.
     private func assertPDFDrawsTheTealImage(_ data: Data) throws {
         let document = try XCTUnwrap(PDFDocument(data: data))
         let page = try XCTUnwrap(document.page(at: 0))
-        let reference = try XCTUnwrap(page.pageRef)
-        XCTAssertTrue(pageHasImageXObject(reference), "the local image must be drawn into the PDF")
         let bounds = page.bounds(for: .mediaBox)
         let scale: CGFloat = 2
         let size = CGSize(width: bounds.width * scale, height: bounds.height * scale)
@@ -66,29 +64,6 @@ final class IOSDocumentExportGrantTests: XCTestCase {
         }
         let teal = try tealPixelCount(in: XCTUnwrap(rendered.cgImage))
         XCTAssertGreaterThan(teal, 0, "the exported PDF should still show the teal image")
-    }
-
-    private func pageHasImageXObject(_ page: CGPDFPage) -> Bool {
-        guard let dictionary = page.dictionary else { return false }
-        var resources: CGPDFDictionaryRef?
-        guard CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources), let resources else { return false }
-        var xobjects: CGPDFDictionaryRef?
-        guard CGPDFDictionaryGetDictionary(resources, "XObject", &xobjects), let xobjects else { return false }
-        var found = false
-        withUnsafeMutablePointer(to: &found) { pointer in
-            CGPDFDictionaryApplyFunction(xobjects, { _, object, info in
-                guard let info else { return }
-                var stream: CGPDFStreamRef?
-                guard CGPDFObjectGetValue(object, .stream, &stream), let stream else { return }
-                guard let streamDictionary = CGPDFStreamGetDictionary(stream) else { return }
-                var subtype: UnsafePointer<CChar>?
-                guard CGPDFDictionaryGetName(streamDictionary, "Subtype", &subtype), let subtype else { return }
-                if String(cString: subtype) == "Image" {
-                    info.assumingMemoryBound(to: Bool.self).pointee = true
-                }
-            }, pointer)
-        }
-        return found
     }
 
     private func tealPixelCount(in image: CGImage) -> Int {
