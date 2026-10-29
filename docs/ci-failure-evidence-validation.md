@@ -131,10 +131,20 @@ Read-only audit of `main` at `88e3a773d54ad0b46bc10fe8f5fd6c14e971cfaa`; no CI r
 test execution or product change. Result: **root cause still unknown, no recurrence.**
 `docs/risk-register.md` lowers R21 to Low as an accepted residual.
 
-- Coverage: all 288 CI workflow runs created 2026-10-04 to 2026-10-28 (UTC); 56 failed
-  attempts across 55 runs (including attempts hidden by successful reruns) and 57 cancelled
-  runs; 136 failed/cancelled job logs; 58 retained `plainsong-ci-failure-*` artifacts from
-  42 runs, each checked against GitHub's SHA-256 and ZIP CRC, none executed.
+- Coverage: the 288 CI workflow runs created from 2026-10-04T00:00Z through
+  2026-10-28T17:54Z (the audit snapshot; three later successful runs that day are not
+  included); 56 failed attempts across 55 runs (including attempts hidden by successful
+  reruns) and 57 cancelled runs; 136 failed/cancelled job logs; 58 retained
+  `plainsong-ci-failure-*` artifacts from 42 runs, each checked against GitHub's SHA-256 and
+  ZIP CRC, none executed.
+- Denominator: 225 of the 288 runs reached a hosted test step that includes
+  PerformanceTests (the combined `build-and-test` test step, or `hosted (ui-performance)`
+  after sharding), and 196 completed it successfully. The other runs were docs-only (hosted
+  jobs skipped since #183), cancelled before it, or failed earlier. 32 runs predate the
+  2026-10-04T17:02Z merge of `1e91ee4` and used the old path without preflight. Artifacts are
+  kept 14 days, so the 89 runs created before 2026-10-15 (39 of them failed or cancelled)
+  were classified from job logs only; the 58 retained artifacts cover the later part of the
+  window.
 - Resource preflight: all 18 retained manifests pass (67 entries, or 28 under that branch's
   older contract). No ENOENT/EIO preflight failure.
 - xcresult: all 17 complete bundles decode, with failures outside R21. 21 bundles from
@@ -155,11 +165,21 @@ test execution or product change. Result: **root cause still unknown, no recurre
   `preview/index.html` lookup failed, log archive creation could not read `version.plist`,
   `FileBackedCASDatabase` rename failed with ENOENT, and `LogStoreManifest.plist` could not
   be saved. Several unrelated file operations under one DerivedData tree failed within
-  ~30 s. Per-run DerivedData isolation removes that sharing; that it caused the incident is
-  inference only.
+  ~30 s. CI now uses a per-run/attempt/shard DerivedData path under `RUNNER_TEMP` and splits
+  build-for-testing from test-without-building. Hosted runners were already ephemeral per
+  job, and one job still shares one tree on the same APFS volume, so this does not remove
+  the hypothesized sharing and is not a mitigation for it. The 32 pre-`1e91ee4` runs on the
+  old path did not recur either. The Low rating rests only on non-recurrence.
 - Public trackers: exact-string GitHub searches for `FileBackedCASDatabase` + `rename failed`
   (including `actions/runner-images`) returned no match; Apple Developer Forums search was
   blocked by a verification page, so Apple-side coverage is incomplete.
+
+Before the incident, 378 CI runs (234 successful) were created without this signature.
+
+Recurrence signature (raise R21 back to Medium): a hosted `FileBackedCASDatabase` rename
+failure; a resource preflight failure with ENOENT, EIO or EILSEQ; or a PerformanceTests
+bundle-resource read failing with an `NSPOSIXErrorDomain` error that is not a known
+URL-construction regression such as the #141 relative-URL case.
 
 Deferred evidence-only captures, to add if the signature recurs (no retry, rerun or budget
 change; local `make test` unchanged with CI variables unset; uploads stay in the controlled
