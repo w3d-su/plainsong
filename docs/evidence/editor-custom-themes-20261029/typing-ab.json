@@ -1,0 +1,1538 @@
+{
+  "campaign": "editor-custom-themes-20261029",
+  "environment": {
+    "baseline": "4025d1010317d9526de39c0c65c8be27b1e133e3",
+    "baseline_captured_at": "2026-10-29T23:06:12.297399+08:00",
+    "candidate_parent": "adc7b130d0c8acd4e1046b7f266ea2685000ac96",
+    "candidate_source_manifest_sha256": "b46f4c133025eed88f987f1df55f02386b12c4fc79e9798eb6a87afa4d6e1e5d",
+    "macos": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0\nBuildVersion:\t\t26A428\n",
+    "xcode": "Xcode 27.0\nBuild version 27A5194q\n",
+    "hardware": "Apple M1 Pro\n17179869184\n",
+    "configuration": "Debug",
+    "load_admission_upper_bound": 8
+  },
+  "source_identity": {
+    "measured_commit": "d78ef2b05407cedb9031369696d8570d08249c46",
+    "matched_tracked_input_count": 877,
+    "manifest_sha256": "b46f4c133025eed88f987f1df55f02386b12c4fc79e9798eb6a87afa4d6e1e5d",
+    "match_verified_after_hosted_execution": true
+  },
+  "procedure": {
+    "shared_pairs": 6,
+    "order": "Odd pairs A then B; even pairs B then A; B custom immediately follows B shared.",
+    "pair_admission": "1-minute load <= 8; no lower bound or idle requirement.",
+    "retention": "Retain every sample and all within-pair load changes; no latency-based filtering.",
+    "budget_ms_exclusive": 16,
+    "custom_selection_scope": "Supplemental absolute-budget evidence; fixture preparation differs from the shared public-editor test.",
+    "runner_sha256": "8adfe533684ef3092a6698f320cdd6c3b87399efda9f38ab690debcc517c6927"
+  },
+  "samples": [
+    {
+      "pair": 1,
+      "tree": "A",
+      "kind": "shared",
+      "started_at": "2026-10-29T23:08:06.479593+08:00",
+      "load_before": [
+        6.25146484375,
+        7.94091796875,
+        13.18017578125
+      ],
+      "exit": 0,
+      "load_after": [
+        6.31103515625,
+        7.92529296875,
+        13.1435546875
+      ],
+      "metrics": [
+        "WS3B PERF hosted public 1 MiB ordinary 8.307 ms, pair 7.497 ms, marked max 9.190 ms",
+        "M5 PERF typing markdown plain max 0.003 ms (200 iterations)",
+        "M5 PERF typing markdown newline max 0.085 ms (200 iterations)",
+        "M5 PERF typing markdown pair max 0.297 ms (50 iterations)",
+        "M5 PERF typing mdx plain max 0.004 ms (200 iterations)",
+        "M5 PERF typing mdx jsx trigger max 0.162 ms (50 iterations)"
+      ],
+      "totals": [
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.831 (0.832) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.029 (0.030) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.860 (0.862) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.860 (0.862) seconds"
+      ]
+    },
+    {
+      "pair": 1,
+      "tree": "B",
+      "kind": "shared",
+      "started_at": "2026-10-29T23:08:11.385398+08:00",
+      "load_before": [
+        6.31103515625,
+        7.92529296875,
+        13.1435546875
+      ],
+      "exit": 0,
+      "load_after": [
+        6.28564453125,
+        7.89306640625,
+        13.1015625
+      ],
+      "metrics": [
+        "WS3B PERF hosted public 1 MiB ordinary 8.081 ms, pair 7.378 ms, marked max 7.369 ms",
+        "M5 PERF typing markdown plain max 0.003 ms (200 iterations)",
+        "M5 PERF typing markdown newline max 0.106 ms (200 iterations)",
+        "M5 PERF typing markdown pair max 0.326 ms (50 iterations)",
+        "M5 PERF typing mdx plain max 0.001 ms (200 iterations)",
+        "M5 PERF typing mdx jsx trigger max 0.154 ms (50 iterations)"
+      ],
+      "totals": [
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.754 (0.755) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.041 (0.042) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.795 (0.797) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.795 (0.798) seconds"
+      ]
+    },
+    {
+      "pair": 1,
+      "tree": "B",
+      "kind": "custom",
+      "started_at": "2026-10-29T23:08:14.926089+08:00",
+      "load_before": [
+        6.28564453125,
+        7.89306640625,
+        13.1015625
+      ],
+      "exit": 0,
+      "load_after": [
+        6.28564453125,
+        7.89306640625,
+        13.1015625
+      ],
+      "metrics": [
+        "THEME PERF hosted custom-selection 1 MiB ordinary 9.202 ms"
+      ],
+      "totals": [
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.209 (0.209) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.209 (0.210) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.209 (0.211) seconds"
+      ]
+    },
+    {
+      "pair": 2,
+      "tree": "B",
+      "kind": "shared",
+      "started_at": "2026-10-29T23:08:17.891763+08:00",
+      "load_before": [
+        6.28564453125,
+        7.89306640625,
+        13.1015625
+      ],
+      "exit": 0,
+      "load_after": [
+        7.1435546875,
+        8.0439453125,
+        13.1240234375
+      ],
+      "metrics": [
+        "WS3B PERF hosted public 1 MiB ordinary 8.091 ms, pair 7.891 ms, marked max 6.936 ms",
+        "M5 PERF typing markdown plain max 0.003 ms (200 iterations)",
+        "M5 PERF typing markdown newline max 0.047 ms (200 iterations)",
+        "M5 PERF typing markdown pair max 0.365 ms (50 iterations)",
+        "M5 PERF typing mdx plain max 0.001 ms (200 iterations)",
+        "M5 PERF typing mdx jsx trigger max 0.159 ms (50 iterations)"
+      ],
+      "totals": [
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.775 (0.776) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.030 (0.030) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.804 (0.806) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.804 (0.807) seconds"
+      ]
+    },
+    {
+      "pair": 2,
+      "tree": "B",
+      "kind": "custom",
+      "started_at": "2026-10-29T23:08:21.412639+08:00",
+      "load_before": [
+        7.1435546875,
+        8.0439453125,
+        13.1240234375
+      ],
+      "exit": 0,
+      "load_after": [
+        7.1435546875,
+        8.0439453125,
+        13.1240234375
+      ],
+      "metrics": [
+        "THEME PERF hosted custom-selection 1 MiB ordinary 6.603 ms"
+      ],
+      "totals": [
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.214 (0.214) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.214 (0.215) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.214 (0.215) seconds"
+      ]
+    },
+    {
+      "pair": 2,
+      "tree": "A",
+      "kind": "shared",
+      "started_at": "2026-10-29T23:08:24.330417+08:00",
+      "load_before": [
+        6.9716796875,
+        7.9931640625,
+        13.076171875
+      ],
+      "exit": 0,
+      "load_after": [
+        6.9716796875,
+        7.9931640625,
+        13.076171875
+      ],
+      "metrics": [
+        "WS3B PERF hosted public 1 MiB ordinary 8.324 ms, pair 6.522 ms, marked max 7.500 ms",
+        "M5 PERF typing markdown plain max 0.003 ms (200 iterations)",
+        "M5 PERF typing markdown newline max 0.078 ms (200 iterations)",
+        "M5 PERF typing markdown pair max 0.166 ms (50 iterations)",
+        "M5 PERF typing mdx plain max 0.002 ms (200 iterations)",
+        "M5 PERF typing mdx jsx trigger max 0.180 ms (50 iterations)"
+      ],
+      "totals": [
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.769 (0.770) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.037 (0.037) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.806 (0.807) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.806 (0.808) seconds"
+      ]
+    },
+    {
+      "pair": 3,
+      "tree": "A",
+      "kind": "shared",
+      "started_at": "2026-10-29T23:08:27.828672+08:00",
+      "load_before": [
+        6.9716796875,
+        7.9931640625,
+        13.076171875
+      ],
+      "exit": 0,
+      "load_after": [
+        7.2939453125,
+        8.04296875,
+        13.06396484375
+      ],
+      "metrics": [
+        "WS3B PERF hosted public 1 MiB ordinary 7.615 ms, pair 7.255 ms, marked max 6.976 ms",
+        "M5 PERF typing markdown plain max 0.002 ms (200 iterations)",
+        "M5 PERF typing markdown newline max 0.041 ms (200 iterations)",
+        "M5 PERF typing markdown pair max 0.190 ms (50 iterations)",
+        "M5 PERF typing mdx plain max 0.008 ms (200 iterations)",
+        "M5 PERF typing mdx jsx trigger max 0.131 ms (50 iterations)"
+      ],
+      "totals": [
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.765 (0.766) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.028 (0.028) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.793 (0.795) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.793 (0.795) seconds"
+      ]
+    },
+    {
+      "pair": 3,
+      "tree": "B",
+      "kind": "shared",
+      "started_at": "2026-10-29T23:08:31.313406+08:00",
+      "load_before": [
+        7.2939453125,
+        8.04296875,
+        13.06396484375
+      ],
+      "exit": 0,
+      "load_after": [
+        7.10986328125,
+        7.9921875,
+        13.0166015625
+      ],
+      "metrics": [
+        "WS3B PERF hosted public 1 MiB ordinary 8.162 ms, pair 5.343 ms, marked max 5.894 ms",
+        "M5 PERF typing markdown plain max 0.003 ms (200 iterations)",
+        "M5 PERF typing markdown newline max 0.044 ms (200 iterations)",
+        "M5 PERF typing markdown pair max 0.169 ms (50 iterations)",
+        "M5 PERF typing mdx plain max 0.001 ms (200 iterations)",
+        "M5 PERF typing mdx jsx trigger max 0.150 ms (50 iterations)"
+      ],
+      "totals": [
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.745 (0.746) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.033 (0.033) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.778 (0.779) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.778 (0.780) seconds"
+      ]
+    },
+    {
+      "pair": 3,
+      "tree": "B",
+      "kind": "custom",
+      "started_at": "2026-10-29T23:08:34.734132+08:00",
+      "load_before": [
+        7.10986328125,
+        7.9921875,
+        13.0166015625
+      ],
+      "exit": 0,
+      "load_after": [
+        7.10986328125,
+        7.9921875,
+        13.0166015625
+      ],
+      "metrics": [
+        "THEME PERF hosted custom-selection 1 MiB ordinary 9.109 ms"
+      ],
+      "totals": [
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.209 (0.210) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.209 (0.210) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.209 (0.211) seconds"
+      ]
+    },
+    {
+      "pair": 4,
+      "tree": "B",
+      "kind": "shared",
+      "started_at": "2026-10-29T23:08:37.590187+08:00",
+      "load_before": [
+        7.10986328125,
+        7.9921875,
+        13.0166015625
+      ],
+      "exit": 0,
+      "load_after": [
+        6.9404296875,
+        7.9423828125,
+        12.96923828125
+      ],
+      "metrics": [
+        "WS3B PERF hosted public 1 MiB ordinary 7.803 ms, pair 7.306 ms, marked max 7.597 ms",
+        "M5 PERF typing markdown plain max 0.003 ms (200 iterations)",
+        "M5 PERF typing markdown newline max 0.045 ms (200 iterations)",
+        "M5 PERF typing markdown pair max 0.322 ms (50 iterations)",
+        "M5 PERF typing mdx plain max 0.001 ms (200 iterations)",
+        "M5 PERF typing mdx jsx trigger max 0.127 ms (50 iterations)"
+      ],
+      "totals": [
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.765 (0.766) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.029 (0.030) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.794 (0.796) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.794 (0.797) seconds"
+      ]
+    },
+    {
+      "pair": 4,
+      "tree": "B",
+      "kind": "custom",
+      "started_at": "2026-10-29T23:08:41.053515+08:00",
+      "load_before": [
+        6.9404296875,
+        7.9423828125,
+        12.96923828125
+      ],
+      "exit": 0,
+      "load_after": [
+        6.9404296875,
+        7.9423828125,
+        12.96923828125
+      ],
+      "metrics": [
+        "THEME PERF hosted custom-selection 1 MiB ordinary 8.944 ms"
+      ],
+      "totals": [
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.218 (0.219) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.218 (0.219) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.218 (0.220) seconds"
+      ]
+    },
+    {
+      "pair": 4,
+      "tree": "A",
+      "kind": "shared",
+      "started_at": "2026-10-29T23:08:43.897267+08:00",
+      "load_before": [
+        6.9404296875,
+        7.9423828125,
+        12.96923828125
+      ],
+      "exit": 0,
+      "load_after": [
+        6.62451171875,
+        7.85986328125,
+        12.91064453125
+      ],
+      "metrics": [
+        "WS3B PERF hosted public 1 MiB ordinary 6.404 ms, pair 7.829 ms, marked max 5.433 ms",
+        "M5 PERF typing markdown plain max 0.002 ms (200 iterations)",
+        "M5 PERF typing markdown newline max 0.074 ms (200 iterations)",
+        "M5 PERF typing markdown pair max 0.160 ms (50 iterations)",
+        "M5 PERF typing mdx plain max 0.001 ms (200 iterations)",
+        "M5 PERF typing mdx jsx trigger max 0.229 ms (50 iterations)"
+      ],
+      "totals": [
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.774 (0.775) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.033 (0.034) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.807 (0.809) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.807 (0.809) seconds"
+      ]
+    },
+    {
+      "pair": 5,
+      "tree": "A",
+      "kind": "shared",
+      "started_at": "2026-10-29T23:08:47.371580+08:00",
+      "load_before": [
+        6.62451171875,
+        7.85986328125,
+        12.91064453125
+      ],
+      "exit": 0,
+      "load_after": [
+        6.57421875,
+        7.82861328125,
+        12.8701171875
+      ],
+      "metrics": [
+        "WS3B PERF hosted public 1 MiB ordinary 7.669 ms, pair 7.127 ms, marked max 7.446 ms",
+        "M5 PERF typing markdown plain max 0.002 ms (200 iterations)",
+        "M5 PERF typing markdown newline max 0.040 ms (200 iterations)",
+        "M5 PERF typing markdown pair max 0.286 ms (50 iterations)",
+        "M5 PERF typing mdx plain max 0.004 ms (200 iterations)",
+        "M5 PERF typing mdx jsx trigger max 0.228 ms (50 iterations)"
+      ],
+      "totals": [
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.746 (0.746) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.029 (0.030) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.775 (0.776) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.775 (0.777) seconds"
+      ]
+    },
+    {
+      "pair": 5,
+      "tree": "B",
+      "kind": "shared",
+      "started_at": "2026-10-29T23:08:50.785700+08:00",
+      "load_before": [
+        6.57421875,
+        7.82861328125,
+        12.8701171875
+      ],
+      "exit": 0,
+      "load_after": [
+        6.57421875,
+        7.82861328125,
+        12.8701171875
+      ],
+      "metrics": [
+        "WS3B PERF hosted public 1 MiB ordinary 7.860 ms, pair 7.118 ms, marked max 7.708 ms",
+        "M5 PERF typing markdown plain max 0.003 ms (200 iterations)",
+        "M5 PERF typing markdown newline max 0.049 ms (200 iterations)",
+        "M5 PERF typing markdown pair max 0.168 ms (50 iterations)",
+        "M5 PERF typing mdx plain max 0.001 ms (200 iterations)",
+        "M5 PERF typing mdx jsx trigger max 0.338 ms (50 iterations)"
+      ],
+      "totals": [
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.749 (0.750) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.035 (0.035) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.784 (0.786) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.784 (0.787) seconds"
+      ]
+    },
+    {
+      "pair": 5,
+      "tree": "B",
+      "kind": "custom",
+      "started_at": "2026-10-29T23:08:54.210459+08:00",
+      "load_before": [
+        6.36767578125,
+        7.7646484375,
+        12.81787109375
+      ],
+      "exit": 0,
+      "load_after": [
+        6.36767578125,
+        7.7646484375,
+        12.81787109375
+      ],
+      "metrics": [
+        "THEME PERF hosted custom-selection 1 MiB ordinary 8.539 ms"
+      ],
+      "totals": [
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.214 (0.215) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.214 (0.216) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.214 (0.216) seconds"
+      ]
+    },
+    {
+      "pair": 6,
+      "tree": "B",
+      "kind": "shared",
+      "started_at": "2026-10-29T23:08:57.084817+08:00",
+      "load_before": [
+        6.36767578125,
+        7.7646484375,
+        12.81787109375
+      ],
+      "exit": 0,
+      "load_after": [
+        6.578125,
+        7.78515625,
+        12.79541015625
+      ],
+      "metrics": [
+        "WS3B PERF hosted public 1 MiB ordinary 8.008 ms, pair 7.039 ms, marked max 7.721 ms",
+        "M5 PERF typing markdown plain max 0.004 ms (200 iterations)",
+        "M5 PERF typing markdown newline max 0.058 ms (200 iterations)",
+        "M5 PERF typing markdown pair max 0.280 ms (50 iterations)",
+        "M5 PERF typing mdx plain max 0.001 ms (200 iterations)",
+        "M5 PERF typing mdx jsx trigger max 0.225 ms (50 iterations)"
+      ],
+      "totals": [
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.796 (0.796) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.042 (0.042) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.837 (0.839) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.837 (0.840) seconds"
+      ]
+    },
+    {
+      "pair": 6,
+      "tree": "B",
+      "kind": "custom",
+      "started_at": "2026-10-29T23:09:00.700668+08:00",
+      "load_before": [
+        6.578125,
+        7.78515625,
+        12.79541015625
+      ],
+      "exit": 0,
+      "load_after": [
+        6.578125,
+        7.78515625,
+        12.79541015625
+      ],
+      "metrics": [
+        "THEME PERF hosted custom-selection 1 MiB ordinary 7.005 ms"
+      ],
+      "totals": [
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.217 (0.218) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.217 (0.219) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.217 (0.219) seconds"
+      ]
+    },
+    {
+      "pair": 6,
+      "tree": "A",
+      "kind": "shared",
+      "started_at": "2026-10-29T23:09:03.686137+08:00",
+      "load_before": [
+        6.578125,
+        7.78515625,
+        12.79541015625
+      ],
+      "exit": 0,
+      "load_after": [
+        6.53173828125,
+        7.75537109375,
+        12.75537109375
+      ],
+      "metrics": [
+        "WS3B PERF hosted public 1 MiB ordinary 6.366 ms, pair 8.429 ms, marked max 7.680 ms",
+        "M5 PERF typing markdown plain max 0.003 ms (200 iterations)",
+        "M5 PERF typing markdown newline max 0.076 ms (200 iterations)",
+        "M5 PERF typing markdown pair max 0.161 ms (50 iterations)",
+        "M5 PERF typing mdx plain max 0.001 ms (200 iterations)",
+        "M5 PERF typing mdx jsx trigger max 0.195 ms (50 iterations)"
+      ],
+      "totals": [
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.770 (0.771) seconds",
+        "Executed 1 test, with 0 failures (0 unexpected) in 0.038 (0.039) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.808 (0.810) seconds",
+        "Executed 2 tests, with 0 failures (0 unexpected) in 0.808 (0.811) seconds"
+      ]
+    }
+  ],
+  "pair_load_admission": [
+    {
+      "at": "2026-10-29T23:08:06.246712+08:00",
+      "load": [
+        6.25146484375,
+        7.94091796875,
+        13.18017578125
+      ]
+    },
+    {
+      "at": "2026-10-29T23:08:17.662568+08:00",
+      "load": [
+        6.28564453125,
+        7.89306640625,
+        13.1015625
+      ]
+    },
+    {
+      "at": "2026-10-29T23:08:27.593608+08:00",
+      "load": [
+        6.9716796875,
+        7.9931640625,
+        13.076171875
+      ]
+    },
+    {
+      "at": "2026-10-29T23:08:37.367342+08:00",
+      "load": [
+        7.10986328125,
+        7.9921875,
+        13.0166015625
+      ]
+    },
+    {
+      "at": "2026-10-29T23:08:47.146713+08:00",
+      "load": [
+        6.62451171875,
+        7.85986328125,
+        12.91064453125
+      ]
+    },
+    {
+      "at": "2026-10-29T23:08:56.854020+08:00",
+      "load": [
+        6.36767578125,
+        7.7646484375,
+        12.81787109375
+      ]
+    }
+  ],
+  "session_checks": [
+    {
+      "at": "2026-10-29T22:56:51.876318+08:00",
+      "label": "before verification",
+      "exit": 75,
+      "unlocked": false
+    },
+    {
+      "at": "2026-10-29T22:59:00.326281+08:00",
+      "label": "before headless verification",
+      "exit": 75,
+      "unlocked": false
+    },
+    {
+      "at": "2026-10-29T23:00:54.630040+08:00",
+      "label": "before headless verification",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:00.868749+08:00",
+      "label": "before hosted admission",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:01.099680+08:00",
+      "label": "focused import before",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:06.246360+08:00",
+      "label": "focused import after",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:06.479469+08:00",
+      "label": "pair-01-A-shared before",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:11.151736+08:00",
+      "label": "pair-01-A-shared after",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:11.385245+08:00",
+      "label": "pair-01-B-shared before",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:14.690883+08:00",
+      "label": "pair-01-B-shared after",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:14.925952+08:00",
+      "label": "pair-01-B-custom before",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:17.662406+08:00",
+      "label": "pair-01-B-custom after",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:17.891659+08:00",
+      "label": "pair-02-B-shared before",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:21.184552+08:00",
+      "label": "pair-02-B-shared after",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:21.412496+08:00",
+      "label": "pair-02-B-custom before",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:24.094943+08:00",
+      "label": "pair-02-B-custom after",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:24.330267+08:00",
+      "label": "pair-02-A-shared before",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:27.593374+08:00",
+      "label": "pair-02-A-shared after",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:27.828507+08:00",
+      "label": "pair-03-A-shared before",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:31.089431+08:00",
+      "label": "pair-03-A-shared after",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:31.313213+08:00",
+      "label": "pair-03-B-shared before",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:34.513029+08:00",
+      "label": "pair-03-B-shared after",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:34.733968+08:00",
+      "label": "pair-03-B-custom before",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:37.367105+08:00",
+      "label": "pair-03-B-custom after",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:37.590027+08:00",
+      "label": "pair-04-B-shared before",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:40.831680+08:00",
+      "label": "pair-04-B-shared after",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:41.053355+08:00",
+      "label": "pair-04-B-custom before",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:43.674376+08:00",
+      "label": "pair-04-B-custom after",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:43.897100+08:00",
+      "label": "pair-04-A-shared before",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:47.146490+08:00",
+      "label": "pair-04-A-shared after",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:47.371422+08:00",
+      "label": "pair-05-A-shared before",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:50.565948+08:00",
+      "label": "pair-05-A-shared after",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:50.785545+08:00",
+      "label": "pair-05-B-shared before",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:53.986399+08:00",
+      "label": "pair-05-B-shared after",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:54.210302+08:00",
+      "label": "pair-05-B-custom before",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:56.853767+08:00",
+      "label": "pair-05-B-custom after",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:08:57.084654+08:00",
+      "label": "pair-06-B-shared before",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:09:00.473654+08:00",
+      "label": "pair-06-B-shared after",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:09:00.700518+08:00",
+      "label": "pair-06-B-custom before",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:09:03.457952+08:00",
+      "label": "pair-06-B-custom after",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:09:03.685962+08:00",
+      "label": "pair-06-A-shared before",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:09:07.020907+08:00",
+      "label": "pair-06-A-shared after",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:09:07.255486+08:00",
+      "label": "full hosted before",
+      "exit": 0,
+      "unlocked": true
+    },
+    {
+      "at": "2026-10-29T23:14:00.092242+08:00",
+      "label": "full hosted after",
+      "exit": 0,
+      "unlocked": true
+    }
+  ],
+  "phases": [
+    {
+      "label": "format",
+      "command": [
+        "make",
+        "format"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 4.87,
+      "finished_at": "2026-10-29T23:00:59.531885+08:00"
+    },
+    {
+      "label": "lint",
+      "command": [
+        "make",
+        "lint"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 0.85,
+      "finished_at": "2026-10-29T23:01:00.450002+08:00"
+    },
+    {
+      "label": "test",
+      "command": [
+        "make",
+        "test",
+        "-o",
+        "test-hosted"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 230.74,
+      "finished_at": "2026-10-29T23:04:51.189132+08:00"
+    },
+    {
+      "label": "build",
+      "command": [
+        "make",
+        "build",
+        "XCODE_DERIVED_DATA=/private/tmp/plainsong-theme-review4-candidate-20261029-dd"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 45.9,
+      "finished_at": "2026-10-29T23:05:37.092668+08:00"
+    },
+    {
+      "label": "candidate-build-for-testing",
+      "command": [
+        "xcodebuild",
+        "-project",
+        "Plainsong.xcodeproj",
+        "-scheme",
+        "Plainsong",
+        "-configuration",
+        "Debug",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-derivedDataPath",
+        "/private/tmp/plainsong-theme-review4-candidate-20261029-dd",
+        "-jobs",
+        "2",
+        "build-for-testing"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 33.6,
+      "finished_at": "2026-10-29T23:06:10.692670+08:00"
+    },
+    {
+      "label": "fetch-main",
+      "command": [
+        "git",
+        "fetch",
+        "origin",
+        "main"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 1.01,
+      "finished_at": "2026-10-29T23:06:11.708223+08:00"
+    },
+    {
+      "label": "baseline-generate",
+      "command": [
+        "make",
+        "generate"
+      ],
+      "cwd": "/private/tmp/plainsong-theme-review4-main-20261029",
+      "exit": 0,
+      "seconds": 0.17,
+      "finished_at": "2026-10-29T23:06:12.594045+08:00"
+    },
+    {
+      "label": "baseline-build-for-testing",
+      "command": [
+        "xcodebuild",
+        "-project",
+        "Plainsong.xcodeproj",
+        "-scheme",
+        "Plainsong",
+        "-configuration",
+        "Debug",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-derivedDataPath",
+        "/private/tmp/plainsong-theme-review4-main-20261029-dd",
+        "-jobs",
+        "2",
+        "build-for-testing"
+      ],
+      "cwd": "/private/tmp/plainsong-theme-review4-main-20261029",
+      "exit": 0,
+      "seconds": 107.91,
+      "finished_at": "2026-10-29T23:08:00.502350+08:00"
+    },
+    {
+      "label": "focused-import",
+      "command": [
+        "xcodebuild",
+        "-xctestrun",
+        "/private/tmp/plainsong-theme-review4-candidate-20261029-dd/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-theme-review4-20261029/focused-import.xcresult",
+        "-only-testing:PlainsongTests/EditorThemeImportTests",
+        "test-without-building"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 4.88,
+      "finished_at": "2026-10-29T23:08:05.978979+08:00"
+    },
+    {
+      "label": "pair-01-A-shared",
+      "command": [
+        "xcodebuild",
+        "-xctestrun",
+        "/private/tmp/plainsong-theme-review4-main-20261029-dd/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-theme-review4-20261029/pair-01-A-shared.xcresult",
+        "-only-testing:PerformanceTests/PerformanceBudgetTests/testTypingLatencyStaysUnderFrameBudget",
+        "-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testHostedPublicEditorCurrentRevisionInputAndMarkedTextStayWithinFrameBudget",
+        "test-without-building"
+      ],
+      "cwd": "/private/tmp/plainsong-theme-review4-main-20261029",
+      "exit": 0,
+      "seconds": 4.44,
+      "finished_at": "2026-10-29T23:08:10.918677+08:00"
+    },
+    {
+      "label": "pair-01-B-shared",
+      "command": [
+        "xcodebuild",
+        "-xctestrun",
+        "/private/tmp/plainsong-theme-review4-candidate-20261029-dd/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-theme-review4-20261029/pair-01-B-shared.xcresult",
+        "-only-testing:PerformanceTests/PerformanceBudgetTests/testTypingLatencyStaysUnderFrameBudget",
+        "-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testHostedPublicEditorCurrentRevisionInputAndMarkedTextStayWithinFrameBudget",
+        "test-without-building"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 3.07,
+      "finished_at": "2026-10-29T23:08:14.454928+08:00"
+    },
+    {
+      "label": "pair-01-B-custom",
+      "command": [
+        "xcodebuild",
+        "-xctestrun",
+        "/private/tmp/plainsong-theme-review4-candidate-20261029-dd/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-theme-review4-20261029/pair-01-B-custom.xcresult",
+        "-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testHostedCustomSelectionThemeTypingStaysUnderFrameBudget",
+        "test-without-building"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 2.5,
+      "finished_at": "2026-10-29T23:08:17.427567+08:00"
+    },
+    {
+      "label": "pair-02-B-shared",
+      "command": [
+        "xcodebuild",
+        "-xctestrun",
+        "/private/tmp/plainsong-theme-review4-candidate-20261029-dd/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-theme-review4-20261029/pair-02-B-shared.xcresult",
+        "-only-testing:PerformanceTests/PerformanceBudgetTests/testTypingLatencyStaysUnderFrameBudget",
+        "-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testHostedPublicEditorCurrentRevisionInputAndMarkedTextStayWithinFrameBudget",
+        "test-without-building"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 3.06,
+      "finished_at": "2026-10-29T23:08:20.948411+08:00"
+    },
+    {
+      "label": "pair-02-B-custom",
+      "command": [
+        "xcodebuild",
+        "-xctestrun",
+        "/private/tmp/plainsong-theme-review4-candidate-20261029-dd/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-theme-review4-20261029/pair-02-B-custom.xcresult",
+        "-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testHostedCustomSelectionThemeTypingStaysUnderFrameBudget",
+        "test-without-building"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 2.45,
+      "finished_at": "2026-10-29T23:08:23.863646+08:00"
+    },
+    {
+      "label": "pair-02-A-shared",
+      "command": [
+        "xcodebuild",
+        "-xctestrun",
+        "/private/tmp/plainsong-theme-review4-main-20261029-dd/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-theme-review4-20261029/pair-02-A-shared.xcresult",
+        "-only-testing:PerformanceTests/PerformanceBudgetTests/testTypingLatencyStaysUnderFrameBudget",
+        "-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testHostedPublicEditorCurrentRevisionInputAndMarkedTextStayWithinFrameBudget",
+        "test-without-building"
+      ],
+      "cwd": "/private/tmp/plainsong-theme-review4-main-20261029",
+      "exit": 0,
+      "seconds": 3.03,
+      "finished_at": "2026-10-29T23:08:27.360807+08:00"
+    },
+    {
+      "label": "pair-03-A-shared",
+      "command": [
+        "xcodebuild",
+        "-xctestrun",
+        "/private/tmp/plainsong-theme-review4-main-20261029-dd/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-theme-review4-20261029/pair-03-A-shared.xcresult",
+        "-only-testing:PerformanceTests/PerformanceBudgetTests/testTypingLatencyStaysUnderFrameBudget",
+        "-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testHostedPublicEditorCurrentRevisionInputAndMarkedTextStayWithinFrameBudget",
+        "test-without-building"
+      ],
+      "cwd": "/private/tmp/plainsong-theme-review4-main-20261029",
+      "exit": 0,
+      "seconds": 3.03,
+      "finished_at": "2026-10-29T23:08:30.861734+08:00"
+    },
+    {
+      "label": "pair-03-B-shared",
+      "command": [
+        "xcodebuild",
+        "-xctestrun",
+        "/private/tmp/plainsong-theme-review4-candidate-20261029-dd/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-theme-review4-20261029/pair-03-B-shared.xcresult",
+        "-only-testing:PerformanceTests/PerformanceBudgetTests/testTypingLatencyStaysUnderFrameBudget",
+        "-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testHostedPublicEditorCurrentRevisionInputAndMarkedTextStayWithinFrameBudget",
+        "test-without-building"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 2.97,
+      "finished_at": "2026-10-29T23:08:34.283514+08:00"
+    },
+    {
+      "label": "pair-03-B-custom",
+      "command": [
+        "xcodebuild",
+        "-xctestrun",
+        "/private/tmp/plainsong-theme-review4-candidate-20261029-dd/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-theme-review4-20261029/pair-03-B-custom.xcresult",
+        "-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testHostedCustomSelectionThemeTypingStaysUnderFrameBudget",
+        "test-without-building"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 2.41,
+      "finished_at": "2026-10-29T23:08:37.139803+08:00"
+    },
+    {
+      "label": "pair-04-B-shared",
+      "command": [
+        "xcodebuild",
+        "-xctestrun",
+        "/private/tmp/plainsong-theme-review4-candidate-20261029-dd/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-theme-review4-20261029/pair-04-B-shared.xcresult",
+        "-only-testing:PerformanceTests/PerformanceBudgetTests/testTypingLatencyStaysUnderFrameBudget",
+        "-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testHostedPublicEditorCurrentRevisionInputAndMarkedTextStayWithinFrameBudget",
+        "test-without-building"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 3.01,
+      "finished_at": "2026-10-29T23:08:40.600831+08:00"
+    },
+    {
+      "label": "pair-04-B-custom",
+      "command": [
+        "xcodebuild",
+        "-xctestrun",
+        "/private/tmp/plainsong-theme-review4-candidate-20261029-dd/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-theme-review4-20261029/pair-04-B-custom.xcresult",
+        "-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testHostedCustomSelectionThemeTypingStaysUnderFrameBudget",
+        "test-without-building"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 2.39,
+      "finished_at": "2026-10-29T23:08:43.441165+08:00"
+    },
+    {
+      "label": "pair-04-A-shared",
+      "command": [
+        "xcodebuild",
+        "-xctestrun",
+        "/private/tmp/plainsong-theme-review4-main-20261029-dd/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-theme-review4-20261029/pair-04-A-shared.xcresult",
+        "-only-testing:PerformanceTests/PerformanceBudgetTests/testTypingLatencyStaysUnderFrameBudget",
+        "-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testHostedPublicEditorCurrentRevisionInputAndMarkedTextStayWithinFrameBudget",
+        "test-without-building"
+      ],
+      "cwd": "/private/tmp/plainsong-theme-review4-main-20261029",
+      "exit": 0,
+      "seconds": 3.02,
+      "finished_at": "2026-10-29T23:08:46.914861+08:00"
+    },
+    {
+      "label": "pair-05-A-shared",
+      "command": [
+        "xcodebuild",
+        "-xctestrun",
+        "/private/tmp/plainsong-theme-review4-main-20261029-dd/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-theme-review4-20261029/pair-05-A-shared.xcresult",
+        "-only-testing:PerformanceTests/PerformanceBudgetTests/testTypingLatencyStaysUnderFrameBudget",
+        "-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testHostedPublicEditorCurrentRevisionInputAndMarkedTextStayWithinFrameBudget",
+        "test-without-building"
+      ],
+      "cwd": "/private/tmp/plainsong-theme-review4-main-20261029",
+      "exit": 0,
+      "seconds": 2.96,
+      "finished_at": "2026-10-29T23:08:50.333279+08:00"
+    },
+    {
+      "label": "pair-05-B-shared",
+      "command": [
+        "xcodebuild",
+        "-xctestrun",
+        "/private/tmp/plainsong-theme-review4-candidate-20261029-dd/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-theme-review4-20261029/pair-05-B-shared.xcresult",
+        "-only-testing:PerformanceTests/PerformanceBudgetTests/testTypingLatencyStaysUnderFrameBudget",
+        "-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testHostedPublicEditorCurrentRevisionInputAndMarkedTextStayWithinFrameBudget",
+        "test-without-building"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 2.97,
+      "finished_at": "2026-10-29T23:08:53.751480+08:00"
+    },
+    {
+      "label": "pair-05-B-custom",
+      "command": [
+        "xcodebuild",
+        "-xctestrun",
+        "/private/tmp/plainsong-theme-review4-candidate-20261029-dd/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-theme-review4-20261029/pair-05-B-custom.xcresult",
+        "-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testHostedCustomSelectionThemeTypingStaysUnderFrameBudget",
+        "test-without-building"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 2.4,
+      "finished_at": "2026-10-29T23:08:56.608973+08:00"
+    },
+    {
+      "label": "pair-06-B-shared",
+      "command": [
+        "xcodebuild",
+        "-xctestrun",
+        "/private/tmp/plainsong-theme-review4-candidate-20261029-dd/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-theme-review4-20261029/pair-06-B-shared.xcresult",
+        "-only-testing:PerformanceTests/PerformanceBudgetTests/testTypingLatencyStaysUnderFrameBudget",
+        "-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testHostedPublicEditorCurrentRevisionInputAndMarkedTextStayWithinFrameBudget",
+        "test-without-building"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 3.14,
+      "finished_at": "2026-10-29T23:09:00.228745+08:00"
+    },
+    {
+      "label": "pair-06-B-custom",
+      "command": [
+        "xcodebuild",
+        "-xctestrun",
+        "/private/tmp/plainsong-theme-review4-candidate-20261029-dd/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-theme-review4-20261029/pair-06-B-custom.xcresult",
+        "-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testHostedCustomSelectionThemeTypingStaysUnderFrameBudget",
+        "test-without-building"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 2.52,
+      "finished_at": "2026-10-29T23:09:03.223525+08:00"
+    },
+    {
+      "label": "pair-06-A-shared",
+      "command": [
+        "xcodebuild",
+        "-xctestrun",
+        "/private/tmp/plainsong-theme-review4-main-20261029-dd/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-theme-review4-20261029/pair-06-A-shared.xcresult",
+        "-only-testing:PerformanceTests/PerformanceBudgetTests/testTypingLatencyStaysUnderFrameBudget",
+        "-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testHostedPublicEditorCurrentRevisionInputAndMarkedTextStayWithinFrameBudget",
+        "test-without-building"
+      ],
+      "cwd": "/private/tmp/plainsong-theme-review4-main-20261029",
+      "exit": 0,
+      "seconds": 3.1,
+      "finished_at": "2026-10-29T23:09:06.782266+08:00"
+    },
+    {
+      "label": "full-hosted",
+      "command": [
+        "xcodebuild",
+        "-test-timeouts-enabled",
+        "YES",
+        "-default-test-execution-time-allowance",
+        "120",
+        "-maximum-test-execution-time-allowance",
+        "120",
+        "-xctestrun",
+        "/private/tmp/plainsong-theme-review4-candidate-20261029-dd/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS,arch=arm64",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-theme-review4-20261029/full-hosted.xcresult",
+        "-only-testing:PlainsongTests",
+        "-only-testing:PerformanceTests",
+        "test-without-building"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 292.27,
+      "finished_at": "2026-10-29T23:13:59.523708+08:00"
+    },
+    {
+      "label": "diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": "/private/tmp/plainsong-editor-custom-themes",
+      "exit": 0,
+      "seconds": 0.02,
+      "finished_at": "2026-10-29T23:14:00.116234+08:00"
+    }
+  ],
+  "verification": {
+    "headless": [
+      {
+        "suite": "All tests",
+        "summary": "Executed 366 tests, with 0 failures (0 unexpected) in 26.890 (26.920) seconds"
+      },
+      {
+        "suite": "All tests",
+        "summary": "Executed 534 tests, with 9 tests skipped and 0 failures (0 unexpected) in 35.778 (35.845) seconds"
+      },
+      {
+        "suite": "All tests",
+        "summary": "Executed 211 tests, with 3 tests skipped and 0 failures (0 unexpected) in 86.966 (87.001) seconds"
+      },
+      {
+        "suite": "All tests",
+        "summary": "Executed 384 tests, with 0 failures (0 unexpected) in 3.779 (3.817) seconds"
+      },
+      {
+        "suite": "All tests",
+        "summary": "Executed 12 tests, with 0 failures (0 unexpected) in 0.289 (0.292) seconds"
+      },
+      {
+        "suite": "All tests",
+        "summary": "Executed 29 tests, with 0 failures (0 unexpected) in 0.007 (0.010) seconds"
+      }
+    ],
+    "focused_import": [
+      {
+        "suite": "EditorThemeImportTests",
+        "summary": "Executed 10 tests, with 0 failures (0 unexpected) in 0.228 (0.232) seconds"
+      },
+      {
+        "suite": "PlainsongTests.xctest",
+        "summary": "Executed 10 tests, with 0 failures (0 unexpected) in 0.228 (0.232) seconds"
+      }
+    ],
+    "full_hosted": [
+      {
+        "suite": "EditorThemeImportTests",
+        "summary": "Executed 10 tests, with 0 failures (0 unexpected) in 0.154 (0.158) seconds"
+      },
+      {
+        "suite": "PlainsongTests.xctest",
+        "summary": "Executed 1075 tests, with 16 tests skipped and 0 failures (0 unexpected) in 244.590 (245.070) seconds"
+      },
+      {
+        "suite": "All tests",
+        "summary": "Executed 1075 tests, with 16 tests skipped and 0 failures (0 unexpected) in 244.590 (245.071) seconds"
+      },
+      {
+        "suite": "PerformanceTests.xctest",
+        "summary": "Executed 32 tests, with 4 tests skipped and 0 failures (0 unexpected) in 32.585 (32.599) seconds"
+      },
+      {
+        "suite": "All tests",
+        "summary": "Executed 32 tests, with 4 tests skipped and 0 failures (0 unexpected) in 32.585 (32.600) seconds"
+      }
+    ]
+  },
+  "formatter_restored": [
+    "App/Views/WorkspaceFilesSidebar.swift",
+    "AppIOS/Composition/IOSDocumentSceneController+Events.swift",
+    "AppIOS/Composition/IOSDocumentSceneController+Lifecycle.swift",
+    "AppIOS/Composition/IOSProductionSurfaces.swift",
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Access/IOSWorkspaceAccessTypes.swift"
+  ],
+  "retained_evidence_directory": "/private/tmp/plainsong-theme-review4-20261029",
+  "retained_log_sha256": {
+    "baseline-generate.log": "8e6bcccf9a2ed4452683262b04b3f8b946a4969e968a2311885c0a85515f99f6",
+    "format.log": "748fe032596bce04894bc4eb6d137e5997f03a1a84b18a1273c0277bcbc2e683",
+    "lint.log": "27aca2cc88e79bf3a2118ae9f3fc13291385c99f1a092d88c742a4791e2168bf",
+    "pair-02-B-shared.log": "a5158a41a584442ee01925ad399c286b74ec2a284c8dadd660b1e136870a42af",
+    "pair-04-B-custom.log": "85940d1b80466f3f74d23042d8796bd87508a00ac76598d9018f21836f8f11f6",
+    "test.log": "a1707fca16c51b1abc36e6bd40cf0114b46d622ffbe5b2f9a020db263ccb1226",
+    "pair-05-B-shared.log": "b8406a33c78ad04859cb86fef768c7fbad285e36c41548aed391cc89aa3a6795",
+    "pair-03-B-custom.log": "03d8aebf55c6056b2e1042208d06b03d6c2240b1acf90b92dd3793cc8a41d2e6",
+    "focused-import.log": "11ba7e09d2628a1aa4f55fdc17934b988da8a6faa894afba635b8689ccac2d89",
+    "baseline-build-for-testing.log": "ad82cc7ad10b0999bd7071ce24d4199ba0f8ca0a05c67752d9586c968ca8c68f",
+    "pair-04-B-shared.log": "c86f8d1ea617671dd33513d8fecec362b1dcd97ee9040dd7471f0ce329df3c0d",
+    "pair-02-B-custom.log": "e564da0cf29f9c25184a8eb4e489cf2a9d3930234ac501a256928127cd1a4669",
+    "pair-03-B-shared.log": "c294581b7afc8bda5a12da6abf8718fe0293280dbe57393e4700e806973ff740",
+    "pair-05-B-custom.log": "4cb7305095bfc640815efef8fad1de19835561f8931f9aa95a7f7eb01c749a6e",
+    "diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "pair-01-A-shared.log": "0598bf1f630d492763727ae2e5e67313bdb6e6bf5f7699a707d2791a0ac2c7c4",
+    "pair-06-A-shared.log": "5c86917c63d68c0134304551fe461e9bbfd400a67fb30dd4a69730fa3e036ad2",
+    "pair-01-B-shared.log": "9106450e469e811482b1870086be69ec7560e5b3c65d2303ea48b461d290fa06",
+    "pair-06-B-shared.log": "7997af2ced924bfc68cc0636f1507703961b36498dab1131227850a679e3c7b9",
+    "pair-04-A-shared.log": "b9730a128064735c9cf909fdde44ee3d2f93ea1017182f921bb5a5005ea4a82b",
+    "pair-03-A-shared.log": "0aa9bb45c39be810bf9774f354e674d1890f8c47dc6e21b08a66ceb84aeddb4a",
+    "full-hosted.log": "78f814f99cf236fb8af62e23328fc7c53d2f6d723e6e959f479b9297c18724d5",
+    "pair-02-A-shared.log": "47ee6ed28bb79886adede57da53fbf493626e6c449a3462e85037f894fa9fdca",
+    "pair-05-A-shared.log": "0fea2fd131309bef64362abcc9ce6f77a21e06fa3cb07c52b13540e54d55ed11",
+    "candidate-build-for-testing.log": "924c16d4032f7f5baea426009fab9fb671f80e1e2f751ccf6ab4b94627af7f15",
+    "pair-01-B-custom.log": "126d57b7d3537ebcf28b7ad41cc064f37edb3cb418bd1c3af65a2675d2936c48",
+    "pair-06-B-custom.log": "80a4991328c06e9bf04257b6129124ee399d6f7818b8bd6d0d7f0c07075e9447",
+    "fetch-main.log": "f4f44feab1a502286a96e1acbc2bc611c770a035fc19922408c1753398da77c0",
+    "build.log": "0ccf52e547a78fae1b121c5cea4b8dfba2810fb1376f97ea98b9478d4fc1502e"
+  },
+  "earlier_failed_lint_directory": "/private/tmp/plainsong-theme-review4-20261029/attempt1-format-lint",
+  "cleanup": {
+    "locks": [
+      "/private/tmp/plainsong-xcodebuild-test.lock",
+      "/var/folders/v1/_k4hb2vx2vzcys_t5pbhdcdm0000gn/T/plainsong-xcodebuild-test.lock"
+    ],
+    "derived_data": [
+      {
+        "path": "/private/tmp/plainsong-theme-review4-main-20261029-dd",
+        "absent": true,
+        "at": "2026-10-29T23:19:58.598082+08:00"
+      },
+      {
+        "path": "/private/tmp/plainsong-theme-review4-candidate-20261029-dd",
+        "absent": true,
+        "at": "2026-10-29T23:19:59.676952+08:00"
+      }
+    ],
+    "retained_evidence": "/private/tmp/plainsong-theme-review4-20261029"
+  }
+}
