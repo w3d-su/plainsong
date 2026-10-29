@@ -243,7 +243,7 @@ final class IOSFormattingActionTests: XCTestCase {
             }
         }
         XCTAssertEqual(codeGroup.map(\.id), [.code, .inlineCode, .codeFence])
-        XCTAssertEqual(IOSAuthoringCatalog.actions.count, 24)
+        XCTAssertEqual(IOSAuthoringCatalog.actions.count, 25)
     }
 
     @MainActor
@@ -311,7 +311,7 @@ final class IOSFormattingActionTests: XCTestCase {
         case .displayMath: .format(.insertDisplayMath)
         case .checkbox: .toggleCheckbox
         case .formatTable: .formatTable
-        case .link, .find, .nextMatch, .previousMatch, .useSelectionForFind, .singleReplace:
+        case .link, .find, .nextMatch, .previousMatch, .useSelectionForFind, .singleReplace, .replaceAll:
             nil
         }
     }

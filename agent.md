@@ -256,6 +256,10 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 - An active workspace search refreshes for document edits only after a 500 ms typing
   pause, and only while the Search navigator shows (an edit made while Files shows
   refreshes when Search shows again); typing never resets the search state.
+- An open iOS folder search reuses cached reads on root refreshes with the same tree,
+  debouncing provider notices. A per-file content notice drops only that path; changed
+  trees and explicit searches read again. In-flight reads cannot restore an invalidated
+  cache entry, including a size or encoding refusal.
 - Each workspace window has its own `AppState` façade, `WindowState`, and
   `WorkspaceRootContext`, and they share one `AppDocumentRegistry`. One preview is
   created per visible document pane. A scene gets the app-owned façade whenever no open
@@ -886,6 +890,9 @@ make format           # swiftformat . && swiftlint --fix
   the Homebrew version differs; CI is authoritative. Bumping the pin means updating the
   version + SHA-256 in `ci.yml`, the Makefile constant, and reformatting the tree in the
   same PR if rule behavior changed.
+- The preview CI job verifies every pinned acceptance resource against the committed
+  bytes before installing preview dependencies. Regenerated resources must update
+  `IOSAcceptanceTests/Resources/acceptance-resource-manifest.txt` in the same PR.
 - Xcode 16+. `.xcodeproj` is generated — **never hand-edit, never commit pbxproj
   conflicts; edit `project.yml`.**
 - Code signing: "Sign to Run Locally" for dev; hardened runtime + notarization scripted

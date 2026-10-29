@@ -11,6 +11,17 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
         didSet { applyThemeChrome() }
     }
 
+    /// Line numbers are presentation only. Source, selection, and statistics ignore them.
+    public var showsLineNumbers = true {
+        didSet {
+            guard showsLineNumbers != oldValue else { return }
+            applyLineNumberChrome()
+        }
+    }
+
+    /// Top visible source line after a real scroll. Typewriter sync listens; the editor does not.
+    public var onViewportLine: ((Int) -> Void)?
+
     let scheduler: IOSHighlightScheduler
     let syntaxTokenizer: (any MarkdownSyntaxTokenizing)?
     var installation: IOSSourceEditorDocumentBinding?
@@ -28,6 +39,9 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
     var lastSelectionViewport = NSRange(location: NSNotFound, length: 0)
     var beforeNativeMutation: (@MainActor (IOSSourceEditorController) -> Void)?
     var needsBaseStyle = false
+    var lineIndex = IOSSourceLineIndex(text: "")
+    var gutterDigits: Int?
+    var lastViewportLine: Int?
 
     public convenience init(
         syntaxTokenizer: (any MarkdownSyntaxTokenizing)? = nil,
@@ -36,7 +50,9 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
         self.init(
             syntaxTokenizer: syntaxTokenizer,
             theme: theme,
-            debounce: IOSHighlightScheduler.productionDebounce
+            debounce: { @Sendable in
+                await IOSHighlightScheduler.productionDebounce()
+            }
         )
     }
 
@@ -52,7 +68,16 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
         super.init()
         textView.editor = self
         textView.delegate = self
+        // Every storage edit (typing, marked text, autocorrect, undo, programmatic
+        // replacement) updates the line index here, from the edit TextKit reports.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(textStorageDidProcessEditing(_:)),
+            name: NSTextStorage.didProcessEditingNotification,
+            object: textView.textStorage
+        )
         applyThemeChrome()
+        applyLineNumberChrome()
     }
 
     public var isTextKit2: Bool {
@@ -193,7 +218,10 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
 
     private func installInitialText(_ text: String) {
         isReconciling = true
-        defer { isReconciling = false }
+        defer {
+            isReconciling = false
+            rebuildLineIndex()
+        }
         guard !ExactSourceFragment.matches(plainText(), text) else { return }
         _ = IOSNativeTextMutation.replaceBufferWithoutUndo(text, in: textView)
         textView.selectedRange = NSRange(location: 0, length: 0)
@@ -214,6 +242,7 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
 
     private func applyThemeChrome() {
         textView.backgroundColor = theme.background
+        applyLineNumberChrome()
         if textView.markedTextRange != nil {
             needsBaseStyle = true
             raisePresentationFloor()
@@ -268,5 +297,104 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
         typing[.font] = theme.baseFont
         typing[.foregroundColor] = theme.baseColor
         textView.typingAttributes = typing
+    }
+
+    func currentLineNumberLabels() -> [IOSLineNumberLabel] {
+        guard showsLineNumbers else { return [] }
+        return IOSLineNumberLayout.labels(in: textView, lineIndex: lineIndex, selection: textView.selectedRange)
+    }
+
+    /// Lays out before reading, for tests and for the gutter's first paint.
+    func lineNumberLabels() -> [IOSLineNumberLabel] {
+        textView.layoutIfNeeded()
+        return currentLineNumberLabels()
+    }
+
+    public func topVisibleSourceLine() -> Int {
+        let range = IOSViewport.visibleUTF16Range(in: textView)
+        let location = range.location == NSNotFound ? 0 : range.location
+        return lineIndex.oneBasedLine(containingUTF16Offset: location)
+    }
+
+    /// Scrolls the source line to the top of the viewport. Used by typewriter sync.
+    public func scrollToSourceLine(_ line: Int) {
+        guard isHostAlive, textView.isTextKit2 else { return }
+        let clamped = min(max(line, 1), max(lineIndex.lineCount, 1))
+        let offset = lineIndex.utf16Offset(forOneBasedLine: clamped)
+        guard let fragmentY = textView.contentY(forUTF16Offset: offset) else { return }
+        // Fragment frames are in text-container coordinates; the content offset that puts
+        // the line at the top of the visible area adds the container inset and starts at
+        // the negative top inset (under the navigation bar), like the gutter.
+        let target = Self.scrollTarget(
+            fragmentY: fragmentY,
+            containerInsetTop: textView.textContainerInset.top,
+            adjustedInset: textView.adjustedContentInset,
+            contentHeight: textView.contentSize.height,
+            boundsHeight: textView.bounds.height
+        )
+        guard abs(textView.contentOffset.y - target) > 0.5 else { return }
+        textView.setContentOffset(CGPoint(x: textView.contentOffset.x, y: target), animated: false)
+    }
+
+    nonisolated static func scrollTarget(
+        fragmentY: CGFloat,
+        containerInsetTop: CGFloat,
+        adjustedInset: UIEdgeInsets,
+        contentHeight: CGFloat,
+        boundsHeight: CGFloat
+    ) -> CGFloat {
+        let minimum = -adjustedInset.top
+        let maximum = max(minimum, contentHeight - boundsHeight + adjustedInset.bottom)
+        // The first line scrolls to the very top, keeping the container inset above it.
+        guard fragmentY > 0 else { return minimum }
+        return min(max(minimum, fragmentY + containerInsetTop - adjustedInset.top), maximum)
+    }
+
+    func noteViewportLine() {
+        let line = topVisibleSourceLine()
+        guard line != lastViewportLine else { return }
+        lastViewportLine = line
+        onViewportLine?(line)
+    }
+
+    /// Applies the storage's processed edit to the line index. `editedRange` is in post-edit
+    /// coordinates and covers every change in the batch, so the pre-edit range is the same
+    /// location with `changeInLength` removed. A failed or mismatched update rebuilds.
+    @objc func textStorageDidProcessEditing(_ notification: Notification) {
+        let storage = textView.textStorage
+        guard notification.object as AnyObject === storage,
+              storage.editedMask.contains(.editedCharacters)
+        else { return }
+        let edited = storage.editedRange
+        let previousLength = edited.length - storage.changeInLength
+        let source = storage.string as NSString
+        guard edited.location != NSNotFound, previousLength >= 0, NSMaxRange(edited) <= source.length else {
+            lineIndex = IOSSourceLineIndex(utf16: source)
+            return
+        }
+        let applied = lineIndex.replaceCharacters(
+            in: NSRange(location: edited.location, length: previousLength),
+            with: source.substring(with: edited)
+        )
+        if !applied || lineIndex.textUTF16Count != source.length {
+            lineIndex = IOSSourceLineIndex(utf16: source)
+        }
+    }
+
+    func rebuildLineIndex() {
+        lineIndex = IOSSourceLineIndex(text: plainText())
+        applyLineNumberChrome()
+    }
+
+    func applyLineNumberChrome() {
+        let metrics = showsLineNumbers
+            ? IOSLineNumberLayout.width(lineCount: lineIndex.lineCount, font: theme.baseFont, digits: gutterDigits)
+            : (width: CGFloat(0), digits: gutterDigits ?? IOSLineNumberDigits.minimum)
+        if showsLineNumbers {
+            gutterDigits = metrics.digits
+        }
+        isAdjustingSelection = true
+        defer { isAdjustingSelection = false }
+        textView.applyLineNumberGutter(width: metrics.width, background: theme.background)
     }
 }

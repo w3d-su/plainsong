@@ -122,7 +122,14 @@ extension IOSAuthoringController {
             statusMessage = IOSAuthoringCatalog.compositionRefusal
             return
         }
-        guard snapshot.isFocused else { return }
+        guard snapshot.canWrite else {
+            statusMessage = IOSAuthoringCatalog.readOnlyRefusal
+            return
+        }
+        guard snapshot.isFocused else {
+            statusMessage = IOSAuthoringCatalog.focusRefusal
+            return
+        }
         guard find.context?.matches(snapshot) == true else {
             beginFindQuery(using: editor)
             statusMessage = "The document changed. Find results are being refreshed."
@@ -176,6 +183,115 @@ extension IOSAuthoringController {
                 postWriteSource: latest.document.text
             )
             install(continuation, snapshot: latest, using: editor)
+        }
+    }
+
+    func replaceAllMatches(using editor: any IOSSourceEditorControlling) {
+        guard let snapshot = editor.captureSnapshot() else { return }
+        if snapshot.hasMarkedText {
+            statusMessage = IOSAuthoringCatalog.compositionRefusal
+            return
+        }
+        guard snapshot.canWrite else {
+            statusMessage = IOSAuthoringCatalog.readOnlyRefusal
+            return
+        }
+        guard snapshot.isFocused else {
+            statusMessage = IOSAuthoringCatalog.focusRefusal
+            return
+        }
+        guard find.context?.matches(snapshot) == true else {
+            beginFindQuery(using: editor)
+            statusMessage = "The document changed. Find results are being refreshed."
+            return
+        }
+        guard find.status != .searching,
+              let session = find.session,
+              session.query == makeQuery()
+        else { return }
+        switch EditorReplacePlanner.planBatch(
+            session: session,
+            source: snapshot.document.text,
+            replacement: find.replacement
+        ) {
+        case let .failure(refusal):
+            statusMessage = batchReplacementMessage(refusal)
+        case let .success(plan):
+            apply(plan, session: session, snapshot: snapshot, using: editor)
+        }
+    }
+
+    private func apply(
+        _ plan: EditorReplaceBatchPlan,
+        session: EditorFindSession,
+        snapshot: IOSSourceEditorSnapshot,
+        using editor: any IOSSourceEditorControlling
+    ) {
+        let caret = snapshot.selection.location
+        if plan.isNoOp {
+            let continuation = EditorReplaceContinuationPlanning.afterBatch(
+                plan: plan,
+                preWriteCurrentMatch: session.currentMatch,
+                preWriteCaretUTF16: caret,
+                postWriteSource: snapshot.document.text
+            )
+            install(continuation, snapshot: snapshot, using: editor)
+            _ = editor.reveal(continuation.collapsedSelection, expected: snapshot.revision)
+            reportBatch("Every match already has that text.")
+            return
+        }
+        guard let enclosing = plan.enclosingRange,
+              let slice = EditorReplaceSourceConstruction.replacedSlice(
+                  snapshot.document.text,
+                  enclosing: enclosing,
+                  ranges: plan.differingRanges,
+                  replacement: plan.replacement
+              ),
+              let post = EditorReplaceSourceConstruction.replacedSource(
+                  snapshot.document.text,
+                  ranges: plan.differingRanges,
+                  replacement: plan.replacement
+              )
+        else {
+            statusMessage = IOSAuthoringCatalog.editRefusal
+            return
+        }
+        let continuation = EditorReplaceContinuationPlanning.afterBatch(
+            plan: plan,
+            preWriteCurrentMatch: session.currentMatch,
+            preWriteCaretUTF16: caret,
+            postWriteSource: post
+        )
+        let result = MarkdownEditResult(
+            replacementRange: enclosing,
+            replacementString: slice,
+            newSelection: continuation.collapsedSelection
+        )
+        let outcome = submit(result, snapshot: snapshot, name: "Replace All", using: editor)
+        guard case let .applied(revision) = outcome,
+              let latest = editor.captureSnapshot(),
+              latest.revision == revision,
+              ExactSourceText.matches(latest.document.text, post)
+        else { return }
+        install(continuation, snapshot: latest, using: editor)
+        reportBatch(plan.changedCount == 1
+            ? "Replaced 1 match."
+            : "Replaced \(plan.changedCount) matches.")
+    }
+
+    private func reportBatch(_ message: String) {
+        statusMessage = message
+        find.message = message
+    }
+
+    private func batchReplacementMessage(_ refusal: EditorReplacePlanRefusal) -> String {
+        switch refusal {
+        case .truncatedSession:
+            "Replace All needs every match. Narrow the search and try again."
+        case .projectedLengthOverflow:
+            "That replacement would make the document too large."
+        default:
+            replacementMessage(refusal)
         }
     }
 
@@ -268,8 +384,10 @@ extension IOSAuthoringController {
             "Replacement isn't valid."
         case .emptySession, .noCurrentMatch:
             "There is no current match to replace."
-        case .truncatedSession, .projectedLengthOverflow:
-            IOSAuthoringCatalog.formattingRefusal
+        case .truncatedSession:
+            "There are too many matches to replace safely. Narrow the search and try again."
+        case .projectedLengthOverflow:
+            "That replacement would make the document too large."
         }
     }
 

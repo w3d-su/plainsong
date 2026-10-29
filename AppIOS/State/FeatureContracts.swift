@@ -9,7 +9,7 @@ enum IOSAuthoringActionID: Hashable, Sendable {
     case bold, italic, link, heading(Int), code
     case strikethrough, inlineCode, paragraph, quote, codeFence
     case inlineMath, displayMath, checkbox, formatTable
-    case find, nextMatch, previousMatch, useSelectionForFind, singleReplace
+    case find, nextMatch, previousMatch, useSelectionForFind, singleReplace, replaceAll
 }
 
 struct IOSKeyboardModifiers: OptionSet, Sendable {

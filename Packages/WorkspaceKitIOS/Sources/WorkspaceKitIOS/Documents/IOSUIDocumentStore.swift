@@ -8,7 +8,7 @@ import WorkspaceCore
 public final class IOSUIDocumentStore: IOSDocumentStore {
     let coordinatedAccess: any IOSCoordinatedFileAccess
     let recovery: any IOSRecoveryPersisting
-    let timing: IOSDocumentTiming
+    public var timing: IOSDocumentTiming
     let filePortFactory: @MainActor (URL) -> any IOSDocumentFilePort
     var byResource: [IOSDocumentResourceKey: IOSDocumentEntry] = [:]
     var byIdentity: [IOSDocumentIdentity: IOSDocumentEntry] = [:]

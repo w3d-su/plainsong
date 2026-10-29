@@ -49,18 +49,10 @@ final class UIDocumentFileAdapter: IOSDocumentFilePort {
     ) {
         let document = prepareDocument()
         document.installSnapshot(snapshot)
+        // save(to:) invokes this completion on the caller queue. This method is main-actor isolated.
+        let finish = DocumentSaveFinish(document: document, completion: completion)
         document.save(to: document.fileURL, for: .forOverwriting) { success in
-            let error = document.takeError()
-            document.clearSnapshot()
-            Task { @MainActor in
-                if success {
-                    completion(.stored)
-                } else if self.isIndeterminate(error) {
-                    completion(.indeterminate)
-                } else {
-                    completion(.failed)
-                }
-            }
+            finish.complete(success)
         }
         _ = operationID
     }
@@ -149,8 +141,46 @@ final class UIDocumentFileAdapter: IOSDocumentFilePort {
     }
 
     private func isIndeterminate(_ error: Error?) -> Bool {
-        guard let error else { return false }
-        let cocoa = error as NSError
-        return cocoa.domain == NSPOSIXErrorDomain && cocoa.code == Int(EINPROGRESS)
+        iosDocumentWriteIsIndeterminate(error)
     }
+}
+
+/// Bridges UIDocument's sendable save callback back to the main-actor caller without retaining a second writer.
+private final class DocumentSaveFinish: @unchecked Sendable {
+    private let document: MarkdownUIDocument
+    private let completion: @MainActor (IOSDocumentFileWriteDisposition) -> Void
+
+    init(
+        document: MarkdownUIDocument,
+        completion: @escaping @MainActor (IOSDocumentFileWriteDisposition) -> Void
+    ) {
+        self.document = document
+        self.completion = completion
+    }
+
+    func complete(_ success: Bool) {
+        let error = document.takeError()
+        document.clearSnapshot()
+        let disposition: IOSDocumentFileWriteDisposition = if success {
+            .stored
+        } else if iosDocumentWriteIsIndeterminate(error) {
+            .indeterminate
+        } else {
+            .failed
+        }
+        Task { @MainActor in
+            self.finish(disposition)
+        }
+    }
+
+    @MainActor
+    private func finish(_ disposition: IOSDocumentFileWriteDisposition) {
+        completion(disposition)
+    }
+}
+
+private func iosDocumentWriteIsIndeterminate(_ error: Error?) -> Bool {
+    guard let error else { return false }
+    let cocoa = error as NSError
+    return cocoa.domain == NSPOSIXErrorDomain && cocoa.code == Int(EINPROGRESS)
 }

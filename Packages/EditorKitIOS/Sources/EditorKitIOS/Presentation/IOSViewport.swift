@@ -1,6 +1,7 @@
 import UIKit
 
 enum IOSViewport {
+    @MainActor
     static func visibleUTF16Range(in textView: IOSMarkdownTextView) -> NSRange {
         let length = textView.textStorage.length
         if let override = textView.viewportOverride {

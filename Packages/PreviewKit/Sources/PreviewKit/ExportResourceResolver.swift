@@ -11,24 +11,90 @@ enum ExportResourceResolver {
         previewDirectory: URL?,
         normalizeDataURI: (String) -> ExportRasterDataURI.Normalized? = ExportRasterDataURI.normalized(from:)
     ) -> [ExportResourceOutcome] {
-        let manifest = ExportFontManifest.woff2FileNames(in: previewDirectory)
-        let fontDirectory = previewDirectory?.appendingPathComponent("fonts", isDirectory: true)
+        let fonts = FontSource(previewDirectory: previewDirectory)
         var state = RasterBudget()
         return resources.map { resource in
-            guard !Task.isCancelled else {
-                return ExportResourceOutcome.omit(resource, reason: "cancelled")
+            switch prepare(resource, fonts: fonts, assetRoot: assetRoot, normalize: normalizeDataURI, state: &state) {
+            case let .resolved(outcome):
+                return outcome
+            case let .loadAsset(fileURL, identity):
+                let loaded = Result { try AssetURLPolicy.loadAsset(at: fileURL) }
+                return finishAsset(resource, identity: identity, loaded: loaded, state: &state)
             }
-            switch resource.kind {
-            case .font:
-                return resolveFont(resource, fontDirectory: fontDirectory, manifest: manifest)
-            case .image:
-                return resolveImage(
-                    resource,
-                    assetRoot: assetRoot,
-                    normalizeDataURI: normalizeDataURI,
-                    state: &state
-                )
+        }
+    }
+
+    /// iOS: local images come from the injected grant-scoped reader instead of a
+    /// direct disk read. Containment, type, size, and the raster budget are unchanged.
+    static func resolve(
+        _ resources: [ExportResourceDescriptor],
+        assetRoot: URL?,
+        previewDirectory: URL?,
+        loadAsset: @Sendable (URL) async throws -> AssetURLPolicyResult
+    ) async -> [ExportResourceOutcome] {
+        let fonts = FontSource(previewDirectory: previewDirectory)
+        var state = RasterBudget()
+        var outcomes: [ExportResourceOutcome] = []
+        outcomes.reserveCapacity(resources.count)
+        for resource in resources {
+            switch prepare(
+                resource,
+                fonts: fonts,
+                assetRoot: assetRoot,
+                normalize: ExportRasterDataURI.normalized(from:),
+                state: &state
+            ) {
+            case let .resolved(outcome):
+                outcomes.append(outcome)
+            case let .loadAsset(fileURL, identity):
+                let loaded: Result<AssetURLPolicyResult, Error>
+                do {
+                    loaded = try await .success(loadAsset(fileURL))
+                } catch {
+                    loaded = .failure(error)
+                }
+                guard !Task.isCancelled else {
+                    outcomes.append(.omit(resource, reason: "cancelled"))
+                    continue
+                }
+                outcomes.append(autoreleasepool {
+                    finishAsset(resource, identity: identity, loaded: loaded, state: &state)
+                })
             }
+        }
+        return outcomes
+    }
+
+    private struct FontSource {
+        let manifest: Set<String>
+        let directory: URL?
+
+        init(previewDirectory: URL?) {
+            manifest = ExportFontManifest.woff2FileNames(in: previewDirectory)
+            directory = previewDirectory?.appendingPathComponent("fonts", isDirectory: true)
+        }
+    }
+
+    private enum Step {
+        case resolved(ExportResourceOutcome)
+        case loadAsset(fileURL: URL, identity: String)
+    }
+
+    private static func prepare(
+        _ resource: ExportResourceDescriptor,
+        fonts: FontSource,
+        assetRoot: URL?,
+        normalize: (String) -> ExportRasterDataURI.Normalized?,
+        state: inout RasterBudget
+    ) -> Step {
+        guard !Task.isCancelled else {
+            return .resolved(ExportResourceOutcome.omit(resource, reason: "cancelled"))
+        }
+        switch resource.kind {
+        case .font:
+            return .resolved(resolveFont(resource, fontDirectory: fonts.directory, manifest: fonts.manifest))
+        case .image:
+            return prepareImage(resource, assetRoot: assetRoot, normalizeDataURI: normalize, state: &state)
         }
     }
 
@@ -66,23 +132,23 @@ enum ExportResourceResolver {
         )
     }
 
-    private static func resolveImage(
+    private static func prepareImage(
         _ resource: ExportResourceDescriptor,
         assetRoot: URL?,
         normalizeDataURI: (String) -> ExportRasterDataURI.Normalized?,
         state: inout RasterBudget
-    ) -> ExportResourceOutcome {
+    ) -> Step {
         let source = resource.src.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !source.isEmpty else {
-            return ExportResourceOutcome.omit(resource, reason: "missing")
+            return .resolved(ExportResourceOutcome.omit(resource, reason: "missing"))
         }
         if source.lowercased().hasPrefix("data:") {
-            return resolveDataImage(resource, source: source, normalize: normalizeDataURI, state: &state)
+            return .resolved(resolveDataImage(resource, source: source, normalize: normalizeDataURI, state: &state))
         }
         guard source.lowercased().hasPrefix("asset:") else {
-            return ExportResourceOutcome.omit(resource, reason: "rejected-scheme")
+            return .resolved(ExportResourceOutcome.omit(resource, reason: "rejected-scheme"))
         }
-        return resolveAssetImage(resource, source: source, assetRoot: assetRoot, state: &state)
+        return prepareAssetImage(resource, source: source, assetRoot: assetRoot, state: state)
     }
 
     private static func resolveDataImage(
@@ -111,41 +177,67 @@ enum ExportResourceResolver {
         return outcome
     }
 
-    private static func resolveAssetImage(
+    private static func prepareAssetImage(
         _ resource: ExportResourceDescriptor,
         source: String,
         assetRoot: URL?,
+        state: RasterBudget
+    ) -> Step {
+        guard let assetRoot, let url = URL(string: source) else {
+            return .resolved(ExportResourceOutcome.omit(resource, reason: "unresolved"))
+        }
+        let fileURL: URL
+        do {
+            fileURL = try AssetURLResolver(allowedRoot: assetRoot).resolve(url)
+        } catch AssetURLResolverError.pathEscapesRoot {
+            return .resolved(ExportResourceOutcome.omit(resource, reason: "escapes-root"))
+        } catch {
+            return .resolved(ExportResourceOutcome.omit(resource, reason: "unresolved"))
+        }
+        let identity = fileURL.path(percentEncoded: false)
+        // A repeated reference reuses the first decision instead of re-reading the file.
+        if let repeated = repeatedOutcome(resource, identity: identity, state: state) {
+            return .resolved(repeated)
+        }
+        return .loadAsset(fileURL: fileURL, identity: identity)
+    }
+
+    private static func finishAsset(
+        _ resource: ExportResourceDescriptor,
+        identity: String,
+        loaded: Result<AssetURLPolicyResult, Error>,
         state: inout RasterBudget
     ) -> ExportResourceOutcome {
-        guard let assetRoot, let url = URL(string: source) else {
-            return ExportResourceOutcome.omit(resource, reason: "unresolved")
+        let asset: AssetURLPolicyResult
+        switch loaded {
+        case let .success(value):
+            asset = value
+        case let .failure(error):
+            let reason = omissionReason(for: error)
+            state.decisionsByIdentity[identity] = .omitted(reason: reason)
+            return ExportResourceOutcome.omit(resource, reason: reason)
         }
-        do {
-            let fileURL = try AssetURLResolver(allowedRoot: assetRoot).resolve(url)
-            let identity = fileURL.path(percentEncoded: false)
-            // A repeated reference reuses the first decision instead of re-reading the file.
-            if let repeated = repeatedOutcome(resource, identity: identity, state: state) {
-                return repeated
-            }
-            let asset = try AssetURLPolicy.loadAsset(at: fileURL)
-            guard ExportRasterSniffer.decodedMIMEType(of: asset.data) == asset.mimeType else {
-                state.decisionsByIdentity[identity] = .omitted(reason: "unsupported")
-                return ExportResourceOutcome.omit(resource, reason: "unsupported")
-            }
-            let dataURI = "data:\(asset.mimeType);base64,\(asset.data.base64EncodedString())"
-            return accept(
-                resource,
-                identity: identity,
-                byteCount: Int64(asset.data.count),
-                dataURI: dataURI,
-                state: &state
-            )
-        } catch AssetURLResolverError.pathEscapesRoot {
-            return ExportResourceOutcome.omit(resource, reason: "escapes-root")
-        } catch AssetURLPolicyError.fileTooLarge {
-            return ExportResourceOutcome.omit(resource, reason: "too-large")
-        } catch {
-            return ExportResourceOutcome.omit(resource, reason: "unresolved")
+        guard ExportRasterSniffer.decodedMIMEType(of: asset.data) == asset.mimeType else {
+            state.decisionsByIdentity[identity] = .omitted(reason: "unsupported")
+            return ExportResourceOutcome.omit(resource, reason: "unsupported")
+        }
+        return accept(
+            resource,
+            identity: identity,
+            byteCount: Int64(asset.data.count),
+            dataURI: "data:\(asset.mimeType);base64,\(asset.data.base64EncodedString())",
+            state: &state
+        )
+    }
+
+    private static func omissionReason(for error: Error) -> String {
+        switch error {
+        case AssetURLResolverError.pathEscapesRoot, PreviewAssetReadFailure.outsideRoot:
+            "escapes-root"
+        case AssetURLPolicyError.fileTooLarge, PreviewAssetReadFailure.tooLarge:
+            "too-large"
+        default:
+            "unresolved"
         }
     }
 
@@ -174,7 +266,7 @@ enum ExportResourceResolver {
         _ resource: ExportResourceDescriptor,
         identity: String,
         byteCount: Int64,
-        dataURI: String,
+        dataURI: @autoclosure () -> String,
         state: inout RasterBudget
     ) -> ExportResourceOutcome {
         let nextTotal = state.totalBytes.addingReportingOverflow(byteCount)
@@ -191,7 +283,7 @@ enum ExportResourceResolver {
             resourceID: resource.resourceID,
             kind: .image,
             action: .embed,
-            dataURI: dataURI
+            dataURI: dataURI()
         )
     }
 }

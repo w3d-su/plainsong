@@ -143,8 +143,9 @@ final class MarkdownUIDocument: UIDocument {
     }
 
     override func accommodatePresentedItemDeletion(completionHandler: @escaping (Error?) -> Void) {
+        let completion = DeletionCompletion(completionHandler)
         super.accommodatePresentedItemDeletion { error in
-            completionHandler(error)
+            completion.call(error)
         }
         emit(.deleted)
     }
@@ -168,9 +169,7 @@ final class MarkdownUIDocument: UIDocument {
         let handler = eventHandler
         stateLock.unlock()
         guard let handler else { return }
-        Task { @MainActor in
-            handler(event)
-        }
+        MainActorEventCall(handler).run(event)
     }
 
     private static func regularFileData(from contents: Any) throws -> Data {
@@ -184,5 +183,38 @@ final class MarkdownUIDocument: UIDocument {
             throw CocoaError(.fileReadCorruptFile)
         }
         throw CocoaError(.fileReadUnsupportedScheme)
+    }
+}
+
+/// UIKit presents this callback from a file-presenter queue. The box only forwards that one call.
+private final class DeletionCompletion: @unchecked Sendable {
+    private let completion: (Error?) -> Void
+
+    init(_ completion: @escaping (Error?) -> Void) {
+        self.completion = completion
+    }
+
+    func call(_ error: Error?) {
+        completion(error)
+    }
+}
+
+/// The handler itself stays on the main actor. Only this immutable bridge crosses the presenter queue.
+private final class MainActorEventCall: @unchecked Sendable {
+    private let handler: @MainActor (IOSDocumentFileEvent) -> Void
+
+    init(_ handler: @escaping @MainActor (IOSDocumentFileEvent) -> Void) {
+        self.handler = handler
+    }
+
+    func run(_ event: IOSDocumentFileEvent) {
+        Task { @MainActor in
+            self.invoke(event)
+        }
+    }
+
+    @MainActor
+    private func invoke(_ event: IOSDocumentFileEvent) {
+        handler(event)
     }
 }
