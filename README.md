@@ -83,8 +83,10 @@ supported. Live fixture coverage: `Fixtures/math.md`.
   as a workspace to grant directory scope.
 - **MDX components render as placeholder cards** (imports as chips, JSX as component
   cards); components are not executed.
-- **Preview images** are limited to PNG/JPEG/GIF/WebP up to 10 MiB; SVG is not rendered.
-  Remote images are off by default, and enabling them allows `https:` images only.
+- **Preview images** are PNG/JPEG/GIF/WebP up to 10 MiB, plus workspace SVG up to 1 MiB
+  shown only as an image after a structural check. `data:` SVG, inline `<svg>`, and SVG
+  in HTML/PDF export are not supported. Remote images are off by default, and enabling
+  them allows `https:` images only; a remote SVG is left to WebKit and is not validated.
 - **WYSIWYG is Experimental and inline-only** (headings, emphasis/strike, inline code,
   list/quote styling, inline `[text](url)` links, and thumbnails for local PNG/JPEG/GIF/WebP
   images up to 10 MiB in a folder workspace). Reference links, autolinks, remote/SVG/

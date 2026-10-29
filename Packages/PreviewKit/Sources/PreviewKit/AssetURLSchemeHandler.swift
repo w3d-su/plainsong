@@ -6,15 +6,40 @@ enum AssetURLPolicyError: Error, Equatable {
     case unsupportedType(String)
     case missingFileSize
     case fileTooLarge(actualBytes: Int64, maxBytes: Int64)
+    /// Keeps the validator's reason in process; the scheme failure is still `unsupportedType`.
+    case rejectedSVG(SVGImageRejection)
+    /// The reader's coordinated file and the requested file disagree on being SVG, so the
+    /// byte cap and the validator decision would have come from different files.
+    case kindChangedDuringRead
 }
 
 struct AssetURLPolicyResult: Equatable {
     let mimeType: String
     let data: Data
+    /// Set only for an admitted SVG. Raster responses stay header-less.
+    let contentSecurityPolicy: String?
+
+    init(mimeType: String, data: Data, contentSecurityPolicy: String? = nil) {
+        self.mimeType = mimeType
+        self.data = data
+        self.contentSecurityPolicy = contentSecurityPolicy
+    }
 }
 
 enum AssetURLPolicy {
     static let maxAssetBytes = MarkdownImageAssetPolicy.maximumFileSizeBytes
+
+    static func isSVG(_ fileURL: URL) -> Bool {
+        fileURL.pathExtension.lowercased() == "svg"
+    }
+
+    /// Raster files keep the 10 MiB cap. SVG is capped before it is parsed.
+    static func maximumPreviewByteCount(for fileURL: URL) -> Int64 {
+        if isSVG(fileURL) {
+            return Int64(SVGImageValidator.maximumByteCount)
+        }
+        return maxAssetBytes
+    }
 
     static func loadAsset(at fileURL: URL) throws -> AssetURLPolicyResult {
         let mimeType = try mimeType(for: fileURL)
@@ -158,7 +183,7 @@ final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler, @unchecked Send
                 requestID: capture.requestID,
                 resolvedURL: resolved,
                 access: capture.access,
-                maximumByteCount: Int(exactly: AssetURLPolicy.maxAssetBytes) ?? .max
+                maximumByteCount: Int(exactly: AssetURLPolicy.maximumPreviewByteCount(for: resolved)) ?? .max
             )
             do {
                 try Task.checkCancellation()
@@ -177,6 +202,7 @@ final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler, @unchecked Send
                 let prepared = try AssetFilesystemPreparation.containedAsset(
                     result.bytes,
                     fileURL: result.coordinatedURL,
+                    requestedURL: resolved,
                     root: root
                 )
                 try Task.checkCancellation()
@@ -228,12 +254,14 @@ final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler, @unchecked Send
         taskID: ObjectIdentifier
     ) {
         guard state.permission(for: capture, taskID: taskID).acceptsDelivery else { return }
-        let response = URLResponse(
+        guard let response = AssetDeliveryResponse.make(
             url: task.requestURL ?? displayURL,
-            mimeType: asset.mimeType,
-            expectedContentLength: asset.data.count,
-            textEncodingName: nil
-        )
+            asset: asset
+        ) else {
+            // An SVG never goes out without its headers.
+            failCurrentSync(task, failure: .providerFailed, capture: capture, taskID: taskID)
+            return
+        }
         task.receive(response: response)
         guard state.permission(for: capture, taskID: taskID).acceptsDelivery else { return }
         task.receive(data: asset.data)
@@ -304,47 +332,24 @@ private extension PreviewAssetReadFailure {
     static func mapped(from error: Error) -> PreviewAssetReadFailure {
         switch error {
         case let failure as PreviewAssetReadFailure:
-            failure
+            return failure
         case let policy as AssetURLPolicyError:
             switch policy {
-            case .unsupportedType: .unsupportedType
-            case .fileTooLarge: .tooLarge
-            case .missingFileSize: .providerFailed
+            case .unsupportedType, .kindChangedDuringRead:
+                return .unsupportedType
+            case let .rejectedSVG(reason):
+                SVGAssetDiagnostics.logRejection(reason)
+                return .unsupportedType
+            case .fileTooLarge:
+                return .tooLarge
+            case .missingFileSize:
+                return .providerFailed
             }
         case is AssetURLResolverError:
-            .outsideRoot
+            return .outsideRoot
         default:
-            .providerFailed
+            return .providerFailed
         }
-    }
-}
-
-/// Filesystem work for a preview asset read. This type is not the URL-scheme
-/// handler, so symlink resolution and file metadata stay off the main actor.
-private enum AssetFilesystemPreparation {
-    struct ContainedAsset: Sendable {
-        let asset: AssetURLPolicyResult
-        let fileURL: URL
-    }
-
-    static func resolvedAssetURL(_ requestURL: URL, allowedRoot: URL) throws -> URL {
-        let resolved = try AssetURLResolver(allowedRoot: allowedRoot).resolve(requestURL)
-        _ = try AssetURLPolicy.mimeType(for: resolved)
-        if let fileSize = try? resolved.resourceValues(forKeys: [.fileSizeKey]).fileSize,
-           Int64(fileSize) > AssetURLPolicy.maxAssetBytes
-        {
-            throw AssetURLPolicyError.fileTooLarge(
-                actualBytes: Int64(fileSize),
-                maxBytes: AssetURLPolicy.maxAssetBytes
-            )
-        }
-        return resolved
-    }
-
-    static func containedAsset(_ bytes: Data, fileURL: URL, root: URL) throws -> ContainedAsset {
-        let contained = try AssetContainment.fileURL(fileURL, isContainedIn: root)
-        let asset = try AssetURLPolicy.deliveredAsset(data: bytes, fileURL: contained)
-        return ContainedAsset(asset: asset, fileURL: contained)
     }
 }
 

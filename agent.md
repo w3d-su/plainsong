@@ -449,9 +449,18 @@ republishes only when its value changes literally.
   against the current file's directory / workspace root. Render payloads carry an opaque
   `assetRootID`; local image URLs include it as a query token so a root change invalidates
   retained image loads, and delayed requests with an obsolete token are rejected. The handler enforces path containment
-  (reject `..` and symlink escapes outside the workspace), and serves only PNG, JPEG,
-  GIF, or WebP assets up to 10 MiB. SVG and other active/ambiguous formats are rejected
-  until a separate sanitization policy exists.
+  (reject `..` and symlink escapes outside the workspace). It serves PNG, JPEG, GIF, or
+  WebP up to 10 MiB, and UTF-8 `.svg` up to 1 MiB when `SVGImageValidator` admits it:
+  no DOCTYPE or non-UTF-8 declared encoding, no script, foreign content, event handlers,
+  or external references (CSS is scanned after decoding escapes, SMIL values included),
+  at most 50,000 elements and depth 256. An admitted SVG is served byte-for-byte as
+  `image/svg+xml; charset=utf-8` with `X-Content-Type-Options: nosniff` and response
+  `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'` (a
+  document-mode backstop; image mode is the barrier). Without those headers the request
+  fails. Validation runs off the main actor; the reader's file and the requested file
+  must agree on being SVG, and the Mac reader reads only a regular file, bounded. `data:image/svg+xml` and inline
+  `<svg>` stay blocked. HTML and PDF export do not embed SVG yet. Other active or
+  ambiguous formats are rejected.
 - Link clicks: intercepted in Swift. `http(s)` → `NSWorkspace.open` (external browser).
   Relative `.md`/`.mdx` → open that file in the editor. `#anchor` stays in JavaScript
   and scrolls the preview to a generated heading ID (Unicode and duplicate headings supported).

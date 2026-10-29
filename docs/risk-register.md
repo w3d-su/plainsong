@@ -1,7 +1,8 @@
 # Risk Register
 
 Status snapshot: 2026-07-12; Workspace Search evidence boundary audited 2026-08-08, updated
-2026-09-18, and R20 closed 2026-10-24 with the Definition of Done; R17 and R22 updated 2026-10-08.
+2026-09-18, and R20 closed 2026-10-24 with the Definition of Done; R17 and R22 updated 2026-10-08;
+R4 and R5 updated 2026-10-29 for image-mode SVG.
 
 This register captures the risks that should drive the next roadmap decisions. Severity is based on
 impact to editor correctness, user trust, or ability to enter Phase 2 safely.
@@ -11,8 +12,8 @@ impact to editor correctness, user trust, or ability to enter Phase 2 safely.
 | R1 | M5 acceptance evidence can drift after acceptance | Low | `docs/m5-checklist.md` passes after PR #33 | Keep README, `agent.md`, and planning docs synchronized with checklist evidence; reopen only on a real regression | Docs, PerformanceTests |
 | R2 | Visible-range highlighting regresses after PR #20 | Medium | PR #20 measured Markdown 17.918 ms max and MDX 22.670 ms max and closed #14 | Keep PerformanceTests and scheduling regression coverage in place before Phase 2 folding work | EditorKit, PerformanceTests |
 | R3 | Memory gate scope is misunderstood after PR #21/#22 | Medium | PR #21 records 149.8 MB host RSS; helper RSS is diagnostic | Keep M5 scoped to host RSS; create a separate system-footprint budget only if needed | App, PreviewKit, PerformanceTests |
-| R4 | MDX sanitizer schema can regress toward active/spoofing HTML | Medium | Mitigated by PR #24/#27 | Keep malicious snapshot coverage; require a new Decision Log entry before allowing user-authored inline CSS or SVG | preview-src |
-| R5 | Local asset and image import paths can read large or active files into memory | Medium | Mitigated by PR #24 with bounded raster-only policy | Keep size/type/path rejection tests; require a separate design before SVG or larger managed assets | PreviewKit, WorkspaceKit |
+| R4 | MDX sanitizer schema can regress toward active/spoofing HTML | Medium | Image-mode workspace SVG is admitted only through `asset://` after `SVGImageValidator` (2026-10-29). Inline SVG and user CSS stay dropped | Keep malicious snapshot coverage; do not inline user SVG or allow user-authored CSS without a new Decision Log entry | preview-src |
+| R5 | Local asset and image import paths can read large or active files into memory | Medium | Raster cap remains 10 MiB. SVG has a separate 1 MiB, 50,000 element, and depth 256 accept-or-reject gate, is read as a bounded regular file, and is not rewritten (2026-10-29). Remote `https:` SVG is not validated. Allow Remote Images off records no connection; on, the probe records at least one `CONNECT` (four on macOS 27, one on macOS 15.7.9 CI) before its proxy returns `403`, so it shows the request policy rather than a completed decode. Blocking it is an open owner decision | Keep size, type, path, and SVG validator tests. Export embedding and any remote-SVG control are separate gates. The raster `loadAsset` read is still unbounded after its size check | PreviewKit, WorkspaceKit, MarkdownCore |
 | R6 | Settings/themes can regress after manual validation | Medium | PR #26 landed settings; PR #30 manually confirmed workflows | Keep Settings/theme checks as regression evidence; keep custom theme JSON and user CSS deferred | App, EditorKit, PreviewKit |
 | R7 | Preview render cost can grow with large DOM/code/Mermaid content | Medium | Preview still rewrites assets, highlights code, renders Mermaid, and scans line anchors | Cache code highlighting/Mermaid by source hash; measure code-heavy and Mermaid-heavy fixtures | preview-src, PerformanceTests |
 | R8 | Documentation drift causes Codex/agents to work from stale milestone assumptions | Medium | Several milestone PRs needed follow-up synchronization | Keep README, `agent.md`, `docs/m5-plan.md`, and this file synchronized per PR | Docs |
