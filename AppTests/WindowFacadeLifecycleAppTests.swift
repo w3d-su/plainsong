@@ -272,6 +272,9 @@ final class WindowFacadeLifecycleAppTests: XCTestCase {
 
     func testFileCommandWithNoWindowReopensTheOwnerAndRunsThere() {
         let owner = makePrimary()
+        // This fixture has no key window; the test host's unrelated window is not its input.
+        KeyWindowRouter.shared.testingUsesKeyWindowOverride = true
+        KeyWindowRouter.shared.testingKeyWindow = nil
         _ = WindowFacadeHolder(owner: owner)
         let window = makeWindow()
         KeyWindowRouter.shared.attach(window, to: owner)

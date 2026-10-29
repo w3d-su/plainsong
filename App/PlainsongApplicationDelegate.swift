@@ -24,8 +24,8 @@ final class PlainsongApplicationDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_: Notification) {
-        // The next turn, not this one: SwiftUI may still be attaching the launch window.
-        // If that window never comes, a File command waiting on it may open the scene.
+        // End launch suppression after yielding. A scene that claimed the owner still
+        // gets its bounded attach wait even if its metadata callback has not run yet.
         Task { @MainActor in
             await Task.yield()
             WorkspaceSceneReopener.shared.noteLaunchSettled()

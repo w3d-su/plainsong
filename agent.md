@@ -261,6 +261,9 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   another shows that façade refuses file and root opens and closes itself until PR D2, and
   native tabbing stays off until PR F. Same-file focus (WD1), shared-root
   release (WD2), and a user-facing New Window (D2) are not implemented yet.
+- With no attached workspace window, New File, Open, and Open Recent wait for a scene
+  that has claimed the owner. A three-second attach timeout lets the next command retry;
+  a tracked façade alone does not establish that a scene exists.
 - Tabs: native window tabs (`NSWindow.tabbingMode`) deferred; Phase 1 uses sidebar
   selection to switch the single editor pane (like Typora). Files selections defer out of
   the native List update, read and verify the file off the main actor, and commit only the

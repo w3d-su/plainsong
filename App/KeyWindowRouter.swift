@@ -124,6 +124,11 @@ final class KeyWindowRouter: ObservableObject {
         NSWindow.allowsAutomaticWindowTabbing = false
     }
 
+    /// A scene has taken the owner, even if its window has not attached yet.
+    func isOwnerClaimed(_ owner: AppState) -> Bool {
+        claimedOwners[ObjectIdentifier(owner)]?.facade === owner
+    }
+
     /// Gives a new scene the app-owned façade when no open scene shows it. Returns false while
     /// another scene shows it, so the caller builds a sibling instead. The owner keeps its
     /// document across a close, as the one shared `AppState` did before PR C.

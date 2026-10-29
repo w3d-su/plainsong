@@ -11,10 +11,11 @@ File commands now keep only the latest action. Quit errors stay in a separate li
 so an Open does not drop a refusal and a refusal does not drop the Open. One open
 attempt waits three seconds. If the owner has not attached, the wait ends, both
 lists are dropped, and the next command may open the scene again. Further commands
-during that wait do not extend it. One turn after launch, if no workspace window has attached, a command that
-was already waiting opens the scene. The app-owned façade is tracked before that
-window exists, so "no façade" is not the signal. Launch itself does not open an
-extra window.
+during that wait do not extend it. After launch, a waiting command requests a scene
+only if no scene has claimed the owner. Tracking the façade happens before any
+scene exists, and a claimed scene may still be waiting for its window to attach.
+The distinction and timeout retry are recorded in
+`docs/decisions/2026-10-29-windows-claimed-scene-attach-wait.md`.
 
 With exactly one workspace window, those three commands still run when Settings or
 About is key. That is an exception to `menuTarget`, which returns nil for a

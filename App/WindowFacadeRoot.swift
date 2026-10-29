@@ -59,6 +59,7 @@ final class WorkspaceSceneReopener {
     private var pendingPresentations: [(AppState) -> Void] = []
     private var opening = false
     private var openGeneration: UInt = 0
+    private var lastOpenExpired = false
     /// The first SwiftUI scene appears on its own. A command before that attach must
     /// wait for it instead of opening a second scene. Launch clears this on the next
     /// turn if no scene attached, so a missing launch window cannot wait forever.
@@ -132,7 +133,9 @@ final class WorkspaceSceneReopener {
 
     func noteAttached(_ facade: AppState) {
         awaitingFirstScene = false
-        guard opening, facade === retainedOwner, WindowOpenAdmission.admits(facade.windowState) else { return }
+        guard facade === retainedOwner, WindowOpenAdmission.admits(facade.windowState) else { return }
+        lastOpenExpired = false
+        guard opening else { return }
         openGeneration &+= 1
         opening = false
         let command = pendingFileCommand
@@ -145,14 +148,12 @@ final class WorkspaceSceneReopener {
         command?(facade)
     }
 
-    /// Called one turn after launch. A window SwiftUI already created wins; otherwise a
-    /// command that was waiting on the launch scene may open one.
+    /// Called after launch. A claimed owner is still waiting for its scene to attach;
+    /// only an unclaimed owner needs a scene request before that wait expires.
     func noteLaunchSettled() {
         guard awaitingFirstScene else { return }
         awaitingFirstScene = false
-        // The app-owned façade is tracked before its first window exists, so an empty
-        // façade list is the wrong signal. No attached window means launch made none.
-        guard opening, let owner = retainedOwner, !hasAttachedAdmittingWindow(owner) else { return }
+        guard opening, let owner = retainedOwner, canRequestScene(for: owner) else { return }
         openScene?()
     }
 
@@ -164,6 +165,7 @@ final class WorkspaceSceneReopener {
             pendingPresentations.removeAll()
             opening = false
             openGeneration &+= 1
+            lastOpenExpired = false
             awaitingFirstScene = true
         }
 
@@ -183,7 +185,7 @@ final class WorkspaceSceneReopener {
         if let presentation {
             pendingPresentations.append(presentation)
         }
-        let shouldOpen = !opening && !awaitingFirstScene && !hasAttachedAdmittingWindow(owner)
+        let shouldOpen = !opening && !awaitingFirstScene && canRequestScene(for: owner)
         if !opening {
             opening = true
             armOpenTimeout()
@@ -207,6 +209,7 @@ final class WorkspaceSceneReopener {
         opening = false
         pendingFileCommand = nil
         pendingPresentations.removeAll()
+        lastOpenExpired = true
         awaitingFirstScene = false
     }
 
@@ -218,5 +221,10 @@ final class WorkspaceSceneReopener {
 
     private func hasAttachedAdmittingWindow(_ owner: AppState) -> Bool {
         admittingFacades(of: owner).contains { KeyWindowRouter.shared.hasAttachedWindow($0) }
+    }
+
+    private func canRequestScene(for owner: AppState) -> Bool {
+        !hasAttachedAdmittingWindow(owner)
+            && (!KeyWindowRouter.shared.isOwnerClaimed(owner) || lastOpenExpired)
     }
 }
