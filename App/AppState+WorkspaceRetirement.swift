@@ -313,6 +313,9 @@ private extension AppState {
         for plan in retirementPlans {
             finishRetiredEditorDocumentSessionIfPossible(for: plan.session)
         }
+        for session in sessions {
+            releaseRetainedWorkspaceAuthorityIfUnreferenced(for: session)
+        }
     }
 
     /// Drops metadata for sessions this root released. Sessions outside the release set

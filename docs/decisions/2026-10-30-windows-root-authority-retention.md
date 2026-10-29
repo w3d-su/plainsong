@@ -26,3 +26,10 @@ so composition can publish until retirement's final revoke. Other windows and
 unrelated warm sessions remain outside the replacement preflight. The existing
 standalone composition, late Reload and failed-destination tests cover this
 boundary; a cross-window test verifies the narrower inventory.
+
+Lease release is retried after root release removes warm ownership, after the last
+installation revokes, and after an external inspection or resolution read finishes.
+A running read retains the scope through its actual completion; eviction does not
+cancel a detached read and immediately stop the scope underneath it. The final
+revoke also removes an unused binding registration, and discard removes the weak
+installation/window record together with the installation itself.

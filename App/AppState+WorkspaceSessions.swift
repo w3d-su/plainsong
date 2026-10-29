@@ -134,6 +134,7 @@ extension AppState {
         for installation in discardedInstallations {
             pendingEditorSourceInstallations[installation] = nil
             editorBindingInstallations[installation] = nil
+            registry.editorInstallationWindows[installation] = nil
         }
         editorWriterInstallations[sessionIdentity] = nil
         externalDiskInspectionTasks.removeValue(forKey: sessionIdentity)?.task.cancel()
@@ -369,9 +370,7 @@ extension AppState {
             let eviction = pending[nextIndex]
             nextIndex += 1
             guard let session = registry.warmSession(at: eviction.url) else { continue }
-            if finishSessionEviction(eviction, session: session) {
-                continue
-            }
+            if finishSessionEviction(eviction, session: session) { continue }
 
             // A failed or fenced candidate stays protected for this entire pass.
             // If every candidate fails, retain the over-limit cache until a later pass.

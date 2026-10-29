@@ -68,7 +68,7 @@ final class WindowRootReleaseAppTests: XCTestCase {
         XCTAssertTrue(fixture.appState.detachedSessionURLs.contains(fixture.secondURL))
     }
 
-    func testClosingR1KeepsQuarantineForASecondWindowsSession() throws {
+    func testClosingR1RefusesCloseAndKeepsOwnRootQuarantineForASecondWindow() throws {
         let fixture = try SecondWindowRegistryFixture.make(testCase: self)
         let write = WorkspaceIndeterminateFileWrite(
             reason: .durabilityFailed,
