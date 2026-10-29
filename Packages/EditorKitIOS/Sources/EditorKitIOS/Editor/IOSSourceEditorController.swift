@@ -41,7 +41,6 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
     var needsBaseStyle = false
     var lineIndex = IOSSourceLineIndex(text: "")
     var gutterDigits: Int?
-    var pendingLineEdit: (range: NSRange, replacement: String)?
     var lastViewportLine: Int?
 
     public convenience init(
@@ -69,6 +68,14 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
         super.init()
         textView.editor = self
         textView.delegate = self
+        // Every storage edit (typing, marked text, autocorrect, undo, programmatic
+        // replacement) updates the line index here, from the edit TextKit reports.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(textStorageDidProcessEditing(_:)),
+            name: NSTextStorage.didProcessEditingNotification,
+            object: textView.textStorage
+        )
         applyThemeChrome()
         applyLineNumberChrome()
     }
@@ -207,7 +214,6 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
         presentationFloor = presentationGeneration
         textView.undoManager?.removeAllActions()
         hadMarkedText = false
-        pendingLineEdit = nil
     }
 
     private func installInitialText(_ text: String) {
@@ -315,14 +321,33 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
         guard isHostAlive, textView.isTextKit2 else { return }
         let clamped = min(max(line, 1), max(lineIndex.lineCount, 1))
         let offset = lineIndex.utf16Offset(forOneBasedLine: clamped)
-        guard let y = textView.contentY(forUTF16Offset: offset) else { return }
-        let limit = max(
-            0,
-            textView.contentSize.height - textView.bounds.height + textView.adjustedContentInset.bottom
+        guard let fragmentY = textView.contentY(forUTF16Offset: offset) else { return }
+        // Fragment frames are in text-container coordinates; the content offset that puts
+        // the line at the top of the visible area adds the container inset and starts at
+        // the negative top inset (under the navigation bar), like the gutter.
+        let target = Self.scrollTarget(
+            fragmentY: fragmentY,
+            containerInsetTop: textView.textContainerInset.top,
+            adjustedInset: textView.adjustedContentInset,
+            contentHeight: textView.contentSize.height,
+            boundsHeight: textView.bounds.height
         )
-        let target = min(max(0, y), limit)
         guard abs(textView.contentOffset.y - target) > 0.5 else { return }
         textView.setContentOffset(CGPoint(x: textView.contentOffset.x, y: target), animated: false)
+    }
+
+    nonisolated static func scrollTarget(
+        fragmentY: CGFloat,
+        containerInsetTop: CGFloat,
+        adjustedInset: UIEdgeInsets,
+        contentHeight: CGFloat,
+        boundsHeight: CGFloat
+    ) -> CGFloat {
+        let minimum = -adjustedInset.top
+        let maximum = max(minimum, contentHeight - boundsHeight + adjustedInset.bottom)
+        // The first line scrolls to the very top, keeping the container inset above it.
+        guard fragmentY > 0 else { return minimum }
+        return min(max(minimum, fragmentY + containerInsetTop - adjustedInset.top), maximum)
     }
 
     func noteViewportLine() {
@@ -332,16 +357,31 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
         onViewportLine?(line)
     }
 
-    func noteLineReplacement(range: NSRange, replacement: String) {
-        let applied = lineIndex.replaceCharacters(in: range, with: replacement)
-        if !applied || lineIndex.textUTF16Count != textView.textStorage.length {
-            lineIndex = IOSSourceLineIndex(text: plainText())
+    /// Applies the storage's processed edit to the line index. `editedRange` is in post-edit
+    /// coordinates and covers every change in the batch, so the pre-edit range is the same
+    /// location with `changeInLength` removed. A failed or mismatched update rebuilds.
+    @objc func textStorageDidProcessEditing(_ notification: Notification) {
+        let storage = textView.textStorage
+        guard notification.object as AnyObject === storage,
+              storage.editedMask.contains(.editedCharacters)
+        else { return }
+        let edited = storage.editedRange
+        let previousLength = edited.length - storage.changeInLength
+        let source = storage.string as NSString
+        guard edited.location != NSNotFound, previousLength >= 0, NSMaxRange(edited) <= source.length else {
+            lineIndex = IOSSourceLineIndex(utf16: source)
+            return
         }
-        applyLineNumberChrome()
+        let applied = lineIndex.replaceCharacters(
+            in: NSRange(location: edited.location, length: previousLength),
+            with: source.substring(with: edited)
+        )
+        if !applied || lineIndex.textUTF16Count != source.length {
+            lineIndex = IOSSourceLineIndex(utf16: source)
+        }
     }
 
     func rebuildLineIndex() {
-        pendingLineEdit = nil
         lineIndex = IOSSourceLineIndex(text: plainText())
         applyLineNumberChrome()
     }

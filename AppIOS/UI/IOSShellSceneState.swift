@@ -29,6 +29,7 @@ final class IOSShellSceneState: ObservableObject {
     /// Non-nil while an export is preparing a file. The shell does not export.
     @Published var exportStatus: String?
     let workspaceSearch = IOSWorkspaceSearchController()
+    var workspaceSearchActivation: Task<Void, Never>?
 
     /// Latest observed editor snapshot. Read at action time, never published
     /// per keystroke — chrome carries the deduplicated projection instead.
@@ -130,7 +131,8 @@ final class IOSShellSceneState: ObservableObject {
                workspaceSearch.hasQuery,
                snapshot.revision.version != previousVersion
             {
-                workspaceSearch.scheduleSearch(environment: workspaceSearchEnvironment())
+                // Only the open buffer changed: other files keep their earlier reads.
+                workspaceSearch.scheduleSearch(environment: workspaceSearchEnvironment(), reusingReads: true)
             }
         case let .detached(_, bindingID):
             if editorSnapshot?.bindingID == bindingID {
@@ -393,8 +395,11 @@ extension IOSShellSceneState {
     }
 
     func openWorkspaceSearchHit(_ hit: IOSWorkspaceSearchHit, in section: IOSWorkspaceSearchSection) {
+        // One activation at a time: a repeated tap does not open the file twice.
+        guard workspaceSearchActivation == nil else { return }
         let location = section.location
-        Task { @MainActor in
+        workspaceSearchActivation = Task { @MainActor in
+            defer { self.workspaceSearchActivation = nil }
             await self.activateWorkspaceSearch(hit, location: location)
         }
     }

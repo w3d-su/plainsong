@@ -179,7 +179,7 @@ extension IOSSourceEditorController {
         defer { isMutating = false }
         let applied = IOSNativeTextMutation.replace(result, in: textView, actionName: actionName)
         if applied {
-            noteLineReplacement(range: result.replacementRange, replacement: result.replacementString)
+            applyLineNumberChrome()
         }
         return applied
     }

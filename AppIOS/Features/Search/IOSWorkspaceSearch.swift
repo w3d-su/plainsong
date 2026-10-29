@@ -45,16 +45,6 @@ struct IOSWorkspaceSearchSection: Identifiable {
     let truncated: Bool
 }
 
-enum IOSDocumentStatisticsPresentation {
-    static func counts(_ statistics: TextStatistics) -> String {
-        "\(statistics.lineCount) lines · \(statistics.wordCount) words · \(statistics.characterCount) characters"
-    }
-
-    static func accessibilitySummary(_ statistics: TextStatistics) -> String {
-        "\(statistics.lineCount) lines, \(statistics.wordCount) words, \(statistics.characterCount) characters"
-    }
-}
-
 struct IOSWorkspaceSearchProgress: Equatable {
     var matchCount = 0
     var fileCount = 0
@@ -71,20 +61,12 @@ struct IOSWorkspaceSearchProgress: Equatable {
 
 enum IOSWorkspaceSearchStatus {
     static func describe(_ progress: IOSWorkspaceSearchProgress) -> String {
+        if progress.folderChanged {
+            return "The folder changed. Search again."
+        }
         let matchCount = progress.matchCount
         let fileCount = progress.fileCount
         let searching = progress.searching
-        let queryTruncated = progress.queryTruncated
-        let matchLimit = progress.matchLimit
-        let skippedLarge = progress.skippedLarge
-        let skippedEncoding = progress.skippedEncoding
-        let skippedUnavailable = progress.skippedUnavailable
-        let skippedOther = progress.skippedOther
-        let stoppedAfterFileLimit = progress.stoppedAfterFileLimit
-        let folderChanged = progress.folderChanged
-        if folderChanged {
-            return "The folder changed. Search again."
-        }
         let base: String
         if searching, matchCount == 0 {
             base = "Searching…"
@@ -100,27 +82,20 @@ enum IOSWorkspaceSearchStatus {
             }
         }
         var notes: [String] = []
-        if queryTruncated {
-            notes.append("Showing the first \(matchLimit) matches")
+        if progress.queryTruncated {
+            notes.append("Showing the first \(progress.matchLimit) matches")
         }
-        if stoppedAfterFileLimit {
+        if progress.stoppedAfterFileLimit {
             notes.append("Stopped after \(IOSWorkspaceSearchLimits.maximumFiles) files")
         }
-        if skippedLarge > 0 {
-            notes.append(skippedLarge == 1 ? "1 file is too large" : "\(skippedLarge) files are too large")
-        }
-        if skippedEncoding > 0 {
-            notes.append(skippedEncoding == 1
-                ? "1 file is not UTF-8"
-                : "\(skippedEncoding) files are not UTF-8")
-        }
-        if skippedUnavailable > 0 {
-            notes.append(skippedUnavailable == 1
-                ? "1 file is unavailable"
-                : "\(skippedUnavailable) files are unavailable")
-        }
-        if skippedOther > 0 {
-            notes.append(skippedOther == 1 ? "1 file could not be read" : "\(skippedOther) files could not be read")
+        let skipped: [(count: Int, one: String, many: String)] = [
+            (progress.skippedLarge, "1 file is too large", "files are too large"),
+            (progress.skippedEncoding, "1 file is not plain UTF-8", "files are not plain UTF-8"),
+            (progress.skippedUnavailable, "1 file is unavailable", "files are unavailable"),
+            (progress.skippedOther, "1 file could not be read", "files could not be read"),
+        ]
+        for item in skipped where item.count > 0 {
+            notes.append(item.count == 1 ? item.one : "\(item.count) \(item.many)")
         }
         guard !notes.isEmpty else { return base }
         return base + ". " + notes.joined(separator: ". ")
@@ -128,6 +103,10 @@ enum IOSWorkspaceSearchStatus {
 }
 
 enum IOSWorkspaceTextSearch {
+    static func containsMatch(in text: String, query: TextSearchQuery) -> Bool {
+        !TextSearchEngine.matches(in: text, query: query, limit: 1).isEmpty
+    }
+
     static func hits(
         in text: String,
         query: TextSearchQuery,
@@ -204,6 +183,9 @@ final class IOSWorkspaceSearchController: ObservableObject {
     private let maximumMatchesPerQuery: Int
     private var task: Task<Void, Never>?
     private var generation: UInt64 = 0
+    /// Disk reads from the last searches, reused only when the editor buffer changed.
+    /// A tree change or an explicit search reads every file again.
+    private var readCache = IOSWorkspaceSearchReadCache()
 
     init(
         maximumMatchesPerFile: Int = IOSWorkspaceSearchLimits.maximumMatchesPerFile,
@@ -218,8 +200,10 @@ final class IOSWorkspaceSearchController: ObservableObject {
         caseSensitivity: TextSearchCaseSensitivity? = nil,
         wholeWord: Bool? = nil,
         environment: IOSWorkspaceSearchEnvironment,
-        immediate: Bool = false
+        immediate: Bool = false,
+        reusingReads: Bool = false
     ) {
+        if !reusingReads { readCache.removeAll() }
         if let query, query != queryText { queryText = query }
         if let caseSensitivity, caseSensitivity != self.caseSensitivity {
             self.caseSensitivity = caseSensitivity
@@ -287,7 +271,12 @@ final class IOSWorkspaceSearchController: ObservableObject {
     func cancel() {
         task?.cancel()
         generation &+= 1
+        readCache.removeAll()
         if isSearching { isSearching = false }
+    }
+
+    var cachedReadCountForTesting: Int {
+        readCache.count
     }
 
     private func rejection(for query: TextSearchQuery) -> String? {
@@ -321,13 +310,29 @@ final class IOSWorkspaceSearchController: ObservableObject {
         var folderChanged = false
         var seenPaths: [String: Int] = [:]
 
+        if let open = environment.openDocument {
+            readCache.remove(open)
+        }
         for entry in ready {
             if Task.isCancelled || generation != token { return }
+            let loaded = await load(entry, environment: environment, token: token)
             if matchCount >= maximumMatchesPerQuery {
-                queryTruncated = true
-                break
+                // Report truncation only when a further match really exists.
+                if case let .text(text) = loaded {
+                    let found = await Task.detached(priority: .userInitiated) {
+                        IOSWorkspaceTextSearch.containsMatch(in: text, query: query)
+                    }.value
+                    if Task.isCancelled || generation != token { return }
+                    if found {
+                        queryTruncated = true
+                        break
+                    }
+                } else if case .cancelled = loaded {
+                    return
+                }
+                continue
             }
-            switch await load(entry, environment: environment, token: token) {
+            switch loaded {
             case .cancelled:
                 return
             case .folderChanged:
@@ -342,37 +347,22 @@ final class IOSWorkspaceSearchController: ObservableObject {
                 skippedOther += 1
             case let .text(text):
                 let remaining = maximumMatchesPerQuery - matchCount
-                let found = IOSWorkspaceTextSearch.hits(
-                    in: text,
-                    query: query,
-                    fileLimit: maximumMatchesPerFile,
-                    remaining: remaining
-                )
+                let perFile = maximumMatchesPerFile
+                // Matching runs off the main actor; only reads and publishing stay here.
+                let found = await Task.detached(priority: .userInitiated) {
+                    IOSWorkspaceTextSearch.hits(in: text, query: query, fileLimit: perFile, remaining: remaining)
+                }.value
+                if Task.isCancelled || generation != token { return }
                 matchCount += found.hits.count
                 if found.truncated, remaining <= maximumMatchesPerFile {
                     queryTruncated = true
                 }
                 if !found.hits.isEmpty {
-                    let path = entry.location.relativePath.isEmpty ? "Untitled" : entry.location.relativePath
-                    let ordinal = seenPaths[path, default: 0]
-                    seenPaths[path] = ordinal + 1
-                    let identity = ordinal == 0 ? path : "\(path)#\(ordinal)"
-                    let hits = found.hits.enumerated().map { index, hit in
-                        IOSWorkspaceSearchHit(
-                            id: "\(identity)#\(index)#\(hit.range.location)",
-                            range: hit.range,
-                            line: hit.line,
-                            preview: hit.preview,
-                            previewMatchRange: hit.previewMatchRange,
-                            matchedText: hit.matchedText
-                        )
-                    }
-                    produced.append(IOSWorkspaceSearchSection(
-                        id: identity,
-                        relativePath: path,
-                        location: entry.location,
-                        hits: hits,
-                        truncated: found.truncated && matchCount < maximumMatchesPerQuery
+                    produced.append(Self.section(
+                        entry,
+                        hits: found.hits,
+                        truncated: found.truncated && matchCount < maximumMatchesPerQuery,
+                        seenPaths: &seenPaths
                     ))
                 }
             }
@@ -404,6 +394,35 @@ final class IOSWorkspaceSearchController: ObservableObject {
         ))
     }
 
+    private static func section(
+        _ entry: IOSWorkspaceEntry,
+        hits found: [IOSWorkspaceSearchHit],
+        truncated: Bool,
+        seenPaths: inout [String: Int]
+    ) -> IOSWorkspaceSearchSection {
+        let path = entry.location.relativePath.isEmpty ? "Untitled" : entry.location.relativePath
+        let ordinal = seenPaths[path, default: 0]
+        seenPaths[path] = ordinal + 1
+        let identity = ordinal == 0 ? path : "\(path)#\(ordinal)"
+        let hits = found.enumerated().map { index, hit in
+            IOSWorkspaceSearchHit(
+                id: "\(identity)#\(index)#\(hit.range.location)",
+                range: hit.range,
+                line: hit.line,
+                preview: hit.preview,
+                previewMatchRange: hit.previewMatchRange,
+                matchedText: hit.matchedText
+            )
+        }
+        return IOSWorkspaceSearchSection(
+            id: identity,
+            relativePath: path,
+            location: entry.location,
+            hits: hits,
+            truncated: truncated
+        )
+    }
+
     private func publish(
         token: UInt64,
         sections: [IOSWorkspaceSearchSection],
@@ -417,7 +436,7 @@ final class IOSWorkspaceSearchController: ObservableObject {
         statusText = IOSWorkspaceSearchStatus.describe(progress)
     }
 
-    private enum Load {
+    enum Load {
         case text(String)
         case tooLarge
         case unsupportedEncoding
@@ -435,15 +454,21 @@ final class IOSWorkspaceSearchController: ObservableObject {
         if let open = environment.openDocument, IOSWorkspaceSearchIndex.sameFile(open, entry.location) {
             return .text(open.text)
         }
+        if let cached = readCache.load(entry.location) {
+            return cached
+        }
         do {
             let text = try await environment.read(entry.location)
             if Task.isCancelled || generation != token { return .cancelled }
+            readCache.store(.text(text), for: entry.location)
             return .text(text)
         } catch is CancellationError {
             return .cancelled
         } catch IOSWorkspaceSearchReadError.tooLarge {
+            if generation == token { readCache.store(.tooLarge, for: entry.location) }
             return .tooLarge
         } catch IOSWorkspaceSearchReadError.unsupportedEncoding {
+            if generation == token { readCache.store(.unsupportedEncoding, for: entry.location) }
             return .unsupportedEncoding
         } catch let failure as IOSWorkspaceFailure {
             switch failure {

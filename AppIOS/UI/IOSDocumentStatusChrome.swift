@@ -1,3 +1,4 @@
+import MarkdownCore
 import SwiftUI
 
 /// Header row: document name, dirty indicator, kind badge, saving spinner.
@@ -265,5 +266,15 @@ struct IOSEmptyDocumentView: View {
         } description: {
             Text(hasWorkspace ? "Choose a file from the workspace." : "Open a file or folder to begin.")
         }
+    }
+}
+
+enum IOSDocumentStatisticsPresentation {
+    static func counts(_ statistics: TextStatistics) -> String {
+        "\(statistics.lineCount) lines · \(statistics.wordCount) words · \(statistics.characterCount) characters"
+    }
+
+    static func accessibilitySummary(_ statistics: TextStatistics) -> String {
+        "\(statistics.lineCount) lines, \(statistics.wordCount) words, \(statistics.characterCount) characters"
     }
 }

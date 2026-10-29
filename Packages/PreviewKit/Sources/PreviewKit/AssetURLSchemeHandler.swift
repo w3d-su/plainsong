@@ -84,6 +84,10 @@ final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler, @unchecked Send
         readers.set(reader)
     }
 
+    func currentReader() -> (any PreviewAssetReading)? {
+        readers.current()
+    }
+
     @discardableResult
     func updateAllowedRoot(_ root: URL?) -> String {
         state.updateAllowedRoot(root)

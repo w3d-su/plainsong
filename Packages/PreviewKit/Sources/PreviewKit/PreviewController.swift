@@ -69,6 +69,9 @@ public final class PreviewController: NSObject, ObservableObject {
     private(set) var allowRemoteImages = false
     private(set) var workspaceAssetRootURL: URL?
     var exportAssetRootURL: URL?
+    /// The grant authority of the newest provider render (iOS), or nil after a Mac render.
+    /// HTML export reads local images through the installed reader with it.
+    var exportAssetAccess: PreviewAssetAccessContext?
 
     override public convenience init() {
         self.init(previewIndexURL: Self.defaultPreviewIndexURL(), recoversFromWebContentTermination: true)
@@ -174,6 +177,7 @@ public final class PreviewController: NSObject, ObservableObject {
         guard !isInvalidated else { return -1 }
         let assetContext = cachedAssetContext(fileURL: change.fileURL)
         let assetRootID = assetSchemeHandler.updateAllowedRoot(assetContext.allowedRoot)
+        exportAssetAccess = nil
         return prepareRender(
             change,
             session: session,
@@ -200,6 +204,7 @@ public final class PreviewController: NSObject, ObservableObject {
             fileKind: snapshot.fileKind,
             fileURL: snapshot.fileURL
         )
+        exportAssetAccess = assetAccess
         _ = prepareRender(
             change,
             session: nil,
@@ -256,6 +261,7 @@ public final class PreviewController: NSObject, ObservableObject {
         viewportScrollQueue.reset()
         exportSourceText = ""
         exportAssetRootURL = nil
+        exportAssetAccess = nil
         scrollDeliveryState.failPendingDelivery()
         webView.stopLoading()
         webView.navigationDelegate = nil

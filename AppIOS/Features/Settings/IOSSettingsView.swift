@@ -6,6 +6,11 @@ import SwiftUI
 struct IOSSettingsView: View {
     @ObservedObject var preferences: IOSAppPreferences
     @Environment(\.dismiss) private var dismiss
+    /// The image folder is edited as a draft and normalized once, on Return or when the
+    /// field loses focus, so spaces and an emptied field can be typed.
+    @State private var folderDraft = ""
+    @State private var folderNote: String?
+    @FocusState private var folderFieldFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -19,6 +24,7 @@ struct IOSSettingsView: View {
                             Text(appearance.title).tag(appearance)
                         }
                     }
+                    .accessibilityLabel("Editor appearance")
                     Picker("Font", selection: Binding(
                         get: { preferences.editorFontName },
                         set: { preferences.setEditorFontName($0) }
@@ -105,6 +111,7 @@ struct IOSSettingsView: View {
                             Text(appearance.title).tag(appearance)
                         }
                     }
+                    .accessibilityLabel("Preview appearance")
                     Toggle("Allow remote images", isOn: Binding(
                         get: { preferences.allowsRemoteImages },
                         set: { preferences.setAllowsRemoteImages($0) }
@@ -127,21 +134,31 @@ struct IOSSettingsView: View {
                         }
                     }
                     .accessibilityIdentifier("plainsong.ios.settings.newFileExtension")
-                    TextField("Image folder", text: Binding(
-                        get: { preferences.assetDirectoryName },
-                        set: { preferences.setAssetDirectoryName($0) }
-                    ))
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .accessibilityIdentifier("plainsong.ios.settings.assetDirectory")
+                    TextField("Image folder", text: $folderDraft)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .submitLabel(.done)
+                        .onSubmit(commitFolderDraft)
+                        .focused($folderFieldFocused)
+                        .onChange(of: folderFieldFocused) { _, focused in
+                            if !focused { commitFolderDraft() }
+                        }
+                        .accessibilityIdentifier("plainsong.ios.settings.assetDirectory")
+                    if let folderNote {
+                        Text(folderNote)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 } header: {
                     Text("Files")
                 } footer: {
-                    Text(
-                        "New files use this extension. Inserted images are copied into the image folder beside the document. Names that leave that folder are ignored."
-                    )
+                    Text("New files use this extension.")
+                    Text("Inserted images are copied into the image folder beside the document.")
+                    Text("The folder is one name, not a path. A hidden or invalid name uses assets.")
                 }
             }
+            .onAppear { folderDraft = preferences.assetDirectoryName }
+            .onDisappear(perform: commitFolderDraft)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -151,6 +168,26 @@ struct IOSSettingsView: View {
                 }
             }
         }
+    }
+}
+
+extension IOSSettingsView {
+    func commitFolderDraft() {
+        let result = IOSAssetFolderDraft.commit(folderDraft, to: preferences)
+        folderDraft = result.name
+        folderNote = result.note
+    }
+}
+
+enum IOSAssetFolderDraft {
+    /// Saves the draft and reports when the stored name differs from what was typed.
+    @MainActor
+    static func commit(_ draft: String, to preferences: IOSAppPreferences) -> (name: String, note: String?) {
+        preferences.setAssetDirectoryName(draft)
+        let stored = preferences.assetDirectoryName
+        let typed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard typed != stored else { return (stored, nil) }
+        return (stored, typed.isEmpty ? "Images use \(stored)." : "Images use \(stored) instead.")
     }
 }
 

@@ -24,6 +24,38 @@ struct IOSProductionComposition {
     )
     let unavailableMessage = "Development scaffold. Editing and file access await device validation and providers."
 
+    /// Folder search reads one document under the scene's current directory grant,
+    /// holding its lease for the read. Size and encoding match opening the file: at most
+    /// 512 KB, and UTF-8 that round-trips to the same bytes (a BOM is refused).
+    static func readSearchDocument(
+        _ location: IOSFileLocation,
+        controller: IOSDocumentSceneController,
+        access: IOSWorkspaceAccessService
+    ) async throws -> String {
+        guard controller.grantIsCurrent, let grant = controller.currentGrant,
+              grant.scope == .directory,
+              location.workspaceID == grant.workspaceID,
+              location.accessGeneration == grant.accessGeneration
+        else { throw IOSWorkspaceFailure.grantChanged }
+        let lease = try access.acquireLease(for: grant)
+        defer { lease.release() }
+        let payload: Data
+        do {
+            payload = try await access.read(
+                location,
+                lease: lease,
+                operationID: UUID(),
+                maximumByteCount: IOSWorkspaceSearchLimits.maximumFileBytes
+            ).data
+        } catch let failure as IOSWorkspaceFailure where failure == .tooLarge {
+            throw IOSWorkspaceSearchReadError.tooLarge
+        }
+        guard let decoded = IOSDocumentTextCodec.decode(payload) else {
+            throw IOSWorkspaceSearchReadError.unsupportedEncoding
+        }
+        return decoded
+    }
+
     /// The real providers share one access service and one UIDocument-backed store.
     /// M0 owner prerequisites and candidate readiness are recorded in the ledger.
     static func makeProduction(recoveryDirectory: URL? = nil) throws -> IOSProductionRuntime {
@@ -59,28 +91,8 @@ struct IOSProductionComposition {
             weak controller,
             weak access
         ] location in
-            guard let controller, let access, controller.grantIsCurrent, let grant = controller.currentGrant,
-                  grant.scope == .directory,
-                  location.workspaceID == grant.workspaceID,
-                  location.accessGeneration == grant.accessGeneration
-            else { throw IOSWorkspaceFailure.grantChanged }
-            let lease = try access.acquireLease(for: grant)
-            defer { lease.release() }
-            let payload: Data
-            do {
-                payload = try await access.read(
-                    location,
-                    lease: lease,
-                    operationID: UUID(),
-                    maximumByteCount: IOSWorkspaceSearchLimits.maximumFileBytes
-                ).data
-            } catch let failure as IOSWorkspaceFailure where failure == .tooLarge {
-                throw IOSWorkspaceSearchReadError.tooLarge
-            }
-            guard let decoded = String(data: payload, encoding: .utf8), Data(decoded.utf8) == payload else {
-                throw IOSWorkspaceSearchReadError.unsupportedEncoding
-            }
-            return decoded
+            guard let controller, let access else { throw IOSWorkspaceFailure.grantChanged }
+            return try await readSearchDocument(location, controller: controller, access: access)
         }
         let runtime = try IOSProductionRuntime(
             controller: controller, editor: editor, preview: preview,

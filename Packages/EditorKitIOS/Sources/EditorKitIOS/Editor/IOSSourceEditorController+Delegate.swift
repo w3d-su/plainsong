@@ -4,14 +4,8 @@ public extension IOSSourceEditorController {
     func textViewDidChange(_ textView: UITextView) {
         guard textView === self.textView, !isReconciling, !isMutating else { return }
         noteMarkedTextTransition()
-        if textView.markedTextRange != nil {
-            rebuildLineIndex()
-        } else if let pending = pendingLineEdit {
-            pendingLineEdit = nil
-            noteLineReplacement(range: pending.range, replacement: pending.replacement)
-        } else {
-            rebuildLineIndex()
-        }
+        // The storage notification already updated the line index for this edit.
+        applyLineNumberChrome()
         publishCurrentText()
         scheduleHighlight()
         emitSnapshot()
@@ -42,11 +36,7 @@ public extension IOSSourceEditorController {
         if isMutating || isReconciling {
             return true
         }
-        let allow = !consumeReplacement(text, range: range)
-        if allow {
-            pendingLineEdit = (range: range, replacement: text)
-        }
-        return allow
+        return !consumeReplacement(text, range: range)
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {

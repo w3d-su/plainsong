@@ -122,7 +122,14 @@ extension IOSAuthoringController {
             statusMessage = IOSAuthoringCatalog.compositionRefusal
             return
         }
-        guard snapshot.isFocused else { return }
+        guard snapshot.canWrite else {
+            statusMessage = IOSAuthoringCatalog.readOnlyRefusal
+            return
+        }
+        guard snapshot.isFocused else {
+            statusMessage = IOSAuthoringCatalog.focusRefusal
+            return
+        }
         guard find.context?.matches(snapshot) == true else {
             beginFindQuery(using: editor)
             statusMessage = "The document changed. Find results are being refreshed."
@@ -185,7 +192,14 @@ extension IOSAuthoringController {
             statusMessage = IOSAuthoringCatalog.compositionRefusal
             return
         }
-        guard snapshot.isFocused, snapshot.canWrite else { return }
+        guard snapshot.canWrite else {
+            statusMessage = IOSAuthoringCatalog.readOnlyRefusal
+            return
+        }
+        guard snapshot.isFocused else {
+            statusMessage = IOSAuthoringCatalog.focusRefusal
+            return
+        }
         guard find.context?.matches(snapshot) == true else {
             beginFindQuery(using: editor)
             statusMessage = "The document changed. Find results are being refreshed."
@@ -370,8 +384,10 @@ extension IOSAuthoringController {
             "Replacement isn't valid."
         case .emptySession, .noCurrentMatch:
             "There is no current match to replace."
-        case .truncatedSession, .projectedLengthOverflow:
-            IOSAuthoringCatalog.formattingRefusal
+        case .truncatedSession:
+            "There are too many matches to replace safely. Narrow the search and try again."
+        case .projectedLengthOverflow:
+            "That replacement would make the document too large."
         }
     }
 

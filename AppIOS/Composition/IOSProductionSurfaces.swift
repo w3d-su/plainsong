@@ -44,6 +44,7 @@ final class IOSProductionRuntime: ObservableObject {
     let exporter = IOSDocumentExportController()
     let typewriter = IOSTypewriterSync()
     var previewThemeName = "system"
+    var systemAppearanceIsDark = false
     var typewriterRequested = false
 
     @Published var showOpenChoices = false
@@ -141,12 +142,14 @@ final class IOSProductionRuntime: ObservableObject {
             switch event {
             case let .snapshotChanged(snapshot):
                 if observedBindingID != snapshot.bindingID {
+                    exporter.cancel()
                     retireAuthoringCapture()
                     observedBindingID = snapshot.bindingID
                     noteNewBinding(snapshot)
                 }
                 queueCommandFocus(snapshot)
             case .detached:
+                exporter.cancel()
                 observedBindingID = nil
                 pendingFocus = nil
                 focusTask?.cancel()
@@ -156,6 +159,7 @@ final class IOSProductionRuntime: ObservableObject {
     }
 
     func stopObserving() {
+        exporter.cancel()
         editorObservation?.cancel()
         editorObservation = nil
         focusTask?.cancel()
@@ -172,6 +176,7 @@ final class IOSProductionRuntime: ObservableObject {
     }
 
     func shutdown() async -> Bool {
+        exporter.cancel()
         pendingOpen = nil
         pickerRequest = nil
         recentPresentation.cancel()

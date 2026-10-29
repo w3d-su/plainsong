@@ -1,6 +1,7 @@
 import EditorKitIOS
 import Foundation
 @testable import PlainsongIOS
+import WorkspaceKitIOS
 import XCTest
 
 @MainActor
@@ -69,5 +70,56 @@ final class IOSAppPreferencesTests: XCTestCase {
         XCTAssertTrue(reloaded.showsLineNumbers)
         XCTAssertTrue(reloaded.typewriterSyncEnabled)
         XCTAssertEqual(preferences.generation, 4)
+    }
+
+    func testImageFolderDraftKeepsSpacesAndReportsAFallback() {
+        let preferences = IOSAppPreferences(defaults: defaults)
+        let generation = preferences.generation
+        let kept = IOSAssetFolderDraft.commit("my images", to: preferences)
+        XCTAssertEqual(kept.name, "my images")
+        XCTAssertNil(kept.note)
+        XCTAssertEqual(preferences.assetDirectoryName, "my images")
+        XCTAssertEqual(preferences.generation, generation + 1, "One commit, not one per character")
+
+        let emptied = IOSAssetFolderDraft.commit("", to: preferences)
+        XCTAssertEqual(emptied.name, "assets")
+        XCTAssertEqual(emptied.note, "Images use assets.")
+        let hidden = IOSAssetFolderDraft.commit(".git", to: preferences)
+        XCTAssertEqual(hidden.name, "assets")
+        XCTAssertEqual(hidden.note, "Images use assets instead.")
+    }
+
+    func testApplyingPreferencesChangesTheLiveProviders() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("ApplyPrefs-\(UUID())")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let runtime = try IOSProductionComposition
+            .makeProduction(recoveryDirectory: root.appendingPathComponent("Recovery"))
+        addTeardownBlock { @MainActor in
+            runtime.stopObserving()
+            runtime.scene.stopObserving()
+            _ = await runtime.shutdown()
+            try? FileManager.default.removeItem(at: root)
+        }
+        let controller = try XCTUnwrap(runtime.controller as? IOSDocumentSceneController)
+        let store = try XCTUnwrap(controller.documents as? IOSUIDocumentStore)
+        let access = try XCTUnwrap(controller.workspace as? IOSWorkspaceAccessService)
+        let preferences = IOSAppPreferences(defaults: defaults)
+        preferences.setEditorFontSize(19)
+        preferences.setEditorPalette(.graphite)
+        preferences.setShowsLineNumbers(false)
+        preferences.setAutosaveIntervalSeconds(4)
+        preferences.setAssetDirectoryName("media")
+        preferences.setNewFileExtension(.mdx)
+        preferences.setPreviewAppearance(.dark)
+
+        runtime.apply(preferences, colorScheme: .light)
+
+        XCTAssertEqual(runtime.editor.theme.baseFont.pointSize, 19)
+        XCTAssertEqual(runtime.editor.theme.palette, .graphite)
+        XCTAssertFalse(runtime.editor.showsLineNumbers)
+        XCTAssertEqual(store.timing.autosaveDelayNanoseconds, 4_000_000_000)
+        XCTAssertEqual(access.assetDirectoryName, "media")
+        XCTAssertEqual(controller.preferredNewDocumentExtension, "mdx")
+        XCTAssertEqual(runtime.previewThemeName, "dark")
     }
 }

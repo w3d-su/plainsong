@@ -124,7 +124,7 @@ final class IOSWorkspaceSearchTests: XCTestCase {
         await controller.searchNow(query: "found", environment: environment)
         XCTAssertEqual(controller.sections.map(\.relativePath), ["ok.md"])
         XCTAssertTrue(controller.statusText.contains("1 file is too large"))
-        XCTAssertTrue(controller.statusText.contains("1 file is not UTF-8"))
+        XCTAssertTrue(controller.statusText.contains("1 file is not plain UTF-8"))
     }
 
     func testActivatingAMatchRevealsTheOpenDocumentWithoutReopeningIt() async throws {
@@ -205,10 +205,78 @@ final class IOSWorkspaceSearchTests: XCTestCase {
         let hit = try XCTUnwrap(section.hits.first)
         scene.present(.workspaceSearch)
         scene.openWorkspaceSearchHit(hit, in: section)
+        // A second tap before the first activation finishes does not open the file again.
+        scene.openWorkspaceSearchHit(hit, in: section)
         try await Task.sleep(for: .milliseconds(50))
 
         XCTAssertEqual(facade.openedURLs.map(\.url.lastPathComponent), ["b.md"])
         XCTAssertEqual(editor.revealCalls.map(\.range), [hit.range])
         XCTAssertNil(scene.presentation)
+    }
+
+    func testTruncationIsReportedOnlyWhenAnotherMatchExists() async {
+        let controller = IOSWorkspaceSearchController(maximumMatchesPerFile: 5, maximumMatchesPerQuery: 2)
+        var later = "nothing here"
+        let environment = { IOSWorkspaceSearchEnvironment(
+            scope: .directory,
+            entries: [ShellFixtures.entry("a.md"), ShellFixtures.entry("b.md")],
+            openDocument: nil,
+            read: { location async throws -> String in
+                location.relativePath == "a.md" ? "hit hit" : later
+            }
+        ) }
+        await controller.searchNow(query: "hit", environment: environment())
+        XCTAssertEqual(controller.sections.first?.hits.count, 2)
+        XCTAssertFalse(controller.statusText.contains("Showing the first"), controller.statusText)
+
+        later = "one more hit"
+        await controller.searchNow(query: "hit", environment: environment())
+        XCTAssertEqual(controller.sections.map(\.relativePath), ["a.md"])
+        XCTAssertTrue(controller.statusText.contains("Showing the first 2 matches"), controller.statusText)
+    }
+
+    func testBufferEditsReuseEarlierReadsAndTreeChangesReadAgain() async {
+        var reads: [String] = []
+        var bText = "disk hit"
+        let open = ShellFixtures.entry("a.md")
+        let other = ShellFixtures.entry("b.md")
+        func environment(buffer: String) -> IOSWorkspaceSearchEnvironment {
+            IOSWorkspaceSearchEnvironment(
+                scope: .directory,
+                entries: [open, other],
+                openDocument: IOSWorkspaceSearchOpenDocument(
+                    workspaceID: ShellFixtures.workspaceID,
+                    relativePath: "a.md",
+                    text: buffer
+                ),
+                read: { location async throws -> String in
+                    reads.append(location.relativePath)
+                    return bText
+                }
+            )
+        }
+        let controller = IOSWorkspaceSearchController()
+        await controller.searchNow(query: "hit", environment: environment(buffer: "no"))
+        XCTAssertEqual(reads, ["b.md"])
+        XCTAssertEqual(controller.cachedReadCountForTesting, 1)
+
+        // An edit to the open buffer re-searches it without reading b.md again.
+        controller.scheduleSearch(environment: environment(buffer: "hit"), immediate: true, reusingReads: true)
+        await waitForIdle(controller)
+        XCTAssertEqual(reads, ["b.md"])
+        XCTAssertEqual(controller.sections.map(\.relativePath), ["a.md", "b.md"])
+
+        // A tree change (or a new search) reads from disk again.
+        bText = "changed"
+        controller.scheduleSearch(environment: environment(buffer: "hit"), immediate: true)
+        await waitForIdle(controller)
+        XCTAssertEqual(reads, ["b.md", "b.md"])
+        XCTAssertEqual(controller.sections.map(\.relativePath), ["a.md"])
+    }
+
+    private func waitForIdle(_ controller: IOSWorkspaceSearchController) async {
+        for _ in 0 ..< 200 where controller.isSearching {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
     }
 }

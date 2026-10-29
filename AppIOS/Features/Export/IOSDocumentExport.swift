@@ -91,9 +91,51 @@ struct IOSExportedFileDocument: FileDocument {
     }
 }
 
-/// One user export. HTML and PDF share the Mac offscreen preview: a dedicated
-/// controller, remote images forced off, then the existing render barrier.
-/// PDF continues into the same page planner and WebKit capture.
+/// The preview theme frozen into one export (Mac `ExportHTMLTheme`): Print is always
+/// light, because paper is white and backgrounds are not printed. HTML and PDF resolve
+/// `system` to the appearance at invocation, so the file never changes theme later.
+enum IOSExportTheme {
+    static func resolve(kind: IOSDocumentExportKind, preference: String, systemIsDark: Bool) -> String {
+        if kind == .print {
+            return "light"
+        }
+        switch preference {
+        case "light", "dark":
+            return preference
+        default:
+            return systemIsDark ? "dark" : "light"
+        }
+    }
+}
+
+/// The paper aspect a printed PDF is planned for (Mac: `exportPrintPageAspect`). iOS asks
+/// for paper only once the print panel is up, so the plan uses the system's best match for
+/// the locale's default sheet: US Letter where the locale measures in US units, A4 otherwise.
+enum IOSPrintPage {
+    static let letter = CGSize(width: 612, height: 792)
+    static let a4 = CGSize(width: 595.2, height: 841.8)
+
+    static func defaultPaperSize(locale: Locale = .current) -> CGSize {
+        locale.measurementSystem == .us ? letter : a4
+    }
+
+    static func imageableAspect(printableRect: CGRect) -> CGFloat? {
+        guard printableRect.width > 0, printableRect.height > 0 else { return nil }
+        return printableRect.height / printableRect.width
+    }
+
+    @MainActor
+    static func defaultImageableAspect(locale: Locale = .current) -> CGFloat {
+        let size = defaultPaperSize(locale: locale)
+        let paper = UIPrintPaper.bestPaper(forPageSize: size, withPapersFrom: [])
+        return imageableAspect(printableRect: paper.printableRect) ?? size.height / size.width
+    }
+}
+
+/// One user export. HTML and PDF share the Mac offscreen preview: a dedicated export
+/// controller whose content rule blocks every HTTP(S) load, a non-persistent data store,
+/// remote images forced off, then the existing render barrier. Local images load through
+/// the scene's grant reader. PDF continues into the same page planner and WebKit capture.
 @MainActor
 final class IOSDocumentExportController: ObservableObject {
     @Published var isPresented = false
@@ -104,20 +146,27 @@ final class IOSDocumentExportController: ObservableObject {
     @Published private(set) var status: String?
 
     private var task: Task<Void, Never>?
-    private var completionNote: String?
+    private(set) var completionNote: String?
     var onNote: ((String) -> Void)?
     var onFailure: ((String) -> Void)?
+    /// Test seam: replaces the system print panel.
+    var presentPrintOverride: ((Data, String, String) -> Void)?
+    /// Test seam: observes the paper aspect a printed PDF was planned for.
+    var onPrintAspect: ((CGFloat) -> Void)?
 
+    /// Stops a running export. Nothing it was preparing is presented afterwards.
     func cancel() {
         task?.cancel()
+        task = nil
     }
 
     func begin(
         _ kind: IOSDocumentExportKind,
         source: DocumentTextChange,
-        assetRoot: URL?,
+        assetAccess: PreviewAssetAccessContext?,
         theme: String,
-        assetReader: (any PreviewAssetReading)?
+        assetReader: (any PreviewAssetReading)?,
+        isCurrent: @escaping @MainActor () -> Bool = { true }
     ) {
         guard !isRunning else { return }
         isRunning = true
@@ -125,7 +174,12 @@ final class IOSDocumentExportController: ObservableObject {
         task?.cancel()
         task = Task { [weak self] in
             await self?.run(
-                kind, source: source, assetRoot: assetRoot, theme: theme, assetReader: assetReader
+                kind,
+                source: source,
+                assetAccess: assetAccess,
+                theme: theme,
+                assetReader: assetReader,
+                isCurrent: isCurrent
             )
         }
     }
@@ -145,18 +199,31 @@ final class IOSDocumentExportController: ObservableObject {
         }
     }
 
+    // swiftlint:disable:next function_body_length cyclomatic_complexity
     private func run(
         _ kind: IOSDocumentExportKind,
         source: DocumentTextChange,
-        assetRoot: URL?,
+        assetAccess: PreviewAssetAccessContext?,
         theme: String,
-        assetReader: (any PreviewAssetReading)?
+        assetReader: (any PreviewAssetReading)?,
+        isCurrent: @MainActor () -> Bool
     ) async {
         defer {
             isRunning = false
             status = nil
         }
-        let preview = PreviewController()
+        func stopped() -> Bool {
+            Task.isCancelled || !isCurrent()
+        }
+        let preview: PreviewController
+        do {
+            preview = try await PreviewController.makeHTMLExportController()
+        } catch {
+            if !stopped() {
+                onFailure?("The export could not be prepared. Try again.")
+            }
+            return
+        }
         let host = IOSExportPreviewHost(webView: preview.webView)
         defer {
             preview.invalidate()
@@ -168,11 +235,10 @@ final class IOSDocumentExportController: ObservableObject {
         // D1: export never follows the live preview's remote-image preference.
         preview.setAllowsRemoteImages(false)
         preview.setTheme(theme)
-        preview.setWorkspaceAssetRoot(assetRoot)
-        if Task.isCancelled { return }
+        if stopped() { return }
 
-        let rendered = await preview.renderForExport(source)
-        if Task.isCancelled { return }
+        let rendered = await preview.renderForExport(source, assetAccess: assetAccess)
+        if stopped() { return }
         let renderID: Int
         switch rendered {
         case let .completed(completed):
@@ -183,7 +249,7 @@ final class IOSDocumentExportController: ObservableObject {
         }
 
         let html = await preview.exportHTML(matchingRenderID: renderID)
-        if Task.isCancelled { return }
+        if stopped() { return }
         guard case let .ready(markup, _, _) = html else {
             if case let .failed(reason, _, _) = html {
                 onFailure?(Self.explain(reason))
@@ -204,9 +270,11 @@ final class IOSDocumentExportController: ObservableObject {
             bytes = Data(markup.utf8)
         case .pdf, .print:
             status = kind == .print ? "Preparing to print…" : "Creating PDF…"
+            let aspect: CGFloat? = kind == .print ? IOSPrintPage.defaultImageableAspect() : nil
+            if let aspect { onPrintAspect?(aspect) }
             do {
-                let document = try await preview.captureExportPDF()
-                if Task.isCancelled { return }
+                let document = try await preview.captureExportPDF(pageAspect: aspect)
+                if stopped() { return }
                 guard !document.data.isEmpty else {
                     onFailure?("The PDF was empty.")
                     return
@@ -216,23 +284,33 @@ final class IOSDocumentExportController: ObservableObject {
                     notes.append("Some wide pages were scaled down to fit the PDF page limit.")
                 }
             } catch let error as ExportPDFCaptureError {
-                onFailure?(Self.explain(error))
+                if !stopped() { onFailure?(Self.explain(error)) }
                 return
             } catch is CancellationError {
                 return
             } catch {
-                onFailure?("The PDF could not be created. Try again.")
+                if !stopped() { onFailure?("The PDF could not be created. Try again.") }
                 return
             }
         }
 
-        filename = IOSExportFileName.make(
-            source: source.text, fileURL: source.fileURL, pathExtension: kind.pathExtension
-        )
+        // Frontmatter parsing stays off the main actor, as on the Mac.
+        let text = source.text
+        let fileURL = source.fileURL
+        let pathExtension = kind.pathExtension
+        let name = await Task.detached(priority: .userInitiated) {
+            IOSExportFileName.make(source: text, fileURL: fileURL, pathExtension: pathExtension)
+        }.value
+        if stopped() { return }
+        filename = name
         contentType = kind.contentType
         let note = notes.joined(separator: " ")
         if kind == .print {
-            presentPrint(bytes, jobName: filename, note: note)
+            if let presentPrintOverride {
+                presentPrintOverride(bytes, name, note)
+            } else {
+                presentPrint(bytes, jobName: name, note: note)
+            }
             return
         }
         file = IOSExportedFileDocument(data: bytes)

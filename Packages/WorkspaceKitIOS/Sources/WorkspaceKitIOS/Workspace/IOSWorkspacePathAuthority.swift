@@ -63,8 +63,10 @@ enum IOSWorkspacePathAuthority {
         return parts.contains { $0 == ".." || $0.isEmpty }
     }
 
-    /// One path component beside the document. Traversal, hidden names, and empty
-    /// input stay on the default `assets` folder.
+    /// One path component beside the document. Traversal, hidden names, control and
+    /// bidirectional-formatting characters (which can disguise a name), names longer than
+    /// NAME_MAX (255 UTF-8 bytes), and empty input stay on the default `assets` folder.
+    /// Unlike the Mac `images/posts` form, iOS takes one folder name, not a path.
     static func normalizedAssetDirectory(_ name: String) -> String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty || trimmed == "." || trimmed == ".." || trimmed.hasPrefix(".") {
@@ -73,10 +75,17 @@ enum IOSWorkspacePathAuthority {
         if trimmed.contains("/") || trimmed.contains("\\") || trimmed.utf8.contains(0) {
             return "assets"
         }
-        if trimmed.unicodeScalars.contains(where: { $0.value < 0x20 }) {
+        if trimmed.unicodeScalars.contains(where: isRefusedFolderScalar) {
+            return "assets"
+        }
+        if trimmed.utf8.count > 255 {
             return "assets"
         }
         return trimmed
+    }
+
+    private static func isRefusedFolderScalar(_ scalar: Unicode.Scalar) -> Bool {
+        scalar.value < 0x20 || (0x7F ... 0x9F).contains(scalar.value) || scalar.properties.isBidiControl
     }
 
     /// Document-parent-relative asset leaf. This never climbs to the grant parent.

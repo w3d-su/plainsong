@@ -109,7 +109,11 @@ public final class IOSMarkdownTextView: UITextView {
         lineNumberGutter.setNeedsDisplay()
     }
 
-    /// Y in text-container coordinates for the source offset, laying out through that line.
+    /// Y in text-container coordinates for the source offset.
+    ///
+    /// Enumeration starts at the target location and stops after that fragment.
+    /// `ensureLayout` of `document.location ..< location` names the whole prefix, so a
+    /// scroll into a long document lays that prefix out on the main thread.
     func contentY(forUTF16Offset offset: Int) -> CGFloat? {
         guard let manager = textLayoutManager, let content = manager.textContentManager else { return nil }
         let document = content.documentRange
@@ -117,10 +121,12 @@ public final class IOSMarkdownTextView: UITextView {
         guard length >= 0 else { return nil }
         let clamped = min(max(offset, 0), length)
         guard let location = content.location(document.location, offsetBy: clamped) else { return nil }
-        if let through = NSTextRange(location: document.location, end: location) {
-            manager.ensureLayout(for: through)
+        var minY: CGFloat?
+        manager.enumerateTextLayoutFragments(from: location, options: [.ensuresLayout]) { fragment in
+            minY = fragment.layoutFragmentFrame.minY
+            return false
         }
-        return manager.textLayoutFragment(for: location)?.layoutFragmentFrame.minY
+        return minY
     }
 
     override public func layoutSubviews() {

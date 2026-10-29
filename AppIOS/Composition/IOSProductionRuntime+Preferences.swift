@@ -9,6 +9,7 @@ import WorkspaceKitIOS
 extension IOSProductionRuntime {
     func apply(_ preferences: IOSAppPreferences, colorScheme: ColorScheme) {
         previewThemeName = preferences.previewAppearance.rawValue
+        systemAppearanceIsDark = colorScheme == .dark
         let style: UIUserInterfaceStyle = switch preferences.editorAppearance {
         case .system:
             colorScheme == .dark ? .dark : .light
@@ -65,10 +66,13 @@ extension IOSProductionRuntime {
             return
         }
         let sceneController = controller as? IOSDocumentSceneController
-        let assetRoot: URL = if let grant = sceneController?.currentGrant, grant.scope == .directory {
-            grant.rootURL
-        } else {
-            stored.location.fileURL.deletingLastPathComponent()
+        // The live preview's authority: a current directory grant, read through its
+        // lease. A single-file grant never promotes the file's parent folder.
+        let assetAccess: PreviewAssetAccessContext? = sceneController.flatMap { scene in
+            guard scene.grantIsCurrent, let grant = scene.currentGrant, grant.scope == .directory else {
+                return nil
+            }
+            return scene.assetContext(grant)
         }
         let source = DocumentTextChange(
             text: document.text,
@@ -76,6 +80,7 @@ extension IOSProductionRuntime {
             fileKind: document.fileKind,
             fileURL: stored.location.fileURL
         )
+        let documentID = stored.revision.documentID
         exporter.onFailure = { [weak scene] message in
             scene?.presentedError = IOSShellError(title: "Couldn't Export", message: message)
         }
@@ -85,9 +90,16 @@ extension IOSProductionRuntime {
         exporter.begin(
             kind,
             source: source,
-            assetRoot: assetRoot,
-            theme: previewThemeName,
-            assetReader: sceneController?.workspace as? IOSWorkspaceAccessService
+            assetAccess: assetAccess,
+            theme: IOSExportTheme.resolve(
+                kind: kind,
+                preference: previewThemeName,
+                systemIsDark: systemAppearanceIsDark
+            ),
+            assetReader: sceneController?.workspace as? IOSWorkspaceAccessService,
+            isCurrent: { [weak self] in
+                self?.controller.snapshot.document?.revision.documentID == documentID
+            }
         )
     }
 }
