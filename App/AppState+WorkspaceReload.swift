@@ -281,7 +281,7 @@ extension AppState {
             throw CancellationError()
         }
 
-        let currentDocumentAtPreparation = currentDocument
+        let currentDocumentAtPreparation = shownSession
         let currentDocumentStateAtPreparation = workspaceReloadCurrentSessionState()
 
         var tree = WorkspaceFileTree.reconcile(
@@ -332,7 +332,7 @@ extension AppState {
         guard isCurrentWorkspaceReload(root: root, generation: generation) else {
             throw CancellationError()
         }
-        guard currentDocument === currentDocumentAtPreparation,
+        guard shownSession === currentDocumentAtPreparation,
               workspaceReloadCurrentSessionState() == currentDocumentStateAtPreparation
         else {
             // User/session lifecycle work won the suspension. Do not apply a tree selection,
@@ -436,7 +436,7 @@ extension AppState {
         tree: WorkspaceFileTree,
         rootAuthority: WorkspaceFileSystemRootAuthority
     ) async throws -> PreparedWorkspaceReloadCurrentDocumentDisposition {
-        let session = currentDocument
+        let session = shownSession
         guard let fileURL = sessionStateURL(for: session) else {
             return .unrelated
         }
@@ -550,7 +550,7 @@ extension AppState {
     }
 
     private func workspaceReloadCurrentSessionState() -> WorkspaceReloadCurrentSessionState {
-        let session = currentDocument
+        let session = shownSession
         let sessionIdentity = ObjectIdentifier(session)
         let stateURL = sessionStateURL(for: session)
         return WorkspaceReloadCurrentSessionState(

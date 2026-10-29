@@ -69,7 +69,7 @@ final class WindowStatePartitionPublishAppTests: XCTestCase {
     /// session's own publishes (`observeCurrentDocument`), never a container's.
     func testBodyEditsPublishOnlyTheSessionsOwnChanges() {
         let session = DocumentSession(text: "alpha", fileKind: .markdown)
-        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let appState = AppState(shownSession: session, shouldRestoreLastOpenedFile: false)
         var appPublishCount = 0
         var sessionPublishCount = 0
         let appProbe = appState.objectWillChange.sink { _ in appPublishCount += 1 }
@@ -151,7 +151,7 @@ final class WindowStatePartitionPublishAppTests: XCTestCase {
             fileKind: .markdown
         )
         let appState = AppState(
-            currentDocument: session,
+            shownSession: session,
             workspaceMutationOperationRecoveryStore: operationStore,
             workspaceMutationTextRecoveryStore: CountingTextRecoveryStore(),
             shouldRestoreLastOpenedFile: false

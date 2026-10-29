@@ -22,7 +22,7 @@ extension ExportDestinationOwnershipAppTests {
         XCTAssertEqual(
             try appState.exportArtifactDestinationOwnership(
                 for: inspection(of: root.appendingPathComponent("unowned.html")),
-                exportSource: appState.currentDocument
+                exportSource: appState.shownSession
             ),
             .permitted,
             "control: the refusal below is attributable to the recovery candidate"
@@ -36,7 +36,7 @@ extension ExportDestinationOwnershipAppTests {
                 disposition: .createNew,
                 bytes: Data("<p>export</p>".utf8)
             ),
-            exportSource: appState.currentDocument
+            exportSource: appState.shownSession
         )
 
         XCTAssertEqual(outcome, .notCommitted(.ownedDestination))
@@ -46,7 +46,7 @@ extension ExportDestinationOwnershipAppTests {
             XCTAssertEqual(
                 appState.exportArtifactDestinationOwnership(
                     for: aliasInspection,
-                    exportSource: appState.currentDocument
+                    exportSource: appState.shownSession
                 ),
                 .refused
             )
@@ -74,7 +74,7 @@ extension ExportDestinationOwnershipAppTests {
         XCTAssertEqual(appState.pendingWorkspaceMutationTextRecoveryRecords.map(\.originalURL), [recoveredURL])
         let control = try inspection(of: root.appendingPathComponent("unowned.html"))
         XCTAssertEqual(
-            appState.exportArtifactDestinationOwnership(for: control, exportSource: appState.currentDocument),
+            appState.exportArtifactDestinationOwnership(for: control, exportSource: appState.shownSession),
             .permitted
         )
 
@@ -87,14 +87,14 @@ extension ExportDestinationOwnershipAppTests {
             XCTAssertEqual(
                 try appState.exportArtifactDestinationOwnership(
                     for: inspection(of: owned),
-                    exportSource: appState.currentDocument
+                    exportSource: appState.shownSession
                 ),
                 .refused,
                 owned.lastPathComponent
             )
         }
         XCTAssertEqual(
-            appState.exportArtifactDestinationOwnership(for: control, exportSource: appState.currentDocument),
+            appState.exportArtifactDestinationOwnership(for: control, exportSource: appState.shownSession),
             .permitted
         )
     }

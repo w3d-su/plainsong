@@ -30,12 +30,12 @@ final class WorkspaceSearchActiveRefreshTests: XCTestCase {
         fixture.appState.editorNavigationCommand = .navigate(warmNavigation)
         fixture.appState.applyAuthorizedEditorText(
             "current needle",
-            to: fixture.appState.currentDocument
+            to: fixture.appState.shownSession
         )
         XCTAssertEqual(fixture.appState.editorNavigationCommand, .navigate(warmNavigation))
 
         let currentIdentity = try XCTUnwrap(
-            fixture.appState.editorDocumentIdentity(for: fixture.appState.currentDocument)
+            fixture.appState.editorDocumentIdentity(for: fixture.appState.shownSession)
         )
         let currentNavigation = EditorNavigationRequest(
             id: 8,
@@ -46,7 +46,7 @@ final class WorkspaceSearchActiveRefreshTests: XCTestCase {
         fixture.appState.editorNavigationCommand = .navigate(currentNavigation)
         fixture.appState.applyAuthorizedEditorText(
             "newest current needle",
-            to: fixture.appState.currentDocument
+            to: fixture.appState.shownSession
         )
 
         guard case let .cancel(cancellationID)? = fixture.appState.editorNavigationCommand else {
@@ -75,8 +75,8 @@ final class WorkspaceSearchActiveRefreshTests: XCTestCase {
         fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "latest"))
         try await waitForActiveSearchRefresh("initial search") { provider.requests.count == 1 }
 
-        fixture.appState.applyAuthorizedEditorText("current draft", to: fixture.appState.currentDocument)
-        fixture.appState.applyAuthorizedEditorText("current latest", to: fixture.appState.currentDocument)
+        fixture.appState.applyAuthorizedEditorText("current draft", to: fixture.appState.shownSession)
+        fixture.appState.applyAuthorizedEditorText("current latest", to: fixture.appState.shownSession)
         fixture.appState.applyDocumentText("warm draft", to: warm)
         fixture.appState.applyDocumentText("warm latest", to: warm)
 
@@ -109,9 +109,9 @@ final class WorkspaceSearchActiveRefreshTests: XCTestCase {
         let oldRequest = provider.requests[0]
         let oldTaskToken = try XCTUnwrap(fixture.appState.workspaceSearchTaskToken)
 
-        fixture.appState.applyAuthorizedEditorText("needle one", to: fixture.appState.currentDocument)
-        fixture.appState.applyAuthorizedEditorText("needle two", to: fixture.appState.currentDocument)
-        fixture.appState.applyAuthorizedEditorText("needle newest", to: fixture.appState.currentDocument)
+        fixture.appState.applyAuthorizedEditorText("needle one", to: fixture.appState.shownSession)
+        fixture.appState.applyAuthorizedEditorText("needle two", to: fixture.appState.shownSession)
+        fixture.appState.applyAuthorizedEditorText("needle newest", to: fixture.appState.shownSession)
 
         try await waitForActiveSearchRefresh("old producer cancellation and one refresh") {
             provider.terminatedIndices.contains(0) && provider.requests.count == 2
@@ -153,11 +153,11 @@ final class WorkspaceSearchActiveRefreshTests: XCTestCase {
 
         fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "saved"))
         try await waitForActiveSearchRefresh("initial search") { provider.requests.count == 1 }
-        fixture.appState.applyAuthorizedEditorText("dirty saved", to: fixture.appState.currentDocument)
-        fixture.appState.applyAuthorizedEditorText("saved baseline", to: fixture.appState.currentDocument)
+        fixture.appState.applyAuthorizedEditorText("dirty saved", to: fixture.appState.shownSession)
+        fixture.appState.applyAuthorizedEditorText("saved baseline", to: fixture.appState.shownSession)
 
         try await waitForActiveSearchRefresh("baseline refresh") { provider.requests.count == 2 }
-        XCTAssertFalse(fixture.appState.currentDocument.isDirty)
+        XCTAssertFalse(fixture.appState.shownSession.isDirty)
         XCTAssertTrue(provider.requests[1].dirtyOverlays.overlays.isEmpty)
     }
 

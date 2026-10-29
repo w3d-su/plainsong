@@ -106,7 +106,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         let source = try fixture.location("post.md")
         fixture.appState.applyDocumentText(
             "Newest editor text",
-            to: fixture.appState.currentDocument
+            to: fixture.appState.shownSession
         )
         operationStore.upsertError = TestWorkspaceMutationRecoveryStoreError.failed
 
@@ -139,9 +139,9 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         relaunched.restoreLastOpenedFileIfNeeded()
 
-        XCTAssertEqual(relaunched.currentDocument.text, "Newest editor text")
-        XCTAssertTrue(relaunched.currentDocument.isDirty)
-        XCTAssertEqual(relaunched.currentDocument.fileURL, source.fileURL)
+        XCTAssertEqual(relaunched.shownSession.text, "Newest editor text")
+        XCTAssertTrue(relaunched.shownSession.isDirty)
+        XCTAssertEqual(relaunched.shownSession.fileURL, source.fileURL)
     }
 
     func testDirtyRelocationBundleSurvivesStandaloneFailureAndImmediateRestart() throws {
@@ -161,7 +161,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         let source = try fixture.location("post.md")
         fixture.appState.applyDocumentText(
             "Newest bundled text",
-            to: fixture.appState.currentDocument
+            to: fixture.appState.shownSession
         )
 
         XCTAssertThrowsError(
@@ -189,8 +189,8 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         relaunched.restoreLastOpenedFileIfNeeded()
 
-        XCTAssertEqual(relaunched.currentDocument.text, "Newest bundled text")
-        XCTAssertTrue(relaunched.currentDocument.isDirty)
+        XCTAssertEqual(relaunched.shownSession.text, "Newest bundled text")
+        XCTAssertTrue(relaunched.shownSession.isDirty)
     }
 
     func testDirtyRelocationKeepsRekeyedJournalWhenStandaloneRekeyFails() throws {
@@ -215,7 +215,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         let destination = try fixture.location(destinationName)
         fixture.appState.applyDocumentText(
             "Dirty after edit",
-            to: fixture.appState.currentDocument
+            to: fixture.appState.shownSession
         )
 
         XCTAssertThrowsError(
@@ -229,8 +229,8 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: source.fileURL.path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: destination.fileURL.path))
-        XCTAssertEqual(fixture.appState.currentDocument.fileURL, destination.fileURL)
-        XCTAssertTrue(fixture.appState.currentDocument.isDirty)
+        XCTAssertEqual(fixture.appState.shownSession.fileURL, destination.fileURL)
+        XCTAssertTrue(fixture.appState.shownSession.isDirty)
 
         // Standalone still only holds the pre-move locator.
         let standalone = try XCTUnwrap(textStore.records.values.first)
@@ -263,9 +263,9 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         relaunched.restoreLastOpenedFileIfNeeded()
 
-        XCTAssertEqual(relaunched.currentDocument.text, "Dirty after edit")
-        XCTAssertTrue(relaunched.currentDocument.isDirty)
-        XCTAssertEqual(relaunched.currentDocument.fileURL, destination.fileURL)
+        XCTAssertEqual(relaunched.shownSession.text, "Dirty after edit")
+        XCTAssertTrue(relaunched.shownSession.isDirty)
+        XCTAssertEqual(relaunched.shownSession.fileURL, destination.fileURL)
     }
 
     func testCommittedRelocationPhaseRekeysBundledTextBeforeSessionCommit() throws {
@@ -288,7 +288,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
                 return
             }
             bundledURLAtCommittedPhase = record.textRecoveryRecords.first?.originalURL
-            sessionURLAtCommittedPhase = fixture.appState.currentDocument.fileURL
+            sessionURLAtCommittedPhase = fixture.appState.shownSession.fileURL
         }
 
         try fixture.appState.renameWorkspaceItem(
@@ -300,7 +300,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
 
         XCTAssertEqual(bundledURLAtCommittedPhase, destination.fileURL)
         XCTAssertEqual(sessionURLAtCommittedPhase, source.fileURL)
-        XCTAssertEqual(fixture.appState.currentDocument.fileURL, destination.fileURL)
+        XCTAssertEqual(fixture.appState.shownSession.fileURL, destination.fileURL)
     }
 
     func testRenameDirtyCurrentSessionRetargetsRetainedAuthorityWithoutRecreatingOldPath() throws {
@@ -309,7 +309,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             currentPath: "post.md"
         )
         defer { cleanUp(fixture) }
-        let session = fixture.appState.currentDocument
+        let session = fixture.appState.shownSession
         let oldLocation = try fixture.location("post.md")
         let newLocation = try fixture.location("renamed.md")
         let expectation = try fixture.expectation("post.md")
@@ -392,7 +392,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
 
         let expected: [(DocumentSession, String)] = [
-            (appState.currentDocument, "archive/drafts/current.md"),
+            (appState.shownSession, "archive/drafts/current.md"),
             (cached, "archive/drafts/cached.md"),
             (retired, "archive/drafts/retired.md"),
             (editorOnly, "archive/drafts/editor.md"),
@@ -434,7 +434,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let oldLocation = try fixture.location("post.md")
         let expectedIdentity = try fixture.expectation("post.md").identity
         let replacementURL = fixture.url("replacement.md")
@@ -450,7 +450,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             "Replacement"
         )
         XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.url("renamed.md").path))
-        XCTAssertTrue(appState.currentDocument === session)
+        XCTAssertTrue(appState.shownSession === session)
         XCTAssertEqual(appState.sessionStateURL(for: session), oldLocation.fileURL)
         XCTAssertTrue(appState.registry.sessionCache[oldLocation.fileURL] === session)
         XCTAssertEqual(
@@ -553,7 +553,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let source = appState.currentDocument
+        let source = appState.shownSession
         let destination = try fixture.installSession(path: "renamed.md", storage: .cached)
         let sourceLocation = try fixture.location("post.md")
         let destinationLocation = try fixture.location("renamed.md")
@@ -859,7 +859,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             guard try !WorkspaceNoFollowItemInspector.parentIsCaseSensitive(of: source) else {
                 throw XCTSkip("Equivalent-spelling rename requires a case-insensitive test volume")
             }
-            let session = fixture.appState.currentDocument
+            let session = fixture.appState.shownSession
             fixture.operationRecoveryStore.onUpsert = { record in
                 guard case let .relocation(relocation) = record.payload,
                       relocation.sessionCommitPhase == .committedCleanup
@@ -939,7 +939,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         let source = try fixture.location("post.md")
         let literalName = "  renamed.md  "
         let destination = try fixture.location(literalName)
-        let session = fixture.appState.currentDocument
+        let session = fixture.appState.shownSession
 
         try fixture.appState.renameWorkspaceItem(
             at: source,
@@ -1024,7 +1024,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let oldLocation = try fixture.location("post.md")
         let newLocation = try fixture.location("post.mdx")
         let binding = try XCTUnwrap(appState.anchoredSessionFileBinding(for: session))
@@ -1091,7 +1091,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
         let sessionIdentity = ObjectIdentifier(session)
         appState.indeterminateWorkspaceMutationSessions.insert(sessionIdentity)
@@ -1160,7 +1160,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             recycler: recycler
         )
         defer { cleanUp(fixture) }
-        fixture.appState.applyDocumentText("Changed", to: fixture.appState.currentDocument)
+        fixture.appState.applyDocumentText("Changed", to: fixture.appState.shownSession)
 
         await XCTAssertThrowsErrorAsync {
             try await fixture.appState.trashWorkspaceItem(
@@ -1250,7 +1250,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             recycler: RemovingMutationRecycler()
         )
         defer { cleanUp(fixture) }
-        let session = fixture.appState.currentDocument
+        let session = fixture.appState.shownSession
         let location = try fixture.location("post.md")
 
         try await fixture.appState.trashWorkspaceItem(
@@ -1260,7 +1260,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: location.fileURL.path))
-        XCTAssertNil(fixture.appState.currentDocument.fileURL)
+        XCTAssertNil(fixture.appState.shownSession.fileURL)
         XCTAssertNil(fixture.appState.registry.sessionCache[location.fileURL])
         XCTAssertNil(fixture.appState.anchoredSessionFileBinding(for: session))
         XCTAssertNil(
@@ -1279,7 +1279,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         let target = fixture.url("target.md")
         let link = fixture.url("alias.md")
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
-        let session = fixture.appState.currentDocument
+        let session = fixture.appState.shownSession
         let targetLocation = try fixture.location("target.md")
 
         try await fixture.appState.trashWorkspaceItem(
@@ -1290,7 +1290,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: link.path))
         XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), "Target")
-        XCTAssertTrue(fixture.appState.currentDocument === session)
+        XCTAssertTrue(fixture.appState.shownSession === session)
         XCTAssertEqual(fixture.appState.sessionStateURL(for: session), targetLocation.fileURL)
         XCTAssertFalse(fixture.appState.detachedSessionURLs.contains(targetLocation.fileURL))
         XCTAssertNil(fixture.appState.missingFilePrompt)
@@ -1420,7 +1420,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
 
         let createdLocation = try fixture.location("created.md")
         let createdExpectation = try fixture.expectation("created.md")
-        let session = fixture.appState.currentDocument
+        let session = fixture.appState.shownSession
         XCTAssertEqual(session.fileURL, createdLocation.fileURL)
         XCTAssertEqual(
             fixture.appState.anchoredSessionFileBinding(for: session)?.identity,
@@ -1440,7 +1440,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let originalSession = appState.currentDocument
+        let originalSession = appState.shownSession
         let destination = fixture.url("notes.txt")
         operationStore.onUpsert = { record in
             guard case let .creation(context) = record.payload,
@@ -1459,7 +1459,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: destination.path))
-        XCTAssertTrue(appState.currentDocument === originalSession)
+        XCTAssertTrue(appState.shownSession === originalSession)
         XCTAssertNil(appState.registry.sessionCache[destination])
         XCTAssertTrue(appState.workspaceMutationRecoveries.isEmpty)
         XCTAssertTrue(operationStore.records.isEmpty)
@@ -1560,7 +1560,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         XCTAssertFalse(committedObservation.stagingExists)
         XCTAssertTrue(committedObservation.destinationExists)
         XCTAssertTrue(operationStore.records.isEmpty)
-        XCTAssertEqual(fixture.appState.currentDocument.fileURL, destination)
+        XCTAssertEqual(fixture.appState.shownSession.fileURL, destination)
     }
 
     func testWorkspaceFolderCreationRecordsPreparedArtifactBeforeExclusivePublication()
@@ -1659,7 +1659,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             operationRecoveryStore: operationStore
         )
         defer { cleanUp(fixture) }
-        let originalSession = fixture.appState.currentDocument
+        let originalSession = fixture.appState.shownSession
         var plannedID: UUID?
         operationStore.onUpsert = { record in
             guard plannedID == nil,
@@ -1701,7 +1701,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             inMemoryRecovery.recoveryExpectation,
             inMemoryRecovery.expectedCreatedItem
         )
-        XCTAssertTrue(fixture.appState.currentDocument === originalSession)
+        XCTAssertTrue(fixture.appState.shownSession === originalSession)
         XCTAssertNotNil(fixture.appState.presentedError)
     }
 
@@ -1768,7 +1768,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         appState.preferences.setAutosaveIntervalSeconds(
             PlainsongPreferences.minimumAutosaveIntervalSeconds
         )
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let outside = try fixture.installSession(path: "outside.md", storage: .cached)
         let editorOnly = try fixture.installSession(path: "editor-only.md", storage: .cached)
         let editorBinding = appState.editorDocumentBinding(for: editorOnly)
@@ -1826,7 +1826,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             appState.currentExternalDiskEventGeneration(for: outside),
             outsideEventGeneration
         )
-        XCTAssertTrue(appState.currentDocument === session)
+        XCTAssertTrue(appState.shownSession === session)
         XCTAssertEqual(session.text, "Typed during trash")
         XCTAssertEqual(appState.missingFilePrompt?.fileURL, location.fileURL)
         XCTAssertTrue(appState.detachedSessionURLs.contains(location.fileURL))
@@ -1847,7 +1847,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let location = try fixture.location("post.md")
         let latest = "NFD e\u{0301} 👩🏽‍💻\nTyped during Trash"
 
@@ -1930,7 +1930,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         }
         await recycler.waitUntilCalled()
         store.upsertError = ControlledMutationRecyclerError.failed
-        appState.applyDocumentText("Must survive", to: appState.currentDocument)
+        appState.applyDocumentText("Must survive", to: appState.shownSession)
 
         XCTAssertFalse(appState.prepareForTermination())
         XCTAssertEqual(appState.presentedError?.title, "Could Not Preserve Recovery Copy")
@@ -1986,7 +1986,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let current = appState.currentDocument
+        let current = appState.shownSession
         let currentRecords = try appState.prepareWorkspaceTrashRecords(
             source: fixture.location("post.md"),
             expectation: fixture.expectation("post.md")
@@ -2031,7 +2031,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let records = try appState.prepareWorkspaceTrashRecords(
             source: fixture.location("post.md"),
             expectation: fixture.expectation("post.md")
@@ -2056,7 +2056,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let records = try appState.prepareWorkspaceTrashRecords(
             source: fixture.location("post.md"),
             expectation: fixture.expectation("post.md")
@@ -2092,7 +2092,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let records = try appState.prepareWorkspaceTrashRecords(
             source: fixture.location("post.md"),
             expectation: fixture.expectation("post.md")
@@ -2129,8 +2129,8 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         relaunched.restoreLastOpenedFileIfNeeded()
 
-        XCTAssertEqual(relaunched.currentDocument.text, persisted.source)
-        XCTAssertTrue(relaunched.currentDocument.isDirty)
+        XCTAssertEqual(relaunched.shownSession.text, persisted.source)
+        XCTAssertTrue(relaunched.shownSession.isDirty)
     }
 
     func testBackgroundEditDuringDirectoryTrashIsPromotedForDetachedRecovery() async throws {
@@ -2165,7 +2165,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         await recycler.complete()
         try await trashTask.value
 
-        XCTAssertTrue(appState.currentDocument === background)
+        XCTAssertTrue(appState.shownSession === background)
         XCTAssertEqual(background.text, "Background changed")
         XCTAssertEqual(appState.missingFilePrompt?.fileURL, backgroundLocation.fileURL)
         XCTAssertTrue(appState.detachedSessionURLs.contains(backgroundLocation.fileURL))
@@ -2188,7 +2188,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let current = appState.currentDocument
+        let current = appState.shownSession
         let background = try fixture.installSession(
             path: "drafts/background.md",
             storage: .retired
@@ -2211,7 +2211,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             return XCTFail("Trash failed before recovery promotion: \(error)")
         }
 
-        XCTAssertTrue(appState.currentDocument === current)
+        XCTAssertTrue(appState.shownSession === current)
         let recoveredCurrent = fixture.rootURL.deletingLastPathComponent()
             .appendingPathComponent("recovered-current-\(UUID().uuidString).md")
         defer { try? FileManager.default.removeItem(at: recoveredCurrent) }
@@ -2223,7 +2223,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             return XCTFail("Saving the first detached copy failed: \(error)")
         }
 
-        XCTAssertTrue(appState.currentDocument === background)
+        XCTAssertTrue(appState.shownSession === background)
         XCTAssertEqual(background.text, "Background changed")
         XCTAssertEqual(
             appState.missingFilePrompt?.fileURL,
@@ -2249,7 +2249,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         appState.preferences.setAutosaveIntervalSeconds(
             PlainsongPreferences.minimumAutosaveIntervalSeconds
         )
-        let outside = appState.currentDocument
+        let outside = appState.shownSession
         let background = try fixture.installSession(
             path: "drafts/background.md",
             storage: .retired
@@ -2275,7 +2275,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         await recycler.completeMovedRequests()
         try await trashTask.value
 
-        XCTAssertTrue(appState.currentDocument === background)
+        XCTAssertTrue(appState.shownSession === background)
         XCTAssertNil(appState.autosaveTask)
         XCTAssertNotNil(
             appState.sessionAutosaveTasks[ObjectIdentifier(outside)]
@@ -2377,8 +2377,8 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
 
         XCTAssertTrue(appState.workspaceMutationRecoveries.isEmpty)
         XCTAssertTrue(appState.indeterminateWorkspaceMutationSessions.isEmpty)
-        XCTAssertEqual(appState.currentDocument.fileURL, source.fileURL)
-        XCTAssertNotNil(appState.anchoredSessionFileBinding(for: appState.currentDocument))
+        XCTAssertEqual(appState.shownSession.fileURL, source.fileURL)
+        XCTAssertNotNil(appState.anchoredSessionFileBinding(for: appState.shownSession))
         XCTAssertNil(appState.workspaceMutationReconciliationPrompt)
     }
 
@@ -2581,7 +2581,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let sessionIdentity = ObjectIdentifier(session)
         let source = try fixture.location("posts/draft.md")
         let destination = try fixture.location("archive/draft.md")
@@ -2816,10 +2816,10 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         XCTAssertTrue(fixture.appState.workspaceMutationRecoveries.isEmpty)
         XCTAssertTrue(fixture.appState.indeterminateWorkspaceMutationSessions.isEmpty)
-        XCTAssertEqual(fixture.appState.currentDocument.fileURL, source.fileURL)
+        XCTAssertEqual(fixture.appState.shownSession.fileURL, source.fileURL)
         XCTAssertEqual(
             fixture.appState.anchoredSessionFileBinding(
-                for: fixture.appState.currentDocument
+                for: fixture.appState.shownSession
             )?.location,
             source
         )
@@ -3268,7 +3268,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let sourceSession = appState.currentDocument
+        let sourceSession = appState.shownSession
         let otherSession = try fixture.installSession(path: "other.md", storage: .cached)
         let source = try fixture.location("post.md")
         let destination = try fixture.location("renamed.md")
@@ -3298,7 +3298,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         ))
 
         appState.performWorkspaceMutationRecoverySecondaryAction()
-        XCTAssertTrue(appState.currentDocument === sourceSession)
+        XCTAssertTrue(appState.shownSession === sourceSession)
         let generationBeforeReconciliation = appState.workspaceGeneration
         appState.reconcileCurrentWorkspaceMutationRecovery()
         XCTAssertTrue(appState.workspaceMutationRecoveries.isEmpty)
@@ -3390,7 +3390,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let originalSession = appState.currentDocument
+        let originalSession = appState.shownSession
         let destination = try fixture.location("created.md")
         let expectation = try fixture.expectation("created.md")
         appState.installWorkspaceCreationRecovery(
@@ -3406,9 +3406,9 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         appState.reconcileCurrentWorkspaceMutationRecovery()
 
         XCTAssertFalse(appState.workspaceMutationRecoveries.isEmpty)
-        XCTAssertTrue(appState.currentDocument === originalSession)
+        XCTAssertTrue(appState.shownSession === originalSession)
         XCTAssertEqual(
-            appState.anchoredSessionFileBinding(for: appState.currentDocument)?.identity,
+            appState.anchoredSessionFileBinding(for: appState.shownSession)?.identity,
             try fixture.expectation("post.md").identity
         )
         XCTAssertEqual(
@@ -3429,7 +3429,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let originalSession = appState.currentDocument
+        let originalSession = appState.shownSession
         let destination = try fixture.location("created.md")
         let createdExpectation = try fixture.expectation("created.md")
         let artifact = try fixture.location(".plainsong-create-artifact.tmp")
@@ -3449,16 +3449,16 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         appState.reconcileCurrentWorkspaceMutationRecovery()
 
         XCTAssertFalse(appState.workspaceMutationRecoveries.isEmpty)
-        XCTAssertTrue(appState.currentDocument === originalSession)
+        XCTAssertTrue(appState.shownSession === originalSession)
         XCTAssertTrue(FileManager.default.fileExists(atPath: artifact.fileURL.path))
 
         try FileManager.default.removeItem(at: artifact.fileURL)
         appState.reconcileCurrentWorkspaceMutationRecovery()
 
         XCTAssertFalse(appState.workspaceMutationRecoveries.isEmpty)
-        XCTAssertTrue(appState.currentDocument === originalSession)
+        XCTAssertTrue(appState.shownSession === originalSession)
         XCTAssertEqual(
-            appState.anchoredSessionFileBinding(for: appState.currentDocument)?.identity,
+            appState.anchoredSessionFileBinding(for: appState.shownSession)?.identity,
             try fixture.expectation("post.md").identity
         )
         XCTAssertEqual(
@@ -3529,7 +3529,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let originalSession = appState.currentDocument
+        let originalSession = appState.shownSession
         let destination = try fixture.location("created.md")
         let expectation = try fixture.expectation("created.md")
         appState.detachedSessionURLs.insert(destination.fileURL)
@@ -3546,7 +3546,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         appState.reconcileCurrentWorkspaceMutationRecovery()
 
         XCTAssertFalse(appState.workspaceMutationRecoveries.isEmpty)
-        XCTAssertTrue(appState.currentDocument === originalSession)
+        XCTAssertTrue(appState.shownSession === originalSession)
         XCTAssertEqual(appState.presentedError?.title, "Could Not Reconcile Workspace Item")
     }
 
@@ -3611,7 +3611,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let source = try fixture.location("post.md")
         let destination = try fixture.location("renamed.md")
         let expectation = try fixture.expectation("post.md")
@@ -3737,7 +3737,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let binding = appState.editorDocumentBinding(for: session)
         let installation = EditorDocumentBindingInstallation(
             bindingID: binding.id,
@@ -3851,7 +3851,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let records = try appState.prepareWorkspaceTrashRecords(
             source: fixture.location("post.md"),
             expectation: fixture.expectation("post.md")
@@ -4039,7 +4039,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let source = try fixture.location("post.md")
         let expectation = try fixture.expectation("post.md")
         let sourceParentExpectation = try fixture.parentExpectation("post.md")
@@ -4369,7 +4369,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
 
         appState.restoreWorkspaceMutationTextRecoveryIfNeeded()
 
-        let session = appState.currentDocument
+        let session = appState.shownSession
         XCTAssertEqual(session.text, record.source)
         XCTAssertTrue(session.isDirty)
         XCTAssertTrue(appState.detachedSessionURLs.contains(originalURL))
@@ -4422,7 +4422,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             shouldRestoreLastOpenedFile: false
         )
         appState.restoreWorkspaceMutationTextRecoveryIfNeeded()
-        let session = appState.currentDocument
+        let session = appState.shownSession
 
         try appState.saveDetachedCurrentDocument(to: saveCopyURL)
 
@@ -4497,7 +4497,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             shouldRestoreLastOpenedFile: false
         )
         appState.restoreWorkspaceMutationTextRecoveryIfNeeded()
-        let recoverySession = appState.currentDocument
+        let recoverySession = appState.shownSession
         let otherSession = DocumentSession(
             text: "Other",
             url: otherURL,
@@ -4516,7 +4516,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             .showEditorCopy
         )
         appState.performWorkspaceMutationRecoverySecondaryAction()
-        XCTAssertTrue(appState.currentDocument === recoverySession)
+        XCTAssertTrue(appState.shownSession === recoverySession)
         XCTAssertEqual(appState.missingFilePrompt?.fileURL, originalURL)
     }
 
@@ -4570,10 +4570,10 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
 
         XCTAssertEqual(lastOpenedStore.restoreCallCount, 0)
         XCTAssertNotNil(appState.workspaceMutationRecoveries[operationRecord.id])
-        XCTAssertEqual(appState.currentDocument.text, standaloneText.source)
+        XCTAssertEqual(appState.shownSession.text, standaloneText.source)
         XCTAssertEqual(
             appState.workspaceMutationTextRecoveryContexts[
-                ObjectIdentifier(appState.currentDocument)
+                ObjectIdentifier(appState.shownSession)
             ]?.recoveryID,
             textID
         )
@@ -4612,11 +4612,11 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         XCTAssertEqual(persisted.textRecoveryRecords.count, 1)
         XCTAssertEqual(
             persisted.textRecoveryRecords.first?.source,
-            fixture.appState.currentDocument.text
+            fixture.appState.shownSession.text
         )
         XCTAssertEqual(
             persisted.textRecoveryRecords.first?.revision,
-            fixture.appState.currentDocument.version
+            fixture.appState.shownSession.version
         )
     }
 
@@ -4875,9 +4875,9 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
 
         XCTAssertNil(appState.workspaceMutationRecoveries[record.id])
         XCTAssertNil(operationStore.records[record.id])
-        XCTAssertEqual(appState.currentDocument.fileURL, destination.fileURL)
+        XCTAssertEqual(appState.shownSession.fileURL, destination.fileURL)
         XCTAssertEqual(
-            appState.anchoredSessionFileBinding(for: appState.currentDocument)?.identity,
+            appState.anchoredSessionFileBinding(for: appState.shownSession)?.identity,
             expectation.identity
         )
         XCTAssertFalse(FileManager.default.fileExists(atPath: stagingURL.path))
@@ -4919,7 +4919,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             operationStore.records[record.id],
             "release must repair the committed journal after delete-before-throw"
         )
-        XCTAssertEqual(fixture.appState.currentDocument.fileURL, fixture.url("created.md"))
+        XCTAssertEqual(fixture.appState.shownSession.fileURL, fixture.url("created.md"))
         operationStore.removeRecordBeforeThrow = false
         operationStore.removeError = nil
 
@@ -4935,8 +4935,8 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
 
         XCTAssertNil(restarted.workspaceMutationRecoveries[record.id])
         XCTAssertNil(operationStore.records[record.id])
-        XCTAssertEqual(restarted.currentDocument.fileURL, fixture.url("created.md"))
-        XCTAssertNotNil(restarted.anchoredSessionFileBinding(for: restarted.currentDocument))
+        XCTAssertEqual(restarted.shownSession.fileURL, fixture.url("created.md"))
+        XCTAssertNotNil(restarted.anchoredSessionFileBinding(for: restarted.shownSession))
     }
 
     func testPreparedCreationParentEscapeAfterPublishKeepsItemAuthorityFenced()
@@ -5167,9 +5167,9 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         }
         XCTAssertEqual(recovery.publicationState, .committed)
         XCTAssertNotNil(operationStore.records[record.id])
-        XCTAssertNil(appState.currentDocument.fileURL)
+        XCTAssertNil(appState.shownSession.fileURL)
         XCTAssertTrue(appState.registry.sessionCache.isEmpty)
-        XCTAssertNil(appState.anchoredSessionFileBinding(for: appState.currentDocument))
+        XCTAssertNil(appState.anchoredSessionFileBinding(for: appState.shownSession))
         XCTAssertTrue(appState.editorImageAssetDocumentAuthorities.isEmpty)
         XCTAssertEqual(
             try WorkspaceNoFollowItemInspector.inspectExact(
@@ -5381,8 +5381,8 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         secondLaunch.restoreLastOpenedFileIfNeeded()
 
-        XCTAssertEqual(secondLaunch.currentDocument.text, bundledText.source)
-        XCTAssertTrue(secondLaunch.currentDocument.isDirty)
+        XCTAssertEqual(secondLaunch.shownSession.text, bundledText.source)
+        XCTAssertTrue(secondLaunch.shownSession.isDirty)
     }
 
     func testRestoredLogicalRevisionAdvancesPastBundledRevision() throws {
@@ -5412,9 +5412,9 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             shouldRestoreLastOpenedFile: false
         )
         firstLaunch.restoreLastOpenedFileIfNeeded()
-        firstLaunch.applyDocumentText("Edited after restart", to: firstLaunch.currentDocument)
+        firstLaunch.applyDocumentText("Edited after restart", to: firstLaunch.shownSession)
         try firstLaunch.persistWorkspaceMutationTextRecovery(
-            for: firstLaunch.currentDocument
+            for: firstLaunch.shownSession
         )
 
         XCTAssertEqual(textStore.records[bundledText.id]?.revision, 10)
@@ -5426,7 +5426,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         secondLaunch.restoreLastOpenedFileIfNeeded()
 
-        XCTAssertEqual(secondLaunch.currentDocument.text, "Edited after restart")
+        XCTAssertEqual(secondLaunch.shownSession.text, "Edited after restart")
     }
 
     func testAuditAMultiSessionStandaloneFailureFallsBackWithoutDroppingSibling() async throws {
@@ -5439,7 +5439,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let sessionA = appState.currentDocument
+        let sessionA = appState.shownSession
         let sessionB = try fixture.installSession(path: "b.md", storage: .cached)
         appState.installWorkspaceMutationTextRecovery(
             for: sessionA,
@@ -6023,7 +6023,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let source = appState.currentDocument
+        let source = appState.shownSession
         let sourceURL = fixture.url("source.md")
         let owner = try fixture.installSession(
             path: "archive/post.md",
@@ -6225,7 +6225,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let sourceURL = fixture.url("post.md")
         let saveCopyURL = fixture.url("copy.md")
 
@@ -6263,7 +6263,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         )
         defer { cleanUp(fixture) }
         let appState = fixture.appState
-        let originalSession = appState.currentDocument
+        let originalSession = appState.shownSession
         let source = try fixture.location("post.md")
         let destination = fixture.url("renamed.md")
 
@@ -6274,9 +6274,9 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
                 preserveWorkspace: true
             )
         )
-        XCTAssertTrue(appState.currentDocument === originalSession)
+        XCTAssertTrue(appState.shownSession === originalSession)
         XCTAssertThrowsError(try appState.closeWorkspaceForReplacement())
-        XCTAssertTrue(appState.currentDocument === originalSession)
+        XCTAssertTrue(appState.shownSession === originalSession)
 
         XCTAssertThrowsError(
             try appState.renameWorkspaceItem(
@@ -6292,7 +6292,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
 
         appState.missingFilePrompt = .init(fileURL: source.fileURL)
         appState.closeMissingFile()
-        XCTAssertTrue(appState.currentDocument === originalSession)
+        XCTAssertTrue(appState.shownSession === originalSession)
     }
 
     func testRecoveryLoadFailureBannerSurvivesDismissAndFailedStopTracking() {
@@ -6367,11 +6367,11 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         textStore.upsertError = TestWorkspaceMutationRecoveryStoreError.failed
         appState.applyDocumentText(
             "New input after quarantine",
-            to: appState.currentDocument
+            to: appState.shownSession
         )
         XCTAssertThrowsError(
             try appState.persistWorkspaceMutationTextRecovery(
-                for: appState.currentDocument
+                for: appState.shownSession
             )
         )
         let updatedOperation = try XCTUnwrap(
@@ -6404,16 +6404,16 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
             shouldRestoreLastOpenedFile: false
         )
         appState.restoreLastOpenedFileIfNeeded()
-        XCTAssertEqual(appState.currentDocument.text, textRecord.source)
+        XCTAssertEqual(appState.shownSession.text, textRecord.source)
 
         appState.stopTrackingWorkspaceMutationRecoveryLoadFailure()
 
         XCTAssertFalse(appState.hasWorkspaceMutationRecoveryLoadFailure)
         XCTAssertEqual(operationStore.quarantineCallCount, 1)
-        XCTAssertEqual(appState.currentDocument.text, textRecord.source)
+        XCTAssertEqual(appState.shownSession.text, textRecord.source)
         XCTAssertNotNil(
             appState.workspaceMutationTextRecoveryContexts[
-                ObjectIdentifier(appState.currentDocument)
+                ObjectIdentifier(appState.shownSession)
             ]
         )
     }
@@ -6918,7 +6918,7 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         let fileOperations = trackedRecycler.map(WorkspaceFileOperations.init(recycler:))
             ?? WorkspaceFileOperations()
         let appState = AppState(
-            currentDocument: current,
+            shownSession: current,
             directoryScanner: MutationImmediateDirectoryScanner(snapshot: snapshot),
             fileOperations: fileOperations,
             workspaceMutationOperationRecoveryStore: operationRecoveryStore,

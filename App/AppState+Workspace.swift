@@ -254,6 +254,7 @@ extension AppState {
     }
 
     func open(url: URL, rememberAsLastOpened: Bool, preserveWorkspace: Bool) throws {
+        try refuseWindowFileOpenIfNeeded()
         try validateWorkspaceMutationRecoveryStoresLoaded(at: url)
         let isDirectory = try SecurityScopedAccess.withAccess(to: url) {
             try Self.isDirectory(url)
@@ -281,6 +282,7 @@ extension AppState {
 
     func openWorkspaceFile(_ url: URL) {
         do {
+            try refuseWindowFileOpenIfNeeded()
             try validateWorkspaceMutationRecoveryStoresLoaded(at: url)
             if workspaceRootURL != nil {
                 guard let rootAuthority = workspaceSearchRootAuthority,
@@ -311,7 +313,7 @@ extension AppState {
     #endif
 
     func saveCurrentDocument() throws {
-        try save(session: currentDocument)
+        try save(session: shownSession)
     }
 }
 
@@ -333,6 +335,7 @@ private struct ManagedSessionWriteContext {
 
 extension AppState {
     func openWorkspace(url: URL, rememberAsLastOpened: Bool) throws {
+        try refuseWindowFileOpenIfNeeded()
         // Keep the chosen root's literal spelling until descriptor capture proves its canonical
         // physical location. Standardizing here loses precomposed Unicode before WS3B's
         // authority layer can retain it.
@@ -418,7 +421,7 @@ extension AppState {
             else {
                 throw AppStateError.invalidSessionIdentity(key)
             }
-            if cachedSession === currentDocument {
+            if cachedSession === shownSession {
                 synchronizeWorkspaceTreeSelection(for: cachedSession)
                 handleSessionAccess(url: key, isDirty: cachedSession.isDirty)
                 return
@@ -485,15 +488,15 @@ extension AppState {
         synchronizingWorkspaceTree: Bool = true,
         requestingEditorFocus: Bool = WorkspaceSelectionFocus.requestsEditorFocus
     ) {
-        guard currentDocument !== session else { return }
-        let previousSession = currentDocument
+        guard shownSession !== session else { return }
+        let previousSession = shownSession
         moveCurrentDocumentWorkToBackgroundBeforeSwitch()
         if requestingEditorFocus { requestEditorFocus() }
         if synchronizingWorkspaceTree {
             synchronizeWorkspaceTreeSelection(for: session)
         }
         cancelPendingEditorNavigationIfNeeded()
-        currentDocument = session
+        shownSession = session
         releaseUnreferencedSessionOwnership(for: previousSession)
         clearPromptsNotMatchingCurrentDocument()
         restoreRecoveryPrompt(for: session)
@@ -512,6 +515,13 @@ extension AppState {
             protectedURLs: protectedSessionURLs()
         )
         handleSessionEvictions(evictions)
+    }
+
+    /// `isSaving` is unpublished. A menu refresh during the write would see Save
+    /// disabled, so the flag is cleared and the menu re-reads only after it returns.
+    private func endSynchronousSave() {
+        isSaving = false
+        registry.noteMenuEnablementDidChange()
     }
 
     func save(session: DocumentSession) throws {
@@ -556,7 +566,7 @@ extension AppState {
 
         cancelAutosave(for: session)
         isSaving = true
-        defer { isSaving = false }
+        defer { endSynchronousSave() }
 
         let text = session.text
         // One digest for the binding, the indeterminate-write context and the disk-hash record.
@@ -736,12 +746,14 @@ extension AppState {
         )
         guard !fileWriteArtifactNotices.contains(notice) else { return }
         fileWriteArtifactNotices.append(notice)
+        KeyWindowRouter.shared.routeNotice(notice.id, owner: self)
     }
 
     /// Acknowledges one retained cleanup artifact without mutating the artifact itself. Removing
     /// the notice also releases the notice's exact filesystem authority when no other owner needs it.
     func acknowledgeFileWriteArtifactNotice(id: FileWriteArtifactNotice.ID) {
         fileWriteArtifactNotices.removeAll { $0.id == id }
+        KeyWindowRouter.shared.forgetNotice(id)
     }
 
     func cancelForegroundDocumentTasks() {
@@ -752,7 +764,7 @@ extension AppState {
     }
 
     func moveCurrentDocumentWorkToBackgroundBeforeSwitch() {
-        let previousSession = currentDocument
+        let previousSession = shownSession
         moveCurrentAutosaveToBackground(for: previousSession)
         moveCurrentStatisticsToBackground(for: previousSession)
     }
@@ -762,7 +774,7 @@ extension AppState {
         canonicalURL: URL
     ) {
         _ = advanceSessionLifecycle(for: session)
-        if session !== currentDocument {
+        if session !== shownSession {
             moveCurrentDocumentWorkToBackgroundBeforeSwitch()
             registry.setWarmSession(session, at: canonicalURL)
             setCurrentDocument(session)

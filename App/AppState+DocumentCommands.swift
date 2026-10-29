@@ -7,6 +7,8 @@ import WorkspaceKit
 /// File › Open…, Save, launch restoration, and error presentation.
 extension AppState {
     func restoreLastOpenedFileIfNeeded() {
+        // A refused extra scene must not consume the one app-global restore attempt.
+        guard WindowOpenAdmission.admits(windowState) else { return }
         guard !didAttemptRestore else { return }
         didAttemptRestore = true
 
@@ -24,7 +26,7 @@ extension AppState {
         else {
             return
         }
-        guard shouldRestoreLastOpenedFile, currentDocument.fileURL == nil else {
+        guard shouldRestoreLastOpenedFile, shownSession.fileURL == nil else {
             return
         }
         do {
@@ -38,6 +40,7 @@ extension AppState {
 
     func openFile() {
         do {
+            try refuseWindowFileOpenIfNeeded()
             try validateWorkspaceMutationRecoveryStoresLoaded()
         } catch {
             present(error, title: "Could Not Open File")
@@ -60,6 +63,11 @@ extension AppState {
     }
 
     func openExternalFile(_ url: URL) {
+        let target = KeyWindowRouter.shared.facadeForExternalOpen(fallback: self)
+        guard target === self else {
+            target.openExternalFile(url)
+            return
+        }
         do {
             try open(url: url, rememberAsLastOpened: true, preserveWorkspace: false)
         } catch {
@@ -84,6 +92,67 @@ extension AppState {
             title: title,
             message: userVisibleDescription(for: error)
         )
+    }
+
+    /// Session failures land on the window showing `session`. An unseen warm session uses
+    /// the home window (`docs/window-state-gates.md` §3.2, W3 bullets 5–6).
+    ///
+    /// Only a refusal the user caused (Quit) passes `activatesWindow`. A background failure,
+    /// such as autosave, leaves the key window alone: making another window key would send
+    /// the user's next keystroke into a different document.
+    func present(
+        _ error: Error,
+        title: String,
+        for session: DocumentSession,
+        activatesWindow: Bool = false
+    ) {
+        let visible = UserVisibleError(
+            title: title,
+            message: userVisibleDescription(for: error)
+        )
+        let matching = registry.connectedWindows.filter { $0.shownSession === session }
+        if let shown = matching.first(where: { KeyWindowRouter.shared.hasAttachedWindow($0) }) {
+            shown.presentedError = visible
+            if activatesWindow {
+                KeyWindowRouter.shared.focus(shown)
+            }
+            return
+        }
+        if activatesWindow, WorkspaceSceneReopener.shared.reopenShowing(visible) {
+            return
+        }
+        let window = matching.first ?? (KeyWindowRouter.shared.home(for: registry) ?? self).windowState
+        window.presentedError = visible
+        if activatesWindow {
+            KeyWindowRouter.shared.focus(window)
+        }
+    }
+
+    /// Termination refusals with no session. A visible home window comes forward. With no
+    /// window, the workspace scene opens again and then shows the error.
+    func presentOnHome(_ error: Error, title: String) {
+        let visible = UserVisibleError(
+            title: title,
+            message: userVisibleDescription(for: error)
+        )
+        if let home = KeyWindowRouter.shared.home(for: registry),
+           KeyWindowRouter.shared.hasAttachedWindow(home)
+        {
+            home.presentedError = visible
+            KeyWindowRouter.shared.focus(home.windowState)
+            return
+        }
+        if WorkspaceSceneReopener.shared.reopenShowing(visible) {
+            return
+        }
+        present(error, title: title)
+        KeyWindowRouter.shared.focus(windowState)
+    }
+
+    func refuseWindowFileOpenIfNeeded() throws {
+        guard WindowOpenAdmission.admits(windowState) else {
+            throw AppStateError.windowFileOpenRefused
+        }
     }
 
     private func userVisibleDescription(for error: Error) -> String {
@@ -118,20 +187,20 @@ extension AppState {
 /// Document facts the menus, toolbar, and preview read.
 extension AppState {
     var hasOpenDocument: Bool {
-        currentDocument.fileURL != nil
+        shownSession.fileURL != nil
     }
 
     var canSave: Bool {
-        guard let url = sessionStateURL(for: currentDocument) else {
+        guard let url = sessionStateURL(for: shownSession) else {
             return false
         }
         return !hasWorkspaceMutationRecoveryLoadFailure &&
             !isSaving &&
-            !hasPendingEditorSource(for: currentDocument) &&
-            externalReloadTasks[ObjectIdentifier(currentDocument)] == nil &&
-            indeterminateSessionWrites[ObjectIdentifier(currentDocument)] == nil &&
-            !workspaceMutationWriteFences.contains(ObjectIdentifier(currentDocument)) &&
-            !indeterminateWorkspaceMutationSessions.contains(ObjectIdentifier(currentDocument)) &&
+            !hasPendingEditorSource(for: shownSession) &&
+            externalReloadTasks[ObjectIdentifier(shownSession)] == nil &&
+            indeterminateSessionWrites[ObjectIdentifier(shownSession)] == nil &&
+            !workspaceMutationWriteFences.contains(ObjectIdentifier(shownSession)) &&
+            !indeterminateWorkspaceMutationSessions.contains(ObjectIdentifier(shownSession)) &&
             !detachedSessionURLs.contains(url) &&
             pendingExternalTexts[url] == nil &&
             pendingExternalFileVersions[url] == nil &&
@@ -139,7 +208,7 @@ extension AppState {
     }
 
     var windowTitle: String {
-        workspaceRootURL?.lastPathComponent ?? currentDocument.fileURL?.lastPathComponent ?? "Plainsong"
+        workspaceRootURL?.lastPathComponent ?? shownSession.fileURL?.lastPathComponent ?? "Plainsong"
     }
 
     var previewAssetRootURL: URL? {

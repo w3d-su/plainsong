@@ -22,7 +22,7 @@ struct WorkspaceInspector: View {
 
     var body: some View {
         DocumentInspectorForm(
-            session: appState.currentDocument,
+            session: appState.shownSession,
             rootURL: appState.workspaceRootURL
         ) { newText, session in
             appState.replaceDocumentText(newText, in: session)

@@ -6,11 +6,11 @@ import WorkspaceKit
 @MainActor
 extension AppState {
     func replaceDocumentText(_ newText: String) {
-        replaceDocumentText(newText, in: currentDocument)
+        replaceDocumentText(newText, in: shownSession)
     }
 
     func replaceDocumentText(_ newText: String, in session: DocumentSession) {
-        guard session === currentDocument,
+        guard session === shownSession,
               !isExternalSourceMutationFenced(for: session),
               !ExactSourceText.matches(newText, session.text)
         else {
@@ -21,7 +21,7 @@ extension AppState {
     }
 
     func cancelStatisticsRefresh(for session: DocumentSession) {
-        if session === currentDocument {
+        if session === shownSession {
             statisticsTask?.cancel()
             statisticsTask = nil
         }
@@ -57,7 +57,7 @@ extension AppState {
         }
         scheduleWorkspaceMutationTextRecovery(for: session)
         scheduleStatisticsRefresh(for: session)
-        if session === currentDocument {
+        if session === shownSession {
             scheduleCompletionWorkspaceRefresh(debounceNanoseconds: 250_000_000)
             scheduleAutosave()
         } else {
@@ -67,16 +67,16 @@ extension AppState {
             cancelPendingEditorNavigationIfNeeded(targeting: session)
             restartActiveWorkspaceSearchAfterRelevantEdit(in: session)
         }
-        if session === currentDocument {
+        if session === shownSession {
             notifyEditorFindDocumentDidChange()
         }
     }
 
     func setTaskCheckbox(line: Int, checked: Bool, version: Int, in session: DocumentSession) {
-        guard session === currentDocument, version == session.version else { return }
-        guard let lineRange = currentDocument.text.rangeOfOneBasedLine(line) else { return }
+        guard session === shownSession, version == session.version else { return }
+        guard let lineRange = shownSession.text.rangeOfOneBasedLine(line) else { return }
 
-        let lineText = String(currentDocument.text[lineRange])
+        let lineText = String(shownSession.text[lineRange])
         guard let checkboxRange = Self.taskCheckboxStateRange(in: lineText) else { return }
 
         let desiredState = checked ? "x" : " "
@@ -85,14 +85,14 @@ extension AppState {
         var updatedLine = lineText
         updatedLine.replaceSubrange(checkboxRange, with: desiredState)
 
-        var updatedText = currentDocument.text
+        var updatedText = shownSession.text
         updatedText.replaceSubrange(lineRange, with: updatedLine)
         replaceDocumentText(updatedText)
     }
 
     func openPreviewLink(_ href: String) {
         guard !href.hasPrefix("#"),
-              let baseURL = currentDocument.fileURL?.deletingLastPathComponent()
+              let baseURL = shownSession.fileURL?.deletingLastPathComponent()
         else {
             return
         }
@@ -111,7 +111,7 @@ extension AppState {
     }
 
     var activeEditorDocumentIdentity: EditorDocumentIdentity? {
-        editorDocumentIdentity(for: currentDocument)
+        editorDocumentIdentity(for: shownSession)
     }
 
     func editorDocumentIdentity(for session: DocumentSession) -> EditorDocumentIdentity? {
@@ -350,7 +350,7 @@ extension AppState {
             _ = advanceSessionLifecycle(for: session)
         }
 
-        if session !== currentDocument {
+        if session !== shownSession {
             moveCurrentDocumentWorkToBackgroundForSearchActivation()
         }
         registry.setWarmSession(session, at: canonicalURL)
@@ -381,7 +381,7 @@ extension AppState {
             break
         }
 
-        if session !== currentDocument {
+        if session !== shownSession {
             setCurrentDocument(session, synchronizingWorkspaceTree: false)
         }
         handleSessionAccess(url: canonicalURL, isDirty: session.isDirty)
@@ -404,7 +404,7 @@ extension AppState {
     }
 
     private func moveCurrentDocumentWorkToBackgroundForSearchActivation() {
-        let previousSession = currentDocument
+        let previousSession = shownSession
         moveCurrentAutosaveToBackground(for: previousSession)
         moveCurrentStatisticsToBackground(for: previousSession)
     }
@@ -587,7 +587,7 @@ extension AppState {
     }
 
     func moveCurrentStatisticsToBackground(for session: DocumentSession) {
-        guard session === currentDocument else { return }
+        guard session === shownSession else { return }
         let shouldReschedule = statisticsTask != nil
         statisticsTask?.cancel()
         statisticsTask = nil
@@ -597,7 +597,7 @@ extension AppState {
 
     private func scheduleStatisticsRefresh(for session: DocumentSession) {
         let sessionIdentity = ObjectIdentifier(session)
-        if session === currentDocument {
+        if session === shownSession {
             sessionStatisticsTasks[sessionIdentity]?.task.cancel()
             sessionStatisticsTasks[sessionIdentity] = nil
             statisticsTask?.cancel()

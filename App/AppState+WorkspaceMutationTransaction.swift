@@ -311,7 +311,7 @@ extension AppState {
             commitWorkspaceSessionRelocation(record, preparedCommit: preparedCommit)
         }
         clearPromptsNotMatchingCurrentDocument()
-        restoreRecoveryPrompt(for: currentDocument)
+        restoreRecoveryPrompt(for: shownSession)
     }
 
     func removeWorkspaceRelocationSourceState(
@@ -358,7 +358,7 @@ extension AppState {
             RetainedEditorImageAssetDocumentAuthority.init
         )
         session.relocate(to: record.newURL)
-        if session === currentDocument {
+        if session === shownSession {
             notifyEditorFindDocumentIdentityDidRekey()
         }
         relocateWorkspaceMutationTextRecovery(for: session, to: record.newURL)
@@ -469,7 +469,7 @@ extension AppState {
                 scheduleAutosave(for: session)
             }
         }
-        restoreRecoveryPrompt(for: currentDocument)
+        restoreRecoveryPrompt(for: shownSession)
     }
 
     func finishWorkspaceTrash(_ records: [WorkspaceTrashSessionRecord]) {
@@ -494,13 +494,13 @@ extension AppState {
             }
 
             _ = clearWorkspaceMutationTextRecovery(for: session)
-            removedCurrentSession = removedCurrentSession || session === currentDocument
+            removedCurrentSession = removedCurrentSession || session === shownSession
             discardRetiredEditorDocumentSession(session, canonicalURL: record.oldURL)
             clearSessionState(for: session, fallbackURL: record.oldURL)
         }
 
         if let currentDetached = detachedRecords.first(where: {
-            $0.session === currentDocument
+            $0.session === shownSession
         }) {
             markSessionDetachedFromMissingFile(
                 currentDetached.session,
@@ -549,7 +549,7 @@ extension AppState {
             }
             finishRetiredEditorDocumentSessionIfPossible(for: session)
         }
-        restoreRecoveryPrompt(for: currentDocument)
+        restoreRecoveryPrompt(for: shownSession)
     }
 
     func recordWorkspaceTrashCleanupState(
@@ -559,13 +559,14 @@ extension AppState {
         if !workspaceTrashCleanupNotices.contains(where: {
             $0.stagingLocation == location
         }) {
-            workspaceTrashCleanupNotices.append(
-                WorkspaceTrashCleanupNotice(stagingLocation: location)
-            )
+            let notice = WorkspaceTrashCleanupNotice(stagingLocation: location)
+            workspaceTrashCleanupNotices.append(notice)
+            KeyWindowRouter.shared.routeNotice(notice.id, owner: self)
         }
         present(
             WorkspaceMutationError.trashStagingCleanupRequired(location.fileURL),
-            title: "Trash Cleanup Needs Attention"
+            title: "Trash Cleanup Needs Attention",
+            for: shownSession
         )
     }
 }

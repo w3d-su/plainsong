@@ -81,7 +81,7 @@ final class ExportHTMLPerformanceTests: XCTestCase {
             let request = ExportArtifactWriteRequest(destinationURL: root.appendingPathComponent("cap-\(index).html"),
                                                      kind: .html, disposition: .createNew, bytes: bytes)
             let start = DispatchTime.now().uptimeNanoseconds
-            let outcome = app.writeExportArtifact(request, exportSource: app.currentDocument)
+            let outcome = app.writeExportArtifact(request, exportSource: app.shownSession)
             let elapsed = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
             guard case .committed = outcome else { return XCTFail("Writer probe must commit: \(outcome)") }
             samples.append(elapsed)
@@ -102,7 +102,7 @@ final class ExportHTMLPerformanceTests: XCTestCase {
         let location = try authority.location(relativePath: document.lastPathComponent)
         let read = try MarkdownFileStore().loadResult(at: location)
         let session = DocumentSession(text: source, url: document)
-        let app = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let app = AppState(shownSession: session, shouldRestoreLastOpenedFile: false)
         app.workspaceRootURL = authority.canonicalRootURL
         app.anchoredSessionFileBindings[ObjectIdentifier(session)] = AnchoredWorkspaceSessionFileBinding(
             location: location, identity: read.metadata.identity, sha256Digest: read.sha256Digest

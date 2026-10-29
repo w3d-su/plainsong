@@ -39,7 +39,7 @@ extension ExportHTMLCommandAppTests {
                 let fixture = try makeFixture()
                 let destination = fixture.exportsDirectory.appendingPathComponent("stale.html")
                 let change = {
-                    fixture.appState.currentDocument = DocumentSession(
+                    fixture.appState.shownSession = DocumentSession(
                         text: close ? "" : "# Another document", fileKind: .markdown
                     )
                 }

@@ -21,7 +21,7 @@ extension EditorFindHostedGateTests {
             attempted: "**NEW** ![image](fixture.png) NEW **untouched**"
         )
         defer { passes.stop() }
-        let identity = ObjectIdentifier(app.currentDocument)
+        let identity = ObjectIdentifier(app.shownSession)
         let initialWriter = app.editorWriterInstallations[identity]
         let observation = BatchRejectedPublicationObservation()
         let observer = NotificationCenter.default.addObserver(

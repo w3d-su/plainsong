@@ -20,7 +20,7 @@ extension EditorFindHostedGateTests {
         let fixture = try makeWorkspaceFixture(files: ["post.md": "# Layout\n"])
         let state = fixture.appState
         state.openExternalFile(fixture.root)
-        try await waitUntil("chrome fixture opens") { state.currentDocument.fileURL != nil }
+        try await waitUntil("chrome fixture opens") { state.shownSession.fileURL != nil }
         state.setLayoutMode(.sourcePreview)
         let setting = NativeInspectorIntent(true)
         let host = makeNativeLayoutHost(appState: state, shell: .split, setting: setting)
@@ -49,7 +49,7 @@ extension EditorFindHostedGateTests {
         let fixture = try makeWorkspaceFixture(files: ["post.md": "# Layout\n"])
         let state = fixture.appState
         state.openExternalFile(fixture.root)
-        try await waitUntil("clamp fixture opens") { state.currentDocument.fileURL != nil }
+        try await waitUntil("clamp fixture opens") { state.shownSession.fileURL != nil }
         state.setLayoutMode(.sourceOnly)
         let setting = NativeInspectorIntent(true)
         let host = makeNativeLayoutHost(appState: state, shell: .fixed, setting: setting)
@@ -111,12 +111,12 @@ extension EditorFindHostedGateTests {
         let fixture = try makeWorkspaceFixture(files: ["post.md": "# Layout\n"])
         let state = fixture.appState
         state.openExternalFile(fixture.root)
-        try await waitUntil("file name fixture opens") { state.currentDocument.fileURL != nil }
+        try await waitUntil("file name fixture opens") { state.shownSession.fileURL != nil }
         let host = makeNativeLayoutHost(appState: state, shell: .fixed, setting: NativeInspectorIntent(false))
         registerTeardown(host: host, fixture: fixture)
-        state.currentDocument.replaceText(state.currentDocument.text + "\nedited\n", refreshStatistics: false)
+        state.shownSession.replaceText(state.shownSession.text + "\nedited\n", refreshStatistics: false)
         try await waitUntil("window exposes the edited state") {
-            state.currentDocument.isDirty && host.window.isDocumentEdited
+            state.shownSession.isDirty && host.window.isDocumentEdited
         }
         let element = try XCTUnwrap(
             AccessibilityQuery.find(identifier: "plainsong.editor.fileName", label: nil, in: host.window),
@@ -135,7 +135,7 @@ extension EditorFindHostedGateTests {
                 let state = fixture.appState
                 state.preferences.setExperimentalWYSIWYGEnabled(true)
                 state.openExternalFile(fixture.root)
-                try await waitUntil("layout fixture opens") { state.currentDocument.fileURL != nil }
+                try await waitUntil("layout fixture opens") { state.shownSession.fileURL != nil }
                 state.setLayoutMode(layout)
                 let setting = NativeInspectorIntent(intent)
                 let host = makeNativeLayoutHost(appState: state, shell: shell, setting: setting)

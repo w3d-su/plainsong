@@ -125,7 +125,7 @@ extension AppState {
 
         switch activation.source {
         case .cached:
-            if session !== currentDocument {
+            if session !== shownSession {
                 cancelForegroundDocumentTasks()
                 setCurrentDocument(session, synchronizingWorkspaceTree: false)
             }
@@ -298,8 +298,8 @@ extension AppState {
     private func moveCurrentDocumentWorkToBackgroundForAnchoredActivation(
         _ destinationSession: DocumentSession
     ) {
-        guard currentDocument !== destinationSession else { return }
-        let previousSession = currentDocument
+        guard shownSession !== destinationSession else { return }
+        let previousSession = shownSession
         moveCurrentAutosaveToBackground(for: previousSession)
         moveCurrentStatisticsToBackground(for: previousSession)
     }

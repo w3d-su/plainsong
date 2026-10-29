@@ -113,7 +113,7 @@ final class EditorFindHost {
         // An authority advance supersedes every plan; a preparing one stops at once instead
         // of draining to a refusal behind a still-visible progress label. One trace entry
         // per advance, with the advancing call site attributed.
-        replaceAuthority.onAdvance = { [weak self, weak replaceBatch] fileID, line in
+        replaceAuthority.observeAdvances(from: self) { [weak self, weak replaceBatch] fileID, line in
             self?.traceReplaceBarAction(
                 "authorityAdvance gen=\(self?.replaceAuthority.generation ?? 0) "
                     + "supersededPreparing=\(replaceBatch?.isPreparing ?? false)",

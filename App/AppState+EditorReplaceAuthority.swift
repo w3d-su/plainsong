@@ -26,15 +26,27 @@ final class EditorReplaceAuthorityState {
     /// Test seam: runs inside EditorKit's commit-time authorization call, before App
     /// evaluates it, so a test can make a fence appear between validation and commit.
     var willCheckCommitForTesting: (() -> Void)?
-    /// Runs after every advance, with the advancing call site attributed. `EditorFindHost`
-    /// uses it to stop a preparing Replace All at once, so its progress and Cancel never
-    /// outlive the authority that started it.
+    /// Runs after every advance, with the advancing call site attributed. Prefer
+    /// `observeAdvances` when more than one `EditorFindHost` shares this authority: each
+    /// observer runs once per advance, and the generation still moves by one.
     var onAdvance: ((_ fileID: StaticString, _ line: UInt) -> Void)?
+    private var advanceObservers: [ObjectIdentifier: (StaticString, UInt) -> Void] = [:]
     private var keyWindowObservation: EditorReplaceKeyWindowObservation?
+
+    func observeAdvances(
+        from owner: AnyObject,
+        body: @escaping (StaticString, UInt) -> Void
+    ) {
+        advanceObservers[ObjectIdentifier(owner)] = body
+    }
 
     func advance(fileID: StaticString = #fileID, line: UInt = #line) {
         precondition(generation < .max, "Replace authority generation exhausted")
         generation += 1
+        let observers = Array(advanceObservers.values)
+        for observer in observers {
+            observer(fileID, line)
+        }
         onAdvance?(fileID, line)
     }
 
@@ -151,7 +163,7 @@ extension AppState {
         line: UInt = #line
     ) {
         advanceEditorReplaceAuthorityGeneration(fileID: fileID, line: line)
-        guard session === currentDocument else { return }
+        guard session === shownSession else { return }
         // A "choose Reload or Keep Mine" refusal no longer describes the document.
         clearEditorReplaceStatus(fileID: fileID, line: line)
         refreshEditorFindCounterFromAppSource()
@@ -162,16 +174,16 @@ extension AppState {
     @discardableResult
     func refreshEditorFindCounterFromAppSource() -> Bool {
         let controller = editorFindHost.controller
-        let revision = UInt64(max(0, currentDocument.version))
+        let revision = UInt64(max(0, shownSession.version))
         guard controller.query != nil,
               controller.documentBinding.identity == activeEditorDocumentIdentity,
               controller.documentBinding.revision != revision
-              || !ExactSourceText.matches(controller.documentBinding.text, currentDocument.text)
+              || !ExactSourceText.matches(controller.documentBinding.text, shownSession.text)
         else {
             return false
         }
         ensureEditorFindSessionObserverInstalled()
-        controller.documentTextDidChange(text: currentDocument.text, revision: revision)
+        controller.documentTextDidChange(text: shownSession.text, revision: revision)
         return true
     }
 }

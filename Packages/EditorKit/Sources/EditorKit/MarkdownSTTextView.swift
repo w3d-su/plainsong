@@ -100,7 +100,7 @@ final class MarkdownSTTextView: STTextView {
             super.cancelOperation(sender)
             return
         }
-        if EditorFindActionHooks.cancelFind?() == true {
+        if EditorFindActionHooks.cancelFind?(window) == true {
             return
         }
         super.cancelOperation(sender)
