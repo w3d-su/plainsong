@@ -313,7 +313,8 @@ extension AppState {
                         ?? URL(fileURLWithPath: "/")
                 ),
                 title: "Could Not Quit",
-                for: pending
+                for: pending,
+                activatesWindow: true
             )
             return false
         }
@@ -373,49 +374,51 @@ extension AppState {
                           context: context
                       )
                 else {
-                    present(
-                        AppStateError.unsavedChangesPreventTermination(
-                            sessionStateURL(for: session)
-                                ?? session.fileURL
-                                ?? URL(fileURLWithPath: "/")
-                        ),
-                        title: "Could Not Quit",
-                        for: session
-                    )
+                    presentUnsavedChangesPreventTermination(for: session)
                     return false
                 }
             } else if workspaceMutationTextRecoveryContexts[sessionIdentity] != nil,
                       !clearWorkspaceMutationTextRecovery(for: session)
             {
-                present(
-                    AppStateError.unsavedChangesPreventTermination(
-                        sessionStateURL(for: session)
-                            ?? session.fileURL
-                            ?? URL(fileURLWithPath: "/")
-                    ),
-                    title: "Could Not Quit",
-                    for: session
-                )
+                presentUnsavedChangesPreventTermination(for: session)
                 return false
             }
         }
         return true
     }
 
+    private func presentUnsavedChangesPreventTermination(for session: DocumentSession) {
+        present(
+            AppStateError.unsavedChangesPreventTermination(
+                sessionStateURL(for: session) ?? session.fileURL ?? URL(fileURLWithPath: "/")
+            ),
+            title: "Could Not Quit",
+            for: session,
+            activatesWindow: true
+        )
+    }
+
+    /// Image insertion counts live in each window's root context, so every window of the
+    /// registry is checked, not just the one the app delegate asked.
     private func imageAssetInsertionAllowsTermination() -> Bool {
-        guard workspaceImageAssetInsertionCount == 0 else {
-            present(
-                AppStateError.workspaceMutationInProgress(
-                    workspaceRootURL
-                        ?? sessionStateURL(for: shownSession)
-                        ?? shownSession.fileURL
-                        ?? URL(fileURLWithPath: "/")
-                ),
-                title: "Could Not Quit"
-            )
-            return false
+        var facades = KeyWindowRouter.shared.facades(in: registry)
+        if !facades.contains(where: { $0 === self }) {
+            facades.insert(self, at: 0)
         }
-        return true
+        guard let busy = facades.first(where: { $0.workspaceImageAssetInsertionCount > 0 }) else {
+            return true
+        }
+        busy.present(
+            AppStateError.workspaceMutationInProgress(
+                busy.workspaceRootURL
+                    ?? busy.sessionStateURL(for: busy.shownSession)
+                    ?? busy.shownSession.fileURL
+                    ?? URL(fileURLWithPath: "/")
+            ),
+            title: "Could Not Quit"
+        )
+        KeyWindowRouter.shared.focus(busy.windowState)
+        return false
     }
 }
 

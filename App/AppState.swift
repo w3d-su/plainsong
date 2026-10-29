@@ -35,7 +35,8 @@ final class AppState: ObservableObject {
     /// property still publishes `AppState.objectWillChange` once, before the change.
     private var containerChangeCancellables: [AnyCancellable] = []
 
-    /// Like the next three, this `private(set)` property forwards here so its setter stays file-private.
+    /// Like the next three, this `private(set)` property forwards here. Writes go through the
+    /// internal `store…` methods below, not through the property itself.
     private(set) var layoutMode: EditorLayoutMode {
         get { windowState.layoutMode }
         set { windowState.layoutMode = newValue }
@@ -56,7 +57,9 @@ final class AppState: ObservableObject {
         set { registry.isWYSIWYGMechanismHealthy = newValue }
     }
 
-    /// Layout writes live in `AppState+LayoutMode.swift`. The setters stay file-private.
+    /// The only writers for the four properties above. They are internal, so any file can
+    /// call them; by convention only `AppState+LayoutMode.swift` and the WYSIWYG health
+    /// path do.
     func storeLayoutMode(_ mode: EditorLayoutMode) {
         layoutMode = mode
     }
@@ -202,7 +205,12 @@ final class AppState: ObservableObject {
         registry.onEditorReplaceAuthorityInputChange = { [weak registry] fileID, line in
             guard let registry else { return }
             let peers = KeyWindowRouter.shared.facades(in: registry)
-            guard let first = peers.first else { return }
+            guard let first = peers.first else {
+                // No open window (the owner's closed and not yet reopened): the shared
+                // generation still advances, so a plan captured before the close is stale.
+                registry.replaceAuthority.advance(fileID: fileID, line: line)
+                return
+            }
             first.noteEditorReplaceAuthorityInputDidChange(fileID: fileID, line: line)
             for peer in peers.dropFirst() {
                 peer.scheduleStaleEditorReplaceBlockedStatusCheck()

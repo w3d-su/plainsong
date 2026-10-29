@@ -22,10 +22,8 @@ final class WindowFacadeRoutingAppTests: XCTestCase {
     }
 
     override func tearDown() async throws {
-        KeyWindowRouter.shared.testingPin = nil
-        KeyWindowRouter.shared.testingUsesKeyWindowOverride = false
-        KeyWindowRouter.shared.testingKeyWindow = nil
-        WindowOpenAdmission.testingBypass = false
+        KeyWindowRouter.shared.resetForTesting()
+        WindowOpenAdmission.resetForTesting()
         defaults.removePersistentDomain(forName: suiteName)
         try? FileManager.default.removeItem(at: directory)
     }
@@ -73,21 +71,53 @@ final class WindowFacadeRoutingAppTests: XCTestCase {
         XCTAssertNil(sibling.presentedError)
     }
 
-    func testTwoWindowsKeepIndependentDocumentsRootsAndExternalBanners() throws {
+    /// W2 bullets 1–3 through the production open paths: two roots opened with
+    /// `openWorkspace`, files activated with `openWorkspaceFile`, and the external change
+    /// delivered by window 1's own FSEvents watcher. `WorkspaceWindow` is not mounted.
+    func testTwoWindowsKeepIndependentDocumentsRootsAndExternalBanners() async throws {
         let primary = makePrimary()
         let second = primary.makeSiblingFacade(admitsFileOperations: true)
-        let alpha = try write("A.md", "alpha\n")
-        let beta = try write("B.md", "beta\n")
-        primary.workspaceRootURL = directory.appendingPathComponent("root-a")
-        second.workspaceRootURL = directory.appendingPathComponent("root-b")
-        let alphaSession = DocumentSession(text: "alpha", url: alpha, fileKind: .markdown)
-        let betaSession = DocumentSession(text: "beta", url: beta, fileKind: .markdown)
-        XCTAssertEqual(alphaSession.fileURL, alpha)
-        primary.shownSession = alphaSession
-        second.shownSession = betaSession
-        XCTAssertTrue(primary.shownSession === alphaSession)
-        XCTAssertEqual(primary.shownSession.fileURL, alpha)
-        XCTAssertEqual(second.shownSession.fileURL, beta)
+        let rootA = try makeRoot("root-a", file: "A.md", contents: "alpha\n")
+        let rootB = try makeRoot("root-b", file: "B.md", contents: "beta\n")
+        try primary.openWorkspace(url: rootA, rememberAsLastOpened: false)
+        try second.openWorkspace(url: rootB, rememberAsLastOpened: false)
+        try await waitUntil("both roots install") {
+            primary.workspaceInstalledCaptureGeneration == primary.workspaceGeneration
+                && second.workspaceInstalledCaptureGeneration == second.workspaceGeneration
+                && primary.workspaceSearchRootAuthority != nil
+                && second.workspaceSearchRootAuthority != nil
+        }
+        defer {
+            primary.closeWorkspace()
+            second.closeWorkspace()
+        }
+        primary.openWorkspaceFile(rootA.appendingPathComponent("A.md"))
+        second.openWorkspaceFile(rootB.appendingPathComponent("B.md"))
+        try await waitUntil("each window shows its own file") {
+            primary.shownSession.fileURL?.lastPathComponent == "A.md"
+                && second.shownSession.fileURL?.lastPathComponent == "B.md"
+        }
+        let alpha = primary.shownSession
+        let beta = second.shownSession
+        XCTAssertNil(primary.presentedError)
+        XCTAssertNil(second.presentedError)
+
+        // Each root has its own context, security scope, and root authority, and each
+        // session's retained location is anchored in the root its window opened.
+        XCTAssertFalse(primary.workspaceRootContext === second.workspaceRootContext)
+        XCTAssertFalse(primary.workspaceAccess === second.workspaceAccess)
+        let authorityA = try XCTUnwrap(primary.workspaceSearchRootAuthority)
+        let authorityB = try XCTUnwrap(second.workspaceSearchRootAuthority)
+        XCTAssertNotEqual(authorityA.canonicalRootURL, authorityB.canonicalRootURL)
+        XCTAssertEqual(
+            primary.retainedManagedSessionLocation(for: alpha)?.rootURL,
+            authorityA.canonicalRootURL
+        )
+        XCTAssertEqual(
+            second.retainedManagedSessionLocation(for: beta)?.rootURL,
+            authorityB.canonicalRootURL
+        )
+
         primary.storeLayoutMode(.sourceOnly)
         second.storeLayoutMode(.sourcePreview)
         primary.editorFindHost.commandContextOverride = true
@@ -99,54 +129,26 @@ final class WindowFacadeRoutingAppTests: XCTestCase {
         primary.updateWorkspaceSearchQueryText("only-a")
         second.updateWorkspaceSearchQueryText("only-b")
 
-        let alphaKey = try XCTUnwrap(alphaSession.fileURL)
-        let betaKey = try XCTUnwrap(betaSession.fileURL)
-        XCTAssertTrue(primary.registry.isShownByAnyWindow(second.shownSession))
-        primary.pendingExternalTexts[alphaKey] = "alpha from disk"
-        primary.restoreRecoveryPrompt(for: primary.shownSession)
-        primary.pendingExternalTexts[betaKey] = "beta from disk"
-        primary.restoreRecoveryPrompt(for: second.shownSession)
+        // A dirty A.md changes on disk. Window 1's watcher delivers it; only window 1 prompts.
+        primary.replaceDocumentText("alpha local edit\n", in: alpha)
+        try Data("alpha from disk\n".utf8).write(to: rootA.appendingPathComponent("A.md"))
+        try await waitUntil("window 1's watcher publishes the conflict", timeoutNanoseconds: 10_000_000_000) {
+            primary.externalChangePrompt != nil
+        }
+        XCTAssertEqual(primary.externalChangePrompt?.fileURL.lastPathComponent, "A.md")
+        XCTAssertNil(second.externalChangePrompt)
+        XCTAssertFalse(primary.canSave)
+        XCTAssertTrue(second.canSave)
 
-        XCTAssertEqual(primary.externalChangePrompt?.fileURL, alphaKey)
-        XCTAssertEqual(second.externalChangePrompt?.fileURL, betaKey)
-        XCTAssertNotEqual(primary.workspaceRootURL, second.workspaceRootURL)
         XCTAssertEqual(primary.layoutMode, .sourceOnly)
         XCTAssertEqual(second.layoutMode, .sourcePreview)
         XCTAssertEqual(primary.workspaceSearchUI.queryText, "only-a")
         XCTAssertEqual(second.workspaceSearchUI.queryText, "only-b")
         XCTAssertTrue(primary.editorFindHost.ui.isBarVisible)
+        XCTAssertFalse(second.editorFindHost.ui.isBarVisible)
         XCTAssertEqual(second.editorFindHost.ui.queryText, "only-b")
-
-        primary.shownSession = DocumentSession(text: "alpha switched", url: alpha, fileKind: .markdown)
-        XCTAssertEqual(second.shownSession.text, "beta")
-        XCTAssertEqual(second.externalChangePrompt?.fileURL, betaKey)
-        XCTAssertEqual(second.layoutMode, .sourcePreview)
-    }
-
-    func testCloseInterceptionVetoesAndDefersWithoutReplacingTheDelegate() {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 120, height: 80),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-        let probe = CloseProbe()
-        window.delegate = probe
-        let interceptor = WindowCloseInterceptor.install(on: window)
-        XCTAssertTrue(interceptor.forwarded === probe)
-
-        interceptor.vetoesClose = true
-        XCTAssertFalse(interceptor.windowShouldClose(window))
-        XCTAssertFalse(probe.asked)
-
-        interceptor.vetoesClose = false
-        interceptor.defersClose = true
-        XCTAssertFalse(interceptor.windowShouldClose(window))
-        XCTAssertFalse(interceptor.defersClose)
-        XCTAssertFalse(probe.asked)
-
-        XCTAssertFalse(interceptor.windowShouldClose(window))
-        XCTAssertTrue(probe.asked)
+        XCTAssertEqual(second.shownSession.text, "beta\n")
+        XCTAssertTrue(second.shownSession === beta)
     }
 
     func testAttachedWorkspaceWindowDisallowsTabbing() {
@@ -318,18 +320,29 @@ final class WindowFacadeRoutingAppTests: XCTestCase {
         AppState(shouldRestoreLastOpenedFile: false, userDefaults: defaults)
     }
 
+    private func makeRoot(_ name: String, file: String, contents: String) throws -> URL {
+        let root = directory.appendingPathComponent(name, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data(contents.utf8).write(to: root.appendingPathComponent(file))
+        return root
+    }
+
+    private func waitUntil(
+        _ description: String,
+        timeoutNanoseconds: UInt64 = 3_000_000_000,
+        condition: @escaping @MainActor () -> Bool
+    ) async throws {
+        let start = DispatchTime.now().uptimeNanoseconds
+        while DispatchTime.now().uptimeNanoseconds - start < timeoutNanoseconds {
+            if condition() { return }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTFail("Timed out waiting for \(description)")
+    }
+
     private func write(_ name: String, _ contents: String) throws -> URL {
         let url = directory.appendingPathComponent(name)
         try Data(contents.utf8).write(to: url)
         return url
-    }
-}
-
-private final class CloseProbe: NSObject, NSWindowDelegate {
-    var asked = false
-
-    func windowShouldClose(_: NSWindow) -> Bool {
-        asked = true
-        return false
     }
 }

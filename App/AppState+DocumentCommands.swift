@@ -96,21 +96,30 @@ extension AppState {
 
     /// Session failures land on the window showing `session`. An unseen warm session uses
     /// the home window (`docs/window-state-gates.md` §3.2, W3 bullets 5–6).
-    func present(_ error: Error, title: String, for session: DocumentSession) {
+    ///
+    /// Only a refusal the user caused (Quit) passes `activatesWindow`. A background failure,
+    /// such as autosave, leaves the key window alone: making another window key would send
+    /// the user's next keystroke into a different document.
+    func present(
+        _ error: Error,
+        title: String,
+        for session: DocumentSession,
+        activatesWindow: Bool = false
+    ) {
         let visible = UserVisibleError(
             title: title,
             message: userVisibleDescription(for: error)
         )
-        if let window = registry.connectedWindows.first(where: { $0.shownSession === session }) {
-            window.presentedError = visible
+        let window = registry.connectedWindows.first { $0.shownSession === session }
+            ?? (KeyWindowRouter.shared.home(for: registry) ?? self).windowState
+        window.presentedError = visible
+        if activatesWindow {
             KeyWindowRouter.shared.focus(window)
-            return
         }
-        let home = KeyWindowRouter.shared.home(for: registry) ?? self
-        home.presentedError = visible
-        KeyWindowRouter.shared.focus(home.windowState)
     }
 
+    /// Termination refusals with no session. The user asked to quit, so the home window
+    /// comes forward.
     func presentOnHome(_ error: Error, title: String) {
         let home = KeyWindowRouter.shared.home(for: registry) ?? self
         home.present(error, title: title)

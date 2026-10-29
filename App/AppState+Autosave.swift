@@ -101,8 +101,11 @@ extension AppState {
         sessionAutosaveTasks[sessionIdentity] = SessionBackgroundTask(token: token, task: task)
     }
 
+    /// Any window may cancel: the shared foreground task always belongs to the home façade's
+    /// document, which a sibling's watcher or reload can be acting on.
     func cancelAutosave(for session: DocumentSession) {
-        if KeyWindowRouter.shared.isHome(self), session === shownSession {
+        let home = KeyWindowRouter.shared.home(for: registry) ?? self
+        if home.shownSession === session {
             autosaveTask?.cancel()
             autosaveTask = nil
         }

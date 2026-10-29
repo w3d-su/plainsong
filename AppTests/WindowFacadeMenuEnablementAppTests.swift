@@ -19,7 +19,8 @@ final class WindowFacadeMenuEnablementAppTests: XCTestCase {
     }
 
     override func tearDown() async throws {
-        KeyWindowRouter.shared.testingPin = nil
+        KeyWindowRouter.shared.resetForTesting()
+        WindowOpenAdmission.resetForTesting()
         defaults.removePersistentDomain(forName: suiteName)
         try? FileManager.default.removeItem(at: directory)
     }
@@ -93,6 +94,35 @@ final class WindowFacadeMenuEnablementAppTests: XCTestCase {
             try String(contentsOf: file, encoding: .utf8),
             "hello!\n"
         )
+    }
+
+    /// Review should-fix 11: every registry input `canSave` reads re-reads Save enablement,
+    /// not only fences and quarantine.
+    func testExternalChangeAndDetachmentInputsUpdateSave() async throws {
+        let primary = makePrimary()
+        let second = primary.makeSiblingFacade(admitsFileOperations: true)
+        let file = try write("pending.md", "hello\n")
+        try second.open(url: file, rememberAsLastOpened: false, preserveWorkspace: true)
+        try await waitUntilMenu("opened file can save") { second.canSave }
+        KeyWindowRouter.shared.testingPin = second
+        let menu = MenuBarState()
+        XCTAssertTrue(menu.snapshot.canSave)
+        let url = try XCTUnwrap(second.sessionStateURL(for: second.shownSession))
+
+        second.registry.pendingExternalTexts[url] = "from disk"
+        try await settleMenu()
+        XCTAssertFalse(menu.snapshot.canSave)
+        second.registry.pendingExternalTexts[url] = nil
+        try await settleMenu()
+        XCTAssertTrue(menu.snapshot.canSave)
+
+        second.registry.detachedSessionURLs.insert(url)
+        try await settleMenu()
+        XCTAssertFalse(menu.snapshot.canSave)
+        second.registry.detachedSessionURLs.remove(url)
+        try await settleMenu()
+        XCTAssertTrue(menu.snapshot.canSave)
+        primary.dismissError()
     }
 
     private func settleMenu() async throws {

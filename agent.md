@@ -168,8 +168,9 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   is the only session inventory, and only the registry touches the warm cache (§3.4 I2).
   `AppState` forwards the containers' remaining properties under the old names.
   `KeyWindowRouter` (App) maps each workspace window to its façade. Menus, Find, and the
-  Carbon ⇧⌘F hot key ask it for the key façade when the command runs. A key
-  non-workspace window has no target, so commands do not fall back to a main window.
+  Carbon ⇧⌘F hot key ask it for the key façade when the command runs. A key sheet or
+  child window resolves to its workspace window; any other key non-workspace window has
+  no target, so commands do not fall back to a main window.
 
 ### Concurrency rules
 
@@ -255,8 +256,10 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   refreshes when Search shows again); typing never resets the search state.
 - Each workspace window has its own `AppState` façade, `WindowState`, and
   `WorkspaceRootContext`, and they share one `AppDocumentRegistry`. One preview is
-  created per visible document pane. A scene after the first refuses file and root opens
-  until PR D2, and native tabbing stays off until PR F. Same-file focus (WD1), shared-root
+  created per visible document pane. A scene gets the app-owned façade whenever no open
+  scene shows it, so closing the only window and reopening it works. A scene opened while
+  another shows that façade refuses file and root opens and closes itself until PR D2, and
+  native tabbing stays off until PR F. Same-file focus (WD1), shared-root
   release (WD2), and a user-facing New Window (D2) are not implemented yet.
 - Tabs: native window tabs (`NSWindow.tabbingMode`) deferred; Phase 1 uses sidebar
   selection to switch the single editor pane (like Typora). Files selections defer out of

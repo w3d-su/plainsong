@@ -18,6 +18,11 @@ final class PlainsongApplicationDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationWillFinishLaunching(_: Notification) {
+        // Before SwiftUI creates the first window, so no window is created tab-capable.
+        KeyWindowRouter.disableAutomaticWindowTabbing()
+    }
+
     func applicationDidBecomeActive(_: Notification) {
         PlainsongWorkspaceSearchHotKey.activate()
     }
@@ -27,6 +32,9 @@ final class PlainsongApplicationDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_: Notification) {
+        // `applicationShouldTerminate` already flushed. This app-global flush is a backstop
+        // for a terminate path that skipped it.
+        appState?.flushAutosaveIfNeeded()
         PlainsongWorkspaceSearchHotKey.tearDown()
         #if DEBUG
             _ = cleanUpDebugEditorFindFixtureIfNeeded()

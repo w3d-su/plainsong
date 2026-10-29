@@ -1,26 +1,21 @@
 import AppKit
 import SwiftUI
 
-/// One workspace scene. The first scene uses the app-owned façade; every later scene gets
-/// its own window and root context on the same registry. Until PR D2 a later scene refuses
-/// file and root opens and closes itself, so it cannot mirror the first window.
+/// One workspace scene. A scene gets the app-owned façade whenever no open scene shows it,
+/// including after its window closed (Dock reopen, Finder open). Every scene opened while the
+/// owner is shown gets its own window and root context on the same registry. Until PR D2
+/// such a scene refuses file and root opens and closes itself once `KeyWindowRouter.attach`
+/// sees its window, so it cannot mirror the first window.
 @MainActor
 final class WindowFacadeHolder: ObservableObject {
     let facade: AppState
 
     init(owner: AppState) {
-        if !KeyWindowRouter.shared.didVendPrimaryScene {
-            KeyWindowRouter.shared.didVendPrimaryScene = true
+        if KeyWindowRouter.shared.claimOwner(owner) {
             facade = owner
         } else {
-            facade = owner.makeSiblingFacade(admitsFileOperations: WindowOpenAdmission.testingBypass)
+            facade = owner.makeSiblingFacade(admitsFileOperations: WindowOpenAdmission.admitsLaterScenes)
         }
-    }
-
-    func closeIfRefused() {
-        guard !WindowOpenAdmission.admits(facade.windowState) else { return }
-        KeyWindowRouter.shared.closeAttachedWindow(of: facade)
-        KeyWindowRouter.shared.closeFacade(facade)
     }
 }
 
@@ -35,11 +30,6 @@ struct WindowFacadeRoot: View {
         WorkspaceWindow()
             .environmentObject(holder.facade)
             .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
-            .onAppear {
-                Task { @MainActor in
-                    holder.closeIfRefused()
-                }
-            }
             .onOpenURL { url in
                 holder.facade.openExternalFile(url)
             }

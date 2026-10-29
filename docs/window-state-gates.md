@@ -4,9 +4,11 @@
 > Each workspace window has its own `AppState` façade over a `WindowState` and a
 > `WorkspaceRootContext`. Those façades share one `AppDocumentRegistry`. `KeyWindowRouter`
 > resolves the key façade. Creation stays guarded until D2, and native tabbing stays off
-> until F. Checked: all W1 bullets, W2 bullets 1–3 and 5, W3 bullets 1–6 and 8, and all
-> W5 bullets. W0's hosted probes are recorded; its owner-smoke
-> boxes stay open. WD1, WD2, D1, and D2 are not done. §12.2 assigns later `agent.md`
+> until F. A scene gets the app-owned façade whenever no open scene shows it, so closing the
+> only window and reopening it keeps working. Checked: all W1 bullets, W2 bullet 5, W3
+> bullets 1–6 and 8, and all W5 bullets. W2 bullets 1–3 have a production-path hosted test
+> but stay open until two mounted `WorkspaceWindow`s are tested. W0's hosted probes are
+> recorded; its owner-smoke boxes stay open. WD1, WD2, D1, and D2 are not done. §12.2 assigns later `agent.md`
 > edits; §9 assigns owner-decision deadlines. Check gates only with named-test or
 > owner-recorded evidence in the implementation commit.
 
@@ -652,7 +654,8 @@ recorded in the closing commit.
 - Evidence (C, hosted only): boxes above stay open because each one still needs owner smoke.
   - Bullet 2: `WindowFacadeRoutingAppTests/testExternalOpenReachesTheAdmittingFacade` routes `openExternalFile` from a refused sibling to the admitting façade. Finder, Dock, and `open -a` are not covered.
   - Bullet 3: `testAttachedWorkspaceWindowDisallowsTabbing` sets `tabbingMode` to `.disallowed` and the router sets `allowsAutomaticWindowTabbing` false. `testRefusedSiblingFailsClosedWithoutConsumingRestore` refuses `open`, `openWorkspace`, `openWorkspaceFile`, `newFile`, and launch restore on an unregistered sibling. Tab-bar "+", Show Tab Bar, Merge All Windows, and system menu shortcuts still need owner smoke.
-  - Bullet 4: `testCloseInterceptionVetoesAndDefersWithoutReplacingTheDelegate` vetoes, defers once, then forwards `windowShouldClose` to the delegate SwiftUI-or-the-test installed. A real window close in the running app still needs owner smoke.
+  - Bullet 4: `WindowFacadeLifecycleAppTests/testCloseInterceptionVetoesAndDefersWithoutReplacingTheDelegate` sends real `performClose` calls. A veto and a one-time defer keep the window visible without asking the wrapped delegate. Then the close asks it, it sees `windowWillClose` once, and the window gets that delegate back. Other delegate messages (`windowDidResize`) still reach it. The interceptor holds the wrapped delegate strongly until the close, because `NSWindow` caches its selectors. Nothing in production sets the veto or defer flag yet: closing a dirty or quarantined window is W7. Owner smoke for this bullet checks only that a normal window closes and reopens.
+  - Closing the only window and reopening it (Dock, Finder, `open -a`) gives the new scene the app-owned façade again, which keeps its document as the one `AppState` did before C: `WindowFacadeLifecycleAppTests/testClosingTheOwnersWindowLetsTheNextSceneReuseTheOwner`. A closed sibling leaves every registry inventory, the admission table, and the router: `testClosingASiblingWindowReleasesItEverywhere`.
 
 ### W1 — Behavior-neutral partition (B1/B2)
 
@@ -685,13 +688,13 @@ recorded in the closing commit.
 
 ### W2 — Two windows never mirror each other's document
 
-- [x] Two production `WorkspaceWindow`s with separate `WindowState`s open `A.md` and `B.md`. Editor text, selection, editor/preview scroll, preview render, title, file header, Find visibility/query, search mode/results, banners, and layout are independent. Switching the document in window 1 leaves window 2 untouched. *Named hosted test.*
-- [x] The same holds for two different roots. *Named hosted test.*
-- [x] An external change to `A.md` shows its banner only in the window showing `A.md`. *Named hosted test.*
+- [ ] Two production `WorkspaceWindow`s with separate `WindowState`s open `A.md` and `B.md`. Editor text, selection, editor/preview scroll, preview render, title, file header, Find visibility/query, search mode/results, banners, and layout are independent. Switching the document in window 1 leaves window 2 untouched. *Named hosted test.*
+- [ ] The same holds for two different roots. *Named hosted test.*
+- [ ] An external change to `A.md` shows its banner only in the window showing `A.md`. *Named hosted test.*
 - [ ] The first bullet passes out of process (PR G). *Named XCUITest.*
 - [x] I2 after C: `git grep -n -w currentDocument -- App Packages` has no hit outside `WindowState` (the bundled Mermaid build excepted). Every window-scoped read that B2 classified now goes through its operation's `WindowState`. *Source audit + PR classification.*
-- Evidence (C): `WindowFacadeRoutingAppTests/testTwoWindowsKeepIndependentDocumentsRootsAndExternalBanners` gives two admitted façades different documents, root URLs, layout modes, Find query/bar visibility, and search query text. An external-change prompt for each file is restored onto the window showing that file. Replacing window 1's document leaves window 2's text, prompt, and layout. The probe does not mount `WorkspaceWindow` (SceneStorage is invalid outside the SwiftUI app lifecycle), so editor selection, scroll offsets, preview pixels, and the file header view are not separately rendered. Those values live on the window's session, Find host, and search UI, which the test does separate. Roots here are distinct `workspaceRootURL`s, not two installed watchers (W6).
-  - Bullet 5: `git grep -n -w currentDocument -- App Packages` at this head hits `App/WindowState.swift` (the stored property and its `shownSession` projection) and two hits inside `App/Resources/preview/mermaid.js` (bundled generated JS, not an app read). No `AppState` forwarder or view still says `currentDocument`.
+- Evidence (C), partial: `WindowFacadeRoutingAppTests/testTwoWindowsKeepIndependentDocumentsRootsAndExternalBanners` opens two temporary roots with `openWorkspace` on two admitted façades and activates `A.md` and `B.md` with `openWorkspaceFile`. Each façade has its own `WorkspaceRootContext`, security scope, and root authority, and each session's retained location is anchored in its own root. A dirty `A.md` is rewritten on disk, window 1's own FSEvents watcher delivers it, and only window 1 shows the prompt and loses Save. Layout, Find bar and query, and search query stay separate. Bullets 1–3 stay open: `WorkspaceWindow` is not mounted (SceneStorage needs the SwiftUI app lifecycle), so selection, editor and preview scroll, preview render, title, and file header are not observed, and the same file in two windows is WD1.
+  - Bullet 5: `git grep -n -w currentDocument -- 'App/*.swift' 'Packages/*.swift'` at this head hits only `App/WindowState.swift` (the stored property and its `shownSession` projection). No `AppState` forwarder or view still says `currentDocument`.
 
 ### W3 — Ownership refusals are cross-window
 

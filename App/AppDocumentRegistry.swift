@@ -281,8 +281,12 @@ final class AppDocumentRegistry: ObservableObject {
         }
     }
 
+    /// Every registry Replace-authority input that `canSave` also reads (pending external
+    /// text and versions, detached URLs, reload tasks, pending editor sources) lands here, so
+    /// Save enablement re-reads them too. `MenuBarState` drops an unchanged snapshot.
     func noteEditorReplaceAuthorityInputDidChange(fileID: StaticString = #fileID, line: UInt = #line) {
         onEditorReplaceAuthorityInputChange(fileID, line)
+        menuEnablementDidChange.send()
     }
 
     func noteMenuEnablementDidChange() {
