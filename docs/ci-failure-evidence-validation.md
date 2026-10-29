@@ -124,3 +124,52 @@ Full `make test` is recorded in `/private/tmp/pr141-make-test.log` with isolated
 a fixed result bundle and the shared test lock; its result and final exact-head hosted CI
 are reported in the PR body after completion. Functional CI-mode runs do not close idle
 performance or owner-only acceptance gates.
+
+## R21 audit — 2026-10-29
+
+Read-only audit of `main` at `88e3a773d54ad0b46bc10fe8f5fd6c14e971cfaa`; no CI rerun,
+test execution or product change. Result: **root cause still unknown, no recurrence.**
+`docs/risk-register.md` lowers R21 to Low as an accepted residual.
+
+- Coverage: all 288 CI workflow runs created 2026-10-04 to 2026-10-28 (UTC); 56 failed
+  attempts across 55 runs (including attempts hidden by successful reruns) and 57 cancelled
+  runs; 136 failed/cancelled job logs; 58 retained `plainsong-ci-failure-*` artifacts from
+  42 runs, each checked against GitHub's SHA-256 and ZIP CRC, none executed.
+- Resource preflight: all 18 retained manifests pass (67 entries, or 28 under that branch's
+  older contract). No ENOENT/EIO preflight failure.
+- xcresult: all 17 complete bundles decode, with failures outside R21. 21 bundles from
+  cancelled execution lack `Info.plist`; that is incomplete evidence, not CAS corruption.
+- The only resource-read signature, [37176591675/a1](https://github.com/w3d-su/plainsong/actions/runs/37176591675?attempt=1),
+  is the relative-URL regression corrected in PR #141 above, with no CAS error.
+- Every other failed attempt is a known non-R21 failure (Replace/Find timeouts, ExportPDF
+  visible `scrollY` 900→899, compile/lint errors, WorkspaceFileTree timing, PreviewKit
+  network-control and teardown, EditorKit geometry).
+- Environment: every retained summary reports image `20260907.0337.1`, Xcode 16.4 (16F6),
+  37–43 GiB free and `ulimit -n` 10240. These are other runs' failure-time values and do not
+  rule out a transient condition on 2026-09-29.
+- Original incident (job log still downloadable): attempt 1 of
+  [36590521567](https://github.com/w3d-su/plainsong/actions/runs/36590521567?attempt=1) at
+  `1c3a4d7` used the combined `xcodebuild test` action with shared
+  `~/Library/Developer/Xcode/DerivedData/Plainsong-…`. Resources were copied at 15:43:42Z;
+  at 15:50:16–15:50:44Z the `perf-500kb.md` read failed (`NSPOSIXErrorDomain` 92, EILSEQ),
+  `preview/index.html` lookup failed, log archive creation could not read `version.plist`,
+  `FileBackedCASDatabase` rename failed with ENOENT, and `LogStoreManifest.plist` could not
+  be saved. Several unrelated file operations under one DerivedData tree failed within
+  ~30 s. Per-run DerivedData isolation removes that sharing; that it caused the incident is
+  inference only.
+- Public trackers: exact-string GitHub searches for `FileBackedCASDatabase` + `rename failed`
+  (including `actions/runner-images`) returned no match; Apple Developer Forums search was
+  blocked by a verification page, so Apple-side coverage is incomplete.
+
+Deferred evidence-only captures, to add if the signature recurs (no retry, rerun or budget
+change; local `make test` unchanged with CI variables unset; uploads stay in the controlled
+runner-temp directory):
+
+1. Failing resource and CAS source/destination: stat (device, inode, mode, flags),
+   `ls -ldOe@`, ACLs and xattrs, the exact errno and absolute URL/base spelling, from
+   allowlisted paths derived from the CI bundle.
+2. UTC start/end and exit status per stage (build-for-testing, preflight,
+   test-without-building), plus failure-time open-descriptor counts and a bounded process
+   snapshot of `xcodebuild`, `xctest` and `testmanagerd`.
+3. xcresult finalization/inspection exit status and stderr, and whether `Info.plist`
+   exists, decoding a working copy so the retained original is unchanged.
