@@ -16,7 +16,12 @@ final class SVGAssetDeliveryTests: XCTestCase {
             data: Self.svg,
             fileURL: URL(fileURLWithPath: "/tmp/mark.svg")
         )
+        XCTAssertEqual(asset.mimeType, "image/svg+xml")
         let url = try XCTUnwrap(URL(string: "asset://mark.svg"))
+        let response = try XCTUnwrap(AssetDeliveryResponse.make(url: url, asset: asset) as? HTTPURLResponse)
+        XCTAssertEqual(response.mimeType, "image/svg+xml")
+        XCTAssertEqual(response.textEncodingName, "utf-8")
+        XCTAssertEqual(response.value(forHTTPHeaderField: "Content-Type"), SVGImageValidator.contentType)
         XCTAssertNil(AssetDeliveryResponse.make(url: url, asset: asset, httpResponse: { _, _ in nil }))
 
         let raster = AssetURLPolicyResult(mimeType: "image/png", data: PreviewAssetTestSupport.onePixelPNG)

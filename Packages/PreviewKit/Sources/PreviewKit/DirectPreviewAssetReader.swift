@@ -67,12 +67,15 @@ struct DirectPreviewAssetReader: PreviewAssetReading {
 
     private static func failure(for error: AssetURLPolicyError) -> PreviewAssetReadFailure {
         switch error {
-        case .unsupportedType, .rejectedSVG, .kindChangedDuringRead:
-            .unsupportedType
+        case .unsupportedType, .kindChangedDuringRead:
+            return .unsupportedType
+        case let .rejectedSVG(reason):
+            SVGAssetDiagnostics.logRejection(reason)
+            return .unsupportedType
         case .fileTooLarge:
-            .tooLarge
+            return .tooLarge
         case .missingFileSize:
-            .providerFailed
+            return .providerFailed
         }
     }
 }

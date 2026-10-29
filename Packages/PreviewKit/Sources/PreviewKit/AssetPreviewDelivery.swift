@@ -1,5 +1,6 @@
 import Foundation
 import MarkdownCore
+import OSLog
 
 enum AssetDeliveryResponse {
     typealias HTTPResponseFactory = (URL, [String: String]) -> HTTPURLResponse?
@@ -15,7 +16,8 @@ enum AssetDeliveryResponse {
     ) -> URLResponse? {
         if let policy = asset.contentSecurityPolicy {
             return httpResponse(url, [
-                "Content-Type": asset.mimeType,
+                "Content-Type": asset.mimeType == SVGImageValidator.mimeType
+                    ? SVGImageValidator.contentType : asset.mimeType,
                 "Content-Length": String(asset.data.count),
                 "Content-Security-Policy": policy,
                 "X-Content-Type-Options": "nosniff",
@@ -27,6 +29,14 @@ enum AssetDeliveryResponse {
             expectedContentLength: asset.data.count,
             textEncodingName: nil
         )
+    }
+}
+
+enum SVGAssetDiagnostics {
+    private static let logger = Logger(subsystem: "app.plainsong", category: "SVGPreview")
+
+    static func logRejection(_ reason: SVGImageRejection) {
+        logger.debug("SVG rejected: \(String(describing: reason), privacy: .public)")
     }
 }
 

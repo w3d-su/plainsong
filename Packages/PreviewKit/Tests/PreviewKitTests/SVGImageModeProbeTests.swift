@@ -93,6 +93,8 @@ final class SVGImageModeProbeTests: XCTestCase {
             text: source, version: 1, fileKind: .markdown, fileURL: fileURL
         ))
         try await waitUntil("remote off render") { blocked.scrollDeliveryState.completedRenderID == blockedRender }
+        // Observe a bounded quiet window after render; the positive control below proves
+        // this same proxy records a remote request when the policy permits it.
         try await Task.sleep(nanoseconds: 500_000_000)
         print("SVG_REMOTE_PROBE allow=false connections=\(proxy.connections)")
         XCTAssertEqual(proxy.connections, [])
@@ -183,9 +185,14 @@ final class SVGImageModeProbeTests: XCTestCase {
         )
         try await waitUntil("link reported") { clicked == href }
         let index = try XCTUnwrap(controller.webView.url?.standardizedFileURL)
+        var assetNavigationWasCancelled = false
+        controller.onNavigationDecisionForTesting = { url, policy in
+            if url?.scheme == "asset" {
+                assetNavigationWasCancelled = policy == .cancel
+            }
+        }
         try controller.webView.load(URLRequest(url: XCTUnwrap(URL(string: "asset://images/diagram.svg"))))
-        // The policy decision ends the load; no fixed sleep.
-        try await waitUntil("asset navigation settled") { !controller.webView.isLoading }
+        try await waitUntil("asset navigation cancelled") { assetNavigationWasCancelled }
         XCTAssertEqual(controller.webView.url?.standardizedFileURL, index)
         let text = try await PreviewHostedTestWait.javascript(
             "document.body.innerText",

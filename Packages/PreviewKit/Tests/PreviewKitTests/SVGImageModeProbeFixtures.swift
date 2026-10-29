@@ -31,6 +31,11 @@ enum SVGProbeFixtures {
             "style-import": #"<style>@import url("\#(probeHost)/import.css");</style>"#,
             "style-url": "<style>rect.p { stroke: url(\(probeHost)/style-url); }</style>",
             "style-escape": #"<style>rect.p { stroke: u\72l(\#(probeHost)/style-escape); }</style>"#,
+            "image-set": #"<style>rect.p { fill: image-set("\#(probeHost)/image-set.png" 1x); }</style>"#,
+            "font-face": #"<style>@font-face { font-family: p; src: url("\#(probeHost)/font.woff"); } "# +
+                #"text { font-family: p; }</style><text y="8">x</text>"#,
+            "fe-image": #"<filter id="f"><feImage href="\#(probeHost)/fe-image"/></filter>"# +
+                #"<rect width="4" height="4" filter="url(#f)"/>"#,
             "fill-url": #"<rect width="4" height="4" fill="url(\#(probeHost)/fill-url)"/>"#,
             "smil-values": #"<rect width="4" height="4"><animate attributeName="fill" dur="1s" "# +
                 #"values="url(\#(probeHost)/smil-values);red"/></rect>"#,

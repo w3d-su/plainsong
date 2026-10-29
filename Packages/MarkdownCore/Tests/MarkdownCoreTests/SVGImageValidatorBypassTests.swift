@@ -106,8 +106,9 @@ final class SVGImageValidatorBypassTests: XCTestCase {
         )
     }
 
-    func testServedMIMETypeCarriesUTF8Charset() {
-        XCTAssertEqual(SVGImageValidator.mimeType, "image/svg+xml; charset=utf-8")
+    func testMIMETypeAndContentTypeKeepSeparateRoles() {
+        XCTAssertEqual(SVGImageValidator.mimeType, "image/svg+xml")
+        XCTAssertEqual(SVGImageValidator.contentType, "image/svg+xml; charset=utf-8")
     }
 
     private func admission(body: String) -> SVGImageAdmission {

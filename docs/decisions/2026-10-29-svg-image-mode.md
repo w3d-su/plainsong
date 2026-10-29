@@ -33,9 +33,10 @@ an SVG without blocking, requires a regular file, and reads at most one byte pas
 
 The response CSP is a backstop for document mode, not the image-mode barrier. WebKit
 builds an SVG image from the bytes, and the S0 probe shows the isolation without that
-header: it serves eleven well-formed, painted hostile samples (script, `onload`,
+header: it serves fourteen well-formed, painted hostile samples (script, `onload`,
 `foreignObject`, `<image href>`, `<use href>`, `@import`, `url(https:)` in style, an
-escaped `url(`, a `fill` URL and a SMIL `values` URL) with no validator and no CSP,
+escaped `url(`, `image-set`, `@font-face`, `feImage`, a `fill` URL, a SMIL `values` URL,
+and the rejected-but-paintable end-to-end control) with no validator and no CSP,
 and records zero bridge messages and zero proxy connections, while a page script and a
 page image prove both observers work. Document mode is already closed by the navigation
 policy and the page CSP (`default-src 'none'`).

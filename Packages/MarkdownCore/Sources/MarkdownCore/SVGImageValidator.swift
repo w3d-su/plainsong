@@ -29,7 +29,8 @@ public enum SVGImageValidator {
     public static let maximumDepth = 256
     /// The charset pins WebKit to UTF-8 (RFC 7303: the HTTP charset overrides the XML
     /// declaration), so it decodes the same characters the validator parsed.
-    public static let mimeType = "image/svg+xml; charset=utf-8"
+    public static let mimeType = "image/svg+xml"
+    public static let contentType = "image/svg+xml; charset=utf-8"
     /// Backstop for document mode only. WebKit builds an SVG image from the bytes and is
     /// not expected to apply response headers in image mode; navigation and the page CSP
     /// already keep `asset://` SVG out of document mode.

@@ -78,9 +78,13 @@ checks the original bytes, off the main actor:
 - Caps: ≤ 50,000 elements and depth ≤ 256 [owner: initial numbers, tuned by S6].
 
 Accepted files are served **byte-for-byte unchanged** with `Content-Type:
-image/svg+xml` and a response CSP of `default-src 'none'; style-src 'unsafe-inline'`.
+image/svg+xml; charset=utf-8`, `X-Content-Type-Options: nosniff`, and a response CSP
+of `default-src 'none'; style-src 'unsafe-inline'`. The response CSP is a document-mode
+backstop; WebKit image-mode isolation is verified separately without that header.
 Rejected files fail like an unsupported image today. The validator's reason is kept
-in process (`AssetURLPolicyError.rejectedSVG`); showing it in the preview is not built yet.
+in process (`AssetURLPolicyError.rejectedSVG`) and logged without file paths; showing it
+in the preview is not built yet. Delivery details are recorded in
+[`2026-10-29-svg-image-mode.md`](decisions/2026-10-29-svg-image-mode.md).
 
 Accept/reject keeps the served bytes auditable: there is no sanitized output that could
 differ from what the user sees in the source, and no mutation-XSS class of bugs.

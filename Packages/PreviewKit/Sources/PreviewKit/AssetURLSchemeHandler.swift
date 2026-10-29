@@ -332,17 +332,23 @@ private extension PreviewAssetReadFailure {
     static func mapped(from error: Error) -> PreviewAssetReadFailure {
         switch error {
         case let failure as PreviewAssetReadFailure:
-            failure
+            return failure
         case let policy as AssetURLPolicyError:
             switch policy {
-            case .unsupportedType, .rejectedSVG, .kindChangedDuringRead: .unsupportedType
-            case .fileTooLarge: .tooLarge
-            case .missingFileSize: .providerFailed
+            case .unsupportedType, .kindChangedDuringRead:
+                return .unsupportedType
+            case let .rejectedSVG(reason):
+                SVGAssetDiagnostics.logRejection(reason)
+                return .unsupportedType
+            case .fileTooLarge:
+                return .tooLarge
+            case .missingFileSize:
+                return .providerFailed
             }
         case is AssetURLResolverError:
-            .outsideRoot
+            return .outsideRoot
         default:
-            .providerFailed
+            return .providerFailed
         }
     }
 }

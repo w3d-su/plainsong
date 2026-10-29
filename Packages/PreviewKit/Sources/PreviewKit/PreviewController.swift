@@ -13,6 +13,7 @@ public final class PreviewController: NSObject, ObservableObject {
     public var onCheckboxToggled: ((Int, Bool, Int, DocumentSession) -> Void)?
     var renderCompletionObserver: ((RenderCompletePayload) -> Void)?
     var externalURLOpenerOverrideForTesting: (@MainActor (URL) -> Void)?
+    var onNavigationDecisionForTesting: (@MainActor (URL?, WKNavigationActionPolicy) -> Void)?
 
     let assetSchemeHandler: AssetURLSchemeHandler
     let eventHub = PreviewEventHub()
@@ -451,6 +452,7 @@ extension PreviewController: WKNavigationDelegate {
         decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void
     ) {
         let policy = Self.navigationPolicy(for: navigationAction.request.url, previewIndexURL: previewIndexURL)
+        onNavigationDecisionForTesting?(navigationAction.request.url, policy)
         decisionHandler(policy)
     }
 
