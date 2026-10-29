@@ -95,6 +95,10 @@ cd preview-src && npm run typecheck
 ## 授權
 
 Plainsong 以 [MIT 授權](LICENSE) 開放原始碼。
+App target 另外連結 [Sparkle](https://github.com/sparkle-project/Sparkle) 2.10.0。
+除非 `PLAINSONG_UPDATES_ENABLED` 是 YES，否則不會檢查更新。Sparkle 為 MIT，並包含
+bsdiff、sais-lite 與 orlp/ed25519；聲明見
+[`docs/third-party/Sparkle-2.10.0-LICENSE.txt`](docs/third-party/Sparkle-2.10.0-LICENSE.txt)。
 
 意見回饋與錯誤回報：[GitHub Issues](https://github.com/w3d-su/plainsong/issues)。
 本 App 不收集任何遙測資料；Alpha 版本以直接下載方式發佈

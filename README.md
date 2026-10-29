@@ -102,6 +102,10 @@ supported. Live fixture coverage: `Fixtures/math.md`.
 ## License
 
 Plainsong is open source under the [MIT License](LICENSE).
+The App target also links [Sparkle](https://github.com/sparkle-project/Sparkle) 2.10.0.
+Updates stay off unless `PLAINSONG_UPDATES_ENABLED` is YES. Sparkle is MIT and bundles
+bsdiff, sais-lite, and orlp/ed25519; those notices are in
+[`docs/third-party/Sparkle-2.10.0-LICENSE.txt`](docs/third-party/Sparkle-2.10.0-LICENSE.txt).
 
 Feedback and bug reports: [GitHub Issues](https://github.com/w3d-su/plainsong/issues).
 The app collects no telemetry; alpha builds are distributed as direct downloads

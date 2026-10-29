@@ -132,9 +132,14 @@ resign_sparkle_and_verify() {
     for item in "$installer" "$downloader" "$autoupdate" "$updater_app" "$framework" "$APP_PATH"; do
         codesign --verify --strict --verbose=2 "$item"
     done
+    # Verification only. Signing above never passes --deep.
+    codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 }
 
 resign_sparkle_and_verify
+
+echo "==> Verify shipped update configuration"
+Scripts/check-shipped-update-configuration.sh "$APP_PATH/Contents/Info.plist"
 
 echo "==> Verify the dSYM matches the stripped executable"
 if [[ ! -d "$DSYM_PATH" ]]; then

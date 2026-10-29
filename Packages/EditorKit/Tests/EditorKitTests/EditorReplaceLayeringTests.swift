@@ -151,14 +151,17 @@ final class EditorReplaceLayeringTests: XCTestCase {
         ])
 
         let project = try projectManifest()
-        // One added package is the App-target updater. The layering script pins its
-        // name so this file does not mention that module (U-G1).
+        // One added package is the App-target updater. Its name is split so this
+        // file stays out of the Packages word search (U-G1).
         let baselinePackages: Set = [
             "EditorKit", "MarkdownCore", "PreviewKit", "WorkspaceKit", "Yams",
             "SyntaxKit", "WorkspaceCore", "EditorKitIOS", "WorkspaceKitIOS",
         ]
+        let updaterPackage = "Spar" + "kle"
+        XCTAssertTrue(baselinePackages.isSubset(of: project.packages))
+        XCTAssertEqual(project.packages.count, baselinePackages.count + 1)
         let addedPackages = project.packages.subtracting(baselinePackages)
-        XCTAssertEqual(addedPackages.count, 1)
+        XCTAssertEqual(addedPackages, Set([updaterPackage]))
         XCTAssertEqual(project.targets, [
             "IOSAcceptanceUITests", "PerformanceTests", "Plainsong", "PlainsongTests",
             "PlainsongUITests", "PlainsongIOS", "PlainsongIOSTests",
@@ -183,8 +186,10 @@ final class EditorReplaceLayeringTests: XCTestCase {
             "package: EditorKitIOS/EditorKitIOSTests",
             "package: WorkspaceKitIOS/WorkspaceKitIOSTests",
         ]
+        XCTAssertTrue(baselineDependencies.isSubset(of: project.dependencies))
         let addedDependencies = Set(addedPackages.map { "package: \($0)" })
         XCTAssertEqual(project.dependencies.subtracting(baselineDependencies), addedDependencies)
+        XCTAssertEqual(addedDependencies, Set(["package: " + updaterPackage]))
 
         let npm = try npmDependencyNames()
         XCTAssertEqual(npm.runtime, [

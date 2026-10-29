@@ -38,9 +38,19 @@ for line in lines:
     if line.strip() == "- package: Sparkle":
         linked_from.append(target)
 
-if "exactVersion: 2.10.0" not in package_block:
-    print("error: Sparkle must be pinned to exactVersion 2.10.0", file=sys.stderr)
+revision = "revision: eef1a539a373c1f1a320624b1130fc5de7b2e100"
+if revision not in package_block:
+    print(f"error: Sparkle must be pinned by {revision}", file=sys.stderr)
     sys.exit(1)
+for line in package_block:
+    if not line or line.startswith("#"):
+        continue
+    if not line.startswith(("url:", "revision:")):
+        print(
+            f"error: Sparkle package block may only contain url, revision, and comments, found {line}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 if linked_from != ["Plainsong"]:
     print(f"error: Sparkle must be linked only by Plainsong, found {linked_from}", file=sys.stderr)
     sys.exit(1)

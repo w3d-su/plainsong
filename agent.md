@@ -65,11 +65,12 @@ projects such as Astro/Next.js content directories).
 | Persistence of prefs | `UserDefaults` + built-in theme IDs; custom theme/user CSS imports deferred | |
 | Project generation | **XcodeGen** (`project.yml` committed; `.xcodeproj` is generated, never hand-edited) | pbxproj diffs are hostile to LLM collaboration. |
 | Lint/format | SwiftFormat + SwiftLint (configs committed) | |
-| Updates | [Sparkle](https://github.com/sparkle-project/Sparkle) 2.10.0, App target only | Exact pin. `PLAINSONG_UPDATES_ENABLED` defaults to NO, so the app does not create or start `SPUUpdater` and makes no update request. Packages must not import Sparkle. |
+| Updates | [Sparkle](https://github.com/sparkle-project/Sparkle) 2.10.0, App target only | Pinned to revision `eef1a539a373c1f1a320624b1130fc5de7b2e100` (tag 2.10.0). `PLAINSONG_UPDATES_ENABLED` defaults to NO, so the app does not create or start `SPUUpdater` and makes no update request. Packages must not import Sparkle. |
 | JS tooling | Node 20+, npm, esbuild, vitest (preview pipeline unit tests) | |
 
 **Dependency policy:** keep the dependency list short. Adding any new Swift package or npm
-package requires a Decision Log entry explaining why.
+package requires a `docs/decisions/` entry explaining why. `docs/decision-log.md` is the
+archive and does not take new rows.
 
 ---
 
@@ -658,7 +659,9 @@ attempt without a Decision Log entry.
   and beta updates), Editor (font, size, line numbers, typewriter sync), Preview (theme,
   allow remote images), Files (image-paste asset folder pattern, default extension
   `.md`/`.mdx`). Plainsong > Check for Updates… and those update toggles stay hidden
-  while `PLAINSONG_UPDATES_ENABLED` is NO.
+  while `PLAINSONG_UPDATES_ENABLED` is NO. When updates are enabled, the automatic
+  download toggle is disabled, and that preference is turned off, while automatic
+  checks are off.
 
 ---
 
@@ -873,9 +876,16 @@ make format           # swiftformat . && swiftlint --fix
   later (Phase 3, direct distribution first, App Store optional).
 - `Scripts/release.sh` re-signs Sparkle innermost first: `Installer.xpc`,
   `Downloader.xpc` (`--preserve-metadata=entitlements`), `Autoupdate`, `Updater.app`,
-  and `Sparkle.framework`, then the app. It never uses `--deep`. The Developer ID path
-  adds `-o runtime --timestamp`. Both paths then run `codesign --verify --strict` on
-  each nested item and the app.
+  and `Sparkle.framework`, then the app. Signing never uses `--deep`. The Developer ID
+  path adds `-o runtime --timestamp`. Both paths then run `codesign --verify --strict`
+  on each nested item and `codesign --verify --deep --strict` on the finished app
+  (verification only). A shipped plist whose `PLAINSONG_UPDATES_ENABLED` is not `NO`
+  must have a 32-byte EdDSA key, the expected HTTPS feed, `SURequireSignedFeed`, and
+  `SUVerifyUpdateBeforeExtraction`. The key check matches Sparkle 2.10.0: trim
+  Foundation's whitespace set only, require padding, and reject interior
+  whitespace. Non-zero trailing base64 bits are accepted. The feed check strips
+  quotes only. CI runs the guard on the Debug Info.plist after the ui-performance
+  `make build`.
 
 ---
 

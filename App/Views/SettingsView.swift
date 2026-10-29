@@ -109,7 +109,7 @@ private struct GeneralSettingsPane: View {
             }
         }
         .formStyle(.grouped)
-        .frame(height: updateSettings == nil ? 214 : 420)
+        .modifier(GeneralSettingsHeight(fitsContent: updateSettings != nil))
     }
 
     private func chooseDefaultFolder() {
@@ -139,6 +139,7 @@ private struct UpdateSettingsSection: View {
                 get: { model.automaticallyDownloadsUpdates },
                 set: { model.setAutomaticallyDownloadsUpdates($0) }
             ))
+            .disabled(!model.automaticallyChecksForUpdates)
             Toggle("Receive beta updates", isOn: Binding(
                 get: { model.receivesBetaUpdates },
                 set: { model.setReceivesBetaUpdates($0) }
@@ -147,6 +148,22 @@ private struct UpdateSettingsSection: View {
             SettingsFooter(
                 "Beta updates include prereleases. Automatic download stays off until you turn it on."
             )
+        }
+    }
+}
+
+/// Disabled builds keep the tuned height. The updates section sizes to its
+/// footer instead of a fixed 420pt frame that can clip the new copy.
+private struct GeneralSettingsHeight: ViewModifier {
+    var fitsContent: Bool
+
+    func body(content: Content) -> some View {
+        if fitsContent {
+            content
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(minHeight: 420, alignment: .top)
+        } else {
+            content.frame(height: 214)
         }
     }
 }

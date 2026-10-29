@@ -36,14 +36,28 @@ final class PlainsongUpdateChannelDelegate: NSObject, SPUUpdaterDelegate {
         _ = updater
         return allowedChannels()
     }
+
+    /// Bundle `SUFeedURL`. Sparkle 2.10.0 treats a nil delegate result as "fall
+    /// back to user defaults" (`-[SPUUpdater retrieveFeedURL:]`). An empty string
+    /// does not fall back, so a missing key stays empty instead of becoming a
+    /// `defaults write` override.
+    static func feedURLString(in bundle: Bundle) -> String {
+        bundle.object(forInfoDictionaryKey: "SUFeedURL") as? String ?? ""
+    }
+
+    func feedURLString(for updater: SPUUpdater) -> String? {
+        _ = updater
+        return Self.feedURLString(in: .main)
+    }
 }
 
 /// The only type that constructs `SPUStandardUpdaterController`. Callers must not
 /// create it when `PLAINSONG_UPDATES_ENABLED` is NO.
 @MainActor
 final class SparkleUpdateClient: UpdateClient {
-    /// Incremented only when an updater is actually constructed and started.
-    private(set) static var startCount = 0
+    /// Incremented when the controller is constructed. `startUpdater` can still
+    /// fail afterwards (U1's empty EdDSA key does); this is not a scheduled check.
+    private(set) static var constructedCount = 0
 
     private let controller: SPUStandardUpdaterController
     private let channels: PlainsongUpdateChannelDelegate
@@ -60,7 +74,10 @@ final class SparkleUpdateClient: UpdateClient {
             userDriverDelegate: nil
         )
         updater = controller.updater
-        Self.startCount += 1
+        // Remove a legacy `defaults write … SUFeedURL` before a later cycle.
+        // The delegate already overrides it for this start.
+        _ = updater.clearFeedURLFromUserDefaults()
+        Self.constructedCount += 1
     }
 
     var automaticallyChecksForUpdates: Bool {

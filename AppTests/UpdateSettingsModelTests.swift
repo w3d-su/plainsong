@@ -50,7 +50,7 @@ final class UpdateSettingsModelTests: XCTestCase {
     }
 
     func testDisabledCenterDoesNotCreateAClient() {
-        let startsBefore = SparkleUpdateClient.startCount
+        let startsBefore = SparkleUpdateClient.constructedCount
         var calls = 0
         let center = AppUpdateCenter.make(updatesEnabled: false) {
             calls += 1
@@ -60,7 +60,7 @@ final class UpdateSettingsModelTests: XCTestCase {
         XCTAssertNil(center.settingsModel)
         XCTAssertNil(center.checkForUpdatesModel)
         XCTAssertEqual(calls, 0)
-        XCTAssertEqual(SparkleUpdateClient.startCount, startsBefore)
+        XCTAssertEqual(SparkleUpdateClient.constructedCount, startsBefore)
     }
 
     func testEnabledCenterUsesTheInjectedClient() {
@@ -71,7 +71,7 @@ final class UpdateSettingsModelTests: XCTestCase {
         XCTAssertNotNil(center.checkForUpdatesModel)
         center.settingsModel?.setAutomaticallyDownloadsUpdates(true)
         XCTAssertTrue(client.automaticallyDownloadsUpdates)
-        XCTAssertEqual(SparkleUpdateClient.startCount, 0)
+        XCTAssertEqual(SparkleUpdateClient.constructedCount, 0)
     }
 
     func testBetaDelegateDoesNotStartTheUpdater() {
@@ -88,7 +88,54 @@ final class UpdateSettingsModelTests: XCTestCase {
         delegate.receivesBetaUpdates = true
         XCTAssertEqual(delegate.allowedChannels(), ["beta"])
         XCTAssertTrue(defaults.bool(forKey: PlainsongUpdateChannelDelegate.defaultsKey))
-        XCTAssertEqual(SparkleUpdateClient.startCount, 0)
+        XCTAssertEqual(SparkleUpdateClient.constructedCount, 0)
+    }
+
+    func testTurningOffAutomaticChecksClearsAutomaticDownload() {
+        let client = FakeUpdateClient(automaticallyDownloadsUpdates: true)
+        let model = UpdateSettingsModel(client: client)
+        XCTAssertTrue(model.automaticallyDownloadsUpdates)
+
+        model.setAutomaticallyChecksForUpdates(false)
+        XCTAssertFalse(client.automaticallyChecksForUpdates)
+        XCTAssertFalse(client.automaticallyDownloadsUpdates)
+        XCTAssertFalse(model.automaticallyDownloadsUpdates)
+
+        model.setAutomaticallyDownloadsUpdates(true)
+        XCTAssertFalse(client.automaticallyDownloadsUpdates)
+        XCTAssertFalse(model.automaticallyDownloadsUpdates)
+    }
+
+    func testFeedURLStringReadsTheBundleInsteadOfUserDefaults() throws {
+        let suite = "PlainsongFeed-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set("https://evil.example/appcast.xml", forKey: "SUFeedURL")
+        let delegate = PlainsongUpdateChannelDelegate(defaults: defaults)
+        XCTAssertTrue(
+            delegate.responds(to: #selector(PlainsongUpdateChannelDelegate.feedURLString(for:)))
+        )
+        XCTAssertEqual(Bundle.main.bundleIdentifier, "app.plainsong.editor")
+        XCTAssertEqual(PlainsongUpdateChannelDelegate.feedURLString(in: .main), "")
+
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("plainsong-feed-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let feed = "https://w3d-su.github.io/plainsong/appcast.xml"
+        let plist = ["SUFeedURL": feed] as NSDictionary
+        try plist.write(to: root.appendingPathComponent("Info.plist"))
+        let bundle = try XCTUnwrap(Bundle(url: root))
+        XCTAssertEqual(PlainsongUpdateChannelDelegate.feedURLString(in: bundle), feed)
+
+        let emptyRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("plainsong-feed-empty-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: emptyRoot, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: emptyRoot) }
+        try ([:] as NSDictionary).write(to: emptyRoot.appendingPathComponent("Info.plist"))
+        let emptyBundle = try XCTUnwrap(Bundle(url: emptyRoot))
+        XCTAssertEqual(PlainsongUpdateChannelDelegate.feedURLString(in: emptyBundle), "")
+        XCTAssertEqual(SparkleUpdateClient.constructedCount, 0)
     }
 
     func testUpdateFlagParsesOnlyExplicitYes() {
