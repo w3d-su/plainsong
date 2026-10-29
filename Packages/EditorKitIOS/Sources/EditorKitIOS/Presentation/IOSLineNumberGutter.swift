@@ -118,7 +118,7 @@ enum IOSLineNumberLayout {
     }
 
     /// UIKit's line fragment has no extra-line flag. The blank line after a
-    /// trailing newline is the empty fragment that starts at the end of the text.
+    /// trailing newline is the empty text line inside the last paragraph fragment.
     @MainActor
     private static func makeFragment(
         _ fragment: NSTextLayoutFragment,
@@ -131,7 +131,10 @@ enum IOSLineNumberLayout {
             let bounds = line.typographicBounds
             let frame = bounds.offsetBy(dx: origin.x, dy: origin.y)
             let baseline = origin.y + bounds.minY + line.glyphOrigin.y
-            let isTrailingBlank = line.characterRange.length == 0 && location == textEnd
+            // The extra blank line lives inside the last paragraph fragment, so the
+            // fragment location is not the document end. Add the text-line offset.
+            let lineStart = location + line.characterRange.location
+            let isTrailingBlank = line.characterRange.length == 0 && lineStart == textEnd
             if isTrailingBlank {
                 result.extraBaseline = baseline
                 result.extraFrame = frame
@@ -184,7 +187,7 @@ final class IOSLineNumberGutterView: UIView {
         let separator = UIBezierPath()
         separator.move(to: CGPoint(x: bounds.width - hairline, y: 0))
         separator.addLine(to: CGPoint(x: bounds.width - hairline, y: bounds.height))
-        UIColor.separator.setStroke()
+        editor.resolvedAppearanceColor(.separator).setStroke()
         separator.lineWidth = hairline
         separator.stroke()
 
@@ -193,13 +196,13 @@ final class IOSLineNumberGutterView: UIView {
         for label in labels where rect.intersects(labelRect(label, offsetY: offsetY, width: bounds.width)) {
             let band = labelRect(label, offsetY: offsetY, width: bounds.width).insetBy(dx: 3, dy: 1)
             if label.isCurrent, band.height > 1 {
-                editor.theme.gutterBandColor.setFill()
+                editor.resolvedAppearanceColor(editor.theme.gutterBandColor).setFill()
                 UIBezierPath(roundedRect: band, cornerRadius: 4).fill()
             }
             let text = "\(label.number)" as NSString
             let attributes: [NSAttributedString.Key: Any] = [
                 .font: font,
-                .foregroundColor: editor.theme.gutterColor(current: label.isCurrent),
+                .foregroundColor: editor.resolvedAppearanceColor(editor.theme.gutterColor(current: label.isCurrent)),
             ]
             let size = text.size(withAttributes: attributes)
             let origin = CGPoint(
