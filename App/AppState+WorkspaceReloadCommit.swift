@@ -128,7 +128,13 @@ extension AppState {
         )
         let context = workspaceRootContext
         for peer in context.facades where peer !== self {
-            try await peer.reconcileSharedWorkspaceWindow(context: context, generation: generation)
+            do {
+                try await peer.reconcileSharedWorkspaceWindow(context: context, generation: generation)
+            } catch is CancellationError {
+                guard !Task.isCancelled, context.workspaceGeneration == generation else { return }
+            } catch {
+                peer.present(error, title: "Could Not Refresh Workspace")
+            }
         }
     }
 

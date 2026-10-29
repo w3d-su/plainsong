@@ -58,7 +58,7 @@ extension AppState {
         workspaceSearchRefreshIntent = nil
         completionWorkspace = .empty
         completionWorkspaceBaseCache = nil
-        resetWorkspaceSearchUIState()
+        teardownWorkspaceSearch()
         notifyEditorFindWorkspaceDidClose()
         workspaceRootContext = WorkspaceRootContext()
         connectWorkspaceRootContext()

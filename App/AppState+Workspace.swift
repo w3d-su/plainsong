@@ -333,7 +333,8 @@ extension AppState {
         let rootPath = normalizedDirectoryPath(
             directory.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
         )
-        return candidatePath == rootPath || candidatePath.hasPrefix("\(rootPath)/")
+        let rootPrefix = rootPath == "/" ? rootPath : "\(rootPath)/"
+        return candidatePath == rootPath || candidatePath.hasPrefix(rootPrefix)
     }
 
     static func normalizedDirectoryPath(_ path: String) -> String {

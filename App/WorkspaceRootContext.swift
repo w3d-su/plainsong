@@ -6,8 +6,8 @@ import WorkspaceKit
 /// authority, generation, security scope, watcher, deferred refresh, image-placement fence,
 /// and thumbnail fan-out per root. Nothing here is published.
 ///
-/// The registry retains one context per canonical physical root. Its weak window list
-/// supplies reference counting and refresh recipients without retaining a closed façade.
+/// The registry indexes live contexts by canonical physical root with weak references.
+/// The weak window list supplies refresh recipients without retaining a closed façade.
 @MainActor
 final class WorkspaceRootContext {
     /// Set by `AppState.init`; records an Export as HTML… context change. Until then a call
