@@ -156,11 +156,13 @@ jobs:
           $SWIFTLINT_LINUX_SHA256  $install_dir/swiftlint.zip
           EOF
           unzip -oq "$install_dir/swiftformat.zip" swiftformat_linux -d "$install_dir"
-          unzip -oq "$install_dir/swiftlint.zip" swiftlint -d "$install_dir"
+          # The static build runs without Swift or libxml2 from the image. It has no
+          # SourceKit, so it skips statement_position, which only ever warns.
+          unzip -oq "$install_dir/swiftlint.zip" swiftlint-static -d "$install_dir"
+          mv "$install_dir/swiftlint-static" "$install_dir/swiftlint"
           mv "$install_dir/swiftformat_linux" "$install_dir/swiftformat"
           chmod +x "$install_dir/swiftformat" "$install_dir/swiftlint"
           echo "$install_dir" >> "$GITHUB_PATH"
-          swift --version
           for tool in swiftformat swiftlint; do
             actual="$("$install_dir/$tool" --version)"
             expected="$SWIFTFORMAT_VERSION"
@@ -208,7 +210,6 @@ jobs:
             Packages/WorkspaceKit/.build
             Packages/SyntaxKit/.build
             Packages/WorkspaceCore/.build
-            !Packages/*/.build/*/debug/*.xctest
           key: spm-v3-${{ runner.os }}-${{ hashFiles('Packages/**/Package.swift', 'Packages/**/Package.resolved') }}
           restore-keys: spm-v3-${{ runner.os }}-
 
@@ -223,7 +224,7 @@ jobs:
   # catch-all shard, so a renamed or new class always still runs. Three shards, not
   # four: CodeQL's default setup holds a macOS runner for ~12 minutes per push, so a
   # fourth shard waits for a free runner longer than it saves. Balanced from measured
-  # class times on macos-15 (run 41338975839).
+  # class times on macos-15 (runs 41338975839 and 41340274653).
   hosted-build:
     name: hosted (build)
     needs: changes
@@ -326,7 +327,6 @@ jobs:
             targets: >-
               PlainsongUITests/WorkspaceSearchAcceptanceTests
               PerformanceTests
-              PlainsongTests/ExportHTMLCommandAppTests
           - shard: find
             targets: >-
               PlainsongUITests
@@ -338,7 +338,6 @@ jobs:
           - shard: app
             targets: PlainsongTests
             skip: >-
-              PlainsongTests/ExportHTMLCommandAppTests
               PlainsongTests/ExportPDFAcceptanceAppTests
               PlainsongTests/WorkspaceSearchAppStateTests
               PlainsongTests/ExportPDFMatrixAppTests
