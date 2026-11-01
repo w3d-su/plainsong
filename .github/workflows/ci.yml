@@ -181,7 +181,7 @@ jobs:
           restore-keys: swiftformat-${{ env.SWIFTFORMAT_VERSION }}-${{ hashFiles('.swiftformat', 'Makefile') }}-
 
       - name: Lint
-        run: make lint SWIFTFORMAT_CACHE="$RUNNER_TEMP/swiftformat-cache"
+        run: make lint-style SWIFTFORMAT_CACHE="$RUNNER_TEMP/swiftformat-cache"
 
       - name: Test evidence tooling
         run: make test-f2-tooling
@@ -212,6 +212,9 @@ jobs:
             Packages/WorkspaceCore/.build
           key: spm-v2-${{ runner.os }}-${{ hashFiles('Packages/**/Package.swift', 'Packages/**/Package.resolved') }}
           restore-keys: spm-v2-${{ runner.os }}-
+
+      - name: Check preview layering
+        run: make check-preview-layering
 
       - name: Test packages
         run: make test-packages-native

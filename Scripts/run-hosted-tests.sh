@@ -24,7 +24,7 @@ if [ "$phase" = test ]; then
         echo "Expected one .xctestrun in $XCODE_DERIVED_DATA/Build/Products, found: ${xctestruns[*]}" >&2
         exit 1
     fi
-    args=(-xctestrun "${xctestruns[0]}" -derivedDataPath "$XCODE_DERIVED_DATA")
+    args=(-xctestrun "${xctestruns[0]}" -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath "$XCODE_DERIVED_DATA")
 fi
 test_args=()
 runs_performance_tests=true

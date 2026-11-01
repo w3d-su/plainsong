@@ -23,7 +23,7 @@ SWIFTFORMAT_COMPAT_FLAGS := $(shell swiftformat --rules 2>/dev/null | grep -q wr
 SWIFTFORMAT_VERSION := 0.62.1
 SWIFTLINT_VERSION := 0.65.1
 
-.PHONY: bootstrap generate build run test test-packages test-packages-native test-hosted test-hosted-build test-hosted-shard test-preview test-f2-tooling format lint preview-bundle release clean swiftformat-version-check
+.PHONY: bootstrap generate build run test test-packages test-packages-native test-hosted test-hosted-build test-hosted-shard test-preview test-f2-tooling format lint lint-style check-preview-layering preview-bundle release clean swiftformat-version-check
 
 swiftformat-version-check:
 	@actual="$$(swiftformat --version 2>/dev/null || echo missing)"; \
@@ -109,8 +109,14 @@ format: swiftformat-version-check
 	swiftformat $(SWIFT_FORMAT_PATHS) $(SWIFTFORMAT_COMPAT_FLAGS)
 	swiftlint --fix --quiet
 
-lint: swiftformat-version-check
+lint: check-preview-layering lint-style
+
+# The layering check resolves project.yml through xcodegen, so CI runs it on macOS;
+# lint-style needs no macOS and CI runs it on Ubuntu.
+check-preview-layering:
 	python3 Scripts/check-preview-webview-layering.py
+
+lint-style: swiftformat-version-check
 	swiftformat $(SWIFT_FORMAT_PATHS) --lint $(SWIFTFORMAT_COMPAT_FLAGS) $(if $(SWIFTFORMAT_CACHE),--cache "$(SWIFTFORMAT_CACHE)")
 	swiftlint
 
