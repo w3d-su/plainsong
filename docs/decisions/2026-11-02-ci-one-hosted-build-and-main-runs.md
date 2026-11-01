@@ -50,3 +50,4 @@ binary. `make test-f2-tooling` hard-codes `/private/tmp`.
   build-system overrides, and a stale hit would be a false green.
 - The dynamic SwiftLint binary, which has SourceKit: it needs `libxml2.so.2`, which the
   runner image does not ship, and one warning-only rule does not justify an `apt` step.
+
