@@ -5,15 +5,18 @@
 > and splits D1 into D1a, D1b, and D1c. D1a implements W11 bullet 3: installed
 > documents stay outside the global LRU capacity of 8 and cannot be evicted.
 > D1b scopes last-root release to that root's eligible sessions (W3 bullet 7 and
-> W6 bullets 4–6).
+> W6 bullets 4–6). D1c shares one canonical root context (W6 bullets 1–3, 7, 8a,
+> and 9) and transfers writer ownership across windows (W4 bullets 3–4). W6 bullet
+> 8b stays with D2.
 > Each workspace window has its own `AppState` façade over a `WindowState` and a
 > `WorkspaceRootContext`. Those façades share one `AppDocumentRegistry`. `KeyWindowRouter`
 > resolves the key façade. Creation stays guarded until D2, and native tabbing stays off
 > until F. A scene gets the app-owned façade whenever no open scene shows it, so closing the
 > only window and reopening it keeps working. Checked: all W1 bullets, W2 bullet 5, W3
-> bullets 1–8, W6 bullets 4–6, all W5 bullets, and W11 bullet 3. W2 bullets 1–3 have a
-> production-path hosted test but stay open until D2 tests two mounted `WorkspaceWindow`s.
-> W0's hosted probes are recorded; its owner-smoke boxes stay open for D2. D1c and D2 are
+> bullets 1–8, W4 bullets 3–4, W6 bullets 1–7, 8a, and 9, all W5 bullets, and W11
+> bullet 3. W2 bullets 1–3 have a production-path hosted test but stay open until D2 tests
+> two mounted `WorkspaceWindow`s.
+> W0's hosted probes are recorded; its owner-smoke boxes stay open for D2. D2 is
 > not done. WD5 and
 > WD6's residency and budget half stay open. §12.2 assigns later `agent.md`
 > edits; §9 assigns owner-decision deadlines. Check gates only with named-test or

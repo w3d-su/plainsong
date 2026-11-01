@@ -2,10 +2,10 @@
 
 - Date: 2026-10-30
 - Commit: measured `f80b0302` against `main` at `17949106`. Rebase onto D1b
-  `e7eaa94e` rewrote that commit; it is not on the branch. Current head is
-  `cff0cafc`. Typing was not remeasured. The measured tree had uncommitted
-  documentation and no dirty Swift source. The later registration narrowing is
-  outside the keystroke path and was not in that binary.
+  `e7eaa94e` rewrote that commit; it is not on the branch. The rebased regression
+  code head is `cff0cafc`. Typing was not remeasured. The measured tree had
+  uncommitted documentation and no dirty Swift source. The later registration
+  narrowing is outside the keystroke path and was not in that binary.
 - Environment: macOS 27.0 (26A428), Xcode 27.0 (27A5194q), Apple M1 Pro, Debug.
   Every run started with `IOConsoleLocked=Yes` and `CGSSessionScreenIsLocked=Yes`.
   The 1-minute load was 2.91–3.35, below the earlier 6–8 comparison load. No extra
