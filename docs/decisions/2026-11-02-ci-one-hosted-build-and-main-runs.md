@@ -33,7 +33,6 @@ above GitHub's 10 GB limit.
   the required `build-and-test` check and blocks the merge. PRs keep the `changes` job from
   the 2026-10-20 decision. The push filter re-includes the same two docs paths that are test
   inputs.
-
 - **A real CRC in the PNG fixture.** `ExportRasterFixture` used a bit-at-a-time CRC over
   10 MiB in a debug build, and 11 tests spent 105 s on it locally. zlib computes the same
   CRC-32, and those tests now take 0.5 s.
