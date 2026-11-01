@@ -23,7 +23,7 @@ SWIFTFORMAT_COMPAT_FLAGS := $(shell swiftformat --rules 2>/dev/null | grep -q wr
 SWIFTFORMAT_VERSION := 0.62.1
 SWIFTLINT_VERSION := 0.65.1
 
-.PHONY: bootstrap generate build run test test-packages test-packages-native test-hosted test-hosted-build test-hosted-shard test-preview test-f2-tooling format lint lint-style check-preview-layering preview-bundle release clean swiftformat-version-check
+.PHONY: bootstrap generate build run test test-packages test-hosted test-hosted-build test-hosted-shard test-preview test-f2-tooling format lint lint-style check-preview-layering preview-bundle release clean swiftformat-version-check
 
 swiftformat-version-check:
 	@actual="$$(swiftformat --version 2>/dev/null || echo missing)"; \
@@ -49,12 +49,10 @@ build: generate
 # `make test` still runs all of them in sequence.
 test: test-packages test-hosted test-preview
 
-# CI runs test-f2-tooling on Ubuntu and test-packages-native on macOS.
-test-packages: test-f2-tooling test-packages-native
-
 # generate: the sandbox checks sign their probes with the XcodeGen-generated
 # App/Plainsong.entitlements.
-test-packages-native: generate
+test-packages: generate
+	$(MAKE) test-f2-tooling
 	python3 Scripts/test-preview-webview-layering.py
 	Scripts/check-sparkle-layering.sh
 	Scripts/check-shipped-update-configuration.sh --self-test

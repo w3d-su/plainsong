@@ -97,7 +97,7 @@ blogeditor/
 │   ├── src/pipeline.ts       # unified pipeline (md and mdx variants)
 │   ├── src/styles/           # preview CSS (Apple system palette, Xcode-style syntax colors)
 │   └── test/                 # vitest specs
-└── .github/workflows/ci.yml  # parallel jobs: preview and lint (Linux), packages (swift test), one hosted build plus four XCTest shards; `build-and-test` gate; docs-only PRs skip the test jobs (`changes`)
+└── .github/workflows/ci.yml  # parallel jobs: preview and lint (Linux), packages (swift test), one hosted build plus three XCTest shards; `build-and-test` gate; docs-only PRs skip the test jobs (`changes`)
 ```
 
 Build artifacts: `preview-src` builds to `App/Resources/preview/` (`index.html`, `bundle.js`,
@@ -913,9 +913,9 @@ make format           # swiftformat . && swiftlint --fix
   versions differ; CI is authoritative. Bumping a pin means updating the version + SHA-256
   in `ci.yml`, the Makefile constant, and reformatting the tree in the same PR if rule
   behavior changed. `make check-preview-layering` runs on macOS because it needs xcodegen.
-- CI builds the hosted test bundles once (`make test-hosted-build`) and four shards run
+- CI builds the hosted test bundles once (`make test-hosted-build`) and three shards run
   those products (`make test-hosted-shard`). A shard that names a class also skips it in
-  its bundle's other shard, so a new or renamed class still runs. `make test` is unchanged.
+  its bundle's catch-all shard, so a new or renamed class still runs. `make test` is unchanged.
 - Pull requests cancel their older run. Every non-docs commit on `main` runs in full,
   never cancelled or queued out, and seeds the caches pull requests restore.
 - The preview CI job verifies every pinned acceptance resource against the committed

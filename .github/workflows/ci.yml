@@ -35,9 +35,10 @@ permissions:
 # The suite runs as parallel jobs. The `build-and-test` job at the bottom keeps the
 # check name the main ruleset requires and passes only when every job passed, or
 # when `changes` found a docs-only pull request and the test jobs were skipped.
-# Everything that does not need macOS runs on Ubuntu. A run holds at most five macOS
-# runners (`packages` plus four shards), GitHub's cap for non-Enterprise accounts;
-# when two pull requests run at once, the second run's jobs wait for a free runner.
+# Everything that does not need macOS runs on Ubuntu. A run holds at most four macOS
+# runners (`packages` plus three shards); CodeQL's Swift analysis takes the fifth of
+# GitHub's non-Enterprise cap. When two pull requests run at once, the second run's
+# jobs wait for a free runner.
 jobs:
   # Docs-only fast path. A pull request counts as docs-only when every path it
   # changes is under docs/ or is a top-level *.md or LICENSE file. Two docs paths
@@ -155,11 +156,11 @@ jobs:
           $SWIFTLINT_LINUX_SHA256  $install_dir/swiftlint.zip
           EOF
           unzip -oq "$install_dir/swiftformat.zip" swiftformat_linux -d "$install_dir"
-          unzip -oq "$install_dir/swiftlint.zip" swiftlint-static -d "$install_dir"
+          unzip -oq "$install_dir/swiftlint.zip" swiftlint -d "$install_dir"
           mv "$install_dir/swiftformat_linux" "$install_dir/swiftformat"
-          mv "$install_dir/swiftlint-static" "$install_dir/swiftlint"
           chmod +x "$install_dir/swiftformat" "$install_dir/swiftlint"
           echo "$install_dir" >> "$GITHUB_PATH"
+          swift --version
           for tool in swiftformat swiftlint; do
             actual="$("$install_dir/$tool" --version)"
             expected="$SWIFTFORMAT_VERSION"
@@ -182,9 +183,6 @@ jobs:
 
       - name: Lint
         run: make lint-style SWIFTFORMAT_CACHE="$RUNNER_TEMP/swiftformat-cache"
-
-      - name: Test evidence tooling
-        run: make test-f2-tooling
 
   packages:
     needs: changes
@@ -210,20 +208,22 @@ jobs:
             Packages/WorkspaceKit/.build
             Packages/SyntaxKit/.build
             Packages/WorkspaceCore/.build
-          key: spm-v2-${{ runner.os }}-${{ hashFiles('Packages/**/Package.swift', 'Packages/**/Package.resolved') }}
-          restore-keys: spm-v2-${{ runner.os }}-
+            !Packages/*/.build/*/debug/*.xctest
+          key: spm-v3-${{ runner.os }}-${{ hashFiles('Packages/**/Package.swift', 'Packages/**/Package.resolved') }}
+          restore-keys: spm-v3-${{ runner.os }}-
 
       - name: Check preview layering
         run: make check-preview-layering
 
       - name: Test packages
-        run: make test-packages-native
+        run: make test-packages
 
   # Hosted XCTest bundles: one job builds every bundle once (~3 min) and the shards
-  # run the same products. Measured class times on macos-15 (run 41334692636):
-  # EditorFindHostedGateTests 161 s of PlainsongTests' 375 s, WorkspaceSearchAcceptance
-  # Tests 186 s of PlainsongUITests' 346 s, PerformanceTests 49 s. A shard that names a
-  # class also skips it elsewhere, so a renamed or new class always still runs.
+  # run the same products. A shard that names a class also skips it in that bundle's
+  # catch-all shard, so a renamed or new class always still runs. Three shards, not
+  # four: CodeQL's default setup holds a macOS runner for ~12 minutes per push, so a
+  # fourth shard waits for a free runner longer than it saves. Balanced from measured
+  # class times on macos-15 (run 41338975839).
   hosted-build:
     name: hosted (build)
     needs: changes
@@ -322,16 +322,27 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - shard: app-gates
-            targets: PlainsongTests/EditorFindHostedGateTests PerformanceTests
-          - shard: app-rest
-            targets: PlainsongTests
-            skip: PlainsongTests/EditorFindHostedGateTests
-          - shard: ui-search
-            targets: PlainsongUITests/WorkspaceSearchAcceptanceTests
-          - shard: ui-rest
-            targets: PlainsongUITests
+          - shard: search
+            targets: >-
+              PlainsongUITests/WorkspaceSearchAcceptanceTests
+              PerformanceTests
+              PlainsongTests/ExportHTMLCommandAppTests
+          - shard: find
+            targets: >-
+              PlainsongUITests
+              PlainsongTests/ExportPDFAcceptanceAppTests
+              PlainsongTests/WorkspaceSearchAppStateTests
+              PlainsongTests/ExportPDFMatrixAppTests
+              PlainsongTests/ExportPDFWideRunsAppTests
             skip: PlainsongUITests/WorkspaceSearchAcceptanceTests
+          - shard: app
+            targets: PlainsongTests
+            skip: >-
+              PlainsongTests/ExportHTMLCommandAppTests
+              PlainsongTests/ExportPDFAcceptanceAppTests
+              PlainsongTests/WorkspaceSearchAppStateTests
+              PlainsongTests/ExportPDFMatrixAppTests
+              PlainsongTests/ExportPDFWideRunsAppTests
     env:
       SHARD: ${{ matrix.shard }}
     steps:
