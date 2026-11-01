@@ -172,4 +172,29 @@ final class WindowSharedRootMutationAppTests: SharedRootAppTestCase {
         }
         second.workspaceImageAssetInsertionCount = 0
     }
+
+    func testImageInsertionLeaseStaysOnTheRootThatStartedItAfterTheWindowLeaves() async throws {
+        let root = try makeRoot("root")
+        let other = try makeRoot("other")
+        try await openPair(root: root)
+        let shared = primary.workspaceRootContext
+        let lease = WorkspaceImageAssetInsertionLease(appState: second)
+        XCTAssertEqual(shared.workspaceImageAssetInsertionCount, 1)
+
+        try await open(second, root: other)
+
+        XCTAssertFalse(second.workspaceRootContext === shared)
+        XCTAssertEqual(shared.workspaceImageAssetInsertionCount, 1)
+        XCTAssertEqual(second.workspaceImageAssetInsertionCount, 0)
+        XCTAssertThrowsError(try primary.beginWorkspaceNamespaceMutation([primary.shownSession])) { error in
+            guard case WorkspaceMutationError.imageInsertionInProgress = error else {
+                return XCTFail("expected the original root to stay busy, got \(error)")
+            }
+        }
+        lease.release()
+        XCTAssertEqual(shared.workspaceImageAssetInsertionCount, 0)
+        XCTAssertEqual(second.workspaceImageAssetInsertionCount, 0)
+        try primary.beginWorkspaceNamespaceMutation([primary.shownSession])
+        primary.endWorkspaceNamespaceMutation([primary.shownSession])
+    }
 }

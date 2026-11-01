@@ -27,4 +27,37 @@ extension AppState {
             }
         }
     }
+
+    /// The adopting window took the writer. When it releases that writer and exactly
+    /// one earlier window still shows the session, that window can write again.
+    func restoreShownWriterIfUnowned(_ session: DocumentSession) {
+        let sessionIdentity = ObjectIdentifier(session)
+        guard editorWriterInstallations[sessionIdentity] == nil else { return }
+        let shown = editorBindingInstallations.filter { installation, owner in
+            owner === session &&
+                supersededEditorWriterInstallations.contains(installation) &&
+                editorInstallationWindows[installation]?.window?.shownSession === session
+        }
+        guard shown.count == 1, let installation = shown.keys.first else { return }
+        supersededEditorWriterInstallations.remove(installation)
+        editorWriterInstallations[sessionIdentity] = installation
+        assertSingleCrossWindowEditorInstallation(for: session)
+    }
+
+    func assertSingleCrossWindowEditorInstallation(for session: DocumentSession) {
+        #if DEBUG
+            var windows: Set<ObjectIdentifier> = []
+            for (installation, owner) in editorBindingInstallations where owner === session {
+                guard !supersededEditorWriterInstallations.contains(installation),
+                      let window = editorInstallationWindows[installation]?.window
+                else { continue }
+                windows.insert(ObjectIdentifier(window))
+            }
+            if windows.count > 1 {
+                assertionFailure(
+                    "A session has non-superseded editor installations in \(windows.count) windows"
+                )
+            }
+        #endif
+    }
 }

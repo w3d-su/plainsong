@@ -37,6 +37,13 @@ extension AppState {
                 guard let file = retainedManagedSessionLocation(for: session)?.fileURL ?? session.fileURL,
                       Self.isDescendant(file, of: url)
                 else { continue }
+                // Attaching to a root already open does not treat its own files as
+                // standalone, even when a former participant still shows one after detach.
+                if let sharedRoot = sharing?.registrationAuthority?.canonicalRootURL,
+                   Self.isDescendant(file, of: sharedRoot)
+                {
+                    continue
+                }
                 // A window can already be on another root while its standalone editor
                 // still awaits teardown. Classify the file, not just the window's mode.
                 if let installedRoot = window.workspaceRootURL, Self.isDescendant(file, of: installedRoot) {

@@ -39,6 +39,7 @@ extension AppState {
         {
             editorWriterInstallations[sessionIdentity] = installation
         }
+        assertSingleCrossWindowEditorInstallation(for: session)
         if let canonicalURL = retiredCanonicalURL(for: session),
            var retirement = retiredEditorDocumentSessions[canonicalURL]
         {
@@ -71,6 +72,9 @@ extension AppState {
         editorBindingInstallations[installation] = nil
         editorInstallationWindows[installation] = nil
         supersededEditorWriterInstallations.remove(installation)
+        if editorWriterInstallations[sessionIdentity] == nil {
+            restoreShownWriterIfUnowned(session)
+        }
         // Keep main's retired-cold cleanup. Also drop a registration only when it
         // is the last reference holding a retained root scope. An unshown untitled
         // or recovery session keeps its registration.
@@ -142,6 +146,7 @@ extension AppState {
                pendingEditorSourceInstallations[installation] == nil
             {
                 editorWriterInstallations[sessionIdentity] = nil
+                restoreShownWriterIfUnowned(session)
             }
             return .synchronize(currentSnapshot)
         }
@@ -153,6 +158,7 @@ extension AppState {
             return .rejected(currentSnapshot)
         }
         editorWriterInstallations[sessionIdentity] = installation
+        assertSingleCrossWindowEditorInstallation(for: session)
         return .activated(currentSnapshot)
     }
 
@@ -169,6 +175,7 @@ extension AppState {
             return false
         }
         editorWriterInstallations[sessionIdentity] = nil
+        restoreShownWriterIfUnowned(session)
         return true
     }
 

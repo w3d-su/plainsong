@@ -63,13 +63,14 @@ final class WorkspaceEditorImageThumbnailAdapter: EditorImageThumbnailLoading {
 }
 
 @MainActor
-private final class WorkspaceImageAssetInsertionLease {
-    private weak var appState: AppState?
+final class WorkspaceImageAssetInsertionLease {
+    private weak var context: WorkspaceRootContext?
     private var isActive = true
 
     init(appState: AppState) {
-        self.appState = appState
-        appState.workspaceImageAssetInsertionCount += 1
+        let context = appState.workspaceRootContext
+        self.context = context
+        context.workspaceImageAssetInsertionCount += 1
     }
 
     func release() {
@@ -77,11 +78,14 @@ private final class WorkspaceImageAssetInsertionLease {
             return
         }
         isActive = false
-        guard let appState else {
+        // The lease belongs to the context that started it. Detach replaces the
+        // facade's context, so releasing through that facade would decrement the
+        // next root and trap on a zero count.
+        guard let context else {
             return
         }
-        precondition(appState.workspaceImageAssetInsertionCount > 0)
-        appState.workspaceImageAssetInsertionCount -= 1
+        precondition(context.workspaceImageAssetInsertionCount > 0)
+        context.workspaceImageAssetInsertionCount -= 1
     }
 }
 

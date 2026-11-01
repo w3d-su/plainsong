@@ -60,6 +60,37 @@ final class WindowWriterAdoptionAppTests: SharedRootAppTestCase {
         XCTAssertEqual(session.text, "new writer")
     }
 
+    func testLeavingTheAdoptingWindowRestoresTheWriterStillShown() throws {
+        let root = try makeRoot("root")
+        try primary.activateFileSession(url: root.appendingPathComponent("a.md"))
+        let session = primary.shownSession
+        let oldBinding = primary.editorDocumentBinding(for: session)
+        let old = installation(oldBinding)
+        oldBinding.onLifecycle(.installed(old))
+        XCTAssertEqual(primary.editorWriterInstallations[ObjectIdentifier(session)], old)
+
+        second.setCurrentDocument(session, requestingEditorFocus: false)
+        XCTAssertTrue(primary.supersededEditorWriterInstallations.contains(old))
+        let newBinding = second.editorDocumentBinding(for: session)
+        let adopted = installation(newBinding)
+        newBinding.onLifecycle(.installed(adopted))
+        XCTAssertEqual(primary.editorWriterInstallations[ObjectIdentifier(session)], adopted)
+
+        second.setCurrentDocument(DocumentSession(), requestingEditorFocus: false)
+        newBinding.onLifecycle(.revoked(adopted))
+
+        XCTAssertFalse(primary.supersededEditorWriterInstallations.contains(old))
+        XCTAssertEqual(primary.editorWriterInstallations[ObjectIdentifier(session)], old)
+        XCTAssertEqual(
+            oldBinding.sourceContract.publish(publication(old, session: session, text: "still shown")),
+            .accepted(
+                EditorDocumentSourceSnapshot(source: "still shown", revision: session.version),
+                sourceWasReconciled: false
+            )
+        )
+        XCTAssertEqual(session.text, "still shown")
+    }
+
     private func installation(_ binding: AppEditorDocumentBinding) -> EditorDocumentBindingInstallation {
         EditorDocumentBindingInstallation(bindingID: binding.id, installationID: EditorDocumentBindingInstallationID())
     }

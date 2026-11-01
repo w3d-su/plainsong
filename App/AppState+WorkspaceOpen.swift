@@ -8,13 +8,17 @@ extension AppState {
         try refuseWindowFileOpenIfNeeded()
         if let shared = matchingWorkspaceRoot(for: url) {
             if shared === workspaceRootContext, workspaceRootURL != nil {
+                rememberWorkspaceIfNeeded(url, remember: rememberAsLastOpened)
                 return
+            }
+            guard let rootAuthority = shared.registrationAuthority else {
+                throw CocoaError(.fileNoSuchFile)
             }
             try validateWorkspaceRootInstallation(url: url, sharing: shared)
             try closeWorkspaceForReplacement()
             workspaceRootContext = shared
             connectWorkspaceRootContext()
-            let root = shared.registrationAuthority!.originalRootURL
+            let root = rootAuthority.originalRootURL
             workspaceRootURL = root
             shared.attach(self)
             installSharedWorkspaceTreeIfReady()

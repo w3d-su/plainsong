@@ -116,4 +116,54 @@ final class WindowSharedRootAdmissionAppTests: SharedRootAppTestCase {
         XCTAssertEqual(scopeStarts, 1)
         XCTAssertEqual(primary.workspaceRootURL, other)
     }
+
+    func testDetachedParticipantStillShowingTheRootDoesNotBlockAnotherWindow() async throws {
+        let root = try makeRoot("root")
+        try await openPair(root: root)
+        let shown = second.shownSession
+        try second.closeWorkspaceForReplacement()
+        XCTAssertTrue(second.shownSession === shown)
+        XCTAssertNil(second.workspaceRootURL)
+
+        let third = primary.makeSiblingFacade(admitsFileOperations: true)
+        defer { third.workspaceWatcher?.stop() }
+        try third.openWorkspace(url: root, rememberAsLastOpened: false)
+
+        XCTAssertTrue(third.workspaceRootContext === primary.workspaceRootContext)
+        XCTAssertEqual(scopeStarts, 1)
+        XCTAssertNil(third.presentedError)
+    }
+
+    func testReopeningTheCurrentRootRemembersWithoutRescanning() async throws {
+        let lastOpened = MemoryLastOpenedFileStore()
+        let recents = MemoryRecentItemStore()
+        let root = try makeRoot("root")
+        let suiteName = "SharedRoot-reopen-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let facade = AppState(
+            lastOpenedFileStore: lastOpened,
+            recentItemStore: recents,
+            directoryScanner: scanner,
+            workspaceSearchDebounceNanoseconds: 0,
+            workspaceMutationOperationRecoveryStore: operationStore,
+            shouldRestoreLastOpenedFile: false,
+            userDefaults: defaults
+        )
+        facade.registry.workspaceScopeStarter = { [weak self] root in
+            self?.scopeStarts += 1
+            return SecurityScopedAccess.startAccessing(root)
+        }
+        defer { facade.workspaceWatcher?.stop() }
+        try await open(facade, root: root)
+        let scans = scanner.count(root)
+        let generation = facade.workspaceGeneration
+
+        try facade.openWorkspace(url: root, rememberAsLastOpened: true)
+
+        XCTAssertEqual(scanner.count(root), scans)
+        XCTAssertEqual(facade.workspaceGeneration, generation)
+        XCTAssertEqual(try lastOpened.restore(), root)
+        XCTAssertEqual(try recents.restore(), [root])
+    }
 }
