@@ -3,11 +3,28 @@
 # XCODE_TEST_TARGETS (space-separated test bundle names) runs only those bundles so CI
 # can split them across parallel jobs; unset keeps the scheme's full test set. Xcode
 # still builds every bundle in the scheme: -only-testing only narrows execution.
+# XCODE_SKIP_TESTS (space-separated bundles or Bundle/Class names) subtracts from that set.
+# XCODE_TEST_PHASE lets CI build once and test on other machines: `build` stops after
+# build-for-testing, and `test` runs the products already in XCODE_DERIVED_DATA, without
+# the project. Unset does both here.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 args=(-project Plainsong.xcodeproj -scheme Plainsong -configuration Debug)
 if [ -n "${XCODE_DERIVED_DATA:-}" ]; then
     args+=(-derivedDataPath "$XCODE_DERIVED_DATA")
+fi
+phase="${XCODE_TEST_PHASE:-}"
+if [ -n "$phase" ]; then
+    : "${XCODE_ARTIFACT_DIR:?XCODE_TEST_PHASE requires an evidence directory}"
+    : "${XCODE_DERIVED_DATA:?XCODE_TEST_PHASE requires isolated DerivedData}"
+fi
+if [ "$phase" = test ]; then
+    xctestruns=("$XCODE_DERIVED_DATA"/Build/Products/*.xctestrun)
+    if [ "${#xctestruns[@]}" -ne 1 ] || [ ! -f "${xctestruns[0]}" ]; then
+        echo "Expected one .xctestrun in $XCODE_DERIVED_DATA/Build/Products, found: ${xctestruns[*]}" >&2
+        exit 1
+    fi
+    args=(-xctestrun "${xctestruns[0]}" -derivedDataPath "$XCODE_DERIVED_DATA")
 fi
 test_args=()
 runs_performance_tests=true
@@ -20,6 +37,9 @@ if [ -n "${XCODE_TEST_TARGETS:-}" ]; then
         fi
     done
 fi
+for target in ${XCODE_SKIP_TESTS:-}; do
+    test_args+=("-skip-testing:$target")
+done
 run_xcode() {
     local log_name="$1"
     shift
@@ -33,7 +53,12 @@ run_xcode() {
 test_action=test
 if [ -n "${XCODE_ARTIFACT_DIR:-}" ]; then
     : "${XCODE_DERIVED_DATA:?CI preflight requires isolated DerivedData}"
-    run_xcode build-for-testing build-for-testing
+    if [ "$phase" != test ]; then
+        run_xcode build-for-testing build-for-testing
+    fi
+    if [ "$phase" = build ]; then
+        exit 0
+    fi
     if [ "$runs_performance_tests" = true ]; then
         bundle="$XCODE_DERIVED_DATA/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest"
         /usr/bin/python3 Scripts/preflight-performance-resources.py \
