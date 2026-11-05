@@ -113,7 +113,7 @@ final class IOSReviewCloseOutcomeTests: XCTestCase {
         let entry = try XCTUnwrap(harness.store.byIdentity[original.identity])
         let port = try XCTUnwrap(harness.port(for: original))
         original.session.replaceText("draft recovered before save")
-        _ = try await harness.store.persistRecovery(entry, reason: .backgroundDeadline)
+        _ = try await harness.store.persistRecovery(entry, reason: .externalConflict)
         _ = try await harness.store.save(original.identity)
         XCTAssertNotNil(entry.recoveryReceipt)
         XCTAssertFalse(original.session.isDirty)

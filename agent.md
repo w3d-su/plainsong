@@ -214,6 +214,7 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   Recent single-file restoration uses that same availability classification and retains
   a live pending selection for Refresh/retry. Cancelled, superseded, revoked or retired
   operations cannot keep an uninstalled scope; returned writers still drain safely.
+- iOS protects the recovery-first background flush with a UIKit background task. A fenced writer can retire after durable recovery and provider close. iCloud version conflicts require explicit selection and a coordinated recheck of the reviewed versions before resolution (Decision Log 2026-11-06).
 - An iOS external reload rechecks its store's current proposal and lifecycle immediately
   before native installation, including proposals deferred before close. Closing holds
   the proposal without retiring its operation; failed close can resume it. Root watcher

@@ -104,6 +104,7 @@ struct IOSDocumentStatusChrome: View {
 struct IOSDocumentStateBanner: View {
     let chrome: IOSShellChromeSnapshot
     let scene: IOSShellSceneState
+    @State private var reviewingVersions: IOSCloudVersionRequest?
 
     var body: some View {
         switch chrome.status {
@@ -171,6 +172,15 @@ struct IOSDocumentStateBanner: View {
                     }
                 }
             } actions: {
+                if chrome.hasCloudVersionConflict, let id = chrome.documentIdentity,
+                   let load = scene.surfaces.reviewCloudVersions, let apply = scene.surfaces.applyCloudVersion
+                {
+                    bannerButton("Review iCloud Versions") { reviewingVersions = IOSCloudVersionRequest(documentID: id)
+                    }
+                    .sheet(item: $reviewingVersions) { request in
+                        IOSCloudVersionPicker(documentID: request.documentID, load: load, apply: apply)
+                    }
+                }
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 12) {
                         if scene.surfaces.reselectUnavailableWorkspace != nil {
