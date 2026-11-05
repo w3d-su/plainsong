@@ -234,6 +234,11 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   sibling staging. Any recovery artifact is reported at its staging-directory path;
   the emptied directory is removed. `Scripts/check-single-file-save-sandbox.sh` exercises
   this in a signed sandboxed probe under a LaunchServices file-only grant.
+- Before staging, a save reads the destination volume through the retained parent descriptor.
+  It creates nothing and fails when the mount is read-only or the volume does not advertise
+  `RENAME_EXCL` (and `RENAME_SWAP` when replacing): exFAT and FAT32 for every save, Mac OS
+  Extended for a replacement. Write-path `errno` becomes a typed reason (unsupported volume,
+  disk full, read-only, not permitted) that the save error names together with a next step.
 - Window chrome: a native `NavigationSplitView` with a resizable, collapsible sidebar
   (Files / Search navigators; ⇧⌘F in a window whose sidebar is hidden reveals it in
   Search) on macOS 27+, a fixed-width sidebar in an `HStack` before
