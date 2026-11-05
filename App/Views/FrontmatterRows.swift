@@ -15,7 +15,13 @@ struct FrontmatterRows: View {
 
     var body: some View {
         if let error = result.error, let block = result.block {
-            MalformedFrontmatterRows(rawYAML: block.rawYAML, message: error.message)
+            let isTOML = block.format == .toml
+            MalformedFrontmatterRows(
+                title: isTOML ? "TOML frontmatter" : "Invalid YAML",
+                systemImage: isTOML ? "lock.fill" : "exclamationmark.triangle.fill",
+                rawYAML: block.rawYAML,
+                message: error.message
+            )
         } else if let block = result.block {
             if block.fields.isEmpty {
                 Text("The frontmatter block is empty.")
@@ -161,16 +167,18 @@ private struct TagsRow: View {
 }
 
 private struct MalformedFrontmatterRows: View {
+    let title: String
+    let systemImage: String
     let rawYAML: String
     let message: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Label {
-                Text("Invalid YAML")
+                Text(title)
                     .fontWeight(.semibold)
             } icon: {
-                Image(systemName: "exclamationmark.triangle.fill")
+                Image(systemName: systemImage)
                     .symbolRenderingMode(.multicolor)
             }
 

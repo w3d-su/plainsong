@@ -670,7 +670,11 @@ attempt without a Decision Log entry.
 
 ## 10. Frontmatter Panel
 
-- Detect YAML frontmatter (`---` fences at byte 0). Parse with `Yams` (SPM).
+- Detect YAML frontmatter (`---` fences at byte 0). Parse with `Yams` (SPM). Fence lines
+  follow the preview's `remark-frontmatter` gate: the marker, then only spaces or tabs. A
+  closed leading `+++` block is TOML: the panel shows it read-only and offers no Add, since
+  adding would insert a second block above it. Documents never start with a BOM here:
+  `String(data:encoding:)` drops it when the file is read.
 - Inspector form (right column, ⌃⌘I, Frontmatter section): key/value editing with
   type-aware controls (string, date picker for `date`, tag token field for `tags`, toggle
   for `draft`).
@@ -682,6 +686,11 @@ attempt without a Decision Log entry.
   cannot parse.
 - String and string-list form writes use explicitly quoted YAML scalars with serializer-owned
   escaping, preserving literal contents and string types through parse/writeback.
+- A writeback replaces the entry under the source's own key spelling (`"title":` and
+  `'title':` included), writes a `date` plain only when YAML reads it back as exactly that
+  plain scalar and the source had not quoted it, and is re-parsed before it is applied: an
+  edit whose block would not load with the same keys and the requested value (a duplicate
+  key, a mapping typed into the date field) is refused.
 
 ---
 
