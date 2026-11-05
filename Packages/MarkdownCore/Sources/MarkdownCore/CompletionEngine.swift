@@ -97,7 +97,12 @@ public struct CompletionEngine: Sendable {
             return emojiCompletions(context: emojiContext, workspace: workspace)
         }
 
-        if let fenceContext = fenceInfoContext(in: linePrefix, lineStart: line.range.location, cursor: cursor) {
+        if let fenceContext = fenceInfoContext(
+            in: text,
+            linePrefix: linePrefix,
+            lineStart: line.range.location,
+            cursor: cursor
+        ) {
             return languageCompletions(context: fenceContext, workspace: workspace)
         }
 

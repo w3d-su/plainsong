@@ -63,7 +63,8 @@ extension CompletionEngine {
     }
 
     func fenceInfoContext(
-        in linePrefix: String,
+        in text: String,
+        linePrefix: String,
         lineStart: Int,
         cursor: Int
     ) -> CompletionContext? {
@@ -82,6 +83,18 @@ extension CompletionEngine {
 
         let query = String(content.dropFirst(marker.count))
         guard !query.contains(where: \.isWhitespace) else { return nil }
+
+        // Inside an open fence this line is code or the closing fence, and a closing fence
+        // takes no info string: accepting a language there would turn it into a new
+        // opener and make the rest of the document code. Any indentation counts, as in the
+        // Enter fence helper, so list-item fences are recognized too.
+        guard MarkdownFenceScanner.openFence(
+            in: text,
+            before: lineStart,
+            indentation: .anyWhitespace
+        ) == nil else {
+            return nil
+        }
 
         let location = lineStart + leadingWhitespace + MarkdownTextEditingSupport.utf16Length(marker)
         return CompletionContext(

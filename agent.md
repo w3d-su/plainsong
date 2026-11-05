@@ -417,7 +417,7 @@ the trigger characters below, or ⌃Space manually. Engine is pure Swift in Mark
 | Context | Trigger | Completions |
 |---|---|---|
 | Line start | typing `#`, `>`, `-` … | snippet list: headings, table skeleton, fenced block, task item, frontmatter block (only at file top) |
-| After ```` ``` ```` | fence info | language ids (`swift`, `ts`, `python`, `mermaid`, …) |
+| After ```` ``` ```` | fence info | language ids (`swift`, `ts`, `python`, `mermaid`, …); none on a line inside an open fence (any indentation), where the run is code or the closing fence |
 | Inside `](` or `](./` | `(`, `/` | workspace-relative file paths (md files and images), anchors `#heading` within current file |
 | Inside `![](` | `(` | image files in workspace |
 | `:` + 2 chars | `:` | emoji shortcodes → insert unicode |
