@@ -275,9 +275,9 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   count toward the 8 and cannot be evicted. Recovery Show/Keep Editor Copy reconciles
   the LRU immediately when the previous shown session becomes countable. One preview is
   created per visible document pane. A scene gets the app-owned façade whenever no open
-  scene shows it, so closing the only window and reopening it works. A scene opened while
-  another shows that façade refuses file and root opens and closes itself until PR D2, and
-  native tabbing stays off until PR F. Closing a root saves or retires the closing
+  scene shows it, so closing the only window and reopening it works; every other scene
+  gets its own admitted façade (D2). Native tabbing stays off until PR F. Closing a root
+  saves or retires the closing
   window's own document and installations wherever they live, and releases them with
   that root's eligible sessions; only sessions the root's authority proves it owns keep
   its scope. Another root's operation recovery does not block the close, and a sibling's
@@ -293,7 +293,33 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   is revoked. Quit waits for image placement and cleanup even if the originating window
   leaves its root. Root overlap and a root containing
   another window's installed standalone file refuse before installation and offer Show.
-  Same-file routing (WD1) and a user-facing New Window remain with D2.
+- One file is shown by at most one window (WD1). Any request that would make a file
+  current in a window while another window shows it (Open…, Open Recent, Finder, the
+  Dock, a sidebar click, the jump bar, a preview link, a search result, New File's save
+  panel) brings that window forward and changes nothing else. Hard links and case or
+  normalization aliases are the same file. A window that is closing or has a sheet cannot
+  come forward, so the request refuses instead. A background reload never moves focus.
+- The Open rule (`docs/window-state-gates.md` §5.2): File › Open…, Open Recent, the
+  empty state, a preview link outside the root, and New File's save panel start in the
+  window that received them; Finder, the Dock, and `open -a` start in the frontmost
+  workspace window by z-order. An empty window (no document, no root) takes the open;
+  otherwise a new window does (WD7). A root that some window has open is shared (WD2),
+  and a single file inside it opens as that root's document in the chosen window. If the
+  open fails in a new window, that window closes and the error appears where the request
+  came from. File › New Window (⇧⌘N) opens an empty window. Only the launch window
+  restores the last file.
+- Closing a window (⌘W, File › Close, the close button) is decided in
+  `windowShouldClose`: pending editor source, a save or a read of the file in flight, a
+  namespace mutation, an image insertion in that window, or quarantine refuse the close;
+  a dirty document that can be saved is saved first, and a failed save keeps the window.
+  A dirty document that cannot be saved closes only if the registry keeps its text,
+  authority, and prompt state (a warm conflicted or missing-file session, or a
+  text-recovery copy); otherwise the close is refused. The last window on a root releases
+  it (D1b) and may refuse. Then the window releases its editor installations and writer,
+  leaves every inventory (so the LRU counts its document again), cancels its search,
+  completion, and Find work, and invalidates its preview. Every closed window keeps no
+  document, the app-owned one included, so the next scene on it is empty. Closing the last
+  window leaves the app running.
 - With no attached workspace window, New File, Open, and Open Recent wait for a scene
   that has claimed the owner. A three-second attach timeout lets the next command retry;
   a tracked façade alone does not establish that a scene exists.
@@ -420,13 +446,16 @@ replacement local to EditorKit.
 | Format table | ⌥⌘F | |
 | Toggle checkbox | ⌘L | |
 | New file | ⌘N | workspace: dedup `Untitled.md` at root; single-file: save panel |
+| New window | ⇧⌘N | File menu: an empty window that does not restore (§5) |
+| Close | ⌘W | File menu: closes the key window through the responder chain (§5 close rules) |
 | Print… | ⌘P | File menu: print the captured light-theme PDF through the standard panel |
 
 All commands appear in the menu bar (Format menu) — menu first, shortcut second, so they
 are discoverable and scriptable. Format menu actions route through the AppKit responder
 chain so commands apply to the focused editor in the key window; if focus is in the
 sidebar or preview, the formatting command no-ops instead of falling back to another
-editor.
+editor. Every document command acts on the key workspace window and never falls back to
+the main window; with Settings key they are disabled.
 
 ### 6.5 Completion engine
 
