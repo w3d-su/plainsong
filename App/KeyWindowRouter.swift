@@ -253,8 +253,13 @@ final class KeyWindowRouter: ObservableObject {
         else {
             return
         }
-        // Hosted tests and an inactive dev session must not steal the owner's key window.
-        guard NSApp.isActive else { return }
+        // Hosted tests and an inactive dev session must not steal the owner's key window. A
+        // Finder or Dock open that arrives just before activation comes forward after it.
+        guard NSApp.isActive else {
+            PendingWindowFocus.shared.request(host)
+            return
+        }
+        PendingWindowFocus.shared.cancel()
         host.makeKeyAndOrderFront(nil)
     }
 
@@ -378,6 +383,7 @@ final class KeyWindowRouter: ObservableObject {
             focusedWindowState = nil
             WorkspaceSceneReopener.shared.resetForTesting()
             WorkspaceWindowRequests.shared.resetForTesting()
+            PendingWindowFocus.shared.cancel()
             objectWillChange.send()
         }
     #endif

@@ -103,10 +103,10 @@ final class WindowSameFileFocusAppTests: SharedRootAppTestCase {
         )
         _ = root
 
-        XCTAssertFalse(second.activateWorkspaceSearchResult(
+        XCTAssertFalse(try second.activateWorkspaceSearchResult(
             context: context,
             fileResult: fileResult,
-            match: try XCTUnwrap(fileResult.matches.first)
+            match: XCTUnwrap(fileResult.matches.first)
         ))
 
         assertFocusedPrimary(leaving: before)
@@ -168,6 +168,23 @@ final class WindowSameFileFocusAppTests: SharedRootAppTestCase {
         XCTAssertNil(second.shownSession.fileURL)
     }
 
+    /// A Finder or Dock open can reach the app just before AppKit activates it. The window
+    /// that shows the file comes forward when activation completes.
+    func testFocusRequestedWhileInactiveAppliesOnActivation() async throws {
+        _ = try await showSharedA()
+        XCTAssertFalse(NSApp.isActive, "hosted tests never activate the app")
+        XCTAssertFalse(firstWindow.isVisible)
+
+        try second.openWorkspaceFile(XCTUnwrap(primary.shownSession.fileURL))
+
+        XCTAssertTrue(KeyWindowRouter.shared.focusedWindowState === primary.windowState)
+        XCTAssertTrue(PendingWindowFocus.shared.pendingWindow === firstWindow)
+        XCTAssertFalse(firstWindow.isVisible, "nothing moves until the app activates")
+        NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: NSApp)
+        XCTAssertTrue(firstWindow.isVisible, "activation brought window 1 forward")
+        XCTAssertNil(PendingWindowFocus.shared.pendingWindow)
+    }
+
     // MARK: - W4 bullet 2: hard links and case or normalization aliases
 
     func testAHardLinkInTheSameRootFocusesTheWindowShowingTheOriginal() async throws {
@@ -185,7 +202,7 @@ final class WindowSameFileFocusAppTests: SharedRootAppTestCase {
         XCTAssertFalse(second.selectWorkspaceNode(id: nodeID))
 
         assertFocusedPrimary(leaving: before)
-        XCTAssertNil(primary.registry.warmSession(at: try XCTUnwrap(
+        XCTAssertNil(try primary.registry.warmSession(at: XCTUnwrap(
             second.workspaceSearchRootAuthority?.location(relativePath: "link.md").fileURL
         )), "no second session was created for the link")
     }
