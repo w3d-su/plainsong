@@ -202,7 +202,9 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 
 - **App Sandbox: ON.** All file access via user-selected URLs; persist
   security-scoped bookmarks for recents/workspaces; always wrap access in
-  `startAccessingSecurityScopedResource()` pairs (helper in WorkspaceKit).
+  `startAccessingSecurityScopedResource()` pairs (helper in WorkspaceKit). Each recent item
+  resolves on its own: one that cannot (an unplugged drive) is hidden but kept, and a stale
+  bookmark is refreshed in place.
 - Open single file: standard `NSOpenPanel` / drag onto Dock / Finder "Open With"
   (import-declare `net.daringfireball.markdown`, and export a UTI for `.mdx`:
   `app.plainsong.mdx` conforming to `public.plain-text` — the `public.*` namespace
