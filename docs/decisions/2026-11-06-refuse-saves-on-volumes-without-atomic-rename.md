@@ -7,7 +7,9 @@ Saving a document on an exFAT disk always failed. The save writer replaces a fil
 "Could not save changes" for an unsupported disk, a full disk, a read-only disk, and revoked
 permission.
 
-Measured on macOS 27.0 (26A428) with 64 MB disk images, in a directory below the volume root:
+Measured on macOS 27.0 (26A428) with disk images, in a directory below the volume root. The
+images are 64 MB, except FAT32, which needs 512 MB; a 64 MB `MS-DOS` image is FAT16 and gave the
+same results as FAT32:
 
 | Format | Advertised swap / exclusive rename | `RENAME_SWAP` over a file | `RENAME_EXCL` to a new name | Empty file's `st_ino` after its first write | Production writer before this change |
 |---|---|---|---|---|---|
