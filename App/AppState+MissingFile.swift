@@ -491,10 +491,12 @@ extension AppState {
         }
     }
 
+    /// An empty window's untouched document owns no file, so it is not a candidate
+    /// (`isPristineEmptyDocument`). Any other window document still is.
     func workspaceSaveCopyOwnershipCandidates() -> [DocumentSession] {
         registry.sessions(from: [
             .warmCache, .retired, .editorBindings, .editorInstallations, .mutationRecovery, .windowDocuments,
-        ])
+        ]).filter { !isPristineEmptyDocument($0) }
     }
 }
 
