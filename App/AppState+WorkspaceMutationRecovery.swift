@@ -1307,6 +1307,7 @@ extension AppState {
                 stopTrackingWorkspaceMutationTextRecovery(for: session)
             case .keepEditorCopy, .showEditorCopy:
                 setCurrentDocument(session)
+                reconcileSessionPolicyAfterEditorLeaseChange()
                 restoreRecoveryPrompt(for: session)
             }
             return
@@ -1324,6 +1325,7 @@ extension AppState {
                 return
             }
             setCurrentDocument(session)
+            reconcileSessionPolicyAfterEditorLeaseChange()
             restoreRecoveryPrompt(for: session)
         case .stopTracking:
             guard recovery.remainingSessions.isEmpty else {
