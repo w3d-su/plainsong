@@ -58,6 +58,10 @@ targets:
       - path: App/Resources/preview
         type: folder
         buildPhase: resources
+      # GPL-3.0-or-later: every shipped app carries the license text
+      # (docs/decisions/2026-11-06-gpl-3.0-or-later-license.md).
+      - path: LICENSE
+        buildPhase: resources
     dependencies:
       - package: MarkdownCore
       - package: EditorKit
@@ -95,7 +99,7 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         LSApplicationCategoryType: public.app-category.productivity
-        NSHumanReadableCopyright: "© 2026 w3d-su"
+        NSHumanReadableCopyright: "© 2026 w3d-su. Free software under the GNU GPL v3 or later, with ABSOLUTELY NO WARRANTY. License and source: https://github.com/w3d-su/plainsong"
         NSHighResolutionCapable: true
         PLAINSONG_UPDATES_ENABLED: "$(PLAINSONG_UPDATES_ENABLED)"
         # Kept on disabled builds. Inert while the updater is not created; the
