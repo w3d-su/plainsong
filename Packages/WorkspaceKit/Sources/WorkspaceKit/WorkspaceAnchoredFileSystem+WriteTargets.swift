@@ -212,12 +212,13 @@ extension WorkspaceAnchoredFileSystem {
         if !staging.isSeparateDirectory, hooks.injectedFailure?(.createSiblingTemporary) != nil {
             throw SiblingStagingRefused()
         }
+        // `0600` for a replacement, `0666` under the umask for a new file.
         let descriptor = name.withCString {
             Darwin.openat(
                 staging.descriptor,
                 $0,
                 O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW,
-                mode_t(S_IRUSR | S_IWUSR)
+                stagingCreationMode(for: target)
             )
         }
         let createError = errno
@@ -263,10 +264,11 @@ extension WorkspaceAnchoredFileSystem {
                 expectedByteCount: expectedByteCount,
                 expectedDigest: expectedDigest
             )
-            if case let .existing(_, _, permissions, _) = target,
-               Darwin.fchmod(descriptor, permissions) != 0
-            {
-                throw WorkspaceAnchoredFileSystemError.unreadable
+            if case let .existing(originalDescriptor, _, permissions, _) = target {
+                guard Darwin.fchmod(descriptor, permissions) == 0 else {
+                    throw WorkspaceAnchoredFileSystemError.unreadable
+                }
+                copyPreservedMetadata(from: originalDescriptor, to: descriptor)
             }
             guard Darwin.fsync(descriptor) == 0 else {
                 throw WorkspaceAnchoredFileSystemError.durabilityFailed

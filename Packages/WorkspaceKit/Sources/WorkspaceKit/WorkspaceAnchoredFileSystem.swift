@@ -271,6 +271,10 @@ public struct WorkspaceIndeterminateFileWrite: Sendable, Equatable {
 /// The three states callers must arbitrate explicitly after a transactional write.
 public enum WorkspaceFileWriteOutcome: Sendable, Equatable {
     case notCommitted(WorkspaceNotCommittedFileWrite)
+    /// The requested bytes are published and `fsync` succeeded for the file and its parent
+    /// directory. This is durability at the syscall boundary, not `F_FULLFSYNC`: the drive
+    /// may still hold the data in its cache across a sudden power loss
+    /// (`docs/workspace-filesystem-contract.md`, "Transactional writes").
     case committedAndDurable(WorkspaceDurableFileWrite)
     case committedButIndeterminate(WorkspaceIndeterminateFileWrite)
 }

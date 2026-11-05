@@ -125,11 +125,23 @@ installed.
 
 ## Transactional writes
 
-All writes first create a same-directory, exclusive `.plainsong-write-*.tmp` file as `0600`
-through an `O_RDWR` descriptor. Preparation explicitly truncates to zero, writes the requested
-byte count, `fsync`s, verifies descriptor size plus SHA-256 against the requested `Data`, applies
-the existing destination's `rwx` permission bits (`st_mode & 0777`; setuid, setgid, and sticky
-bits are never carried over) when replacing, `fsync`s again, and repeats exact verification.
+All writes first create a same-directory, exclusive `.plainsong-write-*.tmp` file through an
+`O_RDWR` descriptor: `0600` when it will replace an existing destination, and `0666` with the
+process umask applied when the destination is missing (Save As, Save Copy to a new name), so
+a new document gets the same mode any other app would give it. Preparation explicitly truncates
+to zero, writes the requested byte count, `fsync`s, verifies descriptor size plus SHA-256 against
+the requested `Data`, applies the existing destination's `rwx` permission bits (`st_mode & 0777`;
+setuid, setgid, and sticky bits are never carried over) when replacing, copies the replaced
+file's own metadata (below), `fsync`s again, and repeats exact verification.
+
+Publication replaces the destination's inode, so a replacing write carries the original's
+extended attributes (Finder tags and colors, `kMDItemWhereFroms`, quarantine), its extended ACL
+and its creation date onto the prepared file before the swap. The copy is best effort and never
+fails the write: the sandbox or the volume may refuse an attribute, and the system-owned
+`com.apple.macl`, `com.apple.provenance`, `com.apple.decmpfs` and `com.apple.system.*` attributes
+are never copied. Hard links cannot survive any rename-based publication: other names keep the
+displaced inode and its old bytes.
+
 The expected byte count and digest stay in `PreparedWrite`; descriptor content and the temporary
 name's identity are revalidated after preparation, immediately before rename, after rename,
 and at the final durable postflight. Empty writes therefore commit as exact zero-byte files, and
