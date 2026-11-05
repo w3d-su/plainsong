@@ -94,7 +94,19 @@ cd preview-src && npm run typecheck
 
 ## 授權
 
-Plainsong 以 [MIT 授權](LICENSE) 開放原始碼。
+Copyright © 2026 w3d-su.
+
+Plainsong 是自由軟體：你可以依照自由軟體基金會發佈的
+[GNU 通用公共授權條款](LICENSE)第 3 版，或（依你的選擇）任何更新的版本，重新散布或修改它
+（SPDX：`GPL-3.0-or-later`）。散布本軟體是希望它有用，但不提供任何擔保，也沒有適售性或特定
+用途適用性的默示擔保。詳見 [`LICENSE`](LICENSE)；授權條款以英文原文為準。
+
+macOS 編輯器連結了 [STTextView](https://github.com/krzyzanowskim/STTextView) 2.4.1，其作者
+允許開放原始碼 App 以 GPLv3 使用它
+（[`docs/third-party/STTextView-2.4.1-LICENSE.md`](docs/third-party/STTextView-2.4.1-LICENSE.md)），
+因此 Plainsong 採用 GPL。先前的版本，包括 `v0.1.0-alpha.5` 及更早的所有 release，以 MIT
+授權發佈，仍可依 MIT 授權使用。
+
 App target 另外連結 [Sparkle](https://github.com/sparkle-project/Sparkle) 2.10.0。
 除非 `PLAINSONG_UPDATES_ENABLED` 是 YES，否則不會檢查更新。Sparkle 為 MIT，並包含
 bsdiff、sais-lite 與 orlp/ed25519；聲明見

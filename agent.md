@@ -47,6 +47,7 @@ projects such as Astro/Next.js content directories).
 | Documentation language | English (this file). |
 | Min deployment target | macOS 14 (Sonoma). |
 | UI framework | SwiftUI app shell; AppKit (`NSViewRepresentable`) for the text editor. |
+| License | GPL-3.0-or-later, because the macOS editor links STTextView under GPLv3 (`docs/decisions/2026-11-06-gpl-3.0-or-later-license.md`). |
 
 ---
 
@@ -69,8 +70,9 @@ projects such as Astro/Next.js content directories).
 | JS tooling | Node 20+, npm, esbuild, vitest (preview pipeline unit tests) | |
 
 **Dependency policy:** keep the dependency list short. Adding any new Swift package or npm
-package requires a `docs/decisions/` entry explaining why. `docs/decision-log.md` is the
-archive and does not take new rows.
+package requires a `docs/decisions/` entry explaining why, and its license must be
+compatible with GPL-3.0-or-later. `docs/decision-log.md` is the archive and does not take
+new rows.
 
 ---
 

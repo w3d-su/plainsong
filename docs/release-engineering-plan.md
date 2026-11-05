@@ -5,7 +5,9 @@
 > notarization scripted later; direct distribution first, App Store optional. This document
 > turns that into ordered work packages with gates. Owner decisions are marked **[owner]**.
 
-Created 2026-07-02. Current state (2026-10-28): MIT `LICENSE` committed; packaging
+Created 2026-07-02. Current state (2026-10-28): `LICENSE` committed (MIT then;
+GPL-3.0-or-later since 2026-11-06, see
+`docs/decisions/2026-11-06-gpl-3.0-or-later-license.md`); packaging
 (`make release`, P3) and unsigned release CI (`release.yml`, P4) landed; v0.1.0-alpha.1 is
 published. The `v0.1.0-alpha.2` tag completed the first end-to-end P4 CI run and created a
 draft prerelease with the build-67 unsigned DMG and filename-only `.sha256`; that GitHub
@@ -63,18 +65,23 @@ date). P1 pipeline work is unblocked.
 
 | # | Decision | Decided 2026-07-02 |
 |---|---|---|
-| P0.1 | License | **MIT**, copyright `w3d-su`. `LICENSE` file committed; README License section updated. |
+| P0.1 | License | **MIT**, copyright `w3d-su`. `LICENSE` file committed; README License section updated. **Superseded 2026-11-06:** GPL-3.0-or-later, because the macOS editor links STTextView under GPLv3 (`docs/decisions/2026-11-06-gpl-3.0-or-later-license.md`). |
 | P0.2 | Distribution channel for alpha | **Direct download** (DMG via GitHub Releases or site). App Store is deliberately left as a future decision — not scheduled, to be re-evaluated later; sandbox-on keeps it possible. |
 | P0.3 | Update mechanism | **None for alpha** (manual downloads). Sparkle or any updater needs its own Decision Log entry; revisit at beta. |
 | P0.4 | Crash/feedback channel | **No telemetry**; feedback via GitHub Issues. Any crash reporter is a new dependency → Decision Log. |
 | P0.5 | Version scheme | **`0.x` marketing version + monotonically increasing build number** stamped by the release script. |
+
+**License obligations for every published build (since 2026-11-06).** The app bundle must
+contain `Contents/Resources/LICENSE` (`project.yml` copies it), and the release notes must
+name the release tag as the corresponding source (GitHub lists the tag's source archives
+next to the DMG). Check both before publishing a draft release.
 
 ## P1 — Identity & signing — DEFERRED (owner decision 2026-07-02)
 
 The owner is not purchasing Apple Developer Program membership for the alpha. Alpha
 builds ship **unsigned** via `PLAINSONG_UNSIGNED=1 make release` (ad-hoc signature,
 "-unsigned" DMG suffix), with the Gatekeeper bypass documented in README "Installing
-(alpha)"; build-from-source remains the zero-friction path for the MIT-licensed repo.
+(alpha)"; build-from-source remains the zero-friction path for the open-source repo.
 P1/P2 resume unchanged when membership is purchased (target: before any beta / wider
 distribution). The steps below are retained for that moment.
 
@@ -166,7 +173,7 @@ required on the unsigned path, and public-repo macOS minutes are free.
 ## P5 — Alpha readiness checklist
 
 - [x] P0 decisions recorded in the Decision Log (2026-07-02).
-- [x] LICENSE committed (MIT); README states license + GitHub Issues feedback channel.
+- [x] LICENSE committed (MIT at the time; GPL-3.0-or-later since 2026-11-06); README states license + GitHub Issues feedback channel.
 - [x] Alpha DMG installs and launches on a second Mac via the documented Gatekeeper
   bypass, opens a folder workspace, edits/saves, and renders the preview offline
   (owner-verified 2026-07-05 with `Plainsong-0.1.0-56-unsigned.dmg`). (Original
