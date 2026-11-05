@@ -15,7 +15,7 @@ enum ListEditing {
             return continueOrderedItem(item, line: line, text: text, selection: selection)
         }
 
-        return continueUnorderedItem(item, selection: selection)
+        return continueUnorderedItem(item, line: line, text: text, selection: selection)
     }
 
     private static func exitEmptyItem(_ item: MarkdownListItem, line: MarkdownLine) -> MarkdownEditResult {
@@ -28,8 +28,14 @@ enum ListEditing {
         )
     }
 
-    private static func continueUnorderedItem(_ item: MarkdownListItem, selection: NSRange) -> MarkdownEditResult {
-        let marker = "\n\(item.nextMarkerText)"
+    private static func continueUnorderedItem(
+        _ item: MarkdownListItem,
+        line: MarkdownLine,
+        text: String,
+        selection: NSRange
+    ) -> MarkdownEditResult {
+        let newline = MarkdownTextEditingSupport.insertedLineTerminator(on: line, in: text)
+        let marker = "\(newline)\(item.nextMarkerText)"
         return MarkdownTextEditingSupport.replacement(
             range: selection,
             string: marker,
@@ -52,7 +58,8 @@ enum ListEditing {
             startingAt: orderedNumber + 2
         )
 
-        let insertedMarker = "\n\(item.nextMarkerText)"
+        let insertedMarker = MarkdownTextEditingSupport.insertedLineTerminator(on: line, in: text)
+            + item.nextMarkerText
         if renumberedTail.range.length == 0 {
             return MarkdownTextEditingSupport.replacement(
                 range: selection,
@@ -273,6 +280,8 @@ struct MarkdownListItem {
         return "\(indent)\(marker) "
     }
 
+    static let maximumOrderedMarkerDigits = 9
+
     private static func string(from units: ArraySlice<UInt16>) -> String {
         String(decoding: units, as: UTF16.self)
     }
@@ -293,6 +302,10 @@ struct MarkdownListItem {
         while index < units.count, units[index] >= 48, units[index] <= 57 {
             index += 1
         }
+        // CommonMark §5.2: an ordered list marker has 1–9 digits. Longer runs are
+        // paragraph text, which also keeps every number below 10^9 so the `+ 1`/`+ 2`
+        // continuation and renumbering arithmetic cannot overflow `Int`.
+        guard index - numberStart <= maximumOrderedMarkerDigits else { return nil }
         guard index < units.count, units[index] == 46 || units[index] == 41 else { return nil }
 
         let numberText = string(from: units[numberStart ..< index])

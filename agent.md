@@ -357,7 +357,10 @@ replacement local to EditorKit.
 - **List continuation:** Enter inside `-`/`*`/`1.`/`- [ ]` list inserts next marker
   (renumbering ordered lists); Enter on an empty item removes the marker (exits list).
   Tab / Shift-Tab indents/outdents list items, including every list item overlapped by
-  a multi-line selection.
+  a multi-line selection. An ordered marker has 1–9 digits (CommonMark §5.2); a longer
+  number is paragraph text, which keeps the renumbering arithmetic far from `Int` overflow.
+  Every Enter helper (list, code fence, table) inserts the line's own terminator (the
+  previous line's on the last line), so CRLF and CR documents never gain mixed endings.
 - **Auto-pairing:** `_`, `` ` ``, `(`, `[`, `{`, `"`, `<` (mdx) auto-close at the
   caret. `*` wraps a selection as italic (`*…*`) but does not auto-close at a bare
   caret so bullets and manually typed italics stay natural. Wrapping: with a selection,
@@ -372,7 +375,10 @@ replacement local to EditorKit.
   `assets/` if outside the workspace).
 - **Table helper:** Tab/Shift-Tab navigate cells; Enter adds a row; `Format Table`
   command (⌥⌘F) realigns pipes, preserving edge cells when outer pipes are omitted
-  and treating escaped pipes as cell content. Pure formatting function lives in MarkdownCore.
+  and treating escaped pipes as cell content. As in GFM, a table starts at the header row
+  directly above its first delimiter row: earlier lines that merely contain `|` stay
+  paragraph text, and a delimiter row with no header is not a table. Formatting keeps each
+  row's own line terminator. Pure formatting function lives in MarkdownCore.
 - **Checkbox toggle:** ⌘L toggles `- [ ]`/`- [x]` on current line(s).
 
 ### 6.4 Formatting commands & shortcuts
