@@ -183,16 +183,20 @@ extension EditorFindHostedGateTests {
         let group = makeHostedWorkspaceGroup(fixture: fixture)
         let firstWindow = mountDesignatedKeyWorkspace(in: group, appState: primary)
         let otherWindow = mountDesignatedKeyWorkspace(in: group, appState: second, originX: 1040)
-        let first = MountedWorkspaceWindow(window: firstWindow, host: try XCTUnwrap(group.members.first?.host))
-        let other = MountedWorkspaceWindow(window: otherWindow, host: try XCTUnwrap(group.members.last?.host))
+        let first = try MountedWorkspaceWindow(window: firstWindow, host: XCTUnwrap(group.members.first?.host))
+        let other = try MountedWorkspaceWindow(window: otherWindow, host: XCTUnwrap(group.members.last?.host))
         try await waitUntil("both windows attach to their own façade") {
             KeyWindowRouter.shared.facade(for: firstWindow) === primary
                 && KeyWindowRouter.shared.facade(for: otherWindow) === second
         }
         designateKeyWindow(firstWindow, in: group)
         for (mounted, facade) in [(first, primary), (other, second)] {
-            try await waitUntil("\(facade.shownSession.fileURL?.lastPathComponent ?? "?") installs its editor", timeout: 20) {
-                guard let applied = EditorSelectionProbe.appliedEditorSelection(in: mounted.window) else { return false }
+            try await waitUntil(
+                "\(facade.shownSession.fileURL?.lastPathComponent ?? "?") installs its editor",
+                timeout: 20
+            ) {
+                guard let applied = EditorSelectionProbe.appliedEditorSelection(in: mounted.window)
+                else { return false }
                 return applied.isDocumentInstalled
                     && applied.documentIdentity == facade.editorDocumentIdentity(for: facade.shownSession)
             }
@@ -218,8 +222,8 @@ extension EditorFindHostedGateTests {
         let otherPreview = try XCTUnwrap(other.preview)
         XCTAssertFalse(firstPreview === otherPreview)
         try await waitUntil("each preview renders its own document", timeout: 15) {
-            let firstText = (try? await self.previewText(firstPreview)) ?? ""
-            let otherText = (try? await self.previewText(otherPreview)) ?? ""
+            let firstText = await (try? self.previewText(firstPreview)) ?? ""
+            let otherText = await (try? self.previewText(otherPreview)) ?? ""
             return firstText.contains(firstMarker) && !firstText.contains(otherMarker)
                 && otherText.contains(otherMarker) && !otherText.contains(firstMarker)
         }
@@ -227,11 +231,20 @@ extension EditorFindHostedGateTests {
         // Title, proxy icon, and file header.
         XCTAssertEqual(first.window.representedURL?.lastPathComponent, primary.shownSession.fileURL?.lastPathComponent)
         XCTAssertEqual(other.window.representedURL?.lastPathComponent, second.shownSession.fileURL?.lastPathComponent)
-        XCTAssertNotEqual(first.window.title, other.window.title, "each window titles its own document")
-        let firstHeader = AccessibilityQuery.find(identifier: "plainsong.editor.fileName", label: nil, onlyIn: first.window)
-            .flatMap(AccessibilityQuery.value(of:))
-        let otherHeader = AccessibilityQuery.find(identifier: "plainsong.editor.fileName", label: nil, onlyIn: other.window)
-            .flatMap(AccessibilityQuery.value(of:))
+        XCTAssertEqual(first.window.title, primary.shownSession.fileURL?.lastPathComponent, "window 1's title")
+        XCTAssertEqual(other.window.title, second.shownSession.fileURL?.lastPathComponent, "window 2's title")
+        let firstHeader = AccessibilityQuery.find(
+            identifier: "plainsong.editor.fileName",
+            label: nil,
+            onlyIn: first.window
+        )
+        .flatMap(AccessibilityQuery.value(of:))
+        let otherHeader = AccessibilityQuery.find(
+            identifier: "plainsong.editor.fileName",
+            label: nil,
+            onlyIn: other.window
+        )
+        .flatMap(AccessibilityQuery.value(of:))
         XCTAssertEqual(firstHeader, primary.shownSession.fileURL?.lastPathComponent)
         XCTAssertEqual(otherHeader, second.shownSession.fileURL?.lastPathComponent)
 
@@ -261,9 +274,16 @@ extension EditorFindHostedGateTests {
         XCTAssertEqual(second.editorFindHost.ui.queryText, "")
 
         // Search mode and results.
+        second.toggleWorkspaceSearch()
+        XCTAssertEqual(second.workspaceSearchUI.mode, .search)
         second.updateWorkspaceSearchQueryText(otherMarker)
+        try await waitUntil("window 2's search finds its marker", timeout: 10) {
+            second.workspaceSearchState.fileResults.contains { $0.relativePath.hasSuffix("B.md") }
+        }
         XCTAssertEqual(second.workspaceSearchUI.queryText, otherMarker)
         XCTAssertEqual(primary.workspaceSearchUI.queryText, "")
+        XCTAssertTrue(primary.workspaceSearchState.fileResults.isEmpty, "window 1 ran no search")
+        XCTAssertEqual(primary.workspaceSearchUI.mode, .files)
 
         // Banners.
         XCTAssertNil(primary.externalChangePrompt)

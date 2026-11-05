@@ -185,7 +185,7 @@ final class WindowCloseLifecycleAppTests: SharedRootAppTestCase {
         XCTAssertEqual(session.text, "mine")
     }
 
-    func testADirtyDocumentWithoutRetentionProofRefusesTheClose() throws {
+    func testADirtyDocumentWithoutRetentionProofRefusesTheClose() {
         let untitled = DocumentSession(text: "draft")
         second.shownSession = untitled
         untitled.replaceText("draft edited")
@@ -275,7 +275,7 @@ final class WindowCloseLifecycleAppTests: SharedRootAppTestCase {
     /// external state survives the close on the registry.
     func testClosingTheOwnersWindowLetsTheNextSceneReuseItEmpty() throws {
         KeyWindowRouter.shared.resetForTesting()
-        let owner = primary!
+        let owner = try XCTUnwrap(primary)
         _ = WindowFacadeHolder(owner: owner)
         let ownerWindow = makeWindow()
         KeyWindowRouter.shared.attach(ownerWindow, to: owner)
