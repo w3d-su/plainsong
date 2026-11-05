@@ -491,6 +491,66 @@ final class WorkspaceSearchResultsPresentationTests: XCTestCase {
 
     // MARK: - Helpers
 
+    func testSectionsCacheReusesSectionsWhenOnlyProgressChanges() {
+        let cache = WorkspaceSearchResultSectionsCache()
+        let first = fileResult(path: "a.md", needle: "x", text: "x one")
+        var state = WorkspaceSearchState(
+            activeQuery: TextSearchQuery(pattern: "x"),
+            queryGeneration: 4,
+            phase: .searching,
+            fileResults: [first],
+            progress: WorkspaceSearchProgress(completedFileCount: 1, candidateFileCount: 100)
+        )
+        let initial = WorkspaceSearchResultsPresenter.make(inputs(for: state), sections: cache)
+        XCTAssertEqual(cache.builtSectionCount, 1)
+
+        for completed in 2 ... 50 {
+            state.progress = WorkspaceSearchProgress(completedFileCount: completed, candidateFileCount: 100)
+            let presentation = WorkspaceSearchResultsPresenter.make(inputs(for: state), sections: cache)
+            XCTAssertEqual(presentation.sections, initial.sections)
+            XCTAssertEqual(
+                presentation.status,
+                .searching(completedFileCount: completed, candidateFileCount: 100)
+            )
+        }
+        XCTAssertEqual(cache.builtSectionCount, 1, "progress updates rebuild no rows")
+
+        state.fileResults.append(fileResult(path: "b.md", needle: "x", text: "x two"))
+        let appended = WorkspaceSearchResultsPresenter.make(inputs(for: state), sections: cache)
+        XCTAssertEqual(cache.builtSectionCount, 2, "an appended file builds only its own section")
+        XCTAssertEqual(
+            appended.sections,
+            WorkspaceSearchResultsPresenter.makeSections(fileResults: state.fileResults, queryGeneration: 4)
+        )
+    }
+
+    func testSectionsCacheRebuildsRewrittenResultsAndNewGenerations() {
+        let cache = WorkspaceSearchResultSectionsCache()
+        let results = [
+            fileResult(path: "a.md", needle: "x", text: "x one"),
+            fileResult(path: "b.md", needle: "x", text: "x two"),
+        ]
+        _ = cache.sections(for: results, queryGeneration: 1)
+        XCTAssertEqual(cache.builtSectionCount, 2)
+
+        // Same count, earlier element rewritten in place: rebuilt from the change on.
+        let rewritten = [fileResult(path: "a.md", needle: "x", text: "x changed"), results[1]]
+        XCTAssertEqual(
+            cache.sections(for: rewritten, queryGeneration: 1),
+            WorkspaceSearchResultsPresenter.makeSections(fileResults: rewritten, queryGeneration: 1)
+        )
+        XCTAssertEqual(cache.builtSectionCount, 4)
+
+        // A new generation changes every row ID.
+        XCTAssertEqual(
+            cache.sections(for: rewritten, queryGeneration: 2),
+            WorkspaceSearchResultsPresenter.makeSections(fileResults: rewritten, queryGeneration: 2)
+        )
+        XCTAssertEqual(cache.builtSectionCount, 6)
+
+        XCTAssertEqual(cache.sections(for: [], queryGeneration: 2), [])
+    }
+
     private func inputs(for state: WorkspaceSearchState) -> WorkspaceSearchResultsPresentationInputs {
         WorkspaceSearchResultsPresentationInputs(
             searchState: state,

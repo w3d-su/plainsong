@@ -498,6 +498,7 @@ extension AppState {
         cancelPendingEditorNavigationIfNeeded()
         shownSession = session
         releaseUnreferencedSessionOwnership(for: previousSession)
+        refreshWorkspaceWatcherEventFilter()
         clearPromptsNotMatchingCurrentDocument()
         restoreRecoveryPrompt(for: session)
         if indeterminateSessionWrites[ObjectIdentifier(session)] != nil {

@@ -249,8 +249,12 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   the list Search ignores) without enumerating them; only the chain down to an open
   session's file in that root is scanned inside them. "Show all files" rescans everything.
 - File tree operations: create/rename/delete/move file & folder (Finder-style, with
-  trash not hard delete). Watch root recursively via `FSEventStream`; debounce 300 ms;
-  reconcile tree diff instead of full reload to preserve expansion state.
+  trash not hard delete). Watch root recursively via `FSEventStream`; debounce 300 ms,
+  never more than 2 s after the first unhandled batch, so a tool that keeps writing cannot
+  postpone the refresh forever. With "Show all files" off, a batch whose every path lies in a
+  subtree the scan skips (an ignored directory off the chain to an open document) is
+  dropped; the scan's pruning is handed to the watcher at each reload and document switch.
+  Reconcile tree diff instead of full reload to preserve expansion state.
   A reload whose final proof is superseded by document/session changes retries with a
   fresh capture in the same generation; a newer reload, workspace switch, or close cancels it.
 - External change to the open file: if editor is clean → silently reload; if dirty →
