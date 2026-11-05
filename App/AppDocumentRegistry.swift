@@ -131,7 +131,18 @@ final class AppDocumentRegistry: ObservableObject {
     }
 
     var detachedSessionURLs: Set<URL> = [] {
-        didSet { noteEditorReplaceAuthorityInputDidChange() }
+        didSet {
+            noteEditorReplaceAuthorityInputDidChange()
+            // A record lives only while its URL is detached: every path that reattaches a
+            // file (Reload, Keep Mine, Save Copy, relocation, reactivation) drops it here, so
+            // a later detach can never reuse a revision recorded for an earlier one.
+            let reattached = oldValue.subtracting(detachedSessionURLs)
+            if !reattached.isEmpty, !cleanDetachedSessionRecords.isEmpty {
+                cleanDetachedSessionRecords = cleanDetachedSessionRecords.filter {
+                    !reattached.contains($0.value.stateURL)
+                }
+            }
+        }
     }
 
     /// The state URL and revision at which a clean session was detached (M2). While the

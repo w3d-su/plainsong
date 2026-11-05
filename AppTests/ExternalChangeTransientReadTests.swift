@@ -154,6 +154,25 @@ final class ExternalChangeTransientReadTests: XCTestCase {
         XCTAssertFalse(appState.detachedSessionURLs.contains(fixture.post))
     }
 
+    func testCleanDetachRecordLivesOnlyWhileTheFileIsDetached() async throws {
+        let fixture = try AnchoredSessionFixture(text: "disk A")
+        defer { fixture.cleanUp() }
+        let (appState, session, post) = (fixture.appState, fixture.session, fixture.post)
+
+        try FileManager.default.removeItem(at: post)
+        appState.handleExternalChange(for: session)
+        try await waitUntil("removal detaches") { appState.detachedSessionURLs.contains(post) }
+        XCTAssertEqual(
+            appState.cleanDetachedSessionRecords[ObjectIdentifier(session)],
+            CleanDetachedSessionRecord(stateURL: post, revision: session.version)
+        )
+
+        // Any path that reattaches the URL (Reload, Keep Mine, Save Copy, relocation) drops
+        // the record, so a later detach cannot reuse it.
+        appState.detachedSessionURLs.remove(post)
+        XCTAssertNil(appState.cleanDetachedSessionRecords[ObjectIdentifier(session)])
+    }
+
     private func waitUntil(
         _ description: String,
         timeout: TimeInterval = 4,
