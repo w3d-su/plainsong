@@ -20,9 +20,9 @@ final class WindowEmptyDocumentOwnershipAppTests: XCTestCase {
         _ = try fixture.showDetachedSessionInSharedWindow()
         let empty = appState.makeSiblingFacade(admitsFileOperations: true)
         XCTAssertTrue(appState.registry.connectedWindows.contains { $0 === empty.windowState })
-        XCTAssertEqual(
+        XCTAssertNil(
             appState.unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(empty.shownSession)],
-            .unavailable(fileURL: nil)
+            "a sibling's blank takes no ownership record"
         )
         XCTAssertTrue(appState.isPristineEmptyDocument(empty.shownSession))
         XCTAssertTrue(empty.isEmptyWorkspaceWindow)
@@ -36,6 +36,18 @@ final class WindowEmptyDocumentOwnershipAppTests: XCTestCase {
         XCTAssertNoThrow(
             try appState.saveDetachedCurrentDocument(to: fixture.root.appendingPathComponent("copy.md"))
         )
+    }
+
+    /// A sibling that goes away without closing its window leaves no record that a later
+    /// session at the same address could inherit.
+    func testASiblingThatGoesAwayLeavesNoOwnershipRecord() throws {
+        let fixture = try SecondWindowRegistryFixture.make(testCase: self)
+        let appState = fixture.appState
+        let before = appState.unanchoredManagedSessionOwnershipProofs.count
+        autoreleasepool {
+            _ = appState.makeSiblingFacade(admitsFileOperations: true)
+        }
+        XCTAssertEqual(appState.unanchoredManagedSessionOwnershipProofs.count, before)
     }
 
     func testTheOwnersLaunchBlankDoesNotBlockASiblingsSaveCopy() throws {

@@ -23,7 +23,6 @@ final class WindowOpenRoutingAppTests: XCTestCase {
 
     override func setUp() async throws {
         KeyWindowRouter.shared.resetForTesting()
-        WindowOpenAdmission.testingBypass = true
         suiteName = "WindowOpenRouting-\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suiteName)
         directory = FileManager.default.temporaryDirectory
@@ -66,7 +65,7 @@ final class WindowOpenRoutingAppTests: XCTestCase {
     func testNewWindowOpensAnEmptyAdmittedWindowThatDoesNotRestore() throws {
         let file = try write("A.md", "alpha")
         try primary.open(url: file, rememberAsLastOpened: false, preserveWorkspace: false)
-        try lastOpened.save(try write("B.md", "beta"))
+        try lastOpened.save(write("B.md", "beta"))
 
         XCTAssertTrue(WorkspaceWindowRequests.shared.openNewWindow(on: primary.registry))
 
@@ -196,7 +195,7 @@ final class WindowOpenRoutingAppTests: XCTestCase {
     /// A request belongs to its registry: a scene of another registry cannot take it.
     func testARequestRunsOnlyInASceneOfItsRegistry() throws {
         let beta = try write("B.md", "beta")
-        try primary.open(url: try write("A.md", "alpha"), rememberAsLastOpened: false, preserveWorkspace: false)
+        try primary.open(url: write("A.md", "alpha"), rememberAsLastOpened: false, preserveWorkspace: false)
         attachesScenesImmediately = false
         primary.routeOpen(beta)
 

@@ -230,7 +230,7 @@ enum AppStateError: LocalizedError {
     case workspaceMutationRecoveryUnavailable(URL)
     case unsavedChangesPreventTermination(URL)
     case recoveryDestinationConflictsOriginal(URL)
-    /// A production extra scene refuses every file and root open until PR D2.
+    /// A façade built to refuse file and root opens (`WindowOpenAdmission`).
     case windowFileOpenRefused
     /// A window close waits for a save or a read of the file on disk to finish (WD8).
     case fileWorkInProgress(URL)

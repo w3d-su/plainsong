@@ -42,8 +42,9 @@ final class WindowFacadeLifecycleAppTests: XCTestCase {
         autoreleasepool {
             let extra = WindowFacadeHolder(owner: owner)
             XCTAssertFalse(extra.facade === owner, "a scene opened while the owner shows is a sibling")
-            XCTAssertFalse(WindowOpenAdmission.admits(extra.facade.windowState))
-            XCTAssertTrue(KeyWindowRouter.shared.home(for: owner.registry) === owner, "a refused scene is never home")
+            XCTAssertTrue(WindowOpenAdmission.admits(extra.facade.windowState), "PR D2 admits every scene")
+            XCTAssertTrue(extra.facade.isEmptyWorkspaceWindow)
+            XCTAssertTrue(KeyWindowRouter.shared.home(for: owner.registry) === owner, "the owner stays home")
         }
 
         let blocked = try write("blocked.md", "blocked\n")

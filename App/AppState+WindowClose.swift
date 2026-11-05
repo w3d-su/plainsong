@@ -62,11 +62,10 @@ extension AppState {
     }
 
     /// The app-owned façade is shown again (Dock reopen, a file command, New Window): it rejoins
-    /// every inventory as an empty window.
+    /// every inventory as an empty window. Its blank owns nothing, so it takes no record.
     func reconnectReclaimedWindow() {
         WindowOpenAdmission.set(windowState, admits: true)
         registry.register(windowState)
-        retainUnanchoredManagedSessionOwnership(for: shownSession)
     }
 
     /// WD8: whether a dirty document that cannot be saved may close and stay warm. The registry
