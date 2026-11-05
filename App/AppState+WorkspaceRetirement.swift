@@ -23,7 +23,7 @@ extension AppState {
                     ?? URL(fileURLWithPath: "/")
             )
         }
-        if let recovery = nextWorkspaceMutationRecovery() {
+        if let recovery = nextWorkspaceMutationRecoveryBlockingClosure() {
             throw WorkspaceMutationError.indeterminateSession(recovery.sourceURL)
         }
         if workspaceRootURL != nil, workspaceRootContext.facades.contains(where: { $0 !== self }) {
@@ -34,7 +34,11 @@ extension AppState {
         // or conflict must not block, and must not be swept up with this close.
         let rootSessions = workspaceSessionsForRootPreflight()
         let sessionsToClose = rootSessions.filter { !isPreservedForAnotherWindow($0) }
-        let preservedSessions = rootSessions.filter { isPreservedForAnotherWindow($0) }
+        // Another window keeps these. Only a session the root's authority proves it owns
+        // keeps the root's grant; the window's own document from elsewhere does not.
+        let preservedRootSessions = rootSessions.filter {
+            isPreservedForAnotherWindow($0) && sessionBelongsToClosingRoot($0)
+        }
         if let quarantinedSession = rootSessions.first(where: {
             indeterminateWorkspaceMutationSessions.contains(ObjectIdentifier($0))
         }) {
@@ -92,45 +96,26 @@ extension AppState {
         commitWorkspaceClosure(
             sessions: sessionsToClose,
             retirementPlans: retirementPlans,
-            preserving: preservedSessions
+            preserving: preservedRootSessions
         )
     }
 }
 
 @MainActor
 private extension AppState {
-    /// Root closure covers its preserved sessions as well as the release set. Without
-    /// a root, replacement retires only this window's shown and installed documents.
+    /// Root closure covers the closing window's own document and installations and the
+    /// root's sessions, preserved ones included (`isCoveredByWorkspaceClosure`). Without a
+    /// root, replacement retires only this window's shown and installed documents.
     func workspaceSessionsForRootPreflight() -> [DocumentSession] {
         registry.sessions(from: [
             .warmCache, .retired, .editorBindings, .editorInstallations, .mutationRecovery, .fileBackedWindowDocuments,
         ]).filter { session in
-            sessionBelongsToClosingRoot(session)
+            isCoveredByWorkspaceClosure(session)
         }.sorted { first, second in
             sessionClosureIdentity(first).utf8.lexicographicallyPrecedes(
                 sessionClosureIdentity(second).utf8
             )
         }
-    }
-
-    func sessionBelongsToClosingRoot(_ session: DocumentSession) -> Bool {
-        guard let authority = workspaceSearchRootAuthority else {
-            if session === shownSession { return true }
-            return editorBindingInstallations.contains { installation, owner in
-                owner === session && registry.editorInstallationWindows[installation]?.window === windowState
-            }
-        }
-        if let location = retainedManagedSessionLocation(for: session),
-           location.rootAuthority == authority
-        {
-            return true
-        }
-        if case let .proven(proof)? = unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)],
-           proof.installedWorkspaceLocation?.rootAuthority == authority
-        {
-            return true
-        }
-        return false
     }
 
     /// The closing window's own document still releases with its root. Another window's
@@ -285,8 +270,12 @@ private extension AppState {
             proofRetainedSessionIdentities.insert(ObjectIdentifier(session))
         }
         if !retainedSessionIdentities.contains(ObjectIdentifier(shownSession)) {
-            autosaveTask?.cancel()
-            autosaveTask = nil
+            // The shared foreground autosave serves the home façade's document
+            // (`scheduleAutosave()`), so a sibling's close leaves it running.
+            if (KeyWindowRouter.shared.home(for: registry) ?? self) === self {
+                autosaveTask?.cancel()
+                autosaveTask = nil
+            }
             statisticsTask?.cancel()
             statisticsTask = nil
         }
