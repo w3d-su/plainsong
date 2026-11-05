@@ -113,7 +113,7 @@ in two editors (§4.1 b), or bridge changes (`PROTOCOL_VERSION` stays unchanged)
 | Hard links and case aliases are detected by physical identity. | `App/AppState+WorkspaceSessions.swift:294-315` | The basis for "same file" (§4.1). |
 | Opening a workspace closes the previous one, starts one security scope, and starts one watcher. | `App/AppState+WorkspaceOpen.swift:7`, `App/AppState+WorkspaceWatcher.swift:11` | Per root. D1c starts the scope and watcher once, then attaches another window to that context. |
 | Opening a single file closes the workspace. | `App/AppState+Workspace.swift:271-273` | Must become "this window's root". |
-| Closing one root releases only sessions whose retained authority or installed membership belongs to that root. | `workspaceSessionsForRootPreflight`, `clearClosedWorkspaceState`, and `pruneMetadataAfterRootRelease` in `App/AppState+WorkspaceRetirement.swift` | Another root, a standalone warm session, and a session another window shows or installs stay warm, with their tasks, metadata, and LRU recency (D1b, §6.2). |
+| Closing one root releases only sessions whose retained authority or installed membership belongs to that root. | `workspaceSessionsForRootPreflight` and `clearClosedWorkspaceState` in `App/AppState+WorkspaceRetirement.swift`; `pruneMetadataAfterRootRelease` in `App/AppState+WorkspaceRootReleasePruning.swift` | Another root, a standalone warm session, and a session another window shows or installs stay warm, with their tasks, metadata, and LRU recency (D1b, §6.2). |
 | A watcher event inspects only sessions of that root authority. An unanchored session records membership in at most one installed root. | `App/AppState+WorkspaceWatcher.swift:15-32`, `App/AppState+Workspace.swift:87`, `App/AppState+SessionOwnership.swift:503-550` (early return at `:508`) | Overlapping roots are unsafe (§4.3). |
 | `WorkspaceFileTree` bundles the scanned root with `expandedNodeIDs` and `selectedNodeID`. | `Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceFileTree.swift:89-100` | Share the snapshot only. Each window owns its entire filtered tree and reload disposition (`App/AppState+WorkspaceReload.swift:284-302`, `Packages/WorkspaceCore/Sources/WorkspaceCore/WorkspacePureTree.swift:155-158`). |
 | One last-opened bookmark key and ten recents. Restore runs once per `AppState` and re-saves stale bookmarks. A restored workspace selects its first file, not the last document. | `Packages/WorkspaceKit/Sources/WorkspaceKit/LastOpenedFileStore.swift:4`, `:25-43`, `Packages/WorkspaceKit/Sources/WorkspaceKit/RecentItemStore.swift:4`, `:12-20`, `App/AppState+DocumentCommands.swift:9-37`, `App/AppState+Workspace.swift:389-393` | Per-window restoration needs a list (§6.4). |
@@ -127,7 +127,7 @@ Additional consumers of `currentDocument` / `sessionCache` that I2 must migrate:
 
 | Consumer | Evidence | Migration obligation |
 |---|---|---|
-| `retainMetadataOnlyForRetiredEditorSessions` | `App/AppState+WorkspaceSessions.swift:319-362`. Root release does not call it; it uses `pruneMetadataAfterRootRelease` (`App/AppState+WorkspaceRetirement.swift:305`). | Preserve sessions outside the release set. The global helper still clears save fences (`App/AppDocumentRegistry.swift:118-128`), bindings, proofs, quarantine, and detached URLs when a caller uses it. |
+| `retainMetadataOnlyForRetiredEditorSessions` | `App/AppState+WorkspaceSessions.swift:319-362`. Root release does not call it; it uses `pruneMetadataAfterRootRelease` (`App/AppState+WorkspaceRootReleasePruning.swift:9`). | Preserve sessions outside the release set. The global helper still clears save fences (`App/AppDocumentRegistry.swift:118-128`), bindings, proofs, quarantine, and detached URLs when a caller uses it. |
 | `firstUnretirableExternalConflict` | `App/AppState+WorkspaceSessions.swift:155-173` | Enumerate globally, or only the release set when closing one root (`among:`). |
 | `isAddressableExternalResolutionSession` | `App/AppState+ExternalChanges.swift:958-972` | Accept registry-owned sessions, including another window's current session. |
 | `canAutosave` membership | `App/AppState+Autosave.swift:141-143` | Registry membership; never one window's cache/current document. |
@@ -437,8 +437,9 @@ In order (closing a tab is closing a window):
    Remove only eligible cache/LRU entries; never reset the whole LRU. Scope metadata pruning
    to those retired sessions, preserving fences, bindings, proofs, quarantine, detached URLs,
    other roots' warm sessions, and standalone warm sessions. D1b does this in
-   `workspaceSessionsForRootPreflight`, `clearClosedWorkspaceState`, and
-   `pruneMetadataAfterRootRelease` in `App/AppState+WorkspaceRetirement.swift`.
+   `workspaceSessionsForRootPreflight` and `clearClosedWorkspaceState` in
+   `App/AppState+WorkspaceRetirement.swift`, and `pruneMetadataAfterRootRelease` in
+   `App/AppState+WorkspaceRootReleasePruning.swift`.
    It does not call `cancelWorkspaceSessionTasks(excluding:)`, `registry.removeAllWarmSessions()`,
    reset the LRU policy, or `retainMetadataOnlyForRetiredEditorSessions()`.
    Release installed membership explicitly; retained authority/security-scope references
