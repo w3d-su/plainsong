@@ -375,27 +375,38 @@ extension AppState {
             pending.append(contentsOf: sessionPolicy.access(
                 eviction.url,
                 isDirty: session.isDirty,
-                protectedURLs: protectedSessionURLs().union(retainedURLs)
+                protectedURLs: protectedSessionURLs().union(retainedURLs),
+                installedURLs: installedSessionURLs()
             ))
         }
     }
 
     func reconcileSessionPolicyAfterEditorLeaseChange() {
-        handleSessionEvictions(sessionPolicy.trim(protectedURLs: protectedSessionURLs()))
+        handleSessionEvictions(sessionPolicy.trim(
+            protectedURLs: protectedSessionURLs(),
+            installedURLs: installedSessionURLs()
+        ))
     }
 
-    func protectedSessionURLs() -> Set<URL> {
-        var urls = Set(retiredEditorDocumentSessions.keys)
-        for session in registry.sessions(from: [.windowDocuments]) {
-            if let shownURL = sessionStateURL(for: session) {
-                urls.insert(shownURL)
-            }
-        }
+    /// Editor-binding installations, plus every connected window's shown session.
+    /// These stay warm without consuming the eight-session capacity.
+    func installedSessionURLs() -> Set<URL> {
+        var urls: Set<URL> = []
         for session in editorBindingInstallations.values {
             if let installedURL = sessionStateURL(for: session) {
                 urls.insert(installedURL)
             }
         }
+        for session in registry.sessions(from: [.windowDocuments]) {
+            if let shownURL = sessionStateURL(for: session) {
+                urls.insert(shownURL)
+            }
+        }
+        return urls
+    }
+
+    func protectedSessionURLs() -> Set<URL> {
+        var urls = Set(retiredEditorDocumentSessions.keys)
         for (sessionIdentity, context) in indeterminateSessionWriteContexts
             where indeterminateSessionWrites[sessionIdentity] != nil
         {
@@ -468,10 +479,12 @@ private extension AppState {
         session: DocumentSession
     ) -> Bool {
         let sessionIdentity = ObjectIdentifier(session)
-        if protectedSessionURLs().contains(eviction.url) || indeterminateSessionWrites[sessionIdentity] != nil ||
-            indeterminateWorkspaceMutationSessions.contains(sessionIdentity) ||
-            workspaceMutationWriteFences.contains(sessionIdentity)
-        {
+        let blocksEviction = protectedSessionURLs().contains(eviction.url)
+            || installedSessionURLs().contains(eviction.url)
+            || indeterminateSessionWrites[sessionIdentity] != nil
+            || indeterminateWorkspaceMutationSessions.contains(sessionIdentity)
+            || workspaceMutationWriteFences.contains(sessionIdentity)
+        if blocksEviction {
             return false
         }
         if eviction.requiresSave || session.isDirty {
