@@ -7,11 +7,12 @@
 `approveWindowClose`. Everything that can fail happens there, while AppKit can still keep the
 window open:
 
-1. Transient work refuses the close: pending editor source (which covers marked text), a save
-   or a read of the file in flight, a namespace mutation, or an image insertion in this
-   window. So does quarantine: an indeterminate write, a mutation quarantine, or a write
-   fence. The user closes again once the work settles. WD8 allows refusing or deferring;
-   refusing keeps the window's state exactly as it was, and no timer can close it later.
+1. Transient work refuses the close: pending editor source in any of the window's editors
+   (which covers marked text), a save or a read of the file in flight, a namespace mutation,
+   or an image insertion in this window. So does quarantine: an indeterminate write, a
+   mutation quarantine, or a write fence. The user closes again once the work settles. WD8
+   allows refusing or deferring; refusing keeps the window's state exactly as it was, and no
+   timer can close it later.
 2. A dirty document that can be saved is saved. A failed save keeps the window open.
 3. A dirty document that cannot be saved closes only with registry retention proof: it is a
    text-recovery copy, or it is warm at its state URL with a retained location and with the
@@ -19,14 +20,19 @@ window open:
    it while it is dirty, because eviction saves first and that save is refused. Otherwise the
    close is refused. An untitled document has no URL, so it can never be warm and always
    refuses.
-4. The last window on a root runs D1b's release, which preflights, saves, and may refuse. Any
-   other window leaves the shared root (D1c).
+4. The last window on a root runs D1b's release, which preflights, saves, and may refuse.
+   Any other window leaves the shared root and releases its own documents from outside it
+   (D1c), which may refuse too. The refusal names the document that blocks it. When no
+   window shows that document (a conflict WD8 kept warm when another window on the root
+   closed), the refusal's Show opens it in this window so the user can resolve it. Keeping
+   such a document past the last release is left for later.
 
-`willClose` then finishes the close and cannot fail. It revokes this window's editor
-installations and releases its writer, instead of waiting for SwiftUI to dismantle the
-editor. It leaves the registry inventories, so the LRU counts the window's document again and
-trims (§6.2 step 3). It cancels the window's search, completion, Find, and navigation work,
-and invalidates its preview controllers (step 5).
+`willClose` then finishes the close and cannot fail. It first leaves the registry
+inventories, so the LRU counts the window's document again and no prompt that a revoke
+restores can land on the closed window. It then revokes this window's editor installations
+and releases its writer, instead of waiting for SwiftUI to dismantle the editor, clears the
+window's prompts, and trims (§6.2 step 3). It cancels the window's search, completion, Find,
+and navigation work, and invalidates its preview controllers (step 5).
 
 Every window keeps no document after it closes, the app-owned one included. The app-owned
 façade stays alive and admitted. Its next scene (a Dock reopen, a file command with no

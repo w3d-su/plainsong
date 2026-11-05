@@ -18,6 +18,8 @@ final class WorkspaceWindowRequests {
         /// Only a scene on this registry may take the request.
         weak var registry: AppDocumentRegistry?
         let action: ((AppState) -> Void)?
+        /// Runs instead of `action` when no window opened for the request in time.
+        let onExpire: (() -> Void)?
     }
 
     private struct Claim {
@@ -46,14 +48,15 @@ final class WorkspaceWindowRequests {
     func openNewWindow(
         on registry: AppDocumentRegistry,
         opener: (() -> Void)? = nil,
-        then action: ((AppState) -> Void)? = nil
+        then action: ((AppState) -> Void)? = nil,
+        ifItNeverOpens onExpire: (() -> Void)? = nil
     ) -> Bool {
         guard WorkspaceSceneReopener.shared.knownOwner?.registry === registry,
               let open = opener ?? WorkspaceSceneReopener.shared.sceneOpener
         else {
             return false
         }
-        let request = Request(registry: registry, action: action)
+        let request = Request(registry: registry, action: action, onExpire: onExpire)
         waiting.append(request)
         expire(request.id)
         open()
@@ -64,7 +67,6 @@ final class WorkspaceWindowRequests {
     func claimNextRequest(for facade: AppState) {
         waiting.removeAll { $0.registry == nil }
         guard let index = waiting.firstIndex(where: { $0.registry === facade.registry }) else { return }
-        claims = claims.filter { $0.value.facade != nil }
         claims[ObjectIdentifier(facade)] = Claim(facade: facade, request: waiting.remove(at: index))
     }
 
@@ -85,13 +87,30 @@ final class WorkspaceWindowRequests {
             waiting.removeAll()
             claims.removeAll()
         }
+
+        /// Runs the three-second expiry now for every request still waiting or claimed.
+        func expireAllForTesting() {
+            let ids = waiting.map(\.id) + claims.values.map(\.request.id)
+            for id in ids {
+                expireNow(id)
+            }
+        }
     #endif
 
     private func expire(_ id: UUID) {
         Task { @MainActor in
             try? await Task.sleep(for: Self.timeout)
-            self.waiting.removeAll { $0.id == id }
-            self.claims = self.claims.filter { $0.value.request.id != id && $0.value.facade != nil }
+            self.expireNow(id)
         }
+    }
+
+    private func expireNow(_ id: UUID) {
+        // A claim whose scene went away before its window attached never ran either, so it
+        // stays until its own expiry reports it.
+        let request = waiting.first { $0.id == id } ?? claims.values.first { $0.request.id == id }?.request
+        waiting.removeAll { $0.id == id }
+        claims = claims.filter { $0.value.request.id != id }
+        // The open never ran: say so where it was asked for, instead of leaving it silent.
+        request?.onExpire?()
     }
 }

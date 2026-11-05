@@ -39,16 +39,28 @@ extension AppState {
                 return
             }
             if isDirectory {
-                // Refuse an overlapping root before a window appears for it (§4.3).
-                try validateWorkspaceRootInstallation(
-                    url: url,
-                    sharing: matchingWorkspaceRoot(for: url),
-                    installingWindow: nil
-                )
+                // Refuse an overlapping root before a window appears for it (§4.3). When this
+                // window is the only conflict (a folder inside its own root, or around its own
+                // standalone file), no new window can take the folder, so it opens here,
+                // replacing this window's workspace as Open did before PR D2.
+                do {
+                    try validateWorkspaceRootInstallation(
+                        url: url,
+                        sharing: matchingWorkspaceRoot(for: url),
+                        installingWindow: nil
+                    )
+                } catch let conflict as WorkspaceRootOpenConflict where conflict.target.window === windowState {
+                    try openInThisWindow(url)
+                    return
+                }
             }
-            WorkspaceWindowRequests.shared.openNewWindow(on: registry) { [weak self] facade in
-                facade.openInRequestedWindow(url, origin: self)
-            }
+            WorkspaceWindowRequests.shared.openNewWindow(
+                on: registry,
+                then: { [weak self] facade in facade.openInRequestedWindow(url, origin: self) },
+                ifItNeverOpens: { [weak self] in
+                    self?.present(AppStateError.newWindowDidNotOpen(url), title: "Could Not Open File")
+                }
+            )
         } catch {
             present(error, title: "Could Not Open File")
         }
@@ -84,16 +96,20 @@ extension AppState {
     func openInRequestedWindow(_ url: URL, origin: AppState?) {
         do {
             try openInThisWindow(url)
-        } catch let shown as DocumentShownInAnotherWindow {
-            KeyWindowRouter.shared.closeAttachedWindow(of: self, skippingCloseChecks: true)
-            focusWindowShowingDocument(shown)
         } catch {
-            guard let origin, origin !== self, KeyWindowRouter.shared.hasAttachedWindow(origin) else {
+            let origin = origin.flatMap { origin in
+                origin !== self && KeyWindowRouter.shared.hasAttachedWindow(origin) ? origin : nil
+            }
+            // With the requesting window gone, keep this window and show the error in it,
+            // unless WD1 found the file in another window: then nothing needs this one.
+            guard origin != nil || error is DocumentShownInAnotherWindow else {
                 present(error, title: "Could Not Open File")
                 return
             }
             KeyWindowRouter.shared.closeAttachedWindow(of: self, skippingCloseChecks: true)
-            origin.present(error, title: "Could Not Open File")
+            // WD1's focus, or its fallback refusal, also runs from the requesting window.
+            let reporter = origin ?? KeyWindowRouter.shared.home(for: registry) ?? self
+            reporter.present(error, title: "Could Not Open File")
         }
     }
 

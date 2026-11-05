@@ -303,11 +303,13 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   empty state, a preview link outside the root, and New File's save panel start in the
   window that received them; Finder, the Dock, and `open -a` start in the frontmost
   workspace window by z-order. An empty window (no document, no root) takes the open;
-  otherwise a new window does (WD7). A root that some window has open is shared (WD2),
-  and a single file inside it opens as that root's document in the chosen window. If the
-  open fails in a new window, that window closes and the error appears where the request
-  came from. File › New Window (⇧⌘N) opens an empty window. Only the launch window
-  restores the last file.
+  otherwise a new window does (WD7). A folder that overlaps only this window's own root
+  opens here instead. A root that some window has open is shared (WD2), and a single
+  file inside it opens as that root's document in the chosen window. If the open fails in
+  a new window, that window closes and the error appears where the request came from; a
+  new window that never appears is reported there too. File › New Window (⇧⌘N) opens an
+  empty window. Only the launch window restores the last file, and until PR E only the
+  app-owned window is restorable.
 - Closing a window (⌘W, File › Close, the close button) is decided in
   `windowShouldClose`: pending editor source, a save or a read of the file in flight, a
   namespace mutation, an image insertion in that window, or quarantine refuse the close;
@@ -315,7 +317,8 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   A dirty document that cannot be saved closes only if the registry keeps its text,
   authority, and prompt state (a warm conflicted or missing-file session, or a
   text-recovery copy); otherwise the close is refused. The last window on a root releases
-  it (D1b) and may refuse. Then the window releases its editor installations and writer,
+  it (D1b) and may refuse; when the blocking document is in no window, the refusal's Show
+  opens it there. Then the window releases its editor installations and writer,
   leaves every inventory (so the LRU counts its document again), cancels its search,
   completion, and Find work, and invalidates its preview. Every closed window keeps no
   document, the app-owned one included, so the next scene on it is empty. Closing the last

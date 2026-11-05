@@ -139,6 +139,9 @@ final class KeyWindowRouter: ObservableObject {
         }
         track(facade)
         window.tabbingMode = .disallowed
+        // Until PR E decides restoration (WD5), only the app-owned window is restorable: a
+        // relaunch must not bring other windows back as empty ones.
+        window.isRestorable = claimedOwners[identifier]?.facade === facade
         if let existing = closeObservers[identifier] {
             NotificationCenter.default.removeObserver(existing)
         }

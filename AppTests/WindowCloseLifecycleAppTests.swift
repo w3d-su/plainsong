@@ -110,6 +110,16 @@ final class WindowCloseLifecycleAppTests: SharedRootAppTestCase {
                     task: Task {}
                 )
             }),
+            ("pending source on another of this window's editors", { facade, _ in
+                let earlier = DocumentSession(text: "earlier", url: URL(fileURLWithPath: "/tmp/earlier.md"))
+                let installation = EditorDocumentBindingInstallation(
+                    bindingID: EditorDocumentBindingID(),
+                    installationID: EditorDocumentBindingInstallationID()
+                )
+                facade.editorBindingInstallations[installation] = earlier
+                facade.editorInstallationWindows[installation] = RegisteredWindowState(window: facade.windowState)
+                facade.pendingEditorSourceInstallations[installation] = earlier
+            }),
             ("namespace mutation", { facade, _ in facade.workspaceMutationNamespaceDepth = 1 }),
             ("image insertion", { facade, _ in
                 facade.registry.activeImageInsertions[UUID()] = (
@@ -145,6 +155,8 @@ final class WindowCloseLifecycleAppTests: SharedRootAppTestCase {
             XCTAssertTrue(primary.registry.connectedWindows.contains { $0 === second.windowState }, name)
             // Undo the fixture so the next case starts clean.
             second.pendingEditorSourceInstallations = [:]
+            second.editorBindingInstallations = second.editorBindingInstallations.filter { $0.value === session }
+            second.editorInstallationWindows = [:]
             second.externalDiskInspectionTasks = [:]
             second.workspaceMutationNamespaceDepth = 0
             second.registry.activeImageInsertions = [:]
@@ -199,13 +211,16 @@ final class WindowCloseLifecycleAppTests: SharedRootAppTestCase {
         XCTAssertEqual(second.presentedError?.title, "Could Not Close Window")
     }
 
-    /// The last window on a root releases it (D1b), which refuses a conflicted root document.
-    func testTheLastRootReleaseRefusesAConflictedDocument() async throws {
+    /// The last window on a root releases it (D1b). The shown conflicted document has an
+    /// editor, as it does in production, so the release retires it with its text and conflict
+    /// instead of refusing, and the closed app-owned window keeps no prompt.
+    func testTheLastRootCloseRetiresAnInstalledConflictedDocumentWithItsState() async throws {
         let root = try makeRoot("blog")
         try await open(primary, root: root)
         primary.openWorkspaceFile(root.appendingPathComponent("a.md"))
         try await waitUntil("window 1 shows a.md") { self.primary.shownSession.fileURL?.lastPathComponent == "a.md" }
         let session = primary.shownSession
+        let installation = install(session, in: primary)
         primary.replaceDocumentText("alpha mine", in: session)
         let stateURL = try XCTUnwrap(primary.sessionStateURL(for: session))
         primary.pendingExternalTexts[stateURL] = "alpha theirs"
@@ -213,11 +228,45 @@ final class WindowCloseLifecycleAppTests: SharedRootAppTestCase {
 
         firstWindow.performClose(nil)
 
-        XCTAssertTrue(KeyWindowRouter.shared.hasAttachedWindow(primary))
+        XCTAssertFalse(KeyWindowRouter.shared.hasAttachedWindow(primary), "the window closed")
+        XCTAssertNil(primary.workspaceRootURL)
+        XCTAssertNil(primary.editorBindingInstallations[installation])
+        XCTAssertEqual(session.text, "alpha mine", "the unsaved text is kept")
+        XCTAssertEqual(primary.pendingExternalTexts[stateURL], "alpha theirs", "the conflict is kept")
+        XCTAssertTrue(
+            primary.workspaceMutationTerminationSessions().contains { $0 === session },
+            "Quit still sees the unsaved document"
+        )
+        XCTAssertNil(primary.externalChangePrompt, "the closed window keeps no prompt")
+        XCTAssertFalse(primary.isSaveBlockedByWindowPrompt(at: stateURL))
+    }
+
+    /// A conflicted document that WD8 kept warm when its window closed blocks the last window
+    /// on that root, and Show opens it there so the user can resolve it.
+    func testAKeptConflictBlocksTheLastRootCloseAndShowOpensIt() async throws {
+        let root = try makeRoot("blog")
+        try await openPair(root: root)
+        second.openWorkspaceFile(root.appendingPathComponent("b.md"))
+        try await waitUntil("window 2 shows b.md") { self.second.shownSession.fileURL?.lastPathComponent == "b.md" }
+        let kept = second.shownSession
+        second.replaceDocumentText("beta mine", in: kept)
+        let keptURL = try XCTUnwrap(second.sessionStateURL(for: kept))
+        second.pendingExternalTexts[keptURL] = "beta theirs"
+        second.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: keptURL)
+        secondWindow.performClose(nil)
+        XCTAssertFalse(KeyWindowRouter.shared.hasAttachedWindow(second), "WD8 kept the conflict warm")
+
+        firstWindow.performClose(nil)
+
+        XCTAssertTrue(KeyWindowRouter.shared.hasAttachedWindow(primary), "the last window stays open")
         XCTAssertNotNil(primary.workspaceRootURL)
-        XCTAssertTrue(primary.shownSession === session)
-        XCTAssertEqual(session.text, "alpha mine")
-        XCTAssertEqual(primary.presentedError?.title, "Could Not Close Window")
+        let refusal = try XCTUnwrap(primary.presentedError)
+        XCTAssertEqual(refusal.title, "Could Not Close Window")
+        let show = try XCTUnwrap(refusal.showWindow, "the refusal offers to show the blocking file")
+        show()
+        XCTAssertTrue(primary.shownSession === kept)
+        XCTAssertEqual(kept.text, "beta mine")
+        XCTAssertEqual(primary.externalChangePrompt?.fileURL, keptURL)
     }
 
     // MARK: - W7 bullet 4: revoke, writer, and the LRU
@@ -301,6 +350,17 @@ final class WindowCloseLifecycleAppTests: SharedRootAppTestCase {
     }
 
     // MARK: - Helpers
+
+    @discardableResult
+    private func install(_ session: DocumentSession, in facade: AppState) -> EditorDocumentBindingInstallation {
+        let binding = facade.editorDocumentBinding(for: session)
+        let installation = EditorDocumentBindingInstallation(
+            bindingID: binding.id,
+            installationID: EditorDocumentBindingInstallationID()
+        )
+        binding.onLifecycle(.installed(installation))
+        return installation
+    }
 
     private func writeLoose(_ name: String, _ text: String) throws -> URL {
         let folder = directory.appendingPathComponent("loose", isDirectory: true)

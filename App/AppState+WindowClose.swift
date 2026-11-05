@@ -18,7 +18,7 @@ extension AppState {
             try flushShownDocumentBeforeClose()
             try releaseWorkspaceRootBeforeClose()
         } catch {
-            present(error, title: "Could Not Close Window")
+            presentCloseRefusal(error)
             return false
         }
         KeyWindowRouter.shared.noteCloseApproved(self)
@@ -28,12 +28,11 @@ extension AppState {
     /// §6.2 steps 3–5 for a window AppKit is closing. A close that skipped
     /// `windowShouldClose` (a blank window this app closes itself) still leaves its root here.
     func finishWindowClose() {
-        if workspaceRootURL != nil {
-            if workspaceRootContext.facades.contains(where: { $0 !== self }) {
-                detachSharedWorkspaceRoot()
-            } else if (try? closeWorkspaceForReplacement()) == nil {
-                detachSharedWorkspaceRoot()
-            }
+        if workspaceRootURL != nil, (try? closeWorkspaceForReplacement()) == nil {
+            // Only a skip-check close reaches this with a root. Leave the root rather than
+            // keep it attached to a window that is going away; its sessions stay warm with
+            // their retained authority.
+            detachSharedWorkspaceRoot()
         }
         // Step 5: this window's own work.
         teardownWorkspaceSearch()
@@ -41,6 +40,14 @@ extension AppState {
         completionWorkspaceTask = nil
         cancelPendingEditorNavigationIfNeeded()
         notifyEditorFindWorkspaceDidClose()
+        // The window leaves `.windowDocuments` first, so its document stops counting as
+        // installed and no prompt the revoke below restores can land on this window. The
+        // façade keeps no document: the app-owned façade reopens as an empty window.
+        let previous = shownSession
+        registry.unregister(windowState)
+        shownSession = DocumentSession()
+        observeCurrentDocument()
+        notifyEditorFindDocumentDidSwitch()
         // Step 3: release this window's editor installations and its writer now, instead of
         // whenever SwiftUI dismantles the editor. A later dismantle finds nothing to revoke.
         for (installation, session) in editorBindingInstallations
@@ -48,14 +55,7 @@ extension AppState {
         {
             revokeEditorDocumentBinding(installation, session: session, expectedBindingID: installation.bindingID)
         }
-        // The window leaves `.windowDocuments`, so its document stops counting as installed and
-        // the LRU trims it like any warm session. The façade keeps no document: the app-owned
-        // façade reopens as an empty window.
-        let previous = shownSession
-        registry.unregister(windowState)
-        shownSession = DocumentSession()
-        observeCurrentDocument()
-        notifyEditorFindDocumentDidSwitch()
+        clearWindowPrompts()
         releaseUnreferencedSessionOwnership(for: previous)
         reconcileSessionPolicyAfterEditorLeaseChange()
         WindowPreviewControllers.invalidate(for: windowState)
@@ -64,8 +64,40 @@ extension AppState {
     /// The app-owned façade is shown again (Dock reopen, a file command, New Window): it rejoins
     /// every inventory as an empty window. Its blank owns nothing, so it takes no record.
     func reconnectReclaimedWindow() {
+        clearWindowPrompts()
         WindowOpenAdmission.set(windowState, admits: true)
         registry.register(windowState)
+    }
+
+    private func clearWindowPrompts() {
+        externalChangePrompt = nil
+        missingFilePrompt = nil
+        indeterminateFileWriteReconciliationPrompt = nil
+    }
+
+    /// A refusal names the document that blocks it. When no window shows that document (the
+    /// root release found it), Show opens it here so the user can resolve it.
+    private func presentCloseRefusal(_ error: Error) {
+        present(error, title: "Could Not Close Window")
+        let blockingURL: URL? = switch error {
+        case let AppStateError.unresolvedExternalChange(url), let AppStateError.missingFile(url):
+            url
+        case let MarkdownFileStoreError.writeRequiresReconciliation(url, _):
+            url
+        case let WorkspaceMutationError.indeterminateSession(url):
+            url
+        default:
+            nil
+        }
+        guard let blockingURL, workspaceRootURL != nil,
+              let blocking = registry.warmSession(at: blockingURL),
+              !registry.isShownByAnyWindow(blocking)
+        else {
+            return
+        }
+        presentedError?.showWindow = { [weak self] in
+            self?.openWorkspaceFile(blockingURL)
+        }
     }
 
     /// WD8: whether a dirty document that cannot be saved may close and stay warm. The registry
@@ -97,7 +129,11 @@ extension AppState {
         let sessionIdentity = ObjectIdentifier(session)
         let url = sessionStateURL(for: session) ?? session.fileURL ?? workspaceRootURL
             ?? URL(fileURLWithPath: "Untitled")
-        if hasPendingEditorSource(for: session) {
+        // Any of this window's editors, not only the shown one: the close revokes them all,
+        // and revoking drops unsynchronized source.
+        if hasPendingEditorSource(for: session) || pendingEditorSourceInstallations.keys.contains(where: {
+            editorInstallationWindows[$0]?.window === windowState
+        }) {
             throw AppStateError.pendingEditorSource(url)
         }
         if isSaving || externalReloadTasks[sessionIdentity] != nil
@@ -140,14 +176,11 @@ extension AppState {
         }
     }
 
-    /// Step 4: the last window on a root releases it (D1b); any other window leaves it
-    /// (D1c). The release preflights, saves, and may refuse, so it runs before the close.
+    /// Step 4: the last window on a root releases it (D1b); any other window leaves it and
+    /// releases its own documents the root does not own (D1c). Either may refuse, so it runs
+    /// before the close.
     private func releaseWorkspaceRootBeforeClose() throws {
         guard workspaceRootURL != nil else { return }
-        if workspaceRootContext.facades.contains(where: { $0 !== self }) {
-            detachSharedWorkspaceRoot()
-            return
-        }
         try closeWorkspaceForReplacement()
     }
 }

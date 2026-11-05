@@ -236,6 +236,8 @@ enum AppStateError: LocalizedError {
     case fileWorkInProgress(URL)
     /// A dirty document that can be neither saved nor kept warm refuses its window's close (WD8).
     case unsavedChangesPreventWindowClose(URL)
+    /// The new window an open asked for did not appear in time (WD7).
+    case newWindowDidNotOpen(URL)
 
     var errorDescription: String? {
         switch self {
@@ -270,6 +272,8 @@ enum AppStateError: LocalizedError {
         case let .unsavedChangesPreventWindowClose(url):
             "\(url.lastPathComponent) has changes that cannot be saved or kept. " +
                 "Save a copy, resolve the change on disk, or undo the edits before closing this window."
+        case let .newWindowDidNotOpen(url):
+            "A new window for \(url.lastPathComponent) did not open. Try opening it again."
         }
     }
 }

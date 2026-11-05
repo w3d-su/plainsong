@@ -163,14 +163,67 @@ final class WindowOpenRoutingAppTests: XCTestCase {
 
     func testAnOverlappingRootIsRefusedBeforeAWindowAppears() async throws {
         let root = try makeRoot("blog", files: ["posts/a.md": "alpha"])
+        let other = try openNewWindow()
+        try await openRoot(root, in: other)
+        try primary.open(url: write("A.md", "alpha"), rememberAsLastOpened: false, preserveWorkspace: false)
+        let requestsBefore = sceneRequests
+
+        primary.routeOpen(root.appendingPathComponent("posts", isDirectory: true))
+
+        XCTAssertEqual(sceneRequests, requestsBefore, "no window appears for a refused root")
+        XCTAssertNotNil(primary.presentedError?.showWindow, "the refusal offers to show the other window")
+        XCTAssertEqual(other.workspaceRootURL?.lastPathComponent, "blog")
+        XCTAssertEqual(primary.shownSession.text, "alpha")
+    }
+
+    /// No new window can take a folder that overlaps only this window's own root, so it opens
+    /// here, replacing the workspace as Open did before PR D2.
+    func testAFolderInsideThisWindowsOwnRootOpensHere() async throws {
+        let root = try makeRoot("blog", files: ["posts/a.md": "alpha", "b.md": "beta"])
         try await openRoot(root, in: primary)
 
         primary.routeOpen(root.appendingPathComponent("posts", isDirectory: true))
 
         XCTAssertEqual(sceneRequests, 0)
-        XCTAssertEqual(scenes.count, 1)
-        XCTAssertNotNil(primary.presentedError?.showWindow, "the refusal offers to show the other window")
-        XCTAssertEqual(primary.workspaceRootURL?.lastPathComponent, "blog")
+        XCTAssertNil(primary.presentedError)
+        try await waitUntil("the subfolder opens in this window") {
+            self.primary.workspaceRootURL?.lastPathComponent == "posts" && self.primary.workspaceTree != nil
+        }
+    }
+
+    /// A new window that never opens is reported in the window that asked for it, whether no
+    /// scene took the request or the scene that took it went away before its window attached.
+    func testANewWindowThatNeverOpensIsReportedInTheRequestingWindow() throws {
+        try primary.open(url: write("A.md", "alpha"), rememberAsLastOpened: false, preserveWorkspace: false)
+        attachesScenesImmediately = false
+
+        try primary.routeOpen(write("B.md", "beta"))
+        XCTAssertEqual(sceneRequests, 1)
+        WorkspaceWindowRequests.shared.expireAllForTesting()
+
+        XCTAssertEqual(primary.presentedError?.title, "Could Not Open File")
+        let late = attachNextScene()
+        XCTAssertTrue(late.isEmptyWorkspaceWindow, "the expired open does not run later")
+
+        primary.presentedError = nil
+        try primary.routeOpen(write("C.md", "gamma"))
+        weak var discarded: AppState?
+        autoreleasepool {
+            discarded = WindowFacadeHolder(owner: primary).facade
+        }
+        XCTAssertNil(discarded, "the scene that took the request went away before attaching")
+        WorkspaceWindowRequests.shared.expireAllForTesting()
+        XCTAssertEqual(primary.presentedError?.title, "Could Not Open File")
+    }
+
+    /// Until PR E, only the app-owned window is restorable, so a relaunch does not bring
+    /// other windows back as empty ones.
+    func testOnlyTheAppOwnedWindowIsRestorable() throws {
+        let ownerWindow = try XCTUnwrap(windows.first)
+        XCTAssertTrue(ownerWindow.isRestorable)
+        let other = try openNewWindow()
+        let otherWindow = try XCTUnwrap(windows.first { KeyWindowRouter.shared.facade(for: $0) === other })
+        XCTAssertFalse(otherWindow.isRestorable)
     }
 
     /// No blank window is left behind when the open fails in the window it asked for.

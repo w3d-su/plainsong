@@ -18,12 +18,13 @@ as already shown and opens nothing.
 A match throws `DocumentShownInAnotherWindow`. `present(_:title:)` turns that error into
 `KeyWindowRouter.focusIfPossible`, so every existing `catch { present(...) }` at a user
 entry point focuses the other window and shows no error. The Files deferral drops the pick,
-which reverts the row. When the other window cannot come forward (it is closing, or it has
-a sheet), the request refuses with "Already Open in Another Window" and neither window
+which reverts the row. When the other window cannot come forward (it is closing, or it has a
+sheet), the request refuses with "Already Open in Another Window" and neither window
 changes. A reload catches the error and selects nothing, because a background refresh must
-never move focus. Recovery Show Editor Copy focuses the window that shows the copy, and
-promotion skips such a copy. Warm sessions belong to no window, so a window still adopts
-one that another window left (D1c).
+never move focus. Recovery Show Editor Copy focuses the window that shows the copy. Neither
+recovery promotion nor a trash, which shows a detached copy in place of the trashed file,
+picks a copy that another window shows. Warm sessions belong to no window, so a window still
+adopts one that another window left (D1c).
 
 A Finder or Dock open can reach the app before AppKit activates it. `focus` then records the
 window and brings it forward when `didBecomeActive` arrives within two seconds. Hosted tests

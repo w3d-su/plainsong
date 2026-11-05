@@ -73,7 +73,10 @@ extension AppState {
                 currentDetached.session,
                 url: currentDetached.oldURL
             )
-        } else if let recovery = detachedRecords.first {
+        } else if let recovery = detachedRecords.first(where: {
+            // WD1: a copy another window shows stays there.
+            otherWindowShowingFile(location: nil, fileURL: nil, identity: nil, session: $0.session) == nil
+        }) {
             setCurrentDocument(recovery.session)
             markSessionDetachedFromMissingFile(recovery.session, url: recovery.oldURL)
         } else if removedCurrentSession {
