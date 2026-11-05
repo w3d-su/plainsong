@@ -33,6 +33,9 @@ extension AppState {
         let sessionIdentity = ObjectIdentifier(session)
         if shownSession === session {
             transferEditorWriterForAdoption(of: session)
+        } else if registry.isShownByAnyWindow(session) {
+            // A delayed install from the previous window can arrive after adoption.
+            supersededEditorWriterInstallations.insert(installation)
         }
         if editorWriterInstallations[sessionIdentity] == nil,
            !supersededEditorWriterInstallations.contains(installation)
@@ -72,9 +75,7 @@ extension AppState {
         editorBindingInstallations[installation] = nil
         editorInstallationWindows[installation] = nil
         supersededEditorWriterInstallations.remove(installation)
-        if editorWriterInstallations[sessionIdentity] == nil {
-            restoreShownWriterIfUnowned(session)
-        }
+        restoreShownWriterIfUnowned(session)
         // Keep main's retired-cold cleanup. Also drop a registration only when it
         // is the last reference holding a retained root scope. An unshown untitled
         // or recovery session keeps its registration.
@@ -146,7 +147,6 @@ extension AppState {
                pendingEditorSourceInstallations[installation] == nil
             {
                 editorWriterInstallations[sessionIdentity] = nil
-                restoreShownWriterIfUnowned(session)
             }
             return .synchronize(currentSnapshot)
         }
@@ -175,7 +175,6 @@ extension AppState {
             return false
         }
         editorWriterInstallations[sessionIdentity] = nil
-        restoreShownWriterIfUnowned(session)
         return true
     }
 

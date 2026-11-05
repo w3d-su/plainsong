@@ -1,3 +1,4 @@
+@testable import EditorKit
 import Foundation
 import MarkdownCore
 @testable import Plainsong
@@ -178,7 +179,7 @@ final class WindowSharedRootMutationAppTests: SharedRootAppTestCase {
         let other = try makeRoot("other")
         try await openPair(root: root)
         let shared = primary.workspaceRootContext
-        let lease = WorkspaceImageAssetInsertionLease(appState: second)
+        let lease = WorkspaceImageAssetInsertionLease(appState: second, rootURL: root)
         XCTAssertEqual(shared.workspaceImageAssetInsertionCount, 1)
 
         try await open(second, root: other)
@@ -196,5 +197,27 @@ final class WindowSharedRootMutationAppTests: SharedRootAppTestCase {
         XCTAssertEqual(second.workspaceImageAssetInsertionCount, 0)
         try primary.beginWorkspaceNamespaceMutation([primary.shownSession])
         primary.endWorkspaceNamespaceMutation([primary.shownSession])
+    }
+
+    func testQuitWaitsForImagePlacementsAfterTheirOnlyWindowJoinsAnotherRoot() async throws {
+        let shared = try makeRoot("shared")
+        let outgoing = try makeRoot("outgoing")
+        try await open(primary, root: shared)
+        try await open(second, root: outgoing)
+        let insert = try XCTUnwrap(second.editorImageAssetInserter)
+        let first = await insert([.data(Data([1]), suggestedFilename: "first.png")])
+        let secondImage = await insert([.data(Data([2]), suggestedFilename: "second.png")])
+        XCTAssertEqual(second.workspaceImageAssetInsertionCount, 2)
+
+        try await open(second, root: shared)
+        XCTAssertTrue(second.workspaceRootContext === primary.workspaceRootContext)
+        XCTAssertEqual(primary.workspaceImageAssetInsertionCount, 0)
+        XCTAssertFalse(primary.prepareForTermination())
+        XCTAssertEqual(second.presentedError?.title, "Could Not Quit")
+
+        await first.discard()
+        XCTAssertFalse(primary.prepareForTermination())
+        await secondImage.discard()
+        XCTAssertTrue(primary.prepareForTermination())
     }
 }

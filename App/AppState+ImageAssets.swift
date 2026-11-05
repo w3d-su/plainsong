@@ -64,28 +64,24 @@ final class WorkspaceEditorImageThumbnailAdapter: EditorImageThumbnailLoading {
 
 @MainActor
 final class WorkspaceImageAssetInsertionLease {
-    private weak var context: WorkspaceRootContext?
-    private var isActive = true
+    private let id = UUID()
+    private weak var registry: AppDocumentRegistry?
+    private var context: WorkspaceRootContext?
 
-    init(appState: AppState) {
+    init(appState: AppState, rootURL: URL) {
         let context = appState.workspaceRootContext
         self.context = context
+        registry = appState.registry
         context.workspaceImageAssetInsertionCount += 1
+        appState.registry.activeImageInsertions[id] = (RegisteredWindowState(window: appState.windowState), rootURL)
     }
 
     func release() {
-        guard isActive else {
-            return
-        }
-        isActive = false
-        // The lease belongs to the context that started it. Detach replaces the
-        // facade's context, so releasing through that facade would decrement the
-        // next root and trap on a zero count.
-        guard let context else {
-            return
-        }
+        guard let context else { return }
+        self.context = nil
         precondition(context.workspaceImageAssetInsertionCount > 0)
         context.workspaceImageAssetInsertionCount -= 1
+        registry?.activeImageInsertions[id] = nil
     }
 }
 
@@ -270,7 +266,9 @@ extension AppState {
         _ assets: [EditorImageAsset],
         documentAuthority: EditorImageAssetDocumentAuthority
     ) async -> EditorImageAssetInsertion {
-        let namespaceLease = WorkspaceImageAssetInsertionLease(appState: self)
+        let namespaceLease = WorkspaceImageAssetInsertionLease(
+            appState: self, rootURL: documentAuthority.location.rootAuthority.originalRootURL
+        )
         let assetFolderRelativePath = preferences.assetFolderRelativePath
         let discardEventHandler = editorImageAssetDiscardEventHandler
 

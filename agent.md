@@ -283,7 +283,9 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   security scope until eviction or final ownership release. Editor installations record
   their owning window, so delayed teardown in the closing window uses retirement.
   Adopting a warm document in another window synchronously supersedes old writers;
-  late release/revoke cannot affect the new writer. Root overlap and a root containing
+  the previous window can resume writing after the adopter’s last eligible installation
+  is revoked. Quit waits for image placement and cleanup even if the originating window
+  leaves its root. Root overlap and a root containing
   another window's installed standalone file refuse before installation and offer Show.
   Same-file routing (WD1) and a user-facing New Window remain with D2.
 - With no attached workspace window, New File, Open, and Open Recent wait for a scene

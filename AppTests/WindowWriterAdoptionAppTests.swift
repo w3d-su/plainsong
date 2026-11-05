@@ -77,6 +77,12 @@ final class WindowWriterAdoptionAppTests: SharedRootAppTestCase {
         XCTAssertEqual(primary.editorWriterInstallations[ObjectIdentifier(session)], adopted)
 
         second.setCurrentDocument(DocumentSession(), requestingEditorFocus: false)
+        XCTAssertEqual(newBinding.sourceContract.writer(.release(adopted)), .released)
+        XCTAssertNil(primary.editorWriterInstallations[ObjectIdentifier(session)])
+        XCTAssertEqual(
+            oldBinding.sourceContract.writer(.activate(old, from: snapshot(session))),
+            .rejected(snapshot(session))
+        )
         newBinding.onLifecycle(.revoked(adopted))
 
         XCTAssertFalse(primary.supersededEditorWriterInstallations.contains(old))
@@ -89,6 +95,55 @@ final class WindowWriterAdoptionAppTests: SharedRootAppTestCase {
             )
         )
         XCTAssertEqual(session.text, "still shown")
+    }
+
+    func testStaleAdopterKeepsTheEarlierWindowSupersededUntilItsSynchronizedRetry() throws {
+        let root = try makeRoot("root")
+        try primary.activateFileSession(url: root.appendingPathComponent("a.md"))
+        let session = primary.shownSession
+        let oldBinding = primary.editorDocumentBinding(for: session)
+        let old = installation(oldBinding)
+        oldBinding.onLifecycle(.installed(old))
+        second.setCurrentDocument(session, requestingEditorFocus: false)
+        let binding = second.editorDocumentBinding(for: session)
+        let adopted = installation(binding)
+        binding.onLifecycle(.installed(adopted))
+        let stale = snapshot(session)
+        _ = binding.sourceContract.publish(publication(adopted, session: session, text: "edited"))
+        let current = snapshot(session)
+        XCTAssertNotEqual(current.revision, stale.revision)
+
+        XCTAssertEqual(binding.sourceContract.writer(.activate(adopted, from: stale)), .synchronize(current))
+        XCTAssertNil(primary.editorWriterInstallations[ObjectIdentifier(session)])
+        XCTAssertEqual(oldBinding.sourceContract.writer(.activate(old, from: current)), .rejected(current))
+        XCTAssertEqual(binding.sourceContract.writer(.activate(adopted, from: current)), .activated(current))
+        XCTAssertEqual(primary.editorWriterInstallations[ObjectIdentifier(session)], adopted)
+    }
+
+    func testLateInstallFromPreviousWindowCannotAcquireWriterOnEitherSideOfAdopterInstall() throws {
+        let root = try makeRoot("root")
+        try primary.activateFileSession(url: root.appendingPathComponent("a.md"))
+        let session = primary.shownSession
+        let oldBinding = primary.editorDocumentBinding(for: session)
+        try primary.activateFileSession(url: root.appendingPathComponent("b.md"))
+        second.setCurrentDocument(session, requestingEditorFocus: false)
+        let early = installation(oldBinding)
+        oldBinding.onLifecycle(.installed(early))
+        XCTAssertEqual(
+            oldBinding.sourceContract.writer(.activate(early, from: snapshot(session))),
+            .rejected(snapshot(session))
+        )
+
+        let binding = second.editorDocumentBinding(for: session)
+        let adopted = installation(binding)
+        binding.onLifecycle(.installed(adopted))
+        let late = installation(oldBinding)
+        oldBinding.onLifecycle(.installed(late))
+        XCTAssertEqual(
+            oldBinding.sourceContract.writer(.activate(late, from: snapshot(session))),
+            .rejected(snapshot(session))
+        )
+        XCTAssertEqual(primary.editorWriterInstallations[ObjectIdentifier(session)], adopted)
     }
 
     private func installation(_ binding: AppEditorDocumentBinding) -> EditorDocumentBindingInstallation {

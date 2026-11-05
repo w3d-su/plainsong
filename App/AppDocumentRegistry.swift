@@ -118,6 +118,8 @@ final class AppDocumentRegistry: ObservableObject {
     var registeredWindows: [RegisteredWindowState] = []
     /// One physical root and lifetime scope, shared by its connected windows.
     var workspaceRoots: [WorkspaceFileSystemRootAuthority: WorkspaceRootReference] = [:]
+    /// Quit must see placements even after the originating window changes roots or closes.
+    var activeImageInsertions: [UUID: (window: RegisteredWindowState, rootURL: URL)] = [:]
     var workspaceScopeStarter: (URL) -> SecurityScopedResourceAccess = SecurityScopedAccess.startAccessing
     var editorInstallationWindows: [EditorDocumentBindingInstallation: RegisteredWindowState] = [:]
     var supersededEditorWriterInstallations: Set<EditorDocumentBindingInstallation> = []

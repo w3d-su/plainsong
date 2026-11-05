@@ -28,15 +28,15 @@ extension AppState {
         }
     }
 
-    /// The adopting window took the writer. When it releases that writer and exactly
-    /// one earlier window still shows the session, that window can write again.
+    /// A released writer can reactivate or retry a stale revision until its binding
+    /// is revoked. Restore an earlier window only after the last eligible binding leaves.
     func restoreShownWriterIfUnowned(_ session: DocumentSession) {
         let sessionIdentity = ObjectIdentifier(session)
         guard editorWriterInstallations[sessionIdentity] == nil else { return }
-        let shown = editorBindingInstallations.filter { installation, owner in
-            owner === session &&
-                supersededEditorWriterInstallations.contains(installation) &&
-                editorInstallationWindows[installation]?.window?.shownSession === session
+        let installed = editorBindingInstallations.filter { $0.value === session }
+        guard installed.keys.allSatisfy(supersededEditorWriterInstallations.contains) else { return }
+        let shown = installed.filter { installation, _ in
+            editorInstallationWindows[installation]?.window?.shownSession === session
         }
         guard shown.count == 1, let installation = shown.keys.first else { return }
         supersededEditorWriterInstallations.remove(installation)

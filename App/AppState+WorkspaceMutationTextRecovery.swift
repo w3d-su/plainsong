@@ -406,25 +406,12 @@ extension AppState {
         )
     }
 
-    /// Image insertion counts live in each window's root context, so every window of the
-    /// registry is checked, not just the one the app delegate asked.
     private func imageAssetInsertionAllowsTermination() -> Bool {
-        var facades = KeyWindowRouter.shared.facades(in: registry)
-        if !facades.contains(where: { $0 === self }) {
-            facades.insert(self, at: 0)
-        }
-        guard let busy = facades.first(where: { $0.workspaceImageAssetInsertionCount > 0 }) else {
-            return true
-        }
-        busy.present(
-            AppStateError.workspaceMutationInProgress(
-                busy.workspaceRootURL
-                    ?? busy.sessionStateURL(for: busy.shownSession)
-                    ?? busy.shownSession.fileURL
-                    ?? URL(fileURLWithPath: "/")
-            ),
-            title: "Could Not Quit"
-        )
+        guard let insertion = registry.activeImageInsertions.values.first else { return true }
+        let busy = KeyWindowRouter.shared.facades(in: registry).first {
+            $0.windowState === insertion.window.window
+        } ?? self
+        busy.present(AppStateError.workspaceMutationInProgress(insertion.rootURL), title: "Could Not Quit")
         KeyWindowRouter.shared.focus(busy.windowState)
         return false
     }

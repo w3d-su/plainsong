@@ -42,7 +42,7 @@ final class WindowStatePartitionAppTests: XCTestCase {
                                                           "replaceAuthority", "registeredWindows",
                                                           "menuEnablementDidChange", "editorInstallationWindows",
                                                           "retainedWorkspaceAuthorityOwners", "workspaceRoots",
-                                                          "workspaceScopeStarter",
+                                                          "workspaceScopeStarter", "activeImageInsertions",
                                                           "supersededEditorWriterInstallations"])
         )
         XCTAssertEqual(
