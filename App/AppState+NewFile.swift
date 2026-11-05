@@ -52,14 +52,27 @@ private extension AppState {
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
+        createNewFile(at: url)
+    }
+}
+
+@MainActor
+extension AppState {
+    /// New File's save-panel choice. Replacing a file another window shows would overwrite
+    /// its document on disk, so that window comes forward instead and nothing is written
+    /// (WD1). The new file then follows the Open rule (§5.2).
+    func createNewFile(at url: URL) {
         do {
             guard FileKind(url: url) != nil else {
                 throw AppStateError.unsupportedFile(url)
             }
+            if let owner = windowShowingFile(at: url) {
+                throw DocumentShownInAnotherWindow(fileURL: url, target: RegisteredWindowState(window: owner))
+            }
             try SecurityScopedAccess.withAccess(to: url) {
                 try Data().write(to: url, options: [.atomic])
             }
-            try open(url: url, rememberAsLastOpened: true, preserveWorkspace: false)
+            routeOpen(url)
         } catch {
             present(error, title: "Could Not Create File")
         }

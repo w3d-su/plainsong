@@ -168,6 +168,7 @@ final class KeyWindowRouter: ObservableObject {
             return
         }
         WorkspaceSceneReopener.shared.noteAttached(facade)
+        WorkspaceWindowRequests.shared.noteAttached(facade)
     }
 
     func isHome(_ facade: AppState) -> Bool {
@@ -282,8 +283,15 @@ final class KeyWindowRouter: ObservableObject {
         closingFacades.contains(ObjectIdentifier(facade))
     }
 
-    func closeAttachedWindow(of facade: AppState) {
-        windowsByFacade[ObjectIdentifier(facade)]?.window?.performClose(nil)
+    /// `skippingCloseChecks` closes a window this app just opened and left blank, without
+    /// asking `windowShouldClose`.
+    func closeAttachedWindow(of facade: AppState, skippingCloseChecks: Bool = false) {
+        guard let window = windowsByFacade[ObjectIdentifier(facade)]?.window else { return }
+        if skippingCloseChecks {
+            window.close()
+        } else {
+            window.performClose(nil)
+        }
     }
 
     func routeNotice(_ id: UUID, owner: AppState) {
@@ -372,6 +380,7 @@ final class KeyWindowRouter: ObservableObject {
             closingFacades = []
             focusedWindowState = nil
             WorkspaceSceneReopener.shared.resetForTesting()
+            WorkspaceWindowRequests.shared.resetForTesting()
             objectWillChange.send()
         }
     #endif

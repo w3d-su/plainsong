@@ -21,6 +21,8 @@ final class WindowFacadeHolder: ObservableObject {
             facade = owner.makeSiblingFacade(admitsFileOperations: WindowOpenAdmission.admitsLaterScenes)
             ownerClaimToken = nil
         }
+        // New Window and WD7 opens wait for the next scene (`WorkspaceWindowRequests`).
+        WorkspaceWindowRequests.shared.claimNextRequest(for: facade)
     }
 }
 
@@ -88,6 +90,11 @@ final class WorkspaceSceneReopener {
 
     var knownOwner: AppState? {
         retainedOwner
+    }
+
+    /// SwiftUI's `openWindow` for the workspace group, once a scene or command installed it.
+    var sceneOpener: (() -> Void)? {
+        openScene
     }
 
     func remember(_ owner: AppState) {

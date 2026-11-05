@@ -15,9 +15,20 @@ extension AppState {
     /// Validate before touching the outgoing root. Same-root attachment is allowed;
     /// overlapping roots and another window's independent file require the Show action.
     func validateWorkspaceRootInstallation(url: URL, sharing: WorkspaceRootContext?) throws {
+        try validateWorkspaceRootInstallation(url: url, sharing: sharing, installingWindow: windowState)
+    }
+
+    /// `installingWindow` is the window that would install the root; its own root and files
+    /// are not conflicts because it replaces them. Nil checks for a new window (WD7), for which
+    /// every open window is another window.
+    func validateWorkspaceRootInstallation(
+        url: URL,
+        sharing: WorkspaceRootContext?,
+        installingWindow: WindowState?
+    ) throws {
         for context in registry.activeWorkspaceRoots where context !== sharing {
             guard let authority = context.registrationAuthority,
-                  let other = context.facades.first(where: { $0 !== self })
+                  let other = context.facades.first(where: { $0.windowState !== installingWindow })
             else { continue }
             if Self.isDescendant(url, of: authority.canonicalRootURL) ||
                 Self.isDescendant(authority.canonicalRootURL, of: url)
@@ -28,7 +39,7 @@ extension AppState {
                 )
             }
         }
-        for window in registry.connectedWindows where window !== windowState {
+        for window in registry.connectedWindows where window !== installingWindow {
             var sessions = [window.shownSession]
             sessions += registry.editorBindingInstallations.compactMap { installation, session in
                 registry.editorInstallationWindows[installation]?.window === window ? session : nil

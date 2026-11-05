@@ -126,6 +126,25 @@ final class WindowSameFileFocusAppTests: SharedRootAppTestCase {
         assertFocusedPrimary(leaving: before)
     }
 
+    func testOpenRecentFocusesTheWindowShowingTheFile() async throws {
+        let root = try await showSharedA()
+        KeyWindowRouter.shared.testingUsesKeyWindowOverride = true
+        KeyWindowRouter.shared.testingKeyWindow = secondWindow
+        let before = second.shownSession
+        var ran = false
+
+        WorkspaceSceneReopener.shared.performFileCommand(openScene: {
+            XCTFail("both windows are attached")
+        }, action: { facade in
+            XCTAssertTrue(facade === self.second)
+            ran = true
+            facade.routeOpen(root.appendingPathComponent("a.md"))
+        })
+
+        XCTAssertTrue(ran)
+        assertFocusedPrimary(leaving: before)
+    }
+
     /// Launch restore and every other caller of `open(url:)` refuse before this window
     /// closes its workspace.
     func testDirectOpenRefusesBeforeClosingThisWindowsWorkspace() async throws {
