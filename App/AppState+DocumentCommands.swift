@@ -88,6 +88,11 @@ extension AppState {
     }
 
     func present(_ error: Error, title: String) {
+        if let shown = error as? DocumentShownInAnotherWindow {
+            // WD1: an open that names a file another window shows focuses that window.
+            focusWindowShowingDocument(shown)
+            return
+        }
         presentedError = UserVisibleError(
             title: title,
             message: userVisibleDescription(for: error),

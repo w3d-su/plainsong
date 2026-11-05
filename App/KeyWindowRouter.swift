@@ -44,6 +44,8 @@ final class KeyWindowRouter: ObservableObject {
     private var claimedOwners: [ObjectIdentifier: OwnerClaim] = [:]
     /// Owners whose window closed. The next claim restores prompts from registry state.
     private var closedOwnersNeedingPromptRestore: Set<ObjectIdentifier> = []
+    /// Façades whose close `windowShouldClose` approved and whose `willClose` has not run.
+    private var closingFacades: Set<ObjectIdentifier> = []
     private var resignObserver: NSObjectProtocol?
     private var becomeObserver: NSObjectProtocol?
     /// Last window a user-initiated refusal asked AppKit to focus. Weak, so a closed window
@@ -241,9 +243,9 @@ final class KeyWindowRouter: ObservableObject {
         return admitting.first ?? fallback
     }
 
-    /// Brings `window` forward for a refusal the user caused (Quit). Background failures
-    /// such as autosave do not call this: making another window key would send the user's
-    /// next keystroke into a different document.
+    /// Brings `window` forward for a request the user made: a refused Quit, or WD1 focusing the
+    /// window that already shows a file. Background failures such as autosave do not call this:
+    /// making another window key would send the user's next keystroke into a different document.
     func focus(_ window: WindowState) {
         focusedWindowState = window
         guard let facade = facadesInOrder.first(where: { $0.windowState === window }),
@@ -254,6 +256,30 @@ final class KeyWindowRouter: ObservableObject {
         // Hosted tests and an inactive dev session must not steal the owner's key window.
         guard NSApp.isActive else { return }
         host.makeKeyAndOrderFront(nil)
+    }
+
+    /// WD1 focus: only a window that is attached, not closing, and not presenting a sheet can
+    /// come forward. Returns false, without focusing, otherwise (§4.1 option c fallback).
+    func focusIfPossible(_ window: WindowState) -> Bool {
+        guard let facade = facadesInOrder.first(where: { $0.windowState === window }),
+              let host = windowsByFacade[ObjectIdentifier(facade)]?.window,
+              host.attachedSheet == nil,
+              !closingFacades.contains(ObjectIdentifier(facade))
+        else {
+            return false
+        }
+        focus(window)
+        return true
+    }
+
+    /// A close that `windowShouldClose` approved. The window cannot be WD1's focus target from
+    /// here until `closeFacade` runs.
+    func noteCloseApproved(_ facade: AppState) {
+        closingFacades.insert(ObjectIdentifier(facade))
+    }
+
+    func isClosing(_ facade: AppState) -> Bool {
+        closingFacades.contains(ObjectIdentifier(facade))
     }
 
     func closeAttachedWindow(of facade: AppState) {
@@ -318,11 +344,16 @@ final class KeyWindowRouter: ObservableObject {
         }
         facades[identifier] = nil
         windowsByFacade[identifier] = nil
+        closingFacades.remove(identifier)
         facadeOrder.removeAll { $0 == identifier }
         objectWillChange.send()
     }
 
     #if DEBUG
+        func resetFocusForTesting() {
+            focusedWindowState = nil
+        }
+
         /// Clears every table and test hook. Hosted tests call it in `tearDown`.
         func resetForTesting() {
             testingPin = nil
@@ -338,6 +369,7 @@ final class KeyWindowRouter: ObservableObject {
             noticeOwners = [:]
             claimedOwners = [:]
             closedOwnersNeedingPromptRestore = []
+            closingFacades = []
             focusedWindowState = nil
             WorkspaceSceneReopener.shared.resetForTesting()
             objectWillChange.send()
@@ -395,6 +427,7 @@ final class KeyWindowRouter: ObservableObject {
         }
         claimedOwners = claimedOwners.filter { $0.value.facade != nil }
         noticeOwners = noticeOwners.filter { $0.value.facade != nil }
+        closingFacades = closingFacades.filter { facades[$0]?.facade != nil }
     }
 
     private func noteKeyChange(resigned window: NSWindow?) {

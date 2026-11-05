@@ -19,6 +19,14 @@ extension AppState {
         guard file.url == key else {
             throw AppStateError.invalidSessionIdentity(key)
         }
+        // WD1: every anchored activation (Files, the jump bar, a preview link, a search result,
+        // reload, creation) refuses a file another window shows, before any side effect.
+        try refuseIfShownInAnotherWindow(
+            location: location,
+            fileURL: key,
+            identity: metadata.identity,
+            session: registry.warmSession(at: key)
+        )
         let binding = AnchoredWorkspaceSessionFileBinding(
             location: location,
             identity: metadata.identity,

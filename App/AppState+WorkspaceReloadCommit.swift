@@ -91,14 +91,22 @@ extension AppState {
         // Cache and retirement state can change while the final root proof suspends. Re-derive the
         // activation source now, then commit it without another suspension so a stale cached or
         // retired source can neither be resurrected nor trip a commit precondition.
-        let preparedActivation = try preparedFile.map { preparedFile in
-            try prepareAnchoredFileSessionActivation(
-                file: preparedFile.file,
-                at: preparedFile.location,
-                metadata: preparedFile.metadata,
-                sha256Digest: preparedFile.sha256Digest,
-                preparedImageAssetAuthority: preparedFile.preparedImageAssetAuthority
-            )
+        let preparedActivation: PreparedAnchoredFileSessionActivation?
+        do {
+            preparedActivation = try preparedFile.map { preparedFile in
+                try prepareAnchoredFileSessionActivation(
+                    file: preparedFile.file,
+                    at: preparedFile.location,
+                    metadata: preparedFile.metadata,
+                    sha256Digest: preparedFile.sha256Digest,
+                    preparedImageAssetAuthority: preparedFile.preparedImageAssetAuthority
+                )
+            }
+        } catch is DocumentShownInAnotherWindow {
+            // WD1: another window shows the file this reload would select. A reload never moves
+            // focus, so this window keeps its document and selects nothing.
+            tree.selectNode(id: nil)
+            preparedActivation = nil
         }
 
         // Every throwing filesystem and cache validation is complete. From here through capture
