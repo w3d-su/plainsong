@@ -16,7 +16,11 @@ filter, expansion, selection and missing/current document disposition from that
 snapshot, then restarts only its own active search. A peer disposition failure is
 reported in that peer and does not prevent later peers from refreshing. Detach
 clears only the departing window's search/completion work; final release uses D1b's
-root preflight and retained-scope ownership.
+root preflight and retained-scope ownership. A departing window's own documents that
+the root does not own still leave with it: detach applies the last release's
+preflight to them, then retires and releases only those, without moving the root's
+scope or advancing its generation. Skipping them dropped an edit to a standalone file
+shown while attached to an empty shared root.
 
 Namespace transactions remain app-wide. Their deferred refresh queue and image
 placement counts remain per root; drain visits every pending context, retaining an
@@ -37,6 +41,7 @@ last reference on a retained root scope. The native editor source contract is un
 Keeping separate root contexts would duplicate scans/watchers and cannot meet WD2.
 A strong registry index would retain unreferenced scopes after facades disappear.
 Publishing the context or reconciling every window on body edits would add work to
-typing. These alternatives are rejected. Named hosted tests and the paired Debug
+typing. Refusing every detach while the window shows a document outside the root
+would block attaching to a folder from a standalone file. These alternatives are rejected. Named hosted tests and the paired Debug
 typing record cover D1c; public window creation/routing remain D2, tabs remain F,
 and four-window residency/typing acceptance remains G.

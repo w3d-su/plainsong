@@ -153,4 +153,71 @@ final class WindowSharedRootAppTests: SharedRootAppTestCase {
         XCTAssertTrue(second.shownSession === secondSession)
         XCTAssertEqual(secondSession.text, "beta text")
     }
+
+    /// A participant that is not the last to leave keeps the root alive, but a document it
+    /// shows from outside the root leaves with it, so it is retired and its edit reaches disk.
+    func testDetachingParticipantRetiresItsOwnStandaloneDocument() async throws {
+        let root = try makeRoot("root", files: [:])
+        let aloneURL = try writeOutsideRoot("alone.md", "alone")
+        let nextURL = try writeOutsideRoot("next.md", "next")
+        try await open(primary, root: root)
+        let alone = try await showStandaloneThenAttach(second, file: aloneURL, root: root)
+        let binding = second.editorDocumentBinding(for: alone)
+        let installation = EditorDocumentBindingInstallation(
+            bindingID: binding.id, installationID: EditorDocumentBindingInstallationID()
+        )
+        binding.onLifecycle(.installed(installation))
+        second.replaceDocumentText("edited", in: alone)
+        let context = primary.workspaceRootContext
+        let generation = context.workspaceGeneration
+
+        try second.open(url: nextURL, rememberAsLastOpened: false, preserveWorkspace: false)
+
+        XCTAssertTrue(primary.workspaceRootContext === context)
+        XCTAssertEqual(context.workspaceGeneration, generation, "the shared root stays alive")
+        XCTAssertTrue(second.isRetiredEditorSession(alone))
+        binding.onLifecycle(.revoked(installation))
+        second.flushAutosaveIfNeeded()
+        XCTAssertEqual(try XCTUnwrap(String(bytes: Data(contentsOf: aloneURL), encoding: .utf8)), "edited")
+    }
+
+    /// The detaching window's own document outside the root gets the last release's
+    /// preflight: an unresolved write refuses the detach and leaves the window attached.
+    func testDetachRefusesWhileItsOwnStandaloneDocumentIsQuarantined() async throws {
+        let root = try makeRoot("root", files: [:])
+        let aloneURL = try writeOutsideRoot("alone.md", "alone")
+        try await open(primary, root: root)
+        let alone = try await showStandaloneThenAttach(second, file: aloneURL, root: root)
+        second.indeterminateWorkspaceMutationSessions.insert(ObjectIdentifier(alone))
+        let context = primary.workspaceRootContext
+
+        XCTAssertThrowsError(try second.closeWorkspaceForReplacement())
+
+        XCTAssertTrue(second.workspaceRootContext === context)
+        XCTAssertNotNil(second.workspaceRootURL)
+        XCTAssertTrue(second.shownSession === alone)
+        second.indeterminateWorkspaceMutationSessions.remove(ObjectIdentifier(alone))
+    }
+
+    private func writeOutsideRoot(_ name: String, _ text: String) throws -> URL {
+        let url = directory.appendingPathComponent(name)
+        try Data(text.utf8).write(to: url)
+        return url
+    }
+
+    /// Opens `file` standalone in `facade`, then attaches it to the empty shared `root`, which
+    /// selects nothing, so the standalone document stays shown outside the root.
+    private func showStandaloneThenAttach(
+        _ facade: AppState,
+        file: URL,
+        root: URL
+    ) async throws -> DocumentSession {
+        try facade.open(url: file, rememberAsLastOpened: false, preserveWorkspace: false)
+        let session = facade.shownSession
+        try facade.openWorkspace(url: root, rememberAsLastOpened: false)
+        try await waitUntil("the participant attaches") { facade.workspaceTree != nil }
+        XCTAssertTrue(primary.workspaceRootContext === facade.workspaceRootContext)
+        XCTAssertTrue(facade.shownSession === session)
+        return session
+    }
 }

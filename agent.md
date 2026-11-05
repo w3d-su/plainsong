@@ -266,8 +266,9 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   generation and scan per refresh; each participant keeps its own filtered tree,
   expansion, selection, reload disposition and search. Namespace mutation is app-wide;
   deferred refresh and image-placement counts stay per root, and drain services every
-  queued root. A departing participant clears only its own window tasks and search;
-  the last reference runs D1b release. The warm-session
+  queued root. A departing participant clears only its own window tasks and search, and
+  retires and releases only its own documents the root does not own, under the last
+  release's preflight; the last reference runs D1b release. The warm-session
   LRU is one global cache: 8 warm sessions plus every installed document. An installed
   document is an editor-binding installation or any connected window's shown session;
   it does not count toward the 8 and cannot be evicted. Other protected sessions still
