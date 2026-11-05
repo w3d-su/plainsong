@@ -42,8 +42,6 @@ final class KeyWindowRouter: ObservableObject {
     /// or when a reopen wait expires before the window attaches, so the next scene (Dock
     /// reopen, Finder open, or a retry) gets the owner back.
     private var claimedOwners: [ObjectIdentifier: OwnerClaim] = [:]
-    /// Owners whose window closed. The next claim restores prompts from registry state.
-    private var closedOwnersNeedingPromptRestore: Set<ObjectIdentifier> = []
     /// Façades whose close `windowShouldClose` approved and whose `willClose` has not run.
     private var closingFacades: Set<ObjectIdentifier> = []
     private var resignObserver: NSObjectProtocol?
@@ -97,9 +95,7 @@ final class KeyWindowRouter: ObservableObject {
         claimedOwners[identifier] = OwnerClaim(facade: owner, token: token)
         WorkspaceSceneReopener.shared.remember(owner)
         track(owner)
-        if closedOwnersNeedingPromptRestore.remove(identifier) != nil {
-            owner.restoreRecoveryPrompt(for: owner.shownSession)
-        }
+        owner.reconnectReclaimedWindow()
         return token
     }
 
@@ -147,7 +143,10 @@ final class KeyWindowRouter: ObservableObject {
             NotificationCenter.default.removeObserver(existing)
         }
         windowsByFacade[identifier] = WindowBox(window: window)
-        _ = WindowCloseInterceptor.install(on: window)
+        // §6.2: `windowShouldClose` asks the façade, which may refuse the close (WD8).
+        WindowCloseInterceptor.install(on: window).closeDecision = { [weak facade] in
+            facade?.approveWindowClose() ?? true
+        }
         closeObservers[identifier] = NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,
             object: window,
@@ -312,9 +311,10 @@ final class KeyWindowRouter: ObservableObject {
     }
 
     /// Moves the home role, the foreground autosave, notices, and any error the closed façade
-    /// was showing to a surviving admitting peer. A sibling's window leaves every registry
-    /// inventory. The app-owned façade stays registered: it keeps its document for the next
-    /// scene, as the single `AppState` did before PR C.
+    /// was showing to a surviving admitting peer, then finishes the close (§6.2 steps 3–5):
+    /// every window, the app-owned one included, leaves the registry inventories and keeps no
+    /// document. The app-owned façade stays alive and admitted, and its next scene shows an
+    /// empty window.
     func closeFacade(_ facade: AppState) {
         let identifier = ObjectIdentifier(facade)
         guard isTracked(facade) || windowsByFacade[identifier] != nil else { return }
@@ -323,6 +323,17 @@ final class KeyWindowRouter: ObservableObject {
             // per-session background task before the home role moves.
             facade.moveCurrentAutosaveToBackground(for: facade.shownSession)
         }
+        if let observer = closeObservers.removeValue(forKey: identifier) {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        // Prompts are visible-window state. A closed window stays out of
+        // isSaveBlockedByWindowPrompt; pending external text stays on the registry, and the
+        // prompt comes back when a window shows that file again.
+        facade.windowState.externalChangePrompt = nil
+        facade.windowState.missingFilePrompt = nil
+        facade.windowState.indeterminateFileWriteReconciliationPrompt = nil
+        facade.finishWindowClose()
+        // After the finish, so an error its LRU trim raised moves too.
         let next = peers(of: facade).first {
             $0 !== facade && WindowOpenAdmission.admits($0.windowState)
         }
@@ -333,21 +344,8 @@ final class KeyWindowRouter: ObservableObject {
         for (noticeID, owner) in noticeOwners where owner.facade === facade {
             noticeOwners[noticeID] = next.map { FacadeBox(facade: $0) }
         }
-        if let observer = closeObservers.removeValue(forKey: identifier) {
-            NotificationCenter.default.removeObserver(observer)
-        }
-        // Prompts are visible-window state. A closed window stays out of
-        // isSaveBlockedByWindowPrompt; pending external text stays on the registry.
-        // The app-owned facade stays registered so its document remains in termination
-        // and autosave inventories, matching the single AppState before PR C.
-        facade.windowState.externalChangePrompt = nil
-        facade.windowState.missingFilePrompt = nil
-        facade.windowState.indeterminateFileWriteReconciliationPrompt = nil
         let isOwner = claimedOwners.removeValue(forKey: identifier)?.facade === facade
-        if isOwner {
-            closedOwnersNeedingPromptRestore.insert(identifier)
-        } else {
-            facade.registry.unregister(facade.windowState)
+        if !isOwner {
             WindowOpenAdmission.forget(facade.windowState)
         }
         facades[identifier] = nil
@@ -376,7 +374,6 @@ final class KeyWindowRouter: ObservableObject {
             windowsByFacade = [:]
             noticeOwners = [:]
             claimedOwners = [:]
-            closedOwnersNeedingPromptRestore = []
             closingFacades = []
             focusedWindowState = nil
             WorkspaceSceneReopener.shared.resetForTesting()

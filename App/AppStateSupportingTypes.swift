@@ -232,6 +232,10 @@ enum AppStateError: LocalizedError {
     case recoveryDestinationConflictsOriginal(URL)
     /// A production extra scene refuses every file and root open until PR D2.
     case windowFileOpenRefused
+    /// A window close waits for a save or a read of the file on disk to finish (WD8).
+    case fileWorkInProgress(URL)
+    /// A dirty document that can be neither saved nor kept warm refuses its window's close (WD8).
+    case unsavedChangesPreventWindowClose(URL)
 
     var errorDescription: String? {
         switch self {
@@ -261,6 +265,11 @@ enum AppStateError: LocalizedError {
                 "\(url.lastPathComponent) may belong to another file."
         case .windowFileOpenRefused:
             "This window cannot open files. Use the existing window."
+        case let .fileWorkInProgress(url):
+            "Plainsong is still working with \(url.lastPathComponent) on disk. Close the window again in a moment."
+        case let .unsavedChangesPreventWindowClose(url):
+            "\(url.lastPathComponent) has changes that cannot be saved or kept. " +
+                "Save a copy, resolve the change on disk, or undo the edits before closing this window."
         }
     }
 }

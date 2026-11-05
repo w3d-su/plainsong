@@ -1,3 +1,4 @@
+import AppKit
 import EditorKit
 import MarkdownCore
 import SwiftUI
@@ -73,6 +74,14 @@ struct PlainsongCommands: Commands {
         }
 
         CommandGroup(replacing: .saveItem) {
+            // Replacing `.saveItem` also removed the system Close item, so ⌘W closed nothing.
+            // Like that item, Close reaches the key window through the responder chain: a
+            // workspace window runs its close lifecycle (§6.2), and Settings simply closes.
+            Button("Close") {
+                NSApp.sendAction(#selector(NSWindow.performClose(_:)), to: nil, from: nil)
+            }
+            .keyboardShortcut("w", modifiers: .command)
+
             Button("Save") {
                 commandTarget?.save()
             }

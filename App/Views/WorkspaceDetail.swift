@@ -92,6 +92,8 @@ struct EditorWorkspace: View {
         scrollCoordinator: EditorPreviewScrollCoordinator
     ) {
         scrollCoordinator.connect(previewController: controller)
+        // Closing the window invalidates this controller (§6.2 step 5).
+        WindowPreviewControllers.register(controller, for: appState.windowState)
 
         controller.onPreviewScrolled = { line in
             guard appState.preferences.typewriterSyncEnabled else { return }
