@@ -503,7 +503,9 @@ republishes only when its value changes literally.
   `<svg>` stay blocked. HTML and PDF export do not embed SVG yet. Other active or
   ambiguous formats are rejected.
 - Link clicks: intercepted in Swift. `http(s)` → `NSWorkspace.open` (external browser).
-  Relative `.md`/`.mdx` → open that file in the editor. `#anchor` stays in JavaScript
+  Relative `.md`/`.mdx` → open that file in the editor. The `href` arrives percent-encoded
+  (remark encodes non-ASCII and spaces), so the App cuts the query and fragment, decodes the
+  path and opens it only when it is a scheme-less relative path. `#anchor` stays in JavaScript
   and scrolls the preview to a generated heading ID (Unicode and duplicate headings supported).
   On iOS, PreviewKit also owns external browser opening; production scene observation
   must not open its informational external-link event a second time.
