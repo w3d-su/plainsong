@@ -33,3 +33,23 @@ extension AppState {
         }
     }
 }
+
+@MainActor
+extension AppState {
+    /// The last revoke keeps a session's registration while another window still shows it.
+    /// Once no window shows it and it is cold, not retired, and installed nowhere, that
+    /// registration is the last reference on its retained root scope. Dropping it lets the
+    /// scope stop, whichever of revoke and switch-away came last.
+    func removeRetainedRootScopeRegistrationIfUnreferenced(for session: DocumentSession) {
+        let identity = ObjectIdentifier(session)
+        guard registry.retainedWorkspaceAuthorityOwners[identity] != nil,
+              editorDocumentBindingIDs[identity] != nil,
+              !registry.isShownByAnyWindow(session),
+              !registry.isWarmSession(session),
+              !isRetiredEditorSession(session),
+              !editorBindingInstallations.values.contains(where: { $0 === session }),
+              !pendingEditorSourceInstallations.values.contains(where: { $0 === session })
+        else { return }
+        removeEditorDocumentBindingRegistration(for: session)
+    }
+}

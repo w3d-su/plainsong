@@ -270,9 +270,13 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   created per visible document pane. A scene gets the app-owned façade whenever no open
   scene shows it, so closing the only window and reopening it works. A scene opened while
   another shows that façade refuses file and root opens and closes itself until PR D2, and
-  native tabbing stays off until PR F. Closing a root releases only that root's
-  eligible sessions. Another root, a standalone warm session, and any session
-  another window shows or installs stay warm with their tasks, metadata, and LRU
+  native tabbing stays off until PR F. Closing a root saves or retires the closing
+  window's own document and installations wherever they live, and releases them with
+  that root's eligible sessions; only sessions the root's authority proves it owns keep
+  its scope. Another root's operation recovery does not block the close, and a sibling's
+  close leaves the home window's foreground autosave running. Another root, a
+  standalone warm session, and any session another window shows or installs stay warm
+  with their tasks, metadata, and LRU
   recency (D1b). Last-root preflight includes every session belonging to that root,
   including a session another window preserves. Preserved sessions retain the original
   security scope until eviction or final ownership release. Editor installations record

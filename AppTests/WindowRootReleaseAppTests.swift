@@ -292,7 +292,7 @@ final class WindowRootReleaseAppTests: XCTestCase {
 }
 
 @MainActor
-private struct TwoRootReleaseFixture {
+struct TwoRootReleaseFixture {
     let primary: AppState
     let second: AppState
     let shownAURL: URL

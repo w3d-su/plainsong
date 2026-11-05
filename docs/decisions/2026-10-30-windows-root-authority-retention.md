@@ -35,3 +35,37 @@ revoke still removes a retired cold registration, and otherwise removes one only
 when it is the last reference on a retained root scope. An unshown untitled
 session keeps its registration and can be shown again. Discard removes the weak
 installation/window record together with the installation itself.
+
+## Follow-up, 2026-11-06 (review of `89a995c`)
+
+Five boundary cases failed in hosted reproductions before this repair
+(`WindowRootReleaseBoundaryAppTests`).
+
+- The closing window's own document and live installations join the preflight and
+  the release set wherever they live, with or without a root. A standalone file still
+  shown after an empty folder opened belonged to no root, so replacing that folder
+  skipped its save and retirement; main saved it. Other windows' sessions still follow
+  root membership.
+- Only a preserved session that the root's authority proves it owns retains the
+  root's scope. During a root's first scan nothing is proven, so a replacement then
+  cannot hand the new folder's grant to a document another window shows.
+- The shared foreground autosave belongs to the home façade (`scheduleAutosave()`),
+  so only the home façade's close cancels it. The shared statistics task stays
+  last-writer-wins: any window refreshes its shown document on it, and a lost refresh
+  only delays a word count.
+- An operation recovery blocks the closure of the root its recorded locations name
+  and of any session it still holds. Another root's recovery no longer blocks
+  (W6 bullet 6). A record that could not be resolved names no authority and still
+  blocks every closure. The in-progress transaction and the recovery store-load fences
+  stay global.
+- When the last window switches away from a cold, unretired, uninstalled session whose
+  registration only its retained root scope still needs, the registration is dropped
+  and the scope can stop. The final revoke already did this in the other order.
+
+Alternatives: refusing the replacement while the window shows a document outside its
+root would block an ordinary standalone-file-to-folder flow. Saving that document
+without retiring it would differ from standalone replacement, where retirement lets
+composition publish until the final revoke.
+Cancelling the foreground autosave whenever the closing window's own document leaves
+would still let a sibling cancel the home window's timer. Keeping every recovery
+global would keep W6 bullet 6 false for operation recoveries.
