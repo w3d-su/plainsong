@@ -6,6 +6,12 @@ import XCTest
 
 @MainActor
 final class PreviewInitialReadinessPolicyTests: XCTestCase {
+    override func setUp() async throws {
+        // Load counts below are taken inside init, which loads synchronously only
+        // after the shared content rules are already compiled.
+        _ = await PreviewRemoteImageRuleStore.rules()
+    }
+
     func testDefaultInitialRetryPolicyIsLimitedToIOS() {
         let clock = InitialReadinessTestClock()
         let page = InitialReadinessTestPage()

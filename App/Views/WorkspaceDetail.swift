@@ -178,8 +178,17 @@ private struct PreviewPane: View {
 
     var body: some View {
         GeometryReader { proxy in
-            MarkdownPreviewWebView(controller: controller)
-                .frame(width: proxy.size.width, height: proxy.size.height)
+            ZStack {
+                MarkdownPreviewWebView(controller: controller)
+                if controller.remoteImageNetworkUnavailable {
+                    ContentUnavailableView {
+                        Label("Preview Unavailable", systemImage: "network.slash")
+                    } description: {
+                        Text(PreviewNetworkPolicyFailure.userMessage)
+                    }
+                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .onAppear {
             controller.setWorkspaceAssetRoot(appState.previewAssetRootURL)

@@ -16,6 +16,13 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
     var noticeFlushScheduled = false
     var recentRestoreRequests: [UUID: UUID] = [:]
     public var includesHiddenEntries = false
+    /// Folder created beside a document for inserted images. Invalid names stay `assets`.
+    public private(set) var assetDirectoryName = "assets"
+
+    public func setAssetDirectoryName(_ name: String) {
+        assetDirectoryName = IOSWorkspacePathAuthority.normalizedAssetDirectory(name)
+    }
+
     public var includesAllFiles = false
     let maximumRecentItems = 10
 

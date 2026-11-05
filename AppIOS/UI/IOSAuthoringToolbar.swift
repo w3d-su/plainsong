@@ -79,6 +79,17 @@ struct IOSAuthoringToolbarItems: ToolbarContent {
                 authoringButton(action)
             }
 
+            ForEach(toolbarGroups) { group in
+                Menu {
+                    ForEach(group.actions, id: \.id) { action in
+                        overflowButton(action)
+                    }
+                } label: {
+                    Label(group.name, systemImage: groupSymbol(group.name))
+                }
+                .accessibilityLabel(group.name)
+            }
+
             if !overflowActions.isEmpty {
                 Menu {
                     ForEach(overflowActions, id: \.id) { action in
@@ -102,7 +113,24 @@ struct IOSAuthoringToolbarItems: ToolbarContent {
             .keyboardShortcut("s", modifiers: .command)
             .accessibilityIdentifier("plainsong.ios.toolbar.save")
 
+            if let export = scene.surfaces.exportDocument {
+                Menu {
+                    Button("Export as HTML") { export(.html) }
+                        .disabled(scene.exportStatus != nil)
+                    Button("Export as PDF") { export(.pdf) }
+                        .disabled(scene.exportStatus != nil)
+                    Button("Print") { export(.print) }
+                        .disabled(scene.exportStatus != nil)
+                } label: {
+                    Label("Export", systemImage: "square.and.arrow.up")
+                }
+                .disabled(!scene.chrome.hasDocument || scene.exportStatus != nil)
+                .accessibilityIdentifier("plainsong.ios.toolbar.export")
+            }
+
             findButton
+
+            workspaceSearchButton
 
             ForEach(unplacedShortcutActions, id: \.id) { action in
                 shortcutHost(action)
@@ -128,15 +156,43 @@ struct IOSAuthoringToolbarItems: ToolbarContent {
         }
     }
 
+    private struct ToolbarGroup: Identifiable {
+        let name: String
+        let actions: [IOSAuthoringAction]
+        var id: String {
+            name
+        }
+    }
+
+    /// Frequent commands stay as 44 pt icon buttons. Heading and code commands
+    /// stay in menus so the keyboard accessory does not overflow on iPhone.
     private var primaryActions: [IOSAuthoringAction] {
         router.actions.filter { action in
             if case .toolbar = action.placement {
                 return true
             }
-            if case .toolbarGroup = action.placement {
-                return true
-            }
             return false
+        }
+    }
+
+    private var toolbarGroups: [ToolbarGroup] {
+        var order: [String] = []
+        var grouped: [String: [IOSAuthoringAction]] = [:]
+        for action in router.actions {
+            guard case let .toolbarGroup(name) = action.placement else { continue }
+            if grouped[name] == nil {
+                order.append(name)
+            }
+            grouped[name, default: []].append(action)
+        }
+        return order.map { ToolbarGroup(name: $0, actions: grouped[$0] ?? []) }
+    }
+
+    private func groupSymbol(_ name: String) -> String {
+        switch name {
+        case "Heading": "textformat.size"
+        case "Code": "chevron.left.forwardslash.chevron.right"
+        default: "textformat"
         }
     }
 
@@ -144,22 +200,35 @@ struct IOSAuthoringToolbarItems: ToolbarContent {
         router.actions.filter { $0.placement == .formatMenu }
     }
 
-    /// Format commands live in a menu, and Find Next / Find Previous / Use
-    /// Selection have no always-visible control. Mount the same installer so
-    /// those shortcuts exist while the toolbar is on screen. Cmd-F stays on
-    /// the visible Find button. Primary buttons install their own shortcuts.
+    /// Menus are not a reliable key-command source, and Find Next / Find
+    /// Previous / Use Selection have no always-visible control. Mount the same
+    /// installer so those shortcuts exist while the toolbar is on screen.
+    /// Cmd-F stays on the visible Find button. Primary buttons install their
+    /// own shortcuts and are not repeated here.
     private var unplacedShortcutActions: [IOSAuthoringAction] {
         router.actions.filter { action in
             guard action.keyEquivalent != nil else { return false }
             switch action.placement {
-            case .formatMenu:
+            case .formatMenu, .toolbarGroup:
                 return true
             case .find:
                 return action.id != .find
-            case .toolbar, .toolbarGroup:
+            case .toolbar:
                 return false
             }
         }
+    }
+
+    private var workspaceSearchButton: some View {
+        Button {
+            scene.presentWorkspaceSearch()
+        } label: {
+            Label("Search in Workspace", systemImage: "text.magnifyingglass")
+        }
+        .disabled(!scene.chrome.hasWorkspace)
+        .keyboardShortcut("f", modifiers: [.command, .shift])
+        .accessibilityIdentifier("plainsong.ios.toolbar.workspaceSearch")
+        .accessibilityHint("Search Markdown files in the open folder")
     }
 
     private var findButton: some View {
@@ -177,12 +246,24 @@ struct IOSAuthoringToolbarItems: ToolbarContent {
     }
 
     private func authoringButton(_ action: IOSAuthoringAction) -> some View {
-        Button(action.title) {
+        Button {
             _ = router.perform(action.id)
+        } label: {
+            Label(action.title, systemImage: symbol(for: action.id))
+                .labelStyle(.iconOnly)
         }
         .disabled(!router.isEnabled(action.id))
         .accessibilityLabel(action.accessibilityLabel)
         .modifier(AuthoringShortcutModifier(action: action))
+    }
+
+    private func symbol(for id: IOSAuthoringActionID) -> String {
+        switch id {
+        case .bold: "bold"
+        case .italic: "italic"
+        case .link: "link"
+        default: "textformat"
+        }
     }
 
     private func overflowButton(_ action: IOSAuthoringAction) -> some View {

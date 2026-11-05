@@ -181,7 +181,8 @@ private extension IOSWorkspaceAccessService {
                 documentRelativePath: request.destination.relativePath,
                 preferredFilename: request.preferredFilename,
                 operationID: request.operationID,
-                exists: { _ in false }
+                exists: { _ in false },
+                assetFolder: assetDirectoryName
             )
         }
     }
@@ -201,7 +202,8 @@ private extension IOSWorkspaceAccessService {
                     documentRelativePath: request.destination.relativePath,
                     preferredFilename: request.preferredFilename,
                     operationID: request.operationID,
-                    exists: { $0 == paths.rootRelative }
+                    exists: { $0 == paths.rootRelative },
+                    assetFolder: assetDirectoryName
                 )
             }
             guard let retry, retry.rootRelative != paths.rootRelative else {

@@ -115,16 +115,20 @@ Arbitrary CSS from the internet is a real attack surface even under the current 
 
 | Risk | Detail |
 |---|---|
-| Tracking | `img-src` allows `https:` statically; the "Allow Remote Images" switch is enforced in JS on `<img>` only. A CSS `background: url(https://…)` would bypass it. |
+| Tracking | **Closed 2026-10-29.** The static CSP still lists `img-src https:` so an allowed image is not rejected by CSP. A WebKit content rule now blocks every http(s) and ws(s) load while Allow Remote Images is off, including CSS `url()`, `srcset`, and `<picture>`. The JS `<img>` policy remains a second layer. A failed block-list compile leaves the page unloaded and reports the failure. |
 | Spoofing | Selectors can hide content, fake the MDX error banner or stale indicator, or use `content:` to show text that is not in the source. |
 | Breaking features | Hiding `[data-line]` anchors, transforms or `position: fixed` break scroll sync; heavy selectors and animations hurt the §12 preview budget. |
 | Export | Would freeze third-party CSS into published HTML. |
 
 Prerequisites before user CSS is implemented, each its own gate:
 
-1. Tighten the static CSP so `img-src https:` is present only when remote images are on
-   (per-load CSP or a pre-render switch), closing the CSS `url()` bypass for everyone.
-2. A CSS sanitizer (tokenizer-based, likely a new npm dependency → `docs/decisions/`) that
+1. **Done (2026-10-29).** The CSS `url()` bypass is closed at the network layer rather than
+   by rewriting the static CSP. While Allow Remote Images is off, a WebKit content rule
+   blocks every `http:`/`https:` and `ws:`/`wss:` load; while it is on, the same slot allows
+   only `https:` images. `img-src https:` stays in the static CSP so an allowed image can
+   load. A failed block-list compile does not load the page. See
+   `docs/decisions/2026-10-29-remote-image-network-block.md`.
+2. A CSS sanitizer (tokenizer-based, likely a new npm dependency → Decision Log) that
    rejects `url()`, `@import`, `@font-face`, `image-set`, `position: fixed`, and scopes
    all rules under the preview body.
 3. User CSS never applies to export unless the user opts in per export.
@@ -133,7 +137,7 @@ Prerequisites before user CSS is implemented, each its own gate:
 
 | Alternative | Why not |
 |---|---|
-| Ship user CSS first (Typora-style) | Largest risk surface; bypasses the remote-image privacy switch today (§4) |
+| Ship user CSS first (Typora-style) | Still requires separate CSS sanitization and layout/export gates (§4) |
 | Separate files for editor and preview themes | Two imports for one look; harder to keep light/dark consistent |
 | Import VS Code / TextMate themes | Their scopes do not map onto our 14 Markdown slots; partial imports look broken |
 | Store themes by bookmark to the user's file | Live editing would be nice, but needs watching and re-validation; copy-on-import is simpler and sandbox-friendly |
@@ -158,8 +162,8 @@ Prerequisites before user CSS is implemented, each its own gate:
 - **B** — T1 + T2 + T3 (editor-only themes; preview keeps built-ins).
 - **C** — T4 + T5 + T6 (preview tokens and export).
 - **D** — T7 + T8.
-- User CSS: a separate spec after §4's prerequisites; the CSP tightening in §4.1 is worth
-  doing independently, since it also hardens the remote-image switch.
+- User CSS: a separate spec after the remaining §4 prerequisites. Premise 1 is complete
+  through the content-rule network block; the static CSP still permits opted-in images.
 
 ## 8. Owner decisions
 

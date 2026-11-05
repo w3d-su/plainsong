@@ -5,6 +5,12 @@ import XCTest
 
 @MainActor
 final class PreviewInitialReadinessTests: XCTestCase {
+    override func setUp() async throws {
+        // Controllers created in this class count page loads during init. That is synchronous
+        // only after the shared content rules are already compiled.
+        _ = await PreviewRemoteImageRuleStore.rules()
+    }
+
     func testSilentBundledAndFallbackPagesRetryOnlyOnceAtTheInitialDeadline() {
         let bundled = URL(fileURLWithPath: "/synthetic/preview/index.html")
         for index in [nil, bundled] as [URL?] {

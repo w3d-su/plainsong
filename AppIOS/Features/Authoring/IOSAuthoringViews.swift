@@ -85,30 +85,42 @@ struct IOSAuthoringLinkSheet<Editor: IOSSourceEditorControlling>: View {
     let draft: IOSLinkDraft
 
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 12) {
             if draft.collectsLabel {
                 TextField("Label", text: label)
+                    .textFieldStyle(.roundedBorder)
                     .accessibilityLabel("Link label")
             }
             TextField("URL", text: url)
+                .textFieldStyle(.roundedBorder)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.URL)
+                .textContentType(.URL)
                 .accessibilityLabel("Link URL")
             Button("Add Link") {
                 controller.confirmLink(using: editor)
             }
+            .buttonStyle(.borderedProminent)
+            .frame(maxWidth: .infinity, minHeight: 44)
             .accessibilityLabel("Add Link")
             if !controller.statusMessage.isEmpty {
-                Text(controller.statusMessage).accessibilityLabel(controller.statusMessage)
+                Text(controller.statusMessage)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel(controller.statusMessage)
             }
         }
         .padding()
     }
 
     private var label: Binding<String> {
-        Binding(get: { controller.linkDraft?.label ?? "" }, set: controller.setLinkLabel)
+        Binding(get: { controller.linkDraft?.label ?? "" }, set: { controller.setLinkLabel($0) })
     }
 
     private var url: Binding<String> {
-        Binding(get: { controller.linkDraft?.url ?? "" }, set: controller.setLinkURL)
+        Binding(get: { controller.linkDraft?.url ?? "" }, set: { controller.setLinkURL($0) })
     }
 }
 
@@ -127,6 +139,8 @@ struct IOSAuthoringFrontmatterPanel<Editor: IOSSourceEditorControlling>: View {
                 Button("Add Frontmatter") {
                     controller.insertDefaultFrontmatter(date: displayedDate, using: editor)
                 }
+                .buttonStyle(.borderedProminent)
+                .frame(minHeight: 44)
                 .accessibilityLabel("Add Frontmatter")
             } else if let fields = parse.block?.fields {
                 ForEach(fields) { field in
@@ -135,6 +149,8 @@ struct IOSAuthoringFrontmatterPanel<Editor: IOSSourceEditorControlling>: View {
             }
             if !controller.frontmatter.drafts.isEmpty {
                 Button("Discard Draft") { controller.discardFrontmatterDrafts(using: editor) }
+                    .buttonStyle(.bordered)
+                    .frame(minHeight: 44)
                     .accessibilityLabel("Discard frontmatter draft")
             }
             if !controller.statusMessage.isEmpty {
@@ -241,11 +257,15 @@ struct IOSAuthoringFindBar<Editor: IOSSourceEditorControlling>: View {
     @FocusState private var findFieldFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 12) {
             TextField("Find", text: Binding(
                 get: { controller.find.queryText },
                 set: { controller.setFindQuery($0, using: editor) }
             ))
+            .textFieldStyle(.roundedBorder)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .submitLabel(.search)
             .focused($findFieldFocused)
             .accessibilityLabel("Find")
             .onChange(of: findFieldFocused) { _, focused in
@@ -261,25 +281,52 @@ struct IOSAuthoringFindBar<Editor: IOSSourceEditorControlling>: View {
                 Text("Sensitive").tag(TextSearchCaseSensitivity.sensitive)
                 Text("Insensitive").tag(TextSearchCaseSensitivity.insensitive)
             }
+            .pickerStyle(.segmented)
             .accessibilityLabel("Find case")
             Toggle("Whole Word", isOn: Binding(
                 get: { controller.find.wholeWord },
                 set: { controller.setFindWholeWord($0, using: editor) }
             ))
             .accessibilityLabel("Whole Word")
-            Text(controller.find.counterText).accessibilityLabel("Find count")
-            Text(controller.find.message).accessibilityLabel(controller.find.message)
-            HStack {
+            Text(controller.find.counterText)
+                .font(.callout)
+                .accessibilityLabel("Find count")
+            if !controller.find.message.isEmpty {
+                Text(controller.find.message)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel(controller.find.message)
+            }
+            HStack(spacing: 12) {
                 Button("Find Next") { controller.perform(.nextMatch, using: editor) }
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .accessibilityHint("Show the next match")
                 Button("Find Previous") { controller.perform(.previousMatch, using: editor) }
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .accessibilityHint("Show the previous match")
             }
             TextField("Replace", text: Binding(
                 get: { controller.find.replacement },
-                set: controller.setReplacement
+                set: { controller.setReplacement($0) }
             ))
+            .textFieldStyle(.roundedBorder)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
             .accessibilityLabel("Replace")
-            Button("Replace") { controller.perform(.singleReplace, using: editor) }
-                .accessibilityLabel("Replace")
+            HStack(spacing: 12) {
+                Button("Replace") { controller.perform(.singleReplace, using: editor) }
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .accessibilityLabel("Replace")
+                Button("Replace All") { controller.perform(.replaceAll, using: editor) }
+                    .buttonStyle(.borderedProminent)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .accessibilityLabel("Replace all matches")
+                    .accessibilityHint("Replace every match in this document. One undo restores the previous text.")
+            }
         }
     }
 }

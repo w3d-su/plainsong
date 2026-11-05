@@ -87,6 +87,24 @@ extension PreviewController {
             let exportID = pending.exportID
             let assetRoot = exportAssetRootURL
             let previewDirectory = previewIndexURL?.deletingLastPathComponent()
+            if let access = exportAssetAccess {
+                // iOS: the grant's reader holds the lease; a direct read outside it fails.
+                let load = Self.exportAssetLoader(
+                    reader: assetSchemeHandler.currentReader(),
+                    access: access
+                )
+                pendingHTMLExport?.resolutionTask = Task.detached { [weak self] in
+                    let outcomes = await ExportResourceResolver.resolve(
+                        resources,
+                        assetRoot: assetRoot,
+                        previewDirectory: previewDirectory,
+                        loadAsset: load
+                    )
+                    guard !Task.isCancelled else { return }
+                    await self?.completeResourceResolution(exportID: exportID, outcomes: outcomes)
+                }
+                return
+            }
             pendingHTMLExport?.resolutionTask = Task.detached { [weak self] in
                 let outcomes = ExportResourceResolver.resolve(
                     resources,
@@ -104,6 +122,32 @@ extension PreviewController {
             finishHTMLExport(.ready(html: html, exportID: payload.exportID, renderID: payload.renderID))
         case let .failed(reason):
             failPendingHTMLExport(reason: reason)
+        }
+    }
+
+    /// Reads one export image through the provider reader and applies the same checks as
+    /// `asset://` delivery: the result must answer this request under the same authority,
+    /// stay inside the root after symlinks, and pass the type allowlist and size cap.
+    nonisolated static func exportAssetLoader(
+        reader: (any PreviewAssetReading)?,
+        access: PreviewAssetAccessContext
+    ) -> @Sendable (URL) async throws -> AssetURLPolicyResult {
+        { fileURL in
+            guard let reader else { throw PreviewAssetReadFailure.unavailable }
+            _ = try AssetURLPolicy.mimeType(for: fileURL)
+            let request = PreviewAssetReadRequest(
+                requestID: UUID(),
+                resolvedURL: fileURL,
+                access: access,
+                maximumByteCount: Int(exactly: AssetURLPolicy.maxAssetBytes) ?? .max
+            )
+            let result = try await reader.read(request)
+            try Task.checkCancellation()
+            guard result.requestID == request.requestID, AssetAuthority.matches(result.access, access) else {
+                throw PreviewAssetReadFailure.accessChanged
+            }
+            let contained = try AssetContainment.fileURL(result.coordinatedURL, isContainedIn: access.allowedRoot)
+            return try AssetURLPolicy.deliveredAsset(data: result.bytes, fileURL: contained)
         }
     }
 

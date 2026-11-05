@@ -42,6 +42,9 @@ struct IOSShellChromeSnapshot: Equatable {
     var editorFocused = false
     var editorHasMarkedText = false
     var sceneUnavailableReason: String?
+    /// Live counts for the open document. Editor statistics win when the binding
+    /// belongs to this document; otherwise the stored snapshot is used.
+    var statistics: TextStatistics?
 
     init(scene: IOSAppSceneSnapshot, editor: IOSSourceEditorSnapshot?) {
         sceneUnavailableReason = scene.unavailableReason
@@ -52,7 +55,12 @@ struct IOSShellChromeSnapshot: Equatable {
         guard let stored = scene.document else {
             editorCanWrite = false
             status = .noDocument
+            statistics = nil
             return
+        }
+        statistics = stored.document.statistics
+        if let editor, editor.revision.documentID == stored.revision.documentID {
+            statistics = editor.document.statistics
         }
         documentIdentity = stored.revision.documentID
         documentKind = stored.document.fileKind

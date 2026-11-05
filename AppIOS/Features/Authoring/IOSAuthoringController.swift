@@ -24,7 +24,7 @@ final class IOSAuthoringController: ObservableObject, IOSAuthoringActionProvidin
             return true
         case .bold, .italic, .link, .heading, .code, .strikethrough, .inlineCode, .paragraph,
              .quote, .codeFence, .inlineMath, .displayMath, .checkbox, .formatTable,
-             .singleReplace:
+             .singleReplace, .replaceAll:
             return snapshot.canWrite
         }
     }
@@ -42,6 +42,8 @@ final class IOSAuthoringController: ObservableObject, IOSAuthoringActionProvidin
             useSelectionForFind(using: editor)
         case .singleReplace:
             replaceCurrentMatch(using: editor)
+        case .replaceAll:
+            replaceAllMatches(using: editor)
         case .link:
             performLink(using: editor)
         default:
@@ -109,7 +111,7 @@ final class IOSAuthoringController: ObservableObject, IOSAuthoringActionProvidin
         case .displayMath: .format(.insertDisplayMath)
         case .checkbox: .toggleCheckbox
         case .formatTable: .formatTable
-        case .link, .find, .nextMatch, .previousMatch, .useSelectionForFind, .singleReplace:
+        case .link, .find, .nextMatch, .previousMatch, .useSelectionForFind, .singleReplace, .replaceAll:
             nil
         }
     }

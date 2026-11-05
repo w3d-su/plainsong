@@ -89,7 +89,8 @@ extension IOSDocumentSceneController {
         guard rootParent || knownDirectory else { throw IOSDocumentFailure.access(.outsideGrant) }
         let occupied = Set(Self.flatten(workspaceSnapshot?.entries ?? []).map { Data($0.location.relativePath.utf8) })
         for index in 1 ... 1000 {
-            let name = index == 1 ? "Untitled.md" : "Untitled \(index).md"
+            let ext = preferredNewDocumentExtension == "mdx" ? "mdx" : "md"
+            let name = index == 1 ? "Untitled.\(ext)" : "Untitled \(index).\(ext)"
             let relative = parent.relativePath.isEmpty ? name : parent.relativePath + "/" + name
             guard WorkspaceRelativePath(spelling: relative) != nil else { throw IOSWorkspaceFailure.invalidPath }
             if occupied.contains(Data(relative.utf8)) {

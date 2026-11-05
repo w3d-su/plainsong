@@ -13,6 +13,7 @@ enum IOSShellPresentation: Hashable, Identifiable {
     case frontmatter
     case findReplace
     case imagePicker
+    case workspaceSearch
 
     var id: Self {
         self
@@ -100,6 +101,10 @@ struct IOSShellFeatureSurfaces {
     /// grant; a scene snapshot or derived parent is never an implicit grant.
     var currentGrant: (() -> IOSWorkspaceGrant?)?
 
+    /// Directory-grant read used by workspace search. Nil means search cannot
+    /// read files; the sheet explains that instead of scanning arbitrary URLs.
+    var readWorkspaceDocument: (@MainActor (IOSFileLocation) async throws -> String)?
+
     /// Conflict "Save a Copy" needs a destination picker + lease owned by
     /// composition; nil hides that button (W14).
     var resolveConflictCopy: (() -> Void)?
@@ -118,4 +123,8 @@ struct IOSShellFeatureSurfaces {
     /// Unavailable access requires explicit file/folder reselection, preserving
     /// the recorded scope. This callback does not reload or replace source.
     var reselectUnavailableWorkspace: (() -> Void)?
+
+    /// HTML and PDF export. Nil hides the command; the shell does not render
+    /// or write the file itself.
+    var exportDocument: ((IOSDocumentExportKind) -> Void)?
 }

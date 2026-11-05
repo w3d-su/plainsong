@@ -35,6 +35,38 @@ final class IOSShellChromeTests: XCTestCase {
         XCTAssertFalse(scene.chrome.editorFocused)
         XCTAssertFalse(scene.chrome.editorHasMarkedText)
         XCTAssertTrue(scene.chrome.hasDocument)
+        XCTAssertEqual(scene.chrome.statistics, TextStatistics(text: "# doc\n"))
+    }
+
+    func testChromePrefersMatchingEditorStatisticsOverTheStoredSnapshot() {
+        let stored = ShellFixtures.storedDocument(text: "one", path: "post.md")
+        let editor = FakeEditorBinding(text: "one two", identity: stored.revision.documentID)
+        let facade = FakeSceneFacade(
+            snapshot: ShellFixtures.sceneSnapshot(document: stored),
+            capabilities: IOSSceneCapabilities(
+                editor: editor, documents: nil, workspace: nil, preview: nil, assets: nil
+            )
+        )
+        let scene = IOSShellSceneState(facade: facade)
+        scene.startObserving()
+        defer { scene.stopObserving() }
+
+        XCTAssertEqual(scene.chrome.statistics, TextStatistics(text: "one two"))
+        editor.session.replaceTextFromAuthorizedEditor("one two three", refreshStatistics: false)
+        editor.session.applyStatistics(TextStatistics(text: editor.session.text))
+        editor.emitSnapshot()
+        XCTAssertEqual(scene.chrome.statistics, TextStatistics(text: "one two three"))
+
+        let other = FakeEditorBinding(text: "completely different words")
+        let mismatched = FakeSceneFacade(
+            snapshot: ShellFixtures.sceneSnapshot(document: stored),
+            capabilities: IOSSceneCapabilities(
+                editor: other, documents: nil, workspace: nil, preview: nil, assets: nil
+            )
+        )
+        let otherScene = IOSShellSceneState(facade: mismatched)
+        otherScene.startObserving()
+        XCTAssertEqual(otherScene.chrome.statistics, TextStatistics(text: "one"))
     }
 
     func testSaveEligibilityRequiresBothStoreAndEditorWritableAuthority() {

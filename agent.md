@@ -256,8 +256,17 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 - An active workspace search refreshes for document edits only after a 500 ms typing
   pause, and only while the Search navigator shows (an edit made while Files shows
   refreshes when Search shows again); typing never resets the search state.
+- An open iOS folder search reuses cached reads on root refreshes with the same tree,
+  debouncing provider notices. A per-file content notice drops only that path; changed
+  trees and explicit searches read again. In-flight reads cannot restore an invalidated
+  cache entry, including a size or encoding refusal.
 - Each workspace window has its own `AppState` façade, `WindowState`, and
-  `WorkspaceRootContext`, and they share one `AppDocumentRegistry`. One preview is
+  `WorkspaceRootContext`, and they share one `AppDocumentRegistry`. The warm-session
+  LRU is one global cache: 8 warm sessions plus every installed document. An installed
+  document is an editor-binding installation or any connected window's shown session;
+  it does not count toward the 8 and cannot be evicted. Other protected sessions still
+  count toward the 8 and cannot be evicted. Recovery Show/Keep Editor Copy reconciles
+  the LRU immediately when the previous shown session becomes countable. One preview is
   created per visible document pane. A scene gets the app-owned façade whenever no open
   scene shows it, so closing the only window and reopening it works. A scene opened while
   another shows that façade refuses file and root opens and closes itself until PR D2, and
@@ -274,7 +283,7 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   native List selection alone misses those clicks on macOS 15. Publish the tree
   selection only after activation succeeds; a failed read keeps the current file selected
   and allows retrying the same row. Multiple open
-  `DocumentSession`s kept warm in an LRU (target 8) so switching files is instant.
+  `DocumentSession`s stay in that global LRU, so switching files is instant.
   A failed or fenced eviction candidate is retained and protected for the whole trim
   pass; each candidate is tried at most once per pass. The cache may exceed 8 while
   saves cannot complete, preserving unsaved content until a later trim can succeed.
@@ -442,10 +451,32 @@ republishes only when its value changes literally.
   arrives, and accepts only a protocol match from the current page generation.
 - **Security:** strict CSP (`default-src 'none'; script-src 'self'; style-src 'self'
   'unsafe-inline'; img-src asset: data: https:`), `isElementFullscreenEnabled` off, and
-  no remote loads by default. The preview JS removes remote image `src` values unless
-  the user enables the Allow Remote Images preference; that preference permits only
-  `https:` images and does not relax script, style, navigation, or non-image network
-  behavior.
+  no remote loads by default. Two layers enforce Allow Remote Images. The JS layer still
+  removes remote `<img>` `src` values unless the preference is on, and even then it
+  permits only `https:` images. The network layer is a WebKit content rule compiled once
+  on the first preview controller (`WKContentRuleListStore`) and swapped without
+  reloading the page. The next list is added before the previous one is removed, so the
+  overlap stays fail-closed. Off blocks every `http:`/`https:` and `ws:`/`wss:` load; on
+  blocks those loads except `https:` images. On the `file://` preview page that CSP does
+  not stop remote script, style, or font; the content rule does. Every preview and export
+  `WKWebView` is created by `PreviewController` and installs the blocking list before the
+  page loads. A new web view, including print or Quick Look, has to go through that
+  controller. `make lint` is a textual guard for production Swift and Objective-C, not a
+  Swift parser. It scans all non-test targets from the resolved `project.yml` spec and
+  package `Sources` directories, including a new extension target outside App/AppIOS.
+  WebKit imports are limited to PreviewKit and the three export adapters that only name
+  WebKit types. SwiftUI `WebView` and `WebPage` calls are rejected. Direct `WKWebView`
+  and `WKWebViewConfiguration` calls are allowed only in the controller's two factory
+  files. Aliases, subclasses, `.self`, bare `.init`, inferred `.init`,
+  `type(of:).init`, and dynamic lookup of a `WK` class are rejected as well, including
+  `.m` and `.mm` sources. Concatenated class names and `removeAllContentRuleLists()` are
+  outside the guard. Link clicks stay in JavaScript (`preventDefault` plus
+  `linkClicked`), so the rule does not take over external opening. If the blocking list
+  fails to compile, the preview page is not loaded and the failure is shown. That result
+  is not cached. The same controller tries again once, off the typing path, and again
+  when another document is shown. If only the https-image exception fails, the preference
+  is treated as off. Export keeps the blocking list for its whole life and will not tell
+  JavaScript that remote images are allowed.
 - **Local assets:** custom scheme `asset://` via `WKURLSchemeHandler`. JS rewrites
   relative image/link `src` to `asset://<workspace-relative-path>`; the handler resolves
   against the current file's directory / workspace root. Render payloads carry an opaque
@@ -886,6 +917,9 @@ make format           # swiftformat . && swiftlint --fix
   the Homebrew version differs; CI is authoritative. Bumping the pin means updating the
   version + SHA-256 in `ci.yml`, the Makefile constant, and reformatting the tree in the
   same PR if rule behavior changed.
+- The preview CI job verifies every pinned acceptance resource against the committed
+  bytes before installing preview dependencies. Regenerated resources must update
+  `IOSAcceptanceTests/Resources/acceptance-resource-manifest.txt` in the same PR.
 - Xcode 16+. `.xcodeproj` is generated — **never hand-edit, never commit pbxproj
   conflicts; edit `project.yml`.**
 - Code signing: "Sign to Run Locally" for dev; hardened runtime + notarization scripted

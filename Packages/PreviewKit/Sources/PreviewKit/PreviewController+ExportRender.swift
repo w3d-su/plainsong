@@ -30,9 +30,40 @@ extension PreviewController {
             return .failed(reason: "invalidated", renderID: -1)
         }
         // Submitting fails any older pending export render as superseded.
-        let renderID = submitRender(change)
+        return await awaitExportRender(submitRender(change))
+    }
 
-        return await withTaskCancellationHandler {
+    /// iOS D1: the same wait, under the scene's grant authority instead of a Mac root.
+    ///
+    /// `assetAccess` is the directory grant the live preview uses
+    /// (`IOSWorkspaceAccessService.previewContext(for:)`), so the installed reader serves
+    /// `asset://` loads and HTML export embeds through that reader. A nil context (a
+    /// single-file grant) never promotes the file's parent: local images become placeholders,
+    /// as in the live preview.
+    public func renderForExport(
+        _ change: DocumentTextChange,
+        assetAccess: PreviewAssetAccessContext?
+    ) async -> PreviewExportRenderResult {
+        guard !Task.isCancelled else {
+            return .failed(reason: "cancelled", renderID: -1)
+        }
+        guard !isInvalidated else {
+            return .failed(reason: "invalidated", renderID: -1)
+        }
+        let installation = assetSchemeHandler.updateAuthority(assetAccess)
+        exportAssetAccess = assetAccess
+        let renderID = prepareRender(
+            change,
+            session: nil,
+            identity: nil,
+            assetContext: Self.grantedAssetContext(fileURL: change.fileURL, access: assetAccess),
+            assetRootID: installation.token
+        )
+        return await awaitExportRender(renderID)
+    }
+
+    private func awaitExportRender(_ renderID: Int) async -> PreviewExportRenderResult {
+        await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 guard !Task.isCancelled else {
                     continuation.resume(returning: .failed(reason: "cancelled", renderID: renderID))

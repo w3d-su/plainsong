@@ -45,7 +45,7 @@ enum IOSImageTerminalMapping {
         case let .committed(ownership):
             guard let applied = request.applied else { return .failed(.indeterminate) }
             return .inserted(applied, ownership: ownership)
-        case let .rolledBack(.removed):
+        case .rolledBack(.removed):
             return removed(asset: asset, request: request)
         case let .rolledBack(.retained(receipt)):
             if let applied = request.applied {

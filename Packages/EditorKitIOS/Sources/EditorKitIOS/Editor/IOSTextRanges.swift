@@ -24,6 +24,7 @@ enum IOSTextRanges {
         return NSRange(location: location, length: min(max(range.length, 0), maxLength))
     }
 
+    @MainActor
     static func textRange(for range: NSRange, in textView: UITextView) -> UITextRange? {
         guard let start = textView.position(from: textView.beginningOfDocument, offset: range.location),
               let end = textView.position(from: start, offset: range.length)
