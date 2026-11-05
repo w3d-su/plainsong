@@ -254,7 +254,13 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   A reload whose final proof is superseded by document/session changes retries with a
   fresh capture in the same generation; a newer reload, workspace switch, or close cancels it.
 - External change to the open file: if editor is clean → silently reload; if dirty →
-  non-modal banner "File changed on disk: Reload / Keep mine".
+  non-modal banner "File changed on disk: Reload / Keep mine". A read that catches the
+  file mid-replacement (its identity or size changing, or briefly unreadable) is retried
+  after 0.2 s, 0.5 s and 1 s before the document detaches. A missing file detaches at once,
+  and a detached document stays marked edited because its text is then the only copy. One
+  that was clean when it detached and has not been edited since reloads silently when its
+  file returns (a `git checkout` unlinks before it writes), instead of raising Reload /
+  Keep mine. The missing-file banner's Close asks before discarding that copy.
 - An active workspace search refreshes for document edits only after a 500 ms typing
   pause, and only while the Search navigator shows (an edit made while Files shows
   refreshes when Search shows again); typing never resets the search state.

@@ -225,47 +225,11 @@ extension AppState {
             return
         }
 
-        let token = UUID()
-        let lifecycleGeneration = currentSessionLifecycleGeneration(for: session)
-        let sourceSnapshot = EditorDocumentSourceSnapshot(
-            source: session.text,
-            revision: session.version
-        )
-        let reader = coherentFileReader
-        let applicationPreparer = externalReloadApplicationPreparer
-        let completionContext = ExternalDiskInspectionReadContext(
+        startExternalDiskInspection(
+            for: session,
             canonicalURL: stateURL,
             location: location,
-            token: token,
-            lifecycleGeneration: lifecycleGeneration,
             diskEventGeneration: diskEventGeneration
-        )
-        let task = Task { @MainActor [weak self, weak session] in
-            let prepared = await prepareExternalFileRead(
-                at: location,
-                reader: reader,
-                applicationPreparer: applicationPreparer,
-                sourceSnapshot: sourceSnapshot
-            )
-            guard !Task.isCancelled else { return }
-            guard let self, let session else { return }
-            handleExternalDiskInspection(
-                prepared.outcome,
-                payload: prepared.payload,
-                preparedImageAssetAuthority: prepared.imageAssetAuthority,
-                session: session,
-                context: completionContext
-            )
-        }
-        externalDiskInspectionTasks[sessionIdentity] = ExternalDiskInspectionTask(
-            token: token,
-            session: session,
-            canonicalURL: stateURL,
-            location: location,
-            lifecycleGeneration: lifecycleGeneration,
-            diskEventGeneration: diskEventGeneration,
-            sourceSnapshot: sourceSnapshot,
-            task: task
         )
     }
 
@@ -301,6 +265,7 @@ extension AppState {
         }
         anchoredSessionFileBindings[sessionIdentity] = nil
         unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
+        cleanDetachedSessionRecords[sessionIdentity] = nil
         discardEditorImageAssetDocumentAuthority(for: session)
         indeterminateSessionWrites[sessionIdentity] = nil
         indeterminateSessionWriteContexts[sessionIdentity] = nil
@@ -371,6 +336,12 @@ extension AppState {
                 fileKind: session.fileKind,
                 isDirty: true
             )
+            cleanDetachedSessionRecords[sessionIdentity] = CleanDetachedSessionRecord(
+                stateURL: url,
+                revision: session.version
+            )
+        } else if !isUneditedSinceCleanDetach(session, at: url) {
+            cleanDetachedSessionRecords[sessionIdentity] = nil
         }
 
         guard session === shownSession else { return }
@@ -831,7 +802,25 @@ private extension AppState {
             )
         case .missing, .symbolicLink, .notRegularFile, .unreadable, .invalidUTF8,
              .namespaceChanged, .unstable:
-            markSessionDetachedFromMissingFile(session, url: context.canonicalURL)
+            if Self.isTransientExternalReadOutcome(outcome),
+               context.transientRetry < Self.externalInspectionTransientRetryDelays.count,
+               !detachedSessionURLs.contains(context.canonicalURL)
+            {
+                // A read racing another tool's replacement: read again before detaching. The
+                // new inspection keeps autosave fenced and is superseded by any newer disk
+                // event. A missing file detaches at once, so a real deletion is reported
+                // promptly; when a tool recreates it (git checkout unlinks first), an unedited
+                // clean session reattaches silently in `applyExternalDiskInspection`.
+                startExternalDiskInspection(
+                    for: session,
+                    canonicalURL: context.canonicalURL,
+                    location: context.location,
+                    diskEventGeneration: context.diskEventGeneration,
+                    transientRetry: context.transientRetry + 1
+                )
+            } else {
+                markSessionDetachedFromMissingFile(session, url: context.canonicalURL)
+            }
         case .cancelled:
             break
         }
@@ -865,7 +854,8 @@ private extension AppState {
         let changed = observedRetainedFileVersionDiffers(observation, for: session)
         let hasConflict = pendingExternalTexts[canonicalURL] != nil ||
             pendingExternalFileVersions[canonicalURL] != nil
-        if !changed, !hasConflict, !detachedSessionURLs.contains(canonicalURL) {
+        let isDetached = detachedSessionURLs.contains(canonicalURL)
+        if !changed, !hasConflict, !isDetached {
             recordKnownSessionDiskText(
                 observation.file.text,
                 for: session,
@@ -874,8 +864,13 @@ private extension AppState {
             return
         }
 
-        if detachedSessionURLs.contains(canonicalURL) ||
-            session.isDirty ||
+        // A session detached while clean and unedited since reloads like a clean one: it
+        // has nothing Reload would lose, and a conflict would only invite Keep Mine to
+        // write the stale copy over the new file (M2).
+        let isClean = isDetached
+            ? isUneditedSinceCleanDetach(session, at: canonicalURL)
+            : !session.isDirty
+        if !isClean ||
             hasPendingEditorSource(for: session) ||
             session.version != sourceSnapshot.revision
         {
@@ -908,6 +903,7 @@ private extension AppState {
         }
         clearExternalChangeConflict(at: canonicalURL)
         detachedSessionURLs.remove(canonicalURL)
+        cleanDetachedSessionRecords[ObjectIdentifier(session)] = nil
         recordKnownSessionDiskText(
             observation.file.text,
             for: session,
@@ -919,6 +915,10 @@ private extension AppState {
             externalChangePrompt = nil
             scheduleCompletionWorkspaceRefresh()
             restartActiveWorkspaceSearchWithFreshOverlays()
+        }
+        if isDetached {
+            // Every window still showing the missing-file banner for it.
+            restoreRecoveryPrompt(for: session)
         }
     }
 
@@ -953,6 +953,21 @@ private extension AppState {
 
 @MainActor
 extension AppState {
+    /// Hands a finished inspection read to the file-private arbitration below.
+    func completeExternalDiskInspection(
+        _ prepared: PreparedExternalFileRead,
+        session: DocumentSession,
+        context: ExternalDiskInspectionReadContext
+    ) {
+        handleExternalDiskInspection(
+            prepared.outcome,
+            payload: prepared.payload,
+            preparedImageAssetAuthority: prepared.imageAssetAuthority,
+            session: session,
+            context: context
+        )
+    }
+
     /// Internal, not private, so the B2 registry tests can show it accepts a session that only a
     /// second window shows (`docs/window-state-gates.md` §2.3).
     func isAddressableExternalResolutionSession(

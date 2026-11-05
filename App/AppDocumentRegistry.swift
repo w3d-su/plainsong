@@ -134,6 +134,13 @@ final class AppDocumentRegistry: ObservableObject {
         didSet { noteEditorReplaceAuthorityInputDidChange() }
     }
 
+    /// The state URL and revision at which a clean session was detached (M2). While the
+    /// session still has that revision at that URL it holds no edits a reload could lose,
+    /// so when its file reads back it reloads like any clean document instead of raising
+    /// Reload/Keep Mine. Detaching still marks it dirty: if the file stays gone, the editor
+    /// copy is the only copy left.
+    var cleanDetachedSessionRecords: [ObjectIdentifier: CleanDetachedSessionRecord] = [:]
+
     /// Exact authority, identity, and content installed for each anchored workspace session.
     /// Saves use this proof instead of recapturing the session's mutable URL.
     var anchoredSessionFileBindings: [ObjectIdentifier: AnchoredWorkspaceSessionFileBinding] = [:]

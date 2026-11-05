@@ -38,9 +38,11 @@ final class WindowStatePartitionAppTests: XCTestCase {
         XCTAssertEqual(
             Self.storedPropertyNames(of: appState.registry),
             // `registeredWindows` is B2's window list for inventories (§3.4 I2).
+            // `cleanDetachedSessionRecords` is per-file external-change state added after B1.
             WindowStatePartitionInventory.registry.union(["onEditorReplaceAuthorityInputChange",
                                                           "replaceAuthority", "registeredWindows",
-                                                          "menuEnablementDidChange"])
+                                                          "menuEnablementDidChange",
+                                                          "cleanDetachedSessionRecords"])
         )
         XCTAssertEqual(
             WindowStatePartitionInventory.window.count + WindowStatePartitionInventory.root.count
