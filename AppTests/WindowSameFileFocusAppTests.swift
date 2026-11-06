@@ -172,7 +172,8 @@ final class WindowSameFileFocusAppTests: SharedRootAppTestCase {
     /// that shows the file comes forward when activation completes.
     func testFocusRequestedWhileInactiveAppliesOnActivation() async throws {
         _ = try await showSharedA()
-        XCTAssertFalse(NSApp.isActive, "hosted tests never activate the app")
+        // A CI runner activates the hosted app; a local run does not. Pin the inactive path.
+        KeyWindowRouter.shared.testingAppIsActive = false
         XCTAssertFalse(firstWindow.isVisible)
 
         try second.openWorkspaceFile(XCTUnwrap(primary.shownSession.fileURL))

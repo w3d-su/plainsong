@@ -15,6 +15,9 @@ final class KeyWindowRouter: ObservableObject {
         /// When true, `testingKeyWindow` replaces `NSApp.keyWindow` (including `nil`).
         var testingUsesKeyWindowOverride = false
         weak var testingKeyWindow: NSWindow?
+        /// Replaces `NSApp.isActive` in `focus` when set. A CI runner activates the hosted app
+        /// and a local run does not, so tests of either focus path pin it.
+        var testingAppIsActive: Bool?
     #endif
 
     private struct FacadeBox {
@@ -258,7 +261,7 @@ final class KeyWindowRouter: ObservableObject {
         }
         // Hosted tests and an inactive dev session must not steal the owner's key window. A
         // Finder or Dock open that arrives just before activation comes forward after it.
-        guard NSApp.isActive else {
+        guard isAppActive else {
             PendingWindowFocus.shared.request(host)
             return
         }
@@ -373,6 +376,7 @@ final class KeyWindowRouter: ObservableObject {
             testingPin = nil
             testingUsesKeyWindowOverride = false
             testingKeyWindow = nil
+            testingAppIsActive = nil
             for observer in closeObservers.values {
                 NotificationCenter.default.removeObserver(observer)
             }
@@ -413,6 +417,13 @@ final class KeyWindowRouter: ObservableObject {
     private var facadesInOrder: [AppState] {
         prune()
         return facadeOrder.compactMap { facades[$0]?.facade }
+    }
+
+    private var isAppActive: Bool {
+        #if DEBUG
+            if let testingAppIsActive { return testingAppIsActive }
+        #endif
+        return NSApp.isActive
     }
 
     private func routedKeyWindow() -> NSWindow? {
