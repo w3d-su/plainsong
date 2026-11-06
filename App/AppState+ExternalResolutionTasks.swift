@@ -28,6 +28,14 @@ struct ExternalDiskInspectionTask {
     let diskEventGeneration: UInt64
     let sourceSnapshot: EditorDocumentSourceSnapshot
     let task: Task<Void, Never>
+    /// How many transient read outcomes this inspection already looked past (M2).
+    var transientRetry = 0
+}
+
+/// Where and at which revision a clean session was detached (M2).
+struct CleanDetachedSessionRecord: Equatable {
+    let stateURL: URL
+    let revision: Int
 }
 
 struct PendingExternalReloadApplication {

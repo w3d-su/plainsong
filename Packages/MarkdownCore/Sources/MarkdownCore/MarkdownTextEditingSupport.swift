@@ -58,6 +58,20 @@ enum MarkdownTextEditingSupport {
         )
     }
 
+    /// The line that ends where `line` begins, or `nil` for the first line. Probing one
+    /// unit back from a CRLF line start lands on the `\n` of the pair, which
+    /// `line(containing:)` reads as an empty line, so the probe steps over the `\r` too.
+    static func line(before line: MarkdownLine, in text: String) -> MarkdownLine? {
+        let start = line.range.location
+        guard start > 0 else { return nil }
+        let storage = text as NSString
+        var probe = start - 1
+        if probe > 0, storage.character(at: probe) == 10, storage.character(at: probe - 1) == 13 {
+            probe -= 1
+        }
+        return self.line(containing: probe, in: text)
+    }
+
     static func lines(overlapping selection: NSRange, in text: String) -> [MarkdownLine] {
         let storage = text as NSString
         let length = storage.length
@@ -92,6 +106,26 @@ enum MarkdownTextEditingSupport {
         let terminatorLength = line.fullEndLocation - line.endLocation
         guard terminatorLength > 0 else { return "" }
         return substring(NSRange(location: line.endLocation, length: terminatorLength), in: text)
+    }
+
+    /// The terminator a helper inserts to start a new line on `line`: the line's own
+    /// terminator, else (the last line has none) the previous line's, else `\n`. Using the
+    /// surrounding terminator keeps CRLF and CR documents from gaining mixed line endings.
+    static func insertedLineTerminator(on line: MarkdownLine, in text: String) -> String {
+        let own = lineTerminator(after: line, in: text)
+        if !own.isEmpty { return own }
+
+        let storage = text as NSString
+        let start = line.range.location
+        guard start > 0 else { return "\n" }
+        switch storage.character(at: start - 1) {
+        case 10:
+            return start > 1 && storage.character(at: start - 2) == 13 ? "\r\n" : "\n"
+        case 13:
+            return "\r"
+        default:
+            return "\n"
+        }
     }
 
     static func replacementRange(covering lines: [MarkdownLine]) -> NSRange? {

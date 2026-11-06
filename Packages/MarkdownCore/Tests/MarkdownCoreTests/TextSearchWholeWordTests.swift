@@ -23,7 +23,7 @@ final class TextSearchWholeWordTests: XCTestCase {
     }
 
     func testWholeWordTreatsLettersNumbersAndUnderscoreAsWordCharacters() {
-        let text = "foo_bar foo bar bar2 文字 文字学"
+        let text = "foo_bar foo bar bar2 한국 한국어"
 
         let foo = TextSearchEngine.matches(
             in: text,
@@ -40,12 +40,14 @@ final class TextSearchWholeWordTests: XCTestCase {
         XCTAssertEqual(bar.count, 1)
         XCTAssertEqual((text as NSString).substring(with: bar[0].range), "bar")
 
-        let cjk = TextSearchEngine.matches(
+        // Hangul separates words with spaces, so its letters stay ordinary word characters.
+        // Scripts written without spaces are covered by TextSearchWholeWordSegmentationTests.
+        let hangul = TextSearchEngine.matches(
             in: text,
-            query: TextSearchQuery(pattern: "文字", caseSensitivity: .sensitive, wholeWord: true),
+            query: TextSearchQuery(pattern: "한국", caseSensitivity: .sensitive, wholeWord: true),
             limit: 10
         )
-        XCTAssertEqual(cjk.count, 1)
+        XCTAssertEqual(hangul.map(\.range), [(text as NSString).range(of: "한국")])
     }
 
     func testWholeWordBoundaryWithAllUnicodeNumberCategories() {

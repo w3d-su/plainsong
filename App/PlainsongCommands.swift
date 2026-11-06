@@ -62,6 +62,12 @@ struct PlainsongCommands: Commands {
             }
             .keyboardShortcut("s", modifiers: .command)
             .disabled(!snapshot.canSave)
+
+            Button("Save As…") {
+                commandTarget?.saveAs()
+            }
+            .keyboardShortcut("s", modifiers: [.command, .shift])
+            .disabled(!snapshot.canSaveAs)
         }
 
         // Export PR F: the system File-menu slot for writing formats the app does not open

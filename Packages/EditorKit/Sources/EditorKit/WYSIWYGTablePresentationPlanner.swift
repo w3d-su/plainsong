@@ -1,10 +1,12 @@
 import AppKit
 import CoreText
 import MarkdownCore
+import SyntaxKit
 
-/// Builds the row markers for one table: measures every column across every row, places tab
-/// stops, and decides eligibility (`docs/table-wysiwyg-gates.md` §1, T2). A nil result
-/// leaves the table raw.
+/// Builds the row markers for one table: measures every column across every row and places
+/// tab stops (`docs/table-wysiwyg-gates.md` T2). SyntaxKit `WYSIWYGTableRegion` decides
+/// every §1 rule except the width check, which needs the editor's fonts and is made here.
+/// A nil result leaves the table raw.
 @MainActor
 enum WYSIWYGTablePresentationPlanner {
     /// Space on each side of a cell's content, in points.
@@ -28,13 +30,13 @@ enum WYSIWYGTablePresentationPlanner {
         let totalWidth: CGFloat
     }
 
-    /// `rows` are the header, the delimiter row, then body rows, in document order.
     static func markers(
-        rows: [MarkdownTableRowStructure],
+        for region: WYSIWYGTableRegion,
         in text: NSAttributedString,
         context: Context
     ) -> [WYSIWYGTableRowPresentationMarker]? {
-        guard isEligible(rows, in: text.string as NSString) else { return nil }
+        guard region.isEligible, NSMaxRange(region.sourceRange) <= text.length else { return nil }
+        let rows = region.rows
 
         // Measure every cell once; the delimiter row has no content.
         let cellWidths: [[CGFloat]] = rows.enumerated().map { rowIndex, row in
@@ -105,29 +107,6 @@ enum WYSIWYGTablePresentationPlanner {
     /// Height of the collapsed delimiter row: half a text line, room for the header rule.
     static func collapsedRowHeight(for font: NSFont) -> CGFloat {
         ((font.ascender - font.descender + font.leading) / 2).rounded(.up)
-    }
-
-    /// The §1 eligibility rules that need only the rows.
-    static func isEligible(_ rows: [MarkdownTableRowStructure], in text: NSString) -> Bool {
-        guard rows.count >= 2, rows[1].isDelimiterRow else { return false }
-        let header = rows[0]
-        let columnCount = header.cells.count
-        guard rows[1].cells.count == columnCount else { return false }
-        for row in rows {
-            guard row.cells.count <= columnCount,
-                  row.hasLeadingPipe == header.hasLeadingPipe,
-                  text.substring(with: row.lineRange).utf16.contains(0x0009) == false
-            else {
-                return false
-            }
-        }
-        if !header.hasLeadingPipe {
-            // No character carries a tab in front of the first column, so it can only start
-            // at the line's left edge.
-            let firstAlignment = rows[1].cells[0].alignment
-            guard firstAlignment == .none || firstAlignment == .left else { return false }
-        }
-        return true
     }
 
     /// The pipe in front of each cell. A virtual boundary (no leading pipe) carries no tab.

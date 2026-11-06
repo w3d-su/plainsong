@@ -173,6 +173,7 @@ extension AppState {
         transferEditorWriterForAdoption(of: session)
         shownSession = session
         releaseUnreferencedSessionOwnership(for: previousSession)
+        refreshWorkspaceWatcherEventFilter()
         clearPromptsNotMatchingCurrentDocument()
         restoreRecoveryPrompt(for: session)
         if indeterminateSessionWrites[ObjectIdentifier(session)] != nil {

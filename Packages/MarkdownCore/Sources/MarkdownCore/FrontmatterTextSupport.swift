@@ -1,4 +1,5 @@
 import Foundation
+import Yams
 
 extension Frontmatter {
     static func rawValueSource(for key: String, in rawYAML: String, lineEnding: String) -> String? {
@@ -33,9 +34,8 @@ extension Frontmatter {
     }
 
     static func rawInlineValue(in line: String) -> String? {
-        guard let colonIndex = line.firstIndex(of: ":") else { return nil }
-        let rawValueStart = line.index(after: colonIndex)
-        return unquotedScalar(String(line[rawValueStart...]).trimmingCharacters(in: .whitespaces))
+        guard let span = topLevelKeySpan(in: line) else { return nil }
+        return unquotedScalar(span.inlineValue)
     }
 
     static func unquotedScalar(_ value: String) -> String {
@@ -64,17 +64,98 @@ extension Frontmatter {
     }
 
     static func topLevelKey(in line: String) -> String? {
-        guard !line.isEmpty,
-              line.first?.isWhitespace == false,
-              !line.trimmingCharacters(in: .whitespaces).hasPrefix("#"),
-              let colonIndex = line.firstIndex(of: ":")
+        topLevelKeySpan(in: line)?.key
+    }
+
+    /// One top-level `key: value` line of a block mapping.
+    struct TopLevelKeySpan {
+        /// The key as YAML loads it: `"title"` and `'title'` are both `title`.
+        let key: String
+        /// The key as the source spells it, quotes included.
+        let keyToken: String
+        /// The text after the `:` indicator, trimmed of spaces and tabs.
+        let inlineValue: String
+
+        var hasQuotedInlineValue: Bool {
+            inlineValue.hasPrefix("\"") || inlineValue.hasPrefix("'")
+        }
+    }
+
+    /// Reads the key of a top-level mapping line. A plain key ends at the first `:` that is
+    /// followed by a space, a tab or the end of the line (`url: https://…` and `a:b: c` keep
+    /// their colons); a quoted key ends at its closing quote and is unescaped by YAML itself.
+    static func topLevelKeySpan(in line: String) -> TopLevelKeySpan? {
+        guard let first = line.first,
+              !first.isWhitespace,
+              first != "#"
         else {
             return nil
         }
 
-        let key = String(line[..<colonIndex]).trimmingCharacters(in: .whitespaces)
+        let colonIndex: String.Index
+        let keyToken: String
+        if first == "\"" || first == "'" {
+            guard let closingQuote = closingQuoteIndex(in: line, quote: first) else { return nil }
+            var index = line.index(after: closingQuote)
+            while index < line.endIndex, line[index] == " " || line[index] == "\t" {
+                index = line.index(after: index)
+            }
+            guard index < line.endIndex, line[index] == ":", isMappingIndicator(at: index, in: line) else {
+                return nil
+            }
+            colonIndex = index
+            keyToken = String(line[...closingQuote])
+        } else {
+            guard let index = line.indices.first(where: { line[$0] == ":" && isMappingIndicator(at: $0, in: line) })
+            else {
+                return nil
+            }
+            colonIndex = index
+            keyToken = String(line[..<index]).trimmingCharacters(in: .whitespaces)
+        }
+
+        let key: String
+        if first == "\"" || first == "'" {
+            guard let unquoted = try? Yams.load(yaml: keyToken) as? String else { return nil }
+            key = unquoted
+        } else {
+            key = keyToken
+        }
         guard !key.isEmpty else { return nil }
-        return key
+
+        let inlineValue = String(line[line.index(after: colonIndex)...]).trimmingCharacters(in: .whitespaces)
+        return TopLevelKeySpan(key: key, keyToken: keyToken, inlineValue: inlineValue)
+    }
+
+    /// A `:` separates a block mapping key from its value only when whitespace or the end
+    /// of the line follows it.
+    private static func isMappingIndicator(at index: String.Index, in line: String) -> Bool {
+        let next = line.index(after: index)
+        return next == line.endIndex || line[next] == " " || line[next] == "\t"
+    }
+
+    /// The closing quote of a quoted scalar starting at the line's first character: `\`
+    /// escapes in double quotes, `''` stands for one quote in single quotes.
+    private static func closingQuoteIndex(in line: String, quote: Character) -> String.Index? {
+        var index = line.index(after: line.startIndex)
+        while index < line.endIndex {
+            let character = line[index]
+            if quote == "\"", character == "\\" {
+                index = line.index(after: index)
+                if index < line.endIndex { index = line.index(after: index) }
+                continue
+            }
+            if character == quote {
+                let next = line.index(after: index)
+                if quote == "'", next < line.endIndex, line[next] == "'" {
+                    index = line.index(after: next)
+                    continue
+                }
+                return index
+            }
+            index = line.index(after: index)
+        }
+        return nil
     }
 
     static func linesWithoutTerminators(_ text: String) -> [String] {
