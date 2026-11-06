@@ -392,8 +392,9 @@ extension WorkspaceAnchoredFileSystem {
                 try checkCancellation()
                 let count = Darwin.write(descriptor, base.advanced(by: offset), bytes.count - offset)
                 if count < 0 {
-                    if errno == EINTR { continue }
-                    throw WorkspaceAnchoredFileSystemError.unreadable
+                    let code = errno
+                    if code == EINTR { continue }
+                    throw writeFailure(errorNumber: code, otherwise: .unreadable)
                 }
                 guard count > 0 else { throw WorkspaceAnchoredFileSystemError.unreadable }
                 offset += count
