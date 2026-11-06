@@ -16,6 +16,9 @@ so the user could not tell whether it held real edits.
   again after 0.2 s, 0.5 s and 1 s before the session detaches. The retry is a registered
   inspection task, so autosave stays fenced while it waits, and any newer disk event
   supersedes it. `.missing` still detaches at once, so a deletion is reported promptly.
+  The coherent reader itself still never retries `namespaceChanged`: each retry is a new
+  fail-closed read of the same retained location (`docs/workspace-filesystem-contract.md`,
+  Coherent reads).
 - `markSessionDetachedFromMissingFile` records the state URL and revision of a session that
   was clean when it detached (`cleanDetachedSessionRecords`). It still marks the session
   dirty: if the file stays gone, the editor copy is the only copy and quitting must not drop

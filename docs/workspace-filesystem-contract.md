@@ -62,9 +62,14 @@ from that descriptor before and after reading. Before returning bytes, the reade
 3. that same retained chain again; and
 4. byte count and metadata stability for that descriptor.
 
-`namespaceChanged` is fail-closed and is not retried. Content instability may be retried
-within the bounded coherent reader. Cancellation is returned as `cancelled`. No successful
-outcome may contain bytes from a descriptor detached from the captured namespace.
+`namespaceChanged` is fail-closed and the reader does not retry it. Content instability may be
+retried within the bounded coherent reader. Cancellation is returned as `cancelled`. No
+successful outcome may contain bytes from a descriptor detached from the captured namespace.
+App's watcher-driven inspection of an open document may start new reads of the same retained
+location after `namespaceChanged`, `unstable` or `unreadable` (0.2 s, 0.5 s and 1 s later) before
+it detaches the session. Each attempt is a separate fail-closed read, and autosave stays fenced
+while a retry is pending
+(`docs/decisions/2026-11-06-transient-reads-and-clean-detached-documents.md`).
 
 Production workspace search first canonicalizes an initially present, in-root alias under its
 existing physical-target policy through the request's one captured authority, then builds the
