@@ -88,6 +88,79 @@ final class AppStateSaveAsTests: XCTestCase {
         XCTAssertEqual(fixture.session.fileURL, fixture.originalURL)
     }
 
+    func testSaveAsPanelFencesFocusLossAutosaveAndReschedulesOnCancel() throws {
+        let fixture = try makeWorkspaceFixture()
+        let session = fixture.session
+        let sessionIdentity = ObjectIdentifier(session)
+
+        // The panel taking key status resigns the document window: KeyWindowRouter's flush,
+        // and any autosave timer, must leave the original alone while the panel is open.
+        let result: URL? = fixture.appState.withSaveAsPanelAutosaveFence(for: session) {
+            XCTAssertFalse(fixture.appState.canAutosave(session: session))
+            fixture.appState.flushAutosaveAfterWindowResignedKey()
+            fixture.appState.flushAutosaveIfNeeded()
+            return nil // Cancel.
+        }
+
+        XCTAssertNil(result)
+        XCTAssertEqual(try text(at: fixture.originalURL), "disk A")
+        XCTAssertTrue(session.isDirty)
+        XCTAssertFalse(fixture.appState.registry.saveAsPanelSessions.contains(sessionIdentity))
+        XCTAssertTrue(fixture.appState.canAutosave(session: session))
+        XCTAssertTrue(
+            fixture.appState.autosaveTask != nil
+                || fixture.appState.sessionAutosaveTasks[sessionIdentity] != nil,
+            "A cancelled Save As must leave the dirty session's autosave scheduled"
+        )
+
+        // Without the panel the same flush autosaves as before.
+        fixture.appState.flushAutosaveAfterWindowResignedKey()
+        XCTAssertEqual(try text(at: fixture.originalURL), "unsaved A")
+        XCTAssertFalse(session.isDirty)
+    }
+
+    func testSaveAsToAHardLinkOfTheCurrentFileIsRefused() throws {
+        let fixture = try makeWorkspaceFixture()
+        let hardLink = fixture.root.appendingPathComponent("hardlink.md")
+        try FileManager.default.linkItem(at: fixture.originalURL, to: hardLink)
+
+        // A distinct directory entry is not a spelling of the current file, so this is not a
+        // plain Save; Save Copy's ownership walk refuses the session's own file identity.
+        XCTAssertThrowsError(try fixture.appState.saveCurrentDocumentAs(to: hardLink)) { error in
+            guard case AppStateError.invalidSessionIdentity = error else {
+                return XCTFail("Expected the hard link to be refused, got \(error)")
+            }
+        }
+        XCTAssertEqual(try text(at: hardLink), "disk A")
+        XCTAssertEqual(try text(at: fixture.originalURL), "disk A")
+        XCTAssertEqual(fixture.session.fileURL, fixture.originalURL)
+        XCTAssertTrue(fixture.session.isDirty)
+    }
+
+    func testSaveAsRekeysFindInEveryWindowShowingTheSession() throws {
+        let fixture = try makeWorkspaceFixture()
+        addTeardownBlock { @MainActor in
+            KeyWindowRouter.shared.resetForTesting()
+            WindowOpenAdmission.resetForTesting()
+        }
+        let sibling = fixture.appState.makeSiblingFacade(admitsFileOperations: true)
+        sibling.shownSession = fixture.session
+        openFindBar(sibling, query: "unsaved")
+        let originalIdentity = sibling.editorFindHost.controller.documentBinding.identity
+        XCTAssertEqual(originalIdentity, sibling.activeEditorDocumentIdentity)
+
+        try fixture.appState.saveCurrentDocumentAs(to: fixture.root.appendingPathComponent("copy.md"))
+
+        let siblingIdentity = try XCTUnwrap(sibling.activeEditorDocumentIdentity)
+        XCTAssertNotEqual(siblingIdentity, originalIdentity)
+        XCTAssertTrue(siblingIdentity.rawValue.hasSuffix("copy.md"))
+        XCTAssertEqual(
+            sibling.editorFindHost.controller.documentBinding.identity,
+            siblingIdentity,
+            "The sibling window's Find must follow the session to the Save As destination"
+        )
+    }
+
     func testSaveAsRefusesWhileAnExternalChangeIsUnresolved() throws {
         let fixture = try makeWorkspaceFixture()
         fixture.appState.pendingExternalTexts[fixture.originalURL] = "disk B"
@@ -242,6 +315,18 @@ private extension AppStateSaveAsTests {
             try? FileManager.default.removeItem(at: url)
         }
         return try WorkspaceFileSystemRootAuthority(rootURL: url).canonicalRootURL
+    }
+
+    func openFindBar(_ appState: AppState, query: String) {
+        appState.editorFindHost.controller.debounceNanoseconds = 0
+        appState.editorFindHost.commandContextOverride = true
+        var ui = appState.editorFindHost.ui
+        ui.isBarVisible = true
+        ui.queryText = query
+        appState.setEditorFindUI(ui)
+        appState.ensureEditorFindSessionObserverInstalled()
+        appState.syncEditorFindControllerDocument()
+        appState.pushEditorFindQueryToController()
     }
 
     func writeText(_ text: String, to url: URL) throws {

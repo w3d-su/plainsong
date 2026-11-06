@@ -330,9 +330,7 @@ private extension AppState {
         // Rekey Find only once the retained binding names the destination: identity comes
         // from `sessionStateURL`, so notifying before `adoptAnchoredFileBinding` would
         // rebind Find to the *old* URL and never correct itself.
-        if completed.session === shownSession {
-            notifyEditorFindDocumentIdentityDidRekey()
-        }
+        notifyEditorFindDocumentIdentityDidRekey(inWindowsShowing: completed.session)
         rememberRecentItem(destination)
         restoreRecoveryPrompt(for: completed.session)
         finishRetiredEditorDocumentSessionIfPossible(for: completed.session)
@@ -674,9 +672,7 @@ private extension AppState {
         // above. Rekeying before that left Find bound to the pre-quarantine URL with no
         // second rebind, so every later find command targeted a document that no longer
         // owned this session's state.
-        if session === shownSession {
-            notifyEditorFindDocumentIdentityDidRekey()
-        }
+        notifyEditorFindDocumentIdentityDidRekey(inWindowsShowing: session)
         cancelAutosave(for: session)
         refreshIndeterminateFileWriteReconciliation(for: session)
     }

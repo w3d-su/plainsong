@@ -35,13 +35,39 @@ extension AppState {
         panel.allowedContentTypes = Self.supportedContentTypes
         panel.canCreateDirectories = true
 
-        guard panel.runModal() == .OK, let destination = panel.url else { return }
+        let session = shownSession
+        let destination = withSaveAsPanelAutosaveFence(for: session) {
+            panel.runModal() == .OK ? panel.url : nil
+        }
+        guard let destination else { return }
 
         do {
             try saveCurrentDocumentAs(to: destination)
         } catch {
             present(error, title: "Could Not Save File")
         }
+    }
+
+    /// Keeps `session` from autosaving while the Save As panel is open. The panel taking key
+    /// status resigns the document window, and `KeyWindowRouter` turns that into an app-wide
+    /// autosave flush that would otherwise write the unsaved text over the original, even if
+    /// the user then cancels. A timer that fires meanwhile is skipped too, so a session still
+    /// dirty when the panel closes gets its autosave rescheduled.
+    func withSaveAsPanelAutosaveFence<Result>(
+        for session: DocumentSession,
+        _ body: () -> Result
+    ) -> Result {
+        let sessionIdentity = ObjectIdentifier(session)
+        let inserted = registry.saveAsPanelSessions.insert(sessionIdentity).inserted
+        defer {
+            if inserted {
+                registry.saveAsPanelSessions.remove(sessionIdentity)
+                if session.isDirty {
+                    scheduleAutosave(for: session)
+                }
+            }
+        }
+        return body()
     }
 
     /// The panel-free half of `saveAs()`, which tests drive directly.
@@ -104,8 +130,10 @@ private extension AppState {
         }
     }
 
-    /// Same spelling, or a regular file whose identity is the one the session's retained
-    /// binding proves (a case or normalization alias on this volume).
+    /// Same spelling, or another spelling of the same directory entry: a regular file whose
+    /// identity is the one the session's retained binding proves *and* whose canonical path is
+    /// the session's (a case or normalization alias on this volume). A distinct hard link
+    /// shares the identity but is a different entry, so it is a real Save As destination.
     func saveAsDestinationIsCurrentFile(
         _ destinationURL: URL,
         session: DocumentSession,
@@ -132,6 +160,12 @@ private extension AppState {
         else {
             return false
         }
-        return destinationIdentity == retainedIdentity
+        guard destinationIdentity == retainedIdentity else { return false }
+        return exactFileURLSpellingMatches(inspection.canonicalLocation.fileURL, oldURL)
+            || workspaceSaveCopyFileURLsMayAlias(
+                destinationURL,
+                oldURL,
+                parentIsCaseSensitive: inspection.parentIsCaseSensitive
+            )
     }
 }
