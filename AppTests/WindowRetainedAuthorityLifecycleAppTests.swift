@@ -115,10 +115,10 @@ final class WindowRetainedAuthorityLifecycleAppTests: XCTestCase {
 
         binding.onLifecycle(.revoked(installation))
 
-        XCTAssertEqual(fixture.appState.editorDocumentBinding(for: session).id, binding.id)
+        XCTAssertEqual(fixture.appState.registeredEditorDocumentBindingID(for: session), binding.id)
         fixture.appState.setCurrentDocument(session, requestingEditorFocus: false)
         XCTAssertTrue(fixture.appState.shownSession === session)
-        XCTAssertEqual(fixture.appState.editorDocumentBinding(for: session).id, binding.id)
+        XCTAssertEqual(fixture.appState.registeredEditorDocumentBindingID(for: session), binding.id)
     }
 
     func testDiscardAlsoRemovesTheInstallationWindowRecord() throws {
@@ -128,6 +128,7 @@ final class WindowRetainedAuthorityLifecycleAppTests: XCTestCase {
             bindingID: binding.id, installationID: EditorDocumentBindingInstallationID()
         )
         binding.onLifecycle(.installed(installation))
+        fixture.appState.supersededEditorWriterInstallations.insert(installation)
         try fixture.appState.closeWorkspaceForReplacement()
         XCTAssertNotNil(fixture.appState.registry.editorInstallationWindows[installation])
 
@@ -135,6 +136,7 @@ final class WindowRetainedAuthorityLifecycleAppTests: XCTestCase {
 
         XCTAssertNil(fixture.appState.editorBindingInstallations[installation])
         XCTAssertNil(fixture.appState.registry.editorInstallationWindows[installation])
+        XCTAssertFalse(fixture.appState.supersededEditorWriterInstallations.contains(installation))
     }
 
     private func preserveSecond(_ fixture: SecondWindowRegistryFixture) throws -> RetiredWorkspaceAuthorityOwner {

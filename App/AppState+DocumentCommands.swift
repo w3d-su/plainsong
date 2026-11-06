@@ -90,7 +90,14 @@ extension AppState {
     func present(_ error: Error, title: String) {
         presentedError = UserVisibleError(
             title: title,
-            message: userVisibleDescription(for: error)
+            message: userVisibleDescription(for: error),
+            showWindow: (error as? WorkspaceRootOpenConflict).map { conflict in
+                {
+                    if let window = conflict.target.window {
+                        KeyWindowRouter.shared.focus(window)
+                    }
+                }
+            }
         )
     }
 

@@ -70,7 +70,6 @@ final class AppDocumentRegistry: ObservableObject {
         didSet { noteEditorReplaceAuthorityInputDidChange() }
     }
 
-    var editorInstallationWindows: [EditorDocumentBindingInstallation: RegisteredWindowState] = [:]
     var retainedWorkspaceAuthorityOwners: [ObjectIdentifier: [RetiredWorkspaceAuthorityOwner]] = [:]
 
     var editorWriterInstallations: [ObjectIdentifier: EditorDocumentBindingInstallation] = [:]
@@ -117,6 +116,13 @@ final class AppDocumentRegistry: ObservableObject {
     var sessionCache: [URL: DocumentSession] = [:]
     /// Every connected window, weakly. Inventories include each window's document.
     var registeredWindows: [RegisteredWindowState] = []
+    /// One physical root and lifetime scope, shared by its connected windows.
+    var workspaceRoots: [WorkspaceFileSystemRootAuthority: WorkspaceRootReference] = [:]
+    /// Quit must see placements even after the originating window changes roots or closes.
+    var activeImageInsertions: [UUID: (window: RegisteredWindowState, rootURL: URL)] = [:]
+    var workspaceScopeStarter: (URL) -> SecurityScopedResourceAccess = SecurityScopedAccess.startAccessing
+    var editorInstallationWindows: [EditorDocumentBindingInstallation: RegisteredWindowState] = [:]
+    var supersededEditorWriterInstallations: Set<EditorDocumentBindingInstallation> = []
     var sessionLifecycleGenerations: [ObjectIdentifier: UInt64] = [:]
     var sessionPolicy = WorkspaceSessionLRUPolicy(limit: 8)
     var lastKnownDiskHashes: [URL: String] = [:]
