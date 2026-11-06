@@ -31,12 +31,14 @@ final class WYSIWYGImageThumbnailPresentationTests: XCTestCase {
             ),
             "\u{FFFC}"
         )
+        // The image ends its line, so its last padding unit is the line-end hanging space
+        // (`WYSIWYGLineEndHangingSpace`); U+200B there would lay out at x = 0.
         XCTAssertEqual(
             (projected.string as NSString).substring(with: NSRange(
                 location: localImageRange.location + 1,
                 length: localImageRange.length - 1
             )),
-            String(repeating: "\u{200B}", count: localImageRange.length - 1)
+            String(repeating: "\u{200B}", count: localImageRange.length - 2) + " "
         )
         XCTAssertEqual(projected.string.unicodeScalars.filter { $0.value == 0xFFFC }.count, 1)
 

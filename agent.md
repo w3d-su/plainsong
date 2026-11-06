@@ -819,6 +819,9 @@ editor *folds* markdown tokens via rendering, not text mutation:
   fragment customization or attribute folding), apply real styles (heading size, bold,
   italic), replace image links with `NSTextAttachment` thumbnails, render fences with a
   framed code block (custom `NSTextLayoutFragment`).
+- A projected U+200B that ends a line (fold or image padding) lays out at x = 0, so the
+  projection turns it into a 0.01 pt space with a negative kern that cancels its advance.
+  The content before it keeps its segment, caret and IME rects (`WYSIWYGLineEndHangingSpace`).
 - When the cursor enters a node's range → reveal raw markdown for that node only
   (Typora's behavior).
 - Tables in WYSIWYG: the paragraph projection turns cell-starting pipes into `\t` with
