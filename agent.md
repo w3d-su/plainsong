@@ -792,8 +792,10 @@ editor *folds* markdown tokens via rendering, not text mutation:
   framed code block (custom `NSTextLayoutFragment`).
 - When the cursor enters a node's range → reveal raw markdown for that node only
   (Typora's behavior).
-- Tables and mermaid in WYSIWYG: custom layout fragments embedding views — hardest part;
-  tables may initially stay raw with the table helper (§6.3).
+- Tables in WYSIWYG: the paragraph projection turns cell-starting pipes into `\t` with
+  per-row left tab stops, hides other structure, and collapses the delimiter row; cells edit
+  in place and structural edits reveal the whole table (`docs/table-wysiwyg-gates.md`). T0
+  passed; tables stay raw with the table helper (§6.3) until T1–T11 pass. Mermaid stays raw.
 - Undo, IME composition (Chinese input!), and selection across folded tokens are the risk
   areas — write exploratory tests early. **IME correctness is non-negotiable: test with
   Traditional Chinese (Zhuyin/Pinyin) marked text at every change.**
