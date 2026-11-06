@@ -87,6 +87,12 @@ private struct WorkspaceWindowContent: View {
                 appState.presentedError?.title ?? "Error",
                 isPresented: errorIsPresented
             ) {
+                if let showWindow = appState.presentedError?.showWindow {
+                    Button("Show") {
+                        showWindow()
+                        appState.dismissError()
+                    }
+                }
                 Button("OK") {
                     appState.dismissError()
                 }
@@ -220,7 +226,9 @@ private struct WorkspaceWindowContent: View {
     /// Matches `shell`: split view only on macOS 27 when the shell is not forced fixed.
     private var usesSplitShell: Bool {
         guard shellOverride != .fixed else { return false }
-        if #available(macOS 27.0, *) { return true }
+        if #available(macOS 27.0, *) {
+            return true
+        }
         return false
     }
 
@@ -240,7 +248,11 @@ private struct WorkspaceWindowContent: View {
             }
             GeometryReader { proxy in
                 Group {
-                    if appState.hasOpenDocument { EditorWorkspace() } else { EmptyEditorState() }
+                    if appState.hasOpenDocument {
+                        EditorWorkspace()
+                    } else {
+                        EmptyEditorState()
+                    }
                 }
                 .frame(width: proxy.size.width, height: proxy.size.height)
             }
