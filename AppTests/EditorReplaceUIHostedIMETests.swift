@@ -86,7 +86,7 @@ extension EditorFindHostedGateTests {
             // Composition ends: nothing queued fires.
             try endComposition(in: owner, of: hosted, fieldEditor: fieldEditor)
             try await assertRemains("\(owner): no queued post-composition Replace") {
-                app.currentDocument.text == "hit one hit two"
+                app.shownSession.text == "hit one hit two"
                     && !app.editorFindHost.replaceBatch.isPreparing
                     && app.editorFindHost.replaceAuthority.lastAuthorizationRecord == nil
             }
@@ -124,14 +124,14 @@ extension EditorFindHostedGateTests {
         XCTAssertFalse(fieldEditor.hasMarkedText())
         try await waitUntil("the committed value reaches App") { app.editorFindHost.ui.replacementText == "NEWㄆ" }
         try await assertRemains("committing composition never replaces") {
-            app.currentDocument.text == "hit one hit two"
+            app.shownSession.text == "hit one hit two"
         }
 
         // A fresh explicit Return replaces exactly once.
         fieldEditor.doCommand(by: #selector(NSResponder.insertNewline(_:)))
-        XCTAssertEqual(app.currentDocument.text, "NEWㄆ one hit two")
+        XCTAssertEqual(app.shownSession.text, "NEWㄆ one hit two")
         editor.undoManager?.undo()
-        XCTAssertEqual(app.currentDocument.text, "hit one hit two")
+        XCTAssertEqual(app.shownSession.text, "hit one hit two")
         XCTAssertFalse(editor.undoManager?.canUndo == true, "exactly one mutation")
 
         // Escape without composition closes the bar and keeps the value.
@@ -170,10 +170,10 @@ extension EditorFindHostedGateTests {
                 XCTAssertEqual(result, .superseded, "\(owner)")
             }
             XCTAssertEqual(app.editorWriterInstallations, writers, "\(owner): no writer activation")
-            XCTAssertEqual(app.currentDocument.text, before.appText, "\(owner)")
+            XCTAssertEqual(app.shownSession.text, before.appText, "\(owner)")
             try endComposition(in: owner, of: hosted, fieldEditor: fieldEditor)
             try await assertRemains("\(owner): no post-composition mutation") {
-                app.currentDocument.text == before.appText && !app.editorFindHost.replaceBatch.isPreparing
+                app.shownSession.text == before.appText && !app.editorFindHost.replaceBatch.isPreparing
             }
             XCTAssertFalse(editor.undoManager?.canUndo == true, "\(owner)")
         }

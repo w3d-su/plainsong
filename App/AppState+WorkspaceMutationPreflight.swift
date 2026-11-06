@@ -20,14 +20,9 @@ extension AppState {
     }
 
     func workspaceMutationManagedSessions() -> [DocumentSession] {
-        var sessions = [currentDocument]
-        sessions.append(contentsOf: sessionCache.values)
-        sessions.append(contentsOf: retiredEditorDocumentSessions.values.map(\.session))
-        sessions.append(contentsOf: editorDocumentBindingSessions.values)
-        sessions.append(contentsOf: editorBindingInstallations.values)
-        sessions.append(contentsOf: workspaceMutationRetainedRecoverySessions())
-        var seen: Set<ObjectIdentifier> = []
-        return sessions.filter { seen.insert(ObjectIdentifier($0)).inserted }
+        registry.sessions(from: [
+            .windowDocuments, .warmCache, .retired, .editorBindings, .editorInstallations, .mutationRecovery,
+        ])
     }
 
     func workspaceManagedSessionProof(
@@ -190,7 +185,7 @@ extension AppState {
 
     func workspaceMutationOwnedStateURLs() -> [URL] {
         var urls = sessionPolicy.warmURLsInLeastRecentOrder
-        urls.append(contentsOf: sessionCache.keys)
+        urls.append(contentsOf: registry.warmSessionURLs)
         urls.append(contentsOf: retiredEditorDocumentSessions.keys)
         urls.append(contentsOf: lastKnownDiskHashes.keys)
         urls.append(contentsOf: lastKnownDiskModificationDates.keys)
@@ -231,7 +226,7 @@ extension AppState {
         guard !destinationIsRelocatingSource else {
             throw WorkspaceMutationError.sessionDestinationConflict(destination)
         }
-        let occupied = sessionCache.keys.contains { exactFileURLSpellingMatches($0, destination) }
+        let occupied = registry.warmSessionURLs.contains { exactFileURLSpellingMatches($0, destination) }
             || retiredEditorDocumentSessions.keys.contains {
                 exactFileURLSpellingMatches($0, destination)
             }

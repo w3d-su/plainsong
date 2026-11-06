@@ -24,7 +24,7 @@ extension EditorFindHostedGateTests {
         appState.preferences.setAutosaveIntervalSeconds(30)
         appState.openExternalFile(fixture.root)
         try await waitUntil("workspace document opens") {
-            appState.currentDocument.fileURL?.lastPathComponent == "post.md"
+            appState.shownSession.fileURL?.lastPathComponent == "post.md"
         }
         let host = makeWorkspaceHost(appState: appState)
         registerTeardown(host: host, fixture: fixture)
@@ -80,7 +80,7 @@ extension EditorFindHostedGateTests {
             appState: appState,
             window: window
         )
-        XCTAssertEqual(appState.currentDocument.text, local)
+        XCTAssertEqual(appState.shownSession.text, local)
         XCTAssertEqual(appState.editorFindHost.controller.documentBinding.text, local)
         XCTAssertEqual(appState.editorFindHost.controller.session?.total, 2)
         XCTAssertEqual(appState.editorFindHost.ui.matchCounterText, "2 / 2")
@@ -99,7 +99,7 @@ extension EditorFindHostedGateTests {
         appState.setLayoutMode(.sourceOnly)
         appState.openExternalFile(fixture.root)
         try await waitUntil("workspace document opens") {
-            appState.currentDocument.fileURL?.lastPathComponent == "post.md"
+            appState.shownSession.fileURL?.lastPathComponent == "post.md"
         }
         let host = makeWorkspaceHost(appState: appState)
         registerTeardown(host: host, fixture: fixture)
@@ -128,7 +128,7 @@ extension EditorFindHostedGateTests {
 
         try await waitUntil("App, Find, and the hosted editor rekey to renamed.md") {
             let identity = appState.activeEditorDocumentIdentity
-            return appState.currentDocument.fileURL?.lastPathComponent == "renamed.md"
+            return appState.shownSession.fileURL?.lastPathComponent == "renamed.md"
                 && identity != originalIdentity
                 && appState.editorFindHost.controller.documentBinding.identity == identity
                 && self.editorIdentity(in: window) == identity
@@ -174,7 +174,7 @@ extension EditorFindHostedGateTests {
 
         let expectedIdentity = AppState.editorDocumentIdentity(for: destination.standardizedFileURL)
         try await waitUntil("App, Find, and the hosted editor follow the Save Copy destination") {
-            appState.currentDocument.fileURL?.standardizedFileURL == destination.standardizedFileURL
+            appState.shownSession.fileURL?.standardizedFileURL == destination.standardizedFileURL
                 && appState.missingFilePrompt == nil
                 && appState.activeEditorDocumentIdentity == expectedIdentity
                 && appState.editorFindHost.controller.documentBinding.identity == expectedIdentity
@@ -236,14 +236,14 @@ extension EditorFindHostedGateTests {
 
         let expectedIdentity = AppState.editorDocumentIdentity(for: destination.standardizedFileURL)
         try await waitUntil("App, Find, and the hosted editor follow the quarantined destination") {
-            appState.currentDocument.fileURL?.standardizedFileURL == destination.standardizedFileURL
+            appState.shownSession.fileURL?.standardizedFileURL == destination.standardizedFileURL
                 && appState.activeEditorDocumentIdentity == expectedIdentity
                 && appState.editorFindHost.controller.documentBinding.identity == expectedIdentity
                 && self.editorIdentity(in: window) == expectedIdentity
                 && appState.editorFindHost.controller.session?.total == 2
         }
         XCTAssertNotNil(
-            appState.indeterminateSessionWriteContexts[ObjectIdentifier(appState.currentDocument)]
+            appState.indeterminateSessionWriteContexts[ObjectIdentifier(appState.shownSession)]
         )
         try await assertFindBarStayedMounted(
             field,
@@ -269,7 +269,7 @@ extension EditorFindHostedGateTests {
         appState.setLayoutMode(.sourceOnly)
         appState.openExternalFile(fixture.root)
         try await waitUntil("workspace document opens") {
-            appState.currentDocument.fileURL?.lastPathComponent == "post.md"
+            appState.shownSession.fileURL?.lastPathComponent == "post.md"
         }
         let host = makeWorkspaceHost(appState: appState)
         registerTeardown(host: host, fixture: fixture)
@@ -299,7 +299,7 @@ extension EditorFindHostedGateTests {
         try reloaded.write(to: post, atomically: true, encoding: .utf8)
         appState.refreshWorkspaceAfterFileSystemChange()
         try await waitUntil("clean Reload reaches App and the hosted editor") {
-            appState.currentDocument.text == reloaded
+            appState.shownSession.text == reloaded
                 && self.editorTextView(in: window)?.text == reloaded
         }
         guard case let .cancel(cancelID)? = appState.editorNavigationCommand else {
@@ -361,7 +361,7 @@ extension EditorFindHostedGateTests {
         appState.setLayoutMode(.sourceOnly)
         appState.openExternalFile(fixture.root)
         try await waitUntil("workspace document opens") {
-            appState.currentDocument.fileURL?.lastPathComponent == "post.md"
+            appState.shownSession.fileURL?.lastPathComponent == "post.md"
         }
         let host = makeWorkspaceHost(appState: appState)
         registerTeardown(host: host, fixture: fixture)

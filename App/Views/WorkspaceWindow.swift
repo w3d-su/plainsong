@@ -34,6 +34,7 @@ enum WorkspaceShell { case automatic, fixed, split }
 
 private struct WorkspaceWindowContent: View {
     @EnvironmentObject private var appState: AppState
+    @Environment(\.workspaceOwnerClaimToken) private var ownerClaimToken
     @Binding var inspectorIntent: Bool
     @Binding var inspectorWidth: Double
     let shellOverride: WorkspaceShell
@@ -94,13 +95,18 @@ private struct WorkspaceWindowContent: View {
             }
             .background(
                 WindowMetadataAccessor(
-                    representedURL: appState.currentDocument.fileURL,
-                    isDocumentEdited: appState.currentDocument.isDirty,
+                    representedURL: appState.shownSession.fileURL,
+                    isDocumentEdited: appState.shownSession.isDirty,
                     contentMinWidth: windowMinimum,
-                    onWindow: { [inspectorVisibility, hostWindow, appState, isSidebarHidden] window in
+                    onWindow: { [inspectorVisibility, hostWindow, appState, isSidebarHidden, ownerClaimToken] window in
                         inspectorVisibility.attach(to: window)
                         hostWindow.window = window
                         appState.setWorkspaceSidebarHidden(isSidebarHidden, in: window)
+                        KeyWindowRouter.shared.attach(
+                            window,
+                            to: appState,
+                            ownerClaimToken: ownerClaimToken
+                        )
                     }
                 )
             )
@@ -110,9 +116,6 @@ private struct WorkspaceWindowContent: View {
                 #if DEBUG
                     appState.showExportHTMLFeedbackSmokeIfRequested()
                 #endif
-            }
-            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
-                appState.flushAutosaveAfterWindowResignedKey()
             }
     }
 
@@ -245,7 +248,7 @@ private struct WorkspaceWindowContent: View {
     }
 
     private var documentTitle: String {
-        if let fileURL = appState.currentDocument.fileURL {
+        if let fileURL = appState.shownSession.fileURL {
             return fileURL.lastPathComponent
         }
         if appState.hasOpenDocument {
@@ -259,7 +262,7 @@ private struct WorkspaceWindowContent: View {
         if let rootURL = appState.workspaceRootURL {
             return rootURL.lastPathComponent
         }
-        return appState.currentDocument.fileURL?.deletingLastPathComponent().lastPathComponent ?? ""
+        return appState.shownSession.fileURL?.deletingLastPathComponent().lastPathComponent ?? ""
     }
 
     private var errorIsPresented: Binding<Bool> {

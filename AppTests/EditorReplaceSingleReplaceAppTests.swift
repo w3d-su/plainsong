@@ -150,7 +150,7 @@ final class EditorReplaceSingleReplaceAppTests: XCTestCase {
             fileKind: .markdown
         )
         let appState = AppState(
-            currentDocument: session,
+            shownSession: session,
             shouldRestoreLastOpenedFile: false
         )
         let identity = try XCTUnwrap(appState.activeEditorDocumentIdentity)

@@ -371,9 +371,10 @@ extension WorkspaceAnchoredFileSystem {
                 context.leaf,
                 flags: UInt32(RENAME_EXCL)
             ) == 0 else {
-                throw errno == EEXIST
+                let code = errno
+                throw code == EEXIST
                     ? WorkspaceAnchoredFileSystemError.changedIdentity
-                    : WorkspaceAnchoredFileSystemError.unreadable
+                    : writeFailure(errorNumber: code, otherwise: .unreadable)
             }
         } catch {
             let artifactState = removeArtifact(

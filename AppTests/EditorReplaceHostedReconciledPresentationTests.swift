@@ -44,7 +44,7 @@ extension EditorFindHostedGateTests {
         replacement: String
     ) async throws {
         let appState = hosted.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let source = session.text
         let sourceRevision = session.version
         let editor = try hostedEditor(hosted)
@@ -145,7 +145,7 @@ extension EditorFindHostedGateTests {
                 size: CGFloat(preferences.editorFontSize)
             )
         ).highlight(
-            hosted.appState.currentDocument.text,
+            hosted.appState.shownSession.text,
             fileKind: .markdown,
             visibleRange: NSRange(location: 0, length: storage.length),
             developmentPresentation: presentation,

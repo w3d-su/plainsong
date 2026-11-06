@@ -14,7 +14,7 @@ extension EditorFindHostedGateTests {
         appState.setLayoutMode(.sourceOnly)
         appState.openExternalFile(fixture.root)
         try await waitUntil("source-only workspace opens a.md") {
-            appState.currentDocument.fileURL?.lastPathComponent == "a.md"
+            appState.shownSession.fileURL?.lastPathComponent == "a.md"
         }
         let host = makeWorkspaceHost(appState: appState)
         registerTeardown(host: host, fixture: fixture)

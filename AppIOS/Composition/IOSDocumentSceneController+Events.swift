@@ -15,8 +15,12 @@ extension IOSDocumentSceneController {
 
     func updateEditorAccess() {
         guard let handle, let bindingID, let state = documents.state(for: handle.identity) else { return }
+        let retainedGeneration = editor.captureSnapshot().flatMap {
+            $0.bindingID == bindingID ? $0.accessGeneration : nil
+        } ?? state.accessGeneration
+        let generation = grantIsCurrent ? state.accessGeneration : max(state.accessGeneration, retainedGeneration)
         editor.updateAccess(
-            for: handle.identity, bindingID: bindingID, generation: state.accessGeneration,
+            for: handle.identity, bindingID: bindingID, generation: generation,
             canWrite: state.canWrite && !transitioning && !isShuttingDown && grantIsCurrent &&
                 currentGrant?.workspaceID == handle.location.workspaceID &&
                 currentGrant?.accessGeneration == state.accessGeneration
@@ -93,7 +97,7 @@ extension IOSDocumentSceneController {
             guard !Task.isCancelled, let self, self.handle?.identity == handle.identity,
                   self.bindingID == bindingID, handle.session.version == revision.version else { return }
             let context = grantIsCurrent ? currentGrant
-                .flatMap { $0.scope == .directory ? assetContext($0) : nil } : nil
+                .flatMap { $0.scope == .directory ? self.assetContext($0) : nil } : nil
             renderedRevision = revision
             preview.render(handle.session.snapshot, identity: handle.identity, assetAccess: context)
         }
@@ -109,8 +113,7 @@ extension IOSDocumentSceneController {
                   let originBinding = bindingID else { return }
             Task { @MainActor [weak self] in
                 guard let self, handle?.identity == identity, bindingID == originBinding else { return }
-                do { try await openSelectedURL(url, scope: .singleFile) }
-                catch {
+                do { try await openSelectedURL(url, scope: .singleFile) } catch {
                     // Navigation failure is a presentation error. It cannot
                     // revoke the current writer or overwrite a real access error.
                     guard handle == nil || (handle?.identity == identity && bindingID == originBinding) else { return }
@@ -123,6 +126,8 @@ extension IOSDocumentSceneController {
             if ["https", "http"].contains(url.scheme?.lowercased() ?? "") {
                 openExternalURL?(url)
             }
+        case .contentRuleUnavailable:
+            noteContentRuleUnavailable()
         default: break
         }
     }

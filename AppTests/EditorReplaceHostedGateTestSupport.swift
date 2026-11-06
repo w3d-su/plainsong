@@ -74,9 +74,9 @@ struct EditorReplaceEffectSnapshot: Equatable {
 
     @MainActor
     init(_ appState: AppState, textView: MarkdownSTTextView?) {
-        appText = appState.currentDocument.text
-        appVersion = appState.currentDocument.version
-        isDirty = appState.currentDocument.isDirty
+        appText = appState.shownSession.text
+        appVersion = appState.shownSession.version
+        isDirty = appState.shownSession.isDirty
         viewText = textView.map { MarkdownTextView.textStorage(of: $0)?.string ?? $0.text ?? "" }
         selection = textView?.selectedRange()
         findSession = appState.editorFindHost.controller.session
@@ -134,7 +134,7 @@ extension EditorFindHostedGateTests {
     /// refusal state. This waits on external observation only, leaving every product fence intact.
     func waitForHostedReplaceObservationQuiescence(_ hosted: HostedReplaceWorkspace) async throws {
         let appState = hosted.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let identity = ObjectIdentifier(session)
         try await waitUntil("hosted Replace setup has no pending external observation") {
             guard appState.externalDiskInspectionTasks[identity] == nil,

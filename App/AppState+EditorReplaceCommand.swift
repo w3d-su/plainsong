@@ -107,7 +107,7 @@ extension AppState {
         case let .success(stamp):
             editorStamp = stamp
         }
-        let session = currentDocument
+        let session = shownSession
         return .success(EditorReplacePlan(
             stamp: currentEditorReplaceAuthorityStamp(for: session),
             editorStamp: editorStamp,

@@ -5,7 +5,7 @@ import WorkspaceKit
 @MainActor
 extension AppState {
     func refreshIndeterminateFileWriteReconciliation() {
-        refreshIndeterminateFileWriteReconciliation(for: currentDocument)
+        refreshIndeterminateFileWriteReconciliation(for: shownSession)
     }
 
     func refreshIndeterminateFileWriteReconciliation(for session: DocumentSession) {
@@ -13,8 +13,8 @@ extension AppState {
         guard indeterminateSessionWrites[sessionIdentity] != nil,
               let context = indeterminateSessionWriteContexts[sessionIdentity]
         else {
-            if session === currentDocument {
-                indeterminateFileWriteReconciliationPrompt = nil
+            for window in registry.connectedWindows where window.shownSession === session {
+                window.indeterminateFileWriteReconciliationPrompt = nil
             }
             return
         }
@@ -44,10 +44,10 @@ extension AppState {
                 // Retain the session's old binding/proof until Reload or Keep Mine adopts this
                 // exact observation; `observeRetainedFileVersion` prioritizes the context
                 // while the indeterminate fence remains active.
-                if session === currentDocument {
-                    indeterminateFileWriteReconciliationPrompt = nil
-                    missingFilePrompt = nil
-                    externalChangePrompt = ExternalChangePrompt(fileURL: destination)
+                for window in registry.connectedWindows where window.shownSession === session {
+                    window.indeterminateFileWriteReconciliationPrompt = nil
+                    window.missingFilePrompt = nil
+                    window.externalChangePrompt = ExternalChangePrompt(fileURL: destination)
                 }
             } catch {
                 exposeUnavailableIndeterminateFileWrite(
@@ -64,10 +64,10 @@ extension AppState {
             lastKnownDiskModificationDates[destination] = nil
             sessionPolicy.updateDirtyState(for: destination, isDirty: true)
             cancelAutosave(for: session)
-            if session === currentDocument {
-                indeterminateFileWriteReconciliationPrompt = nil
-                externalChangePrompt = nil
-                missingFilePrompt = MissingFilePrompt(fileURL: destination)
+            for window in registry.connectedWindows where window.shownSession === session {
+                window.indeterminateFileWriteReconciliationPrompt = nil
+                window.externalChangePrompt = nil
+                window.missingFilePrompt = MissingFilePrompt(fileURL: destination)
             }
         case .symbolicLink:
             exposeUnavailableIndeterminateFileWrite(
@@ -96,12 +96,13 @@ extension AppState {
         state: IndeterminateFileWriteReconciliationState
     ) {
         cancelAutosave(for: session)
-        guard session === currentDocument else { return }
-        externalChangePrompt = nil
-        missingFilePrompt = nil
-        indeterminateFileWriteReconciliationPrompt = IndeterminateFileWriteReconciliationPrompt(
-            fileURL: context.location.fileURL,
-            state: state
-        )
+        for window in registry.connectedWindows where window.shownSession === session {
+            window.externalChangePrompt = nil
+            window.missingFilePrompt = nil
+            window.indeterminateFileWriteReconciliationPrompt = IndeterminateFileWriteReconciliationPrompt(
+                fileURL: context.location.fileURL,
+                state: state
+            )
+        }
     }
 }

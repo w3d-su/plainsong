@@ -13,12 +13,12 @@ extension ExportHTMLCommandAppTests {
                                  ("post.markdown", false), ("post.txt", false), ("post.html", false),
                                  ("post.pdf", false), ("", false)]
         {
-            app.currentDocument = DocumentSession(text: "# Availability",
-                                                  url: name.isEmpty ? nil : fixture.root.appendingPathComponent(name))
+            app.shownSession = DocumentSession(text: "# Availability",
+                                               url: name.isEmpty ? nil : fixture.root.appendingPathComponent(name))
             XCTAssertEqual(app.canExportCurrentDocumentAsHTML, expected, name)
             XCTAssertEqual(MenuBarSnapshot(appState: app).canExportHTML, expected, name)
         }
-        app.currentDocument = fixture.session
+        app.shownSession = fixture.session
         app.exportHTMLOperations.panelWindowProvider = { nil }
         XCTAssertFalse(app.canExportCurrentDocumentAsHTML)
         XCTAssertFalse(MenuBarSnapshot(appState: app).canExportHTML)

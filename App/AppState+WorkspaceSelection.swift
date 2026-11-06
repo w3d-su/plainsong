@@ -112,7 +112,7 @@ extension AppState {
     private func workspaceNodeSelectionSessionState(
         at location: WorkspaceFileSystemLocation
     ) -> WorkspaceNodeSelectionSessionState {
-        let session = sessionCache[location.fileURL]
+        let session = registry.warmSession(at: location.fileURL)
             ?? retiredEditorDocumentSessions[location.fileURL]?.session
         let binding = session.flatMap { anchoredSessionFileBinding(for: $0) }
         return WorkspaceNodeSelectionSessionState(

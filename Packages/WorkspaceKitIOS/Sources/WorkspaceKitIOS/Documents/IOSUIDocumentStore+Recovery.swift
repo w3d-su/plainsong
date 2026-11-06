@@ -12,7 +12,8 @@ extension IOSUIDocumentStore {
         guard let record = recoveryRecord(entry, reason: reason) else { return }
         do {
             let receipt = try await recovery.persist(record)
-            guard guardCurrentAuthority(entry, generation: entry.accessGeneration) else { return }
+            guard guardCurrentAuthority(entry, generation: entry.accessGeneration),
+                  !entry.hasUnresolvedVersions else { return }
             guard ExactSourceText.matches(session.text, captured) else {
                 if allowRetry {
                     await beginConflict(entry, reason: reason, allowRetry: false)
@@ -47,7 +48,12 @@ extension IOSUIDocumentStore {
 
     func recoveryRecord(_ entry: IOSDocumentEntry, reason: IOSRecoveryReason) -> IOSRecoveryRecord? {
         guard let session = entry.session else { return nil }
-        return IOSRecoveryRecord(
+        let isCheckpoint = reason == .backgroundDeadline && !entry.fenced
+        let slot = isCheckpoint ? \IOSDocumentEntry.checkpoint : \.retainedDraft
+        if let existing = entry[keyPath: slot], existing.revisionVersion == session.version {
+            return existing
+        }
+        let record = IOSRecoveryRecord(
             recordID: UUID(),
             operationID: UUID(),
             documentID: entry.identity.rawValue,
@@ -59,8 +65,10 @@ extension IOSUIDocumentStore {
             fileURLPath: entry.location.fileURL.path(percentEncoded: false),
             source: session.text,
             baseline: entry.lastPersistedText ?? "",
-            reason: reason
+            reason: entry.fenced && reason == .backgroundDeadline ? .closeIncomplete : reason
         )
+        entry[keyPath: slot] = record
+        return record
     }
 
     func persistRecovery(_ entry: IOSDocumentEntry, reason: IOSRecoveryReason) async throws -> IOSRecoveryReceipt {
@@ -69,18 +77,19 @@ extension IOSUIDocumentStore {
         }
         let receipt = try await recovery.persist(record)
         entry.recoveryReceipt = receipt
+        emit(.recoveryPersisted(receipt))
         return receipt
     }
 
     public func close(_ identity: IOSDocumentIdentity) async throws -> IOSDocumentCloseOutcome {
         let entry = try requireEntry(identity)
         if let retirement = entry.retirementTask {
-            try await retirement.value
-            return .closed
+            return try await retirement.value
         }
         if let closing = entry.closeTask {
             return try await closing.value
         }
+        entry.cloudResolution?.cancel()
         entry.isClosing = true
         entry.autosaveTask?.cancel()
         refreshWritableState(entry)

@@ -12,7 +12,7 @@ extension EditorFindHostedGateTests {
         let state = fixture.appState
         state.setLayoutMode(.sourceOnly)
         state.openExternalFile(fixture.root)
-        try await waitUntil("sidebar fixture opens") { state.currentDocument.fileURL?.lastPathComponent == "a.md" }
+        try await waitUntil("sidebar fixture opens") { state.shownSession.fileURL?.lastPathComponent == "a.md" }
         // A deferred pick is refused while the open reload's capture still lags; wait
         // for it to install so the first arrow cannot hit that window (29c).
         try await waitUntil("the open reload installed its capture") {
@@ -32,7 +32,7 @@ extension EditorFindHostedGateTests {
         for file in ["b.md", "c.md"] {
             try sendFilesArrowDown(to: host.window)
             try await waitUntil("arrow selection opens \(file)") {
-                state.currentDocument.fileURL?.lastPathComponent == file
+                state.shownSession.fileURL?.lastPathComponent == file
             }
             XCTAssertEqual(state.editorFocusRequestID, focusBefore)
             XCTAssertTrue(host.window.firstResponder === list)
@@ -58,7 +58,7 @@ extension EditorFindHostedGateTests {
         state.setLayoutMode(.sourceOnly)
         state.openExternalFile(fixture.root)
         try await waitUntil("sidebar fixture opens") {
-            state.currentDocument.fileURL?.lastPathComponent == "a.md"
+            state.shownSession.fileURL?.lastPathComponent == "a.md"
         }
         try await waitUntil("the open reload installed its capture") {
             state.workspaceInstalledCaptureGeneration == state.workspaceGeneration
@@ -102,14 +102,14 @@ extension EditorFindHostedGateTests {
         XCTAssertNil(deferral.pendingID)
         let scannerIsHeld = await scanner.isHeld
         XCTAssertTrue(scannerIsHeld)
-        XCTAssertEqual(state.currentDocument.fileURL?.lastPathComponent, "a.md")
+        XCTAssertEqual(state.shownSession.fileURL?.lastPathComponent, "a.md")
         XCTAssertEqual(list.selectedRow, aRow)
 
         await scanner.release()
         try await waitUntil("the held reload installs") {
             state.workspaceInstalledCaptureGeneration == state.workspaceGeneration
         }
-        XCTAssertEqual(state.currentDocument.fileURL?.lastPathComponent, "a.md")
+        XCTAssertEqual(state.shownSession.fileURL?.lastPathComponent, "a.md")
     }
 
     /// A burst of arrows lands on the last file without reverting, and keeps focus in the
@@ -122,7 +122,7 @@ extension EditorFindHostedGateTests {
         state.setLayoutMode(.sourceOnly)
         state.openExternalFile(fixture.root)
         try await waitUntil("sidebar fixture opens") {
-            state.currentDocument.fileURL?.lastPathComponent == "a.md"
+            state.shownSession.fileURL?.lastPathComponent == "a.md"
         }
         // Same as the two-file test: settle the open reload before the arrows so no
         // deferred pick is refused by a lagging capture it was not meant to meet (29c).
@@ -145,9 +145,9 @@ extension EditorFindHostedGateTests {
             try sendFilesArrowDown(to: host.window)
         }
         try await waitUntil("the last arrow's file is open") {
-            state.currentDocument.fileURL?.lastPathComponent == "d.md"
+            state.shownSession.fileURL?.lastPathComponent == "d.md"
         }
-        XCTAssertEqual(state.currentDocument.fileURL?.lastPathComponent, "d.md")
+        XCTAssertEqual(state.shownSession.fileURL?.lastPathComponent, "d.md")
         XCTAssertEqual(list.selectedRow, dRow)
         XCTAssertEqual(state.editorFocusRequestID, focusBefore)
         XCTAssertTrue(host.window.firstResponder === list)
@@ -158,7 +158,7 @@ extension EditorFindHostedGateTests {
         let state = fixture.appState
         state.setLayoutMode(.sourceOnly)
         state.openExternalFile(fixture.root)
-        try await waitUntil("sidebar fixture opens") { state.currentDocument.fileURL?.lastPathComponent == "a.md" }
+        try await waitUntil("sidebar fixture opens") { state.shownSession.fileURL?.lastPathComponent == "a.md" }
         let host = makeWorkspaceHost(appState: state)
         registerTeardown(host: host, fixture: fixture)
         var table: NSTableView?
@@ -189,7 +189,7 @@ extension EditorFindHostedGateTests {
         NSApp.postEvent(up, atStart: false)
         list.mouseDown(with: down)
         try await waitUntil("single click opens draggable b.md") {
-            state.currentDocument.fileURL?.lastPathComponent == "b.md"
+            state.shownSession.fileURL?.lastPathComponent == "b.md"
         }
         XCTAssertEqual(state.workspaceTree?.selectedNode?.name, "b.md")
     }
@@ -209,7 +209,7 @@ extension EditorFindHostedGateTests {
         state.setLayoutMode(.sourceOnly)
         state.openExternalFile(fixture.root)
         try await waitUntil("sidebar fixture opens") {
-            state.currentDocument.fileURL?.lastPathComponent == "a.md"
+            state.shownSession.fileURL?.lastPathComponent == "a.md"
         }
         try await waitUntil("the open reload installed its capture") {
             state.workspaceInstalledCaptureGeneration == state.workspaceGeneration
@@ -253,17 +253,17 @@ extension EditorFindHostedGateTests {
         try await waitUntil("the newest pick was refused three times under the lag") {
             deferral.openAttempts.filter { $0.id == cID && !$0.landed }.count >= 3
         }
-        XCTAssertEqual(state.currentDocument.fileURL?.lastPathComponent, "a.md",
+        XCTAssertEqual(state.shownSession.fileURL?.lastPathComponent, "a.md",
                        "a held reload must keep both picks refused")
 
         await scanner.release()
         try await waitUntil("the newest pick opens after the capture installs") {
-            state.currentDocument.fileURL?.lastPathComponent == "c.md"
+            state.shownSession.fileURL?.lastPathComponent == "c.md"
         }
         // Give the superseded retry its next turn: it must have exited instead of landing.
         try await Task.sleep(nanoseconds: 50_000_000)
         await Task.yield()
-        XCTAssertEqual(state.currentDocument.fileURL?.lastPathComponent, "c.md")
+        XCTAssertEqual(state.shownSession.fileURL?.lastPathComponent, "c.md")
 
         let attempts = deferral.openAttempts
         let firstC = try XCTUnwrap(attempts.firstIndex { $0.id == cID })
@@ -297,7 +297,7 @@ extension EditorFindHostedGateTests {
         state.setLayoutMode(.sourceOnly)
         state.openExternalFile(fixture.root)
         try await waitUntil("sidebar fixture opens") {
-            state.currentDocument.fileURL?.lastPathComponent == "a.md"
+            state.shownSession.fileURL?.lastPathComponent == "a.md"
         }
         try await waitUntil("the open reload installed its capture") {
             state.workspaceInstalledCaptureGeneration == state.workspaceGeneration
@@ -354,7 +354,7 @@ extension EditorFindHostedGateTests {
 
         await scanner.release()
         try await waitUntil("b.md opens after the capture installs") {
-            state.currentDocument.fileURL?.lastPathComponent == "b.md"
+            state.shownSession.fileURL?.lastPathComponent == "b.md"
         }
         try await Task.sleep(nanoseconds: 100_000_000)
         await Task.yield()
@@ -385,7 +385,7 @@ extension EditorFindHostedGateTests {
         state.setLayoutMode(.sourceOnly)
         state.openExternalFile(fixture.root)
         try await waitUntil("sidebar fixture opens") {
-            state.currentDocument.fileURL?.lastPathComponent == "a.md"
+            state.shownSession.fileURL?.lastPathComponent == "a.md"
         }
         try await waitUntil("the open reload installed its capture") {
             state.workspaceInstalledCaptureGeneration == state.workspaceGeneration
@@ -429,7 +429,7 @@ extension EditorFindHostedGateTests {
 
         await scanner.release()
         try await waitUntil("b.md opens after the capture installs") {
-            state.currentDocument.fileURL?.lastPathComponent == "b.md"
+            state.shownSession.fileURL?.lastPathComponent == "b.md"
         }
         try await Task.sleep(nanoseconds: 100_000_000)
         await Task.yield()

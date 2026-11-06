@@ -1,0 +1,223 @@
+import Darwin
+import Foundation
+import MarkdownCore
+
+struct EditorThemeCatalog: Equatable {
+    var themes: [CustomThemeDocument]
+    var invalidIdentifiers: Set<String>
+
+    func theme(identifier: String) -> CustomThemeDocument? {
+        themes.first { $0.id == identifier }
+    }
+}
+
+enum EditorThemeStoreError: Equatable, Error, LocalizedError {
+    case unreadable
+    case invalid(CustomThemeValidationFailure)
+    case notFound(String)
+    case failedToStore
+
+    var errorDescription: String? {
+        switch self {
+        case .unreadable:
+            "The theme file could not be read."
+        case let .invalid(failure):
+            EditorThemeValidationMessage.text(for: failure)
+        case let .notFound(identifier):
+            "No imported theme with the id \"\(identifier)\" was found."
+        case .failedToStore:
+            "The theme could not be saved."
+        }
+    }
+}
+
+enum EditorThemeImportResult: Equatable {
+    case imported(CustomThemeDocument)
+    case replacementDeclined(id: String)
+}
+
+enum EditorThemeValidationMessage {
+    static func text(for failure: CustomThemeValidationFailure) -> String {
+        switch failure {
+        case .exceedsMaximumSize:
+            "Theme files must be 64 KiB or smaller."
+        case .invalidUTF8:
+            "Theme files must be UTF-8 text."
+        case .invalidJSON:
+            "The theme file is not a JSON object of schema version 1."
+        case let .unknownField(field):
+            "The theme file has an unknown field \"\(field)\". Schema version 1 rejects the whole file."
+        case let .missingField(field):
+            "The theme file is missing \"\(field)\"."
+        case let .unsupportedSchemaVersion(version):
+            "Theme schema version \(version) is not supported. This version of Plainsong reads version 1."
+        case .identifier:
+            "Theme ids must be 1-64 characters from a-z, 0-9, and hyphen."
+        case let .reservedIdentifier(identifier):
+            "\"\(identifier)\" is a built-in theme id."
+        case .name:
+            "Theme names must include visible text and be 1-128 Unicode scalars after trimming, with no control, "
+                + "format, or line-break characters, and cannot start with a combining mark."
+        case let .color(field):
+            "\"\(field)\" must be a #RRGGBB or #RRGGBBAA color."
+        case let .nonOpaqueColor(field):
+            "\"\(field)\" must be opaque. text, caret, and background accept #RRGGBB or #RRGGBBAA with alpha FF."
+        }
+    }
+}
+
+struct EditorThemeLibrary {
+    let directory: URL
+    private let fileManager: FileManager
+
+    init(directory: URL, fileManager: FileManager = .default) {
+        self.directory = directory
+        self.fileManager = fileManager
+    }
+
+    static func production(fileManager: FileManager = .default) -> EditorThemeLibrary {
+        let applicationSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        let directory = applicationSupport
+            .appendingPathComponent("Plainsong", isDirectory: true)
+            .appendingPathComponent("Themes", isDirectory: true)
+        return EditorThemeLibrary(directory: directory, fileManager: fileManager)
+    }
+
+    func loadCatalog() -> EditorThemeCatalog {
+        guard let files = try? fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return EditorThemeCatalog(themes: [], invalidIdentifiers: [])
+        }
+
+        var themes: [CustomThemeDocument] = []
+        var invalid: Set<String> = []
+        for url in files where url.pathExtension == "json" {
+            let identifier = url.deletingPathExtension().lastPathComponent
+            let data: Data
+            do {
+                data = try readThemeFile(at: url)
+            } catch {
+                invalid.insert(identifier)
+                continue
+            }
+            guard case let .success(document) = CustomThemeValidation.validate(data),
+                  document.id == identifier
+            else {
+                invalid.insert(identifier)
+                continue
+            }
+            themes.append(document)
+        }
+        return EditorThemeCatalog(themes: themes, invalidIdentifiers: invalid)
+    }
+
+    func importTheme(
+        data: Data,
+        replacingExisting: (CustomThemeDocument) -> Bool
+    ) throws -> EditorThemeImportResult {
+        let document: CustomThemeDocument
+        switch CustomThemeValidation.validate(data) {
+        case let .success(validated):
+            document = validated
+        case let .failure(failure):
+            throw EditorThemeStoreError.invalid(failure)
+        }
+        guard let destination = themeFileURL(identifier: document.id) else {
+            throw EditorThemeStoreError.invalid(.identifier)
+        }
+        if fileManager.fileExists(atPath: destination.path) {
+            guard replacingExisting(document) else {
+                return .replacementDeclined(id: document.id)
+            }
+        }
+        do {
+            try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+            try data.write(to: destination, options: .atomic)
+        } catch {
+            throw EditorThemeStoreError.failedToStore
+        }
+        return .imported(document)
+    }
+
+    /// Reads at most 64 KiB + 1 byte. `O_NOFOLLOW` rejects a symlink, and `O_NONBLOCK`
+    /// keeps a FIFO from stalling the main actor. The open descriptor is checked with
+    /// `fstat`, so a file replaced after the path lookup is not trusted from `resourceValues`.
+    func readThemeFile(at url: URL) throws -> Data {
+        let maximum = CustomThemeDocument.maximumByteCount
+        let descriptor = url.withUnsafeFileSystemRepresentation { representation -> Int32 in
+            guard let representation else { return -1 }
+            return Darwin.open(representation, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
+        }
+        guard descriptor >= 0 else {
+            throw EditorThemeStoreError.unreadable
+        }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        var info = stat()
+        guard fstat(descriptor, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG, info.st_size >= 0 else {
+            throw EditorThemeStoreError.unreadable
+        }
+        let byteCount = Int(clamping: info.st_size)
+        if byteCount > maximum {
+            throw EditorThemeStoreError.invalid(.exceedsMaximumSize(byteCount: byteCount))
+        }
+        var data = Data()
+        let cap = maximum + 1
+        do {
+            while data.count < cap {
+                guard let chunk = try handle.read(upToCount: cap - data.count), !chunk.isEmpty else {
+                    break
+                }
+                data.append(chunk)
+            }
+        } catch {
+            throw EditorThemeStoreError.unreadable
+        }
+        if data.count > maximum {
+            throw EditorThemeStoreError.invalid(.exceedsMaximumSize(byteCount: data.count))
+        }
+        return data
+    }
+
+    func existingFileURL(identifier: String) -> URL? {
+        guard let url = themeFileURL(identifier: identifier),
+              fileManager.fileExists(atPath: url.path)
+        else {
+            return nil
+        }
+        return url
+    }
+
+    @discardableResult
+    func moveToTrash(identifier: String) throws -> URL {
+        guard let url = existingFileURL(identifier: identifier) else {
+            throw EditorThemeStoreError.notFound(identifier)
+        }
+        var trashed: NSURL?
+        do {
+            try fileManager.trashItem(at: url, resultingItemURL: &trashed)
+        } catch {
+            throw EditorThemeStoreError.failedToStore
+        }
+        guard let trashed else {
+            throw EditorThemeStoreError.failedToStore
+        }
+        return trashed as URL
+    }
+
+    private func themeFileURL(identifier: String) -> URL? {
+        guard CustomThemeValidation.isIdentifier(identifier),
+              !identifier.contains("/")
+        else {
+            return nil
+        }
+        let url = directory.appendingPathComponent("\(identifier).json", isDirectory: false)
+        let directoryPath = directory.standardizedFileURL.path
+        let filePath = url.standardizedFileURL.deletingLastPathComponent().path
+        guard filePath == directoryPath else { return nil }
+        return url
+    }
+}

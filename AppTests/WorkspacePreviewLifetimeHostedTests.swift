@@ -60,7 +60,7 @@ extension EditorFindHostedGateTests {
         state.setLayoutMode(.sourcePreview)
         state.openExternalFile(fixture.root)
         try await waitUntil("\(layout) workspace opens") {
-            state.currentDocument.fileURL?.lastPathComponent == "a.md"
+            state.shownSession.fileURL?.lastPathComponent == "a.md"
         }
         let host = makeWorkspaceHost(appState: state, shellOverride: shell)
         XCTAssertFalse(host.previewLifecycle.isReleased, "\(layout): no preview controller mounted")

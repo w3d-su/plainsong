@@ -36,3 +36,20 @@ struct WYSIWYGFallbackBanner: View {
         }
     }
 }
+
+struct EditorThemeFallbackBanner: View {
+    @EnvironmentObject private var appState: AppState
+    let message: String
+
+    var body: some View {
+        NoticeBar(
+            tone: .caution,
+            systemImage: "paintpalette",
+            message: message
+        ) {
+            Button("Dismiss") {
+                appState.preferences.dismissEditorThemeFallbackNotice()
+            }
+        }
+    }
+}

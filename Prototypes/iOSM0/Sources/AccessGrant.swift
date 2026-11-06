@@ -31,8 +31,10 @@ final class AccessGrant: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         guard !released else { throw CocoaError(.fileReadNoPermission) }
+        // Preserve the default bookmark information while this grant is live.
+        // Relaunch scope restoration remains a real Files/provider device gate.
         let data = try root.bookmarkData(
-            options: .minimalBookmark,
+            options: [],
             includingResourceValuesForKeys: nil,
             relativeTo: nil
         )
@@ -48,7 +50,8 @@ final class AccessGrant: @unchecked Sendable {
             throw CocoaError(.fileReadNoSuchFile)
         }
         var stale = false
-        let url = try URL(resolvingBookmarkData: data, options: [], relativeTo: nil, bookmarkDataIsStale: &stale)
+        let url = try URL(resolvingBookmarkData: data, options: .withoutImplicitStartAccessing,
+                          relativeTo: nil, bookmarkDataIsStale: &stale)
         guard !stale else { throw CocoaError(.fileReadNoPermission) }
         return try AccessGrant(root: url, scope: scope)
     }

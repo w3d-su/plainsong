@@ -21,7 +21,7 @@ extension EditorFindHostedGateTests {
             localEdit: "hit local hit local"
         )
         let appState = hosted.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let staleEditor = mountDesignatedKeyWorkspace(in: hosted.group, appState: appState, originX: 40)
         try await waitUntil("the second window installs the same document") {
             appState.liveEditorDocumentBindingInstallations(for: session).count == 2
@@ -73,7 +73,7 @@ extension EditorFindHostedGateTests {
             localEdit: local
         )
         let appState = hosted.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let controller = appState.editorFindHost.controller
         let prePrompt = try appState.makeEditorReplacePlan(replacement: "HIT").get()
         try await recordExternalConflict(hosted, disk: "hit disk")
@@ -115,7 +115,7 @@ extension EditorFindHostedGateTests {
             localEdit: local
         )
         let appState = hosted.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let controller = appState.editorFindHost.controller
         try await recordExternalConflict(hosted, disk: "hit disk")
         controller.documentTextDidChange(text: "hit one", revision: 0)
@@ -145,7 +145,7 @@ extension EditorFindHostedGateTests {
             localEdit: "hit local hit local"
         )
         let appState = hosted.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let prePrompt = try appState.makeEditorReplacePlan(replacement: "HIT").get()
         try await recordExternalConflict(hosted, disk: "hit disk hit disk hit disk")
 
@@ -183,7 +183,7 @@ extension EditorFindHostedGateTests {
         XCTAssertEqual(controller.documentBinding.text, source, file: file, line: line)
         XCTAssertEqual(
             controller.documentBinding.revision,
-            UInt64(appState.currentDocument.version),
+            UInt64(appState.shownSession.version),
             file: file,
             line: line
         )

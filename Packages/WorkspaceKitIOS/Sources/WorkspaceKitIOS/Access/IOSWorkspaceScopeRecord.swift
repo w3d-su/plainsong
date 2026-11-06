@@ -21,6 +21,7 @@ final class IOSWorkspaceScopeRecord {
     var expansion: WorkspaceExpansionState?
     var latestRequestID: UUID?
     var bookmark: Data?
+    var recentRecordID: UUID?
 
     init(
         workspaceID: IOSWorkspaceIdentity,

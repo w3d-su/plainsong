@@ -177,7 +177,11 @@ extension IOSSourceEditorController {
         guard isValid(result) else { return false }
         isMutating = true
         defer { isMutating = false }
-        return IOSNativeTextMutation.replace(result, in: textView, actionName: actionName)
+        let applied = IOSNativeTextMutation.replace(result, in: textView, actionName: actionName)
+        if applied {
+            applyLineNumberChrome()
+        }
+        return applied
     }
 
     private func isValid(_ result: MarkdownEditResult) -> Bool {
@@ -202,14 +206,25 @@ extension IOSSourceEditorController {
         guard !ExactSourceFragment.matches(current, installation.session.text) else { return }
         installation.session.replaceTextFromAuthorizedEditor(current, refreshStatistics: false)
         let version = installation.session.version
-        let session = installation.session
-        Task { @MainActor in
-            let statistics = await Task.detached(priority: .utility) {
-                TextStatistics(text: current)
-            }.value
-            guard session.version == version, ExactSourceFragment.matches(session.text, current) else { return }
-            session.applyStatistics(statistics)
+        // Count off the main actor; drop the result if the session's version or text
+        // changed before it returns to the main actor.
+        Task.detached(priority: .utility) { [weak self] in
+            let statistics = TextStatistics(text: current)
+            await self?.republishDeferredStatistics(statistics, version: version, text: current)
         }
+    }
+
+    private func republishDeferredStatistics(
+        _ statistics: TextStatistics,
+        version: Int,
+        text: String
+    ) {
+        guard let session = installation?.session else { return }
+        guard session.version == version, ExactSourceFragment.matches(session.text, text) else { return }
+        guard session.statistics != statistics else { return }
+        session.applyStatistics(statistics)
+        // Chrome reads the editor snapshot, which was emitted before this count finished.
+        emitSnapshot()
     }
 
     func consumeSelectionEpoch() {

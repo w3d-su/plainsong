@@ -28,7 +28,7 @@ final class EditorReplaceAuthorizationAppTests: XCTestCase {
     func testEverySection56StateRefusesWithItsReasonAndAdvancesTheGeneration() throws {
         let fixture = try makeAnchoredFixture()
         let appState = fixture.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         XCTAssertEqual(appState.editorReplaceAuthorizationDecision(for: session), .allowed)
 
         for fence in try section56Fences(fixture) {
@@ -48,7 +48,7 @@ final class EditorReplaceAuthorizationAppTests: XCTestCase {
     func testDecisionIsBoundToTheExactSessionAndIsNotCanSave() throws {
         let fixture = try makeAnchoredFixture()
         let appState = fixture.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         XCTAssertEqual(
             appState.editorReplaceAuthorizationDecision(for: DocumentSession(text: "other")),
             .refused(.notCurrentSession)
@@ -62,9 +62,9 @@ final class EditorReplaceAuthorizationAppTests: XCTestCase {
         XCTAssertEqual(appState.editorReplaceAuthorizationDecision(for: session), .allowed)
 
         let untitled = AppState(shouldRestoreLastOpenedFile: false)
-        XCTAssertNil(untitled.currentDocument.fileURL)
+        XCTAssertNil(untitled.shownSession.fileURL)
         XCTAssertFalse(untitled.canSave)
-        XCTAssertEqual(untitled.editorReplaceAuthorizationDecision(for: untitled.currentDocument), .allowed)
+        XCTAssertEqual(untitled.editorReplaceAuthorizationDecision(for: untitled.shownSession), .allowed)
     }
 
     /// A text-recovery session restored at launch is formerly-backed authority behind a
@@ -87,9 +87,9 @@ final class EditorReplaceAuthorizationAppTests: XCTestCase {
         )
         appState.restoreLastOpenedFileIfNeeded()
 
-        XCTAssertEqual(appState.currentDocument.text, "Recovered hit")
+        XCTAssertEqual(appState.shownSession.text, "Recovered hit")
         XCTAssertEqual(
-            appState.editorReplaceAuthorizationDecision(for: appState.currentDocument),
+            appState.editorReplaceAuthorizationDecision(for: appState.shownSession),
             .refused(.detachedRecoveryAuthority)
         )
     }
@@ -124,15 +124,15 @@ final class EditorReplaceAuthorizationAppTests: XCTestCase {
     func testTypingSupersedesAStampWithoutTouchingTheGeneration() async throws {
         let untitled = try await makeInstalledUntitled(source: "a a")
         let appState = untitled.appState
-        let stamp = appState.currentEditorReplaceAuthorityStamp(for: appState.currentDocument)
+        let stamp = appState.currentEditorReplaceAuthorityStamp(for: appState.shownSession)
         let generation = appState.editorReplaceAuthorityGeneration
 
         untitled.textView.insertText("x", replacementRange: NSRange(location: 3, length: 0))
 
-        XCTAssertEqual(appState.currentDocument.text, "a ax")
+        XCTAssertEqual(appState.shownSession.text, "a ax")
         XCTAssertEqual(appState.editorReplaceAuthorityGeneration, generation)
         XCTAssertEqual(
-            appState.editorReplaceAuthorizationDecision(for: stamp, session: appState.currentDocument),
+            appState.editorReplaceAuthorizationDecision(for: stamp, session: appState.shownSession),
             .refused(.authoritySuperseded)
         )
     }
@@ -142,7 +142,7 @@ final class EditorReplaceAuthorizationAppTests: XCTestCase {
     func testCommitAuthorizationReEvaluatesLiveStateAndRecordsItsReason() throws {
         let fixture = try makeAnchoredFixture()
         let appState = fixture.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         appState.workspaceMutationWriteFences.insert(ObjectIdentifier(session))
         let record = EditorReplaceAuthorizationRecord()
         let authorization = appState.makeEditorReplaceCommitAuthorization(
@@ -165,7 +165,7 @@ final class EditorReplaceAuthorizationAppTests: XCTestCase {
     func testInstalledUntitledDocumentIsAllowedThroughTheProductionPath() async throws {
         let untitled = try await makeInstalledUntitled(source: "a a")
         let appState = untitled.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         XCTAssertNil(session.fileURL)
         XCTAssertNil(appState.activeEditorDocumentIdentity)
         XCTAssertFalse(appState.canSave)

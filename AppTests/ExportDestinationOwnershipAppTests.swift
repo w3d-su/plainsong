@@ -56,7 +56,7 @@ final class ExportDestinationOwnershipAppTests: XCTestCase {
             )
             switch placement {
             case "cached":
-                fixture.appState.sessionCache[standaloneURL] = session
+                fixture.appState.registry.sessionCache[standaloneURL] = session
             case "retired":
                 fixture.appState.retiredEditorDocumentSessions[standaloneURL] =
                     RetiredEditorDocumentSession(
@@ -126,7 +126,7 @@ final class ExportDestinationOwnershipAppTests: XCTestCase {
             isDirty: true
         )
         let sessionIdentity = ObjectIdentifier(session)
-        fixture.appState.sessionCache[quarantinedURL] = session
+        fixture.appState.registry.sessionCache[quarantinedURL] = session
         fixture.appState.indeterminateSessionWrites[sessionIdentity] = WorkspaceIndeterminateFileWrite(
             reason: .durabilityFailed,
             preparedMetadata: nil,
@@ -189,7 +189,7 @@ final class ExportDestinationOwnershipAppTests: XCTestCase {
                 disposition: .createNew,
                 bytes: Data("<p>untitled</p>".utf8)
             ),
-            exportSource: untitledApp.currentDocument
+            exportSource: untitledApp.shownSession
         )
         guard case .committed = outcome else {
             return XCTFail("an unowned destination must commit: \(outcome)")
@@ -331,12 +331,12 @@ extension ExportDestinationOwnershipAppTests {
             fileKind: .markdown,
             isDirty: true
         )
-        let appState = AppState(currentDocument: ownedSession, shouldRestoreLastOpenedFile: false)
+        let appState = AppState(shownSession: ownedSession, shouldRestoreLastOpenedFile: false)
         appState.workspaceRootURL = root
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
-        appState.sessionCache[ownedURL] = ownedSession
+        appState.registry.sessionCache[ownedURL] = ownedSession
         appState.anchoredSessionFileBindings[ObjectIdentifier(ownedSession)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: ownedLocation,

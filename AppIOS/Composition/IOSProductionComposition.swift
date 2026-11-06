@@ -4,6 +4,7 @@ import PreviewKit
 import PreviewKitContracts
 import SyntaxKit
 import UIKit
+import WorkspaceCore
 import WorkspaceKitIOS
 
 /// C0 remains an unavailable sentinel for contract regressions. The production
@@ -22,6 +23,38 @@ struct IOSProductionComposition {
         assets: nil
     )
     let unavailableMessage = "Development scaffold. Editing and file access await device validation and providers."
+
+    /// Folder search reads one document under the scene's current directory grant,
+    /// holding its lease for the read. Size and encoding match opening the file: at most
+    /// 512 KB, and UTF-8 that round-trips to the same bytes (a BOM is refused).
+    static func readSearchDocument(
+        _ location: IOSFileLocation,
+        controller: IOSDocumentSceneController,
+        access: IOSWorkspaceAccessService
+    ) async throws -> String {
+        guard controller.grantIsCurrent, let grant = controller.currentGrant,
+              grant.scope == .directory,
+              location.workspaceID == grant.workspaceID,
+              location.accessGeneration == grant.accessGeneration
+        else { throw IOSWorkspaceFailure.grantChanged }
+        let lease = try access.acquireLease(for: grant)
+        defer { lease.release() }
+        let payload: Data
+        do {
+            payload = try await access.read(
+                location,
+                lease: lease,
+                operationID: UUID(),
+                maximumByteCount: IOSWorkspaceSearchLimits.maximumFileBytes
+            ).data
+        } catch let failure as IOSWorkspaceFailure where failure == .tooLarge {
+            throw IOSWorkspaceSearchReadError.tooLarge
+        }
+        guard let decoded = IOSDocumentTextCodec.decode(payload) else {
+            throw IOSWorkspaceSearchReadError.unsupportedEncoding
+        }
+        return decoded
+    }
 
     /// The real providers share one access service and one UIDocument-backed store.
     /// M0 owner prerequisites and candidate readiness are recorded in the ledger.
@@ -54,6 +87,13 @@ struct IOSProductionComposition {
                 )
             }
         )
+        let readWorkspaceDocument: @MainActor (IOSFileLocation) async throws -> String = { [
+            weak controller,
+            weak access
+        ] location in
+            guard let controller, let access else { throw IOSWorkspaceFailure.grantChanged }
+            return try await readSearchDocument(location, controller: controller, access: access)
+        }
         let runtime = try IOSProductionRuntime(
             controller: controller, editor: editor, preview: preview,
             currentGrant: { [weak controller] in
@@ -68,12 +108,41 @@ struct IOSProductionComposition {
                 guard let controller else { throw IOSDocumentFailure.unavailable }
                 try await controller.openPickedURL(url, scope: scope)
             },
-            shutdown: { [controller] in await controller.shutdown() }, recovery: recoveryUI
+            shutdown: { [controller] in await controller.shutdown() }, recovery: recoveryUI,
+            conflictCopy: IOSConflictCopyCoordinator(controller: controller),
+            readWorkspaceDocument: readWorkspaceDocument
+        )
+        runtime.scene.surfaces.reviewCloudVersions = { [weak controller, weak runtime] id in
+            guard let controller else { throw IOSDocumentFailure.unavailable }
+            runtime?.prepareForReadOnlyPresentation()
+            return try await controller.reviewVersions(id)
+        }
+        runtime.scene.surfaces.applyCloudVersion = { [weak controller, weak scene = runtime.scene] id, review in
+            guard let controller else { throw IOSDocumentFailure.unavailable }
+            do {
+                try await controller.chooseVersion(id, from: review)
+            } catch is IOSCloudVersionReopenFailure {
+                scene?.presentedError = IOSShellError(
+                    title: "Version Saved",
+                    message: "Open the document again in Files to continue editing the chosen version. Your earlier text is in Recovered Drafts."
+                )
+            }
+        }
+        runtime.recentPresentation.install(
+            access: access,
+            openRecent: { [weak controller] recordID in
+                guard let controller else { throw IOSDocumentFailure.unavailable }
+                try await controller.openRecent(recordID: recordID, using: access)
+            },
+            reselectionScope: { [weak controller] in controller?.currentGrant?.scope ?? .singleFile }
         )
         recoveryUI.onRestored = { [weak scene = runtime.scene] in scene?.navigateToDocument() }
         recoveryUI.onPresent = { [weak runtime] in runtime?.prepareForReadOnlyPresentation() }
         controller.onNavigationFailure = { [weak scene = runtime.scene] message in
             scene?.presentedError = IOSShellError(title: "Link Could Not Be Opened", message: message)
+        }
+        controller.onPreviewUnavailable = { [weak scene = runtime.scene] message in
+            scene?.presentedError = IOSShellError(title: "Preview Unavailable", message: message)
         }
         return runtime
     }

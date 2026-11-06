@@ -86,7 +86,7 @@ extension EditorFindHostedGateTests {
         }
         XCTAssertFalse(EditorFindCommandDelivery.performReplace())
         XCTAssertFalse(EditorFindCommandDelivery.performReplaceAll())
-        XCTAssertEqual(app.currentDocument.text, before.appText)
+        XCTAssertEqual(app.shownSession.text, before.appText)
 
         try await click(EditorFindAccessibility.replaceDisclosure, in: window)
         let field = try await waitForReplacementField(in: window)
@@ -104,19 +104,19 @@ extension EditorFindHostedGateTests {
             app.workspaceInstalledCaptureGeneration == app.workspaceGeneration
                 && app.workspaceSnapshot?.entries.contains { $0.relativePath == "other.md" } == true
         }
-        let identity = ObjectIdentifier(app.currentDocument)
+        let identity = ObjectIdentifier(app.shownSession)
         app.workspaceMutationWriteFences.insert(identity)
         try await click(EditorFindAccessibility.replaceButton, in: window)
         XCTAssertEqual(app.editorFindHost.replaceStatus?.kind, .blocked)
         app.workspaceMutationWriteFences.remove(identity)
-        let postSource = app.currentDocument.text
+        let postSource = app.shownSession.text
 
         let hold = try await startHeldBarReplaceAll(hosted) {
             try await self.click(EditorFindAccessibility.replaceAllButton, in: window)
         }
         app.openWorkspaceFile(other)
         try await waitUntil("the sidebar switch installs other.md") {
-            app.currentDocument.fileURL?.lastPathComponent == "other.md"
+            app.shownSession.fileURL?.lastPathComponent == "other.md"
         }
         XCTAssertFalse(app.editorFindHost.replaceBatch.isPreparing, "a switch cancels progress")
         XCTAssertNil(app.editorFindHost.replaceStatus, "no message survives the switch")
@@ -130,7 +130,7 @@ extension EditorFindHostedGateTests {
         try await waitUntil("the counter recomputes for the new document") {
             app.editorFindHost.controller.session?.total == 1
         }
-        XCTAssertEqual(app.currentDocument.text, "hit other", "no replacement intent survives the switch")
+        XCTAssertEqual(app.shownSession.text, "hit other", "no replacement intent survives the switch")
         XCTAssertEqual(try String(contentsOf: hosted.postURL, encoding: .utf8), postSource)
     }
 
@@ -144,18 +144,18 @@ extension EditorFindHostedGateTests {
         // A clean document reloads from disk without a prompt (§5.1 Reload row).
         try "hit x hit y".write(to: hosted.postURL, atomically: true, encoding: .utf8)
         app.refreshWorkspaceAfterFileSystemChange()
-        try await waitUntil("the external change is adopted") { app.currentDocument.text == "hit x hit y" }
+        try await waitUntil("the external change is adopted") { app.shownSession.text == "hit x hit y" }
         XCTAssertFalse(app.editorFindHost.replaceBatch.isPreparing, "Reload cancels progress")
         hold.release()
         await awaitBarReplaceAll(app)
         XCTAssertEqual(app.editorFindHost.replaceBatch.lastResult, .superseded)
-        XCTAssertEqual(app.currentDocument.text, "hit x hit y")
+        XCTAssertEqual(app.shownSession.text, "hit x hit y")
         XCTAssertTrue(app.editorFindHost.ui.isReplaceRowActive)
         XCTAssertEqual(app.editorFindHost.ui.replacementText, "NEW")
         try await waitUntil("authoritative post-resolution recompute and settled authority") {
             app.editorFindHost.controller.session?.total == 2
-                && app.editorFindHost.controller.documentBinding.revision == UInt64(app.currentDocument.version)
-                && app.editorReplaceAuthorizationDecision(for: app.currentDocument) == .allowed
+                && app.editorFindHost.controller.documentBinding.revision == UInt64(app.shownSession.version)
+                && app.editorReplaceAuthorizationDecision(for: app.shownSession) == .allowed
         }
         // Only a fresh explicit action, after the recount, replaces.
         app.notifyEditorFindDocumentIdentityDidRekey()
@@ -163,7 +163,7 @@ extension EditorFindHostedGateTests {
         XCTAssertTrue(app.editorFindHost.ui.isReplaceRowActive, "rekey keeps the row")
         try await click(EditorFindAccessibility.replaceAllButton, in: window)
         await awaitBarReplaceAll(app)
-        XCTAssertEqual(app.currentDocument.text, "NEW x NEW y")
+        XCTAssertEqual(app.shownSession.text, "NEW x NEW y")
     }
 
     func testHostedEditorTypingWithTheRowOpenTouchesNoReplaceGenerationOrRowState() async throws {
@@ -183,7 +183,7 @@ extension EditorFindHostedGateTests {
         for character in "typing" {
             editor.insertText(String(character), replacementRange: editor.selectedRange())
         }
-        XCTAssertEqual(app.currentDocument.text, "hit one hit twotyping")
+        XCTAssertEqual(app.shownSession.text, "hit one hit twotyping")
         XCTAssertEqual(app.editorReplaceAuthorityGeneration, authority, "editor keystrokes never touch authority")
         XCTAssertEqual(app.editorFindHost.replaceBatch.replacementGeneration, replacement)
         XCTAssertEqual(app.editorFindHost.replaceStatusSerial, serial)
@@ -193,7 +193,7 @@ extension EditorFindHostedGateTests {
 
         // The debounced recount publishes Find chrome; it still touches no Replace state.
         try await waitUntil("the debounced Find recount lands for the typed revision") {
-            controller.documentBinding.revision == UInt64(app.currentDocument.version)
+            controller.documentBinding.revision == UInt64(app.shownSession.version)
                 && controller.session?.total == 2
                 && app.editorFindHost.ui.matchCounterText.hasSuffix("/ 2")
         }

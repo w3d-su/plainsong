@@ -27,7 +27,7 @@ final class EditorReplaceBatchSpikeAppTests: XCTestCase {
             fileKind: .markdown
         )
         let appState = AppState(
-            currentDocument: session,
+            shownSession: session,
             shouldRestoreLastOpenedFile: false
         )
         let hosted = try makeAppBackedFixture(session: session, appState: appState)

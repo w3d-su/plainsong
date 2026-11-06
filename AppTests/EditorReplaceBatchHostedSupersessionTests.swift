@@ -37,10 +37,10 @@ extension EditorFindHostedGateTests {
     func testHostedReplaceAllEditWhilePreparingCannotApplyOldSourcePlan() async throws {
         try await assertHeldHostedBatchSupersession { hosted in
             let editor = try self.hostedEditor(hosted)
-            let length = (hosted.appState.currentDocument.text as NSString).length
+            let length = (hosted.appState.shownSession.text as NSString).length
             editor.insertText("!", replacementRange: NSRange(location: length, length: 0))
             try await self.waitUntil("ordinary typing is authoritative and rescanned") {
-                hosted.appState.currentDocument.text == "hit one hit two!"
+                hosted.appState.shownSession.text == "hit one hit two!"
                     && hosted.appState.editorFindHost.controller.session != nil
             }
         }
@@ -88,7 +88,7 @@ extension EditorFindHostedGateTests {
             let installation = try XCTUnwrap(original?.currentDocumentBindingInstallation)
             // Exercise the real App installation authority: release/reinstall of the
             // originating editor, rather than merely inventing a different stamp.
-            let binding = hosted.appState.editorDocumentBinding(for: hosted.appState.currentDocument)
+            let binding = hosted.appState.editorDocumentBinding(for: hosted.appState.shownSession)
             binding.onLifecycle(.revoked(installation))
             binding.onLifecycle(.installed(installation))
         }
@@ -175,11 +175,11 @@ extension EditorFindHostedGateTests {
 
     func testHostedReplaceAllNewFenceABADuringPreparationDropsPlanWithoutUndo() async throws {
         try await assertHeldHostedBatchSupersession { hosted in
-            let identity = ObjectIdentifier(hosted.appState.currentDocument)
+            let identity = ObjectIdentifier(hosted.appState.shownSession)
             hosted.appState.workspaceMutationWriteFences.insert(identity)
             hosted.appState.workspaceMutationWriteFences.remove(identity)
             XCTAssertEqual(
-                hosted.appState.editorReplaceAuthorizationDecision(for: hosted.appState.currentDocument),
+                hosted.appState.editorReplaceAuthorizationDecision(for: hosted.appState.shownSession),
                 .allowed
             )
         }

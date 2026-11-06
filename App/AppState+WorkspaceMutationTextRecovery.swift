@@ -261,7 +261,7 @@ extension AppState {
     }
 
     func restoreWorkspaceMutationTextRecoveryIfNeeded() {
-        let currentIdentity = ObjectIdentifier(currentDocument)
+        let currentIdentity = ObjectIdentifier(shownSession)
         guard workspaceMutationRecoveryIDBySession[currentIdentity] == nil,
               workspaceMutationTextRecoveryContexts[currentIdentity] == nil,
               let record = pendingWorkspaceMutationTextRecoveryRecords.first
@@ -290,10 +290,18 @@ extension AppState {
         unanchoredManagedSessionOwnershipProofs[sessionIdentity] =
             .unavailable(fileURL: record.originalURL)
         detachedSessionURLs.insert(record.originalURL)
-        handleSessionEvictions(
-            sessionPolicy.access(record.originalURL, isDirty: true)
-        )
+        // Match activateFileSession: the restored document is shown, and therefore
+        // installed, before admission. Accessing it first would count it while the
+        // previous untitled document still occupies the installed exemption.
         setCurrentDocument(session, synchronizingWorkspaceTree: false)
+        handleSessionEvictions(
+            sessionPolicy.access(
+                record.originalURL,
+                isDirty: true,
+                protectedURLs: protectedSessionURLs(),
+                installedURLs: installedSessionURLs()
+            )
+        )
         restoreRecoveryPrompt(for: session)
     }
 
@@ -301,7 +309,7 @@ extension AppState {
         do {
             try validateWorkspaceMutationRecoveryStoresLoaded()
         } catch {
-            present(error, title: "Could Not Quit")
+            presentOnHome(error, title: "Could Not Quit")
             return false
         }
         let sessions = workspaceMutationTerminationSessions()
@@ -312,7 +320,9 @@ extension AppState {
                         ?? pending.fileURL
                         ?? URL(fileURLWithPath: "/")
                 ),
-                title: "Could Not Quit"
+                title: "Could Not Quit",
+                for: pending,
+                activatesWindow: true
             )
             return false
         }
@@ -334,16 +344,16 @@ extension AppState {
                 }
             }
         } catch {
-            present(error, title: "Could Not Preserve Recovery Copy")
+            presentOnHome(error, title: "Could Not Preserve Recovery Copy")
             return false
         }
 
         guard workspaceMutationNamespaceDepth == 0 else {
-            present(
+            presentOnHome(
                 AppStateError.workspaceMutationInProgress(
                     workspaceRootURL
-                        ?? sessionStateURL(for: currentDocument)
-                        ?? currentDocument.fileURL
+                        ?? sessionStateURL(for: shownSession)
+                        ?? shownSession.fileURL
                         ?? URL(fileURLWithPath: "/")
                 ),
                 title: "Could Not Quit"
@@ -351,7 +361,7 @@ extension AppState {
             return false
         }
         guard workspaceMutationRecoveries.isEmpty else {
-            present(
+            presentOnHome(
                 WorkspaceMutationError.indeterminateSession(
                     workspaceMutationRecoveries.values.first?.sourceURL
                         ?? URL(fileURLWithPath: "/")
@@ -372,47 +382,51 @@ extension AppState {
                           context: context
                       )
                 else {
-                    present(
-                        AppStateError.unsavedChangesPreventTermination(
-                            sessionStateURL(for: session)
-                                ?? session.fileURL
-                                ?? URL(fileURLWithPath: "/")
-                        ),
-                        title: "Could Not Quit"
-                    )
+                    presentUnsavedChangesPreventTermination(for: session)
                     return false
                 }
             } else if workspaceMutationTextRecoveryContexts[sessionIdentity] != nil,
                       !clearWorkspaceMutationTextRecovery(for: session)
             {
-                present(
-                    AppStateError.unsavedChangesPreventTermination(
-                        sessionStateURL(for: session)
-                            ?? session.fileURL
-                            ?? URL(fileURLWithPath: "/")
-                    ),
-                    title: "Could Not Quit"
-                )
+                presentUnsavedChangesPreventTermination(for: session)
                 return false
             }
         }
         return true
     }
 
+    private func presentUnsavedChangesPreventTermination(for session: DocumentSession) {
+        present(
+            AppStateError.unsavedChangesPreventTermination(
+                sessionStateURL(for: session) ?? session.fileURL ?? URL(fileURLWithPath: "/")
+            ),
+            title: "Could Not Quit",
+            for: session,
+            activatesWindow: true
+        )
+    }
+
+    /// Image insertion counts live in each window's root context, so every window of the
+    /// registry is checked, not just the one the app delegate asked.
     private func imageAssetInsertionAllowsTermination() -> Bool {
-        guard workspaceImageAssetInsertionCount == 0 else {
-            present(
-                AppStateError.workspaceMutationInProgress(
-                    workspaceRootURL
-                        ?? sessionStateURL(for: currentDocument)
-                        ?? currentDocument.fileURL
-                        ?? URL(fileURLWithPath: "/")
-                ),
-                title: "Could Not Quit"
-            )
-            return false
+        var facades = KeyWindowRouter.shared.facades(in: registry)
+        if !facades.contains(where: { $0 === self }) {
+            facades.insert(self, at: 0)
         }
-        return true
+        guard let busy = facades.first(where: { $0.workspaceImageAssetInsertionCount > 0 }) else {
+            return true
+        }
+        busy.present(
+            AppStateError.workspaceMutationInProgress(
+                busy.workspaceRootURL
+                    ?? busy.sessionStateURL(for: busy.shownSession)
+                    ?? busy.shownSession.fileURL
+                    ?? URL(fileURLWithPath: "/")
+            ),
+            title: "Could Not Quit"
+        )
+        KeyWindowRouter.shared.focus(busy.windowState)
+        return false
     }
 }
 
@@ -441,10 +455,7 @@ extension AppState {
 
     func workspaceMutationTerminationSessions() -> [DocumentSession] {
         var sessions = workspaceMutationManagedSessions()
-        sessions.append(contentsOf: workspaceMutationTextRecoverySessions.values)
-        if currentDocument.fileURL != nil {
-            sessions.append(currentDocument)
-        }
+        sessions.append(contentsOf: registry.sessions(from: [.textRecovery, .fileBackedWindowDocuments]))
         var seen: Set<ObjectIdentifier> = []
         return sessions.filter { seen.insert(ObjectIdentifier($0)).inserted }
     }

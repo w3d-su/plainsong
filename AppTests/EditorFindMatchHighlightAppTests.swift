@@ -11,7 +11,7 @@ final class EditorFindMatchHighlightAppTests: XCTestCase {
     private func makeAppState(text: String) -> AppState {
         let url = URL(fileURLWithPath: "/tmp/plainsong-find-highlight-\(UUID().uuidString).md")
         let session = DocumentSession(text: text, url: url, fileKind: .markdown)
-        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let appState = AppState(shownSession: session, shouldRestoreLastOpenedFile: false)
         appState.editorFindHost.controller.debounceNanoseconds = 0
         appState.editorFindHost.commandContextOverride = true
         return appState

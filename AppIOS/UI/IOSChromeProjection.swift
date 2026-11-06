@@ -36,12 +36,16 @@ struct IOSShellChromeSnapshot: Equatable {
     var isDirty = false
     var isSaving = false
     var status: Status = .noDocument
+    var hasCloudVersionConflict = false
     var statusDetail: String?
     var hasWorkspace = false
     var editorCanWrite = false
     var editorFocused = false
     var editorHasMarkedText = false
     var sceneUnavailableReason: String?
+    /// Live counts for the open document. Editor statistics win when the binding
+    /// belongs to this document; otherwise the stored snapshot is used.
+    var statistics: TextStatistics?
 
     init(scene: IOSAppSceneSnapshot, editor: IOSSourceEditorSnapshot?) {
         sceneUnavailableReason = scene.unavailableReason
@@ -52,7 +56,12 @@ struct IOSShellChromeSnapshot: Equatable {
         guard let stored = scene.document else {
             editorCanWrite = false
             status = .noDocument
+            statistics = nil
             return
+        }
+        statistics = stored.document.statistics
+        if let editor, editor.revision.documentID == stored.revision.documentID {
+            statistics = editor.document.statistics
         }
         documentIdentity = stored.revision.documentID
         documentKind = stored.document.fileKind
@@ -82,7 +91,10 @@ struct IOSShellChromeSnapshot: Equatable {
                 : "The file changed outside this editor. A recovery copy of your edits was saved."
         case let .unavailable(_, reason):
             status = .unavailable
-            statusDetail = IOSShellChromeSnapshot.describe(reason)
+            hasCloudVersionConflict = reason == .conflict
+            statusDetail = hasCloudVersionConflict
+                ? "iCloud has conflicting versions. Review the versions and choose which one to keep."
+                : IOSShellChromeSnapshot.describe(reason)
         case .closed:
             status = .closed
         }
@@ -96,7 +108,7 @@ struct IOSShellChromeSnapshot: Equatable {
     }
 
     var canSave: Bool {
-        status == .ready && isDirty
+        status == .ready && isDirty && editorCanWrite
     }
 
     private static func describe(_ failure: IOSDocumentFailure) -> String {

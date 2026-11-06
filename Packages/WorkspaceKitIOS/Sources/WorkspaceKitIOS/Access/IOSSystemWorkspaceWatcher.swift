@@ -32,7 +32,7 @@ final class IOSSystemWorkspaceWatcher: IOSWorkspaceChangeWatching, @unchecked Se
     }
 }
 
-private final class IOSRootFilePresenter: NSObject, NSFilePresenter {
+final class IOSRootFilePresenter: NSObject, NSFilePresenter {
     let root: URL
     let sink: @Sendable (IOSExternalWorkspaceNotice) -> Void
     let operationQueue: OperationQueue
@@ -55,27 +55,22 @@ private final class IOSRootFilePresenter: NSObject, NSFilePresenter {
     }
 
     func presentedItemDidChange() {
-        emit(.changed(relativePath: IOSWorkspacePathAuthority.lastComponent(root.path(percentEncoded: false))))
+        emit(.rootChanged)
     }
 
     func accommodatePresentedItemDeletion(completionHandler: @escaping (Error?) -> Void) {
-        presentedItemDidChange()
-        emit(.deleted(relativePath: IOSWorkspacePathAuthority.lastComponent(root.path(percentEncoded: false))))
+        emit(.rootDeleted)
         completionHandler(nil)
     }
 
     func accommodatePresentedItemEviction(completionHandler: @escaping (Error?) -> Void) {
         emit(.offlineRoot)
-        NSFileCoordinator.removeFilePresenter(self)
         completionHandler(nil)
     }
 
-    func presentedItemDidMove(to newURL: URL) {
-        let destination = IOSWorkspacePathAuthority.lastComponent(newURL.path(percentEncoded: false))
-        emit(.moved(
-            from: IOSWorkspacePathAuthority.lastComponent(root.path(percentEncoded: false)),
-            to: destination
-        ))
+    func presentedItemDidMove(to _: URL) {
+        // A callback alone does not prove that security authority follows the destination.
+        emit(.rootMoved)
     }
 
     func presentedItemDidChangeUbiquityAttributes(_: Set<URLResourceKey>) {

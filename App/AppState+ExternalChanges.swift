@@ -42,7 +42,7 @@ extension AppState {
     func reloadExternallyChangedFile() {
         guard let prompt = externalChangePrompt else { return }
         let key = prompt.fileURL
-        let session = currentDocument
+        let session = shownSession
         guard let stateURL = sessionStateURL(for: session),
               exactFileURLSpellingMatches(stateURL, key)
         else {
@@ -75,7 +75,7 @@ extension AppState {
     func keepMineForExternallyChangedFile() {
         guard let prompt = externalChangePrompt else { return }
         let key = prompt.fileURL
-        let session = currentDocument
+        let session = shownSession
         guard let stateURL = sessionStateURL(for: session),
               exactFileURLSpellingMatches(stateURL, key)
         else {
@@ -176,7 +176,7 @@ extension AppState {
         fileID: StaticString = #fileID,
         line: UInt = #line
     ) {
-        handleExternalChange(for: currentDocument, fileID: fileID, line: line)
+        handleExternalChange(for: shownSession, fileID: fileID, line: line)
     }
 
     func handleExternalChange(
@@ -219,7 +219,7 @@ extension AppState {
                 diskEventGeneration: diskEventGeneration
             ) else { return }
             restartExternalResolutionIfNeeded(for: session)
-            if session === currentDocument {
+            if session === shownSession {
                 restoreRecoveryPrompt(for: session)
             }
             return
@@ -283,9 +283,7 @@ extension AppState {
         removesEditorBindingRegistration: Bool = true
     ) {
         let sessionIdentity = ObjectIdentifier(session)
-        var stateKeys = Set(sessionCache.compactMap { key, cachedSession in
-            cachedSession === session ? key : nil
-        })
+        var stateKeys = Set(registry.warmSessionURLs(for: session))
         if let stateURL = sessionStateURL(for: session) {
             stateKeys.insert(stateURL)
         }
@@ -317,9 +315,7 @@ extension AppState {
         at key: URL,
         removing session: DocumentSession
     ) {
-        if sessionCache[key] === session {
-            sessionCache[key] = nil
-        }
+        registry.removeWarmSession(session, at: key)
         guard !workspaceMutationManagedSessions().contains(where: { candidate in
             guard candidate !== session,
                   let candidateStateURL = sessionStateURL(for: candidate)
@@ -377,7 +373,7 @@ extension AppState {
             )
         }
 
-        guard session === currentDocument else { return }
+        guard session === shownSession else { return }
         restoreRecoveryPrompt(for: session)
     }
 
@@ -504,6 +500,7 @@ private extension AppState {
         session: DocumentSession,
         context: ExternalResolutionReadContext
     ) {
+        defer { releaseRetainedWorkspaceAuthorityIfUnreferenced(for: session) }
         let sessionIdentity = ObjectIdentifier(session)
         guard let operation = externalReloadTasks[sessionIdentity],
               operation.token == context.token,
@@ -605,7 +602,7 @@ private extension AppState {
             abortExternalResolutionAfterUnexpectedSourceChange(for: session)
             return
         }
-        if session === currentDocument {
+        if session === shownSession {
             notifyEditorFindExternalContentDidReplace()
         }
         let acceptedSourceSnapshot = EditorDocumentSourceSnapshot(
@@ -652,7 +649,7 @@ private extension AppState {
         )
         sessionPolicy.updateDirtyState(for: application.canonicalURL, isDirty: false)
         cancelAutosave(for: session)
-        if session === currentDocument {
+        if session === shownSession {
             scheduleCompletionWorkspaceRefresh()
             restartActiveWorkspaceSearchWithFreshOverlays()
         }
@@ -766,29 +763,13 @@ private extension AppState {
         by session: DocumentSession,
         canonicalURL: URL
     ) {
-        guard currentDocument === session,
+        guard shownSession === session,
               let prompt = externalChangePrompt,
               exactFileURLSpellingMatches(prompt.fileURL, canonicalURL)
         else {
             return
         }
         externalChangePrompt = nil
-    }
-
-    func isAddressableExternalResolutionSession(
-        _ session: DocumentSession,
-        canonicalURL: URL
-    ) -> Bool {
-        guard let stateURL = sessionStateURL(for: session),
-              exactFileURLSpellingMatches(stateURL, canonicalURL)
-        else {
-            return false
-        }
-        return session === currentDocument ||
-            sessionCache.values.contains(where: { $0 === session }) ||
-            retiredEditorDocumentSessions.values.contains(where: { $0.session === session }) ||
-            editorDocumentBindingSessions.values.contains(where: { $0 === session }) ||
-            editorBindingInstallations.values.contains(where: { $0 === session })
     }
 
     func handleExternalDiskInspection(
@@ -798,6 +779,7 @@ private extension AppState {
         session: DocumentSession,
         context: ExternalDiskInspectionReadContext
     ) {
+        defer { releaseRetainedWorkspaceAuthorityIfUnreferenced(for: session) }
         let sessionIdentity = ObjectIdentifier(session)
         guard let inspection = externalDiskInspectionTasks[sessionIdentity],
               inspection.token == context.token,
@@ -923,7 +905,7 @@ private extension AppState {
             return
         }
 
-        if session === currentDocument {
+        if session === shownSession {
             notifyEditorFindExternalContentDidReplace()
         }
         clearExternalChangeConflict(at: canonicalURL)
@@ -934,7 +916,7 @@ private extension AppState {
             canonicalURL: canonicalURL
         )
         sessionPolicy.updateDirtyState(for: canonicalURL, isDirty: false)
-        if session === currentDocument {
+        if session === shownSession {
             missingFilePrompt = nil
             externalChangePrompt = nil
             scheduleCompletionWorkspaceRefresh()
@@ -968,5 +950,26 @@ private extension AppState {
         } else {
             lastKnownDiskModificationDates[url] = nil
         }
+    }
+}
+
+@MainActor
+extension AppState {
+    /// Internal, not private, so the B2 registry tests can show it accepts a session that only a
+    /// second window shows (`docs/window-state-gates.md` §2.3).
+    func isAddressableExternalResolutionSession(
+        _ session: DocumentSession,
+        canonicalURL: URL
+    ) -> Bool {
+        guard let stateURL = sessionStateURL(for: session),
+              exactFileURLSpellingMatches(stateURL, canonicalURL)
+        else {
+            return false
+        }
+        return registry.isShownByAnyWindow(session) ||
+            registry.isWarmSession(session) ||
+            retiredEditorDocumentSessions.values.contains(where: { $0.session === session }) ||
+            editorDocumentBindingSessions.values.contains(where: { $0 === session }) ||
+            editorBindingInstallations.values.contains(where: { $0 === session })
     }
 }

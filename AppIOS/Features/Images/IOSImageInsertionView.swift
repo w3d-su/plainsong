@@ -12,13 +12,20 @@ struct IOSImageInsertionView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 Button("Photos") { presentPhotos() }
+                    .buttonStyle(.borderedProminent)
+                    .frame(minHeight: 44)
                     .accessibilityLabel("Insert photo from library")
                     .disabled(isBusy)
                 Button("Files") { presentFiles() }
+                    .buttonStyle(.bordered)
+                    .frame(minHeight: 44)
                     .accessibilityLabel("Insert image from Files")
                     .disabled(isBusy)
             }
+            .accessibilityElement(children: .contain)
             status
+                .font(.body)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .sheet(isPresented: $showPhotos, onDismiss: session.pickerDismissed) {
             IOSImagePhotoPicker { results in
@@ -41,6 +48,8 @@ struct IOSImageInsertionView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(IOSImageInsertionMessages.needsDirectoryGrant())
                 Button("Choose Folder", action: chooseFolder)
+                    .buttonStyle(.borderedProminent)
+                    .frame(minHeight: 44)
                     .accessibilityLabel("Choose folder before inserting an image")
             }
         case .importing:
@@ -86,7 +95,7 @@ struct IOSImageInsertionView: View {
             session.pickerDismissed()
             return
         }
-        Task {
+        Task { @MainActor in
             let loaded = await IOSImagePhotoPayloadLoader.load(result)
             await session.finishImport(loaded, context: context)
         }
@@ -97,7 +106,7 @@ struct IOSImageInsertionView: View {
             session.pickerDismissed()
             return
         }
-        Task {
+        Task { @MainActor in
             let loaded = await IOSImagePickedFileBytes.load(url: url)
             await session.finishImport(loaded, context: context)
         }

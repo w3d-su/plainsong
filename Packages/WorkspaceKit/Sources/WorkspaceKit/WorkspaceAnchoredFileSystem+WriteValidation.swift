@@ -49,7 +49,7 @@ extension WorkspaceAnchoredFileSystem {
             metadata: context.originalMetadata
         )
         guard commit.swapStagedNameWithLeaf() == 0 else {
-            throw WorkspaceAnchoredFileSystemError.unreadable
+            throw writeFailure(errorNumber: errno, otherwise: .unreadable)
         }
     }
 

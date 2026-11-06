@@ -13,7 +13,7 @@ final class EditorFindUITests: XCTestCase {
         let url = URL(fileURLWithPath: "/tmp/plainsong-editor-find-\(UUID().uuidString).md")
         let session = DocumentSession(text: text, url: url, fileKind: .markdown)
         let appState = AppState(
-            currentDocument: session,
+            shownSession: session,
             shouldRestoreLastOpenedFile: false
         )
         appState.editorFindHost.controller.debounceNanoseconds = 0
@@ -98,7 +98,7 @@ final class EditorFindUITests: XCTestCase {
         XCTAssertTrue(appState.editorFindHost.ui.isBarVisible)
 
         // Simulate focused session closed → empty DocumentSession (no fileURL).
-        appState.currentDocument = DocumentSession()
+        appState.shownSession = DocumentSession()
         appState.notifyEditorFindDocumentDidSwitch()
 
         XCTAssertFalse(appState.editorFindHost.ui.isBarVisible)
@@ -194,7 +194,7 @@ final class EditorFindUITests: XCTestCase {
         XCTAssertEqual(request.selection, expected)
         XCTAssertTrue(appState.isPreviewVisible, "source+preview stays preview-visible")
         // Source identity unchanged.
-        XCTAssertEqual(appState.currentDocument.text, "hello findme world findme")
+        XCTAssertEqual(appState.shownSession.text, "hello findme world findme")
     }
 
     func testSourceOnlyControlStillNavigatesWithoutPreview() async throws {
@@ -373,7 +373,7 @@ final class EditorFindUITests: XCTestCase {
         let range = ("prefix selectedWord suffix" as NSString).range(of: "selectedWord")
         appState.editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
             documentIdentity: appState.activeEditorDocumentIdentity,
-            sourceRevision: appState.currentDocument.version,
+            sourceRevision: appState.shownSession.version,
             range: range
         )
 
@@ -398,7 +398,7 @@ final class EditorFindUITests: XCTestCase {
         let appState = makeAppState(text: "a\nb")
         appState.editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
             documentIdentity: appState.activeEditorDocumentIdentity,
-            sourceRevision: appState.currentDocument.version,
+            sourceRevision: appState.shownSession.version,
             range: NSRange(location: 0, length: 3) // includes newline
         )
         appState.useSelectionForEditorFind()
@@ -414,7 +414,7 @@ final class EditorFindUITests: XCTestCase {
         appState.editorFindHost.commandContextOverride = true
         appState.editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
             documentIdentity: appState.activeEditorDocumentIdentity,
-            sourceRevision: appState.currentDocument.version,
+            sourceRevision: appState.shownSession.version,
             range: NSRange(location: 0, length: long.utf16.count)
         )
         appState.useSelectionForEditorFind()
@@ -426,7 +426,7 @@ final class EditorFindUITests: XCTestCase {
         let rangeA = ("alpha beta" as NSString).range(of: "alpha")
         appState.editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
             documentIdentity: appState.activeEditorDocumentIdentity,
-            sourceRevision: appState.currentDocument.version,
+            sourceRevision: appState.shownSession.version,
             range: rangeA
         )
         let other = DocumentSession(
@@ -442,7 +442,7 @@ final class EditorFindUITests: XCTestCase {
         // Wrong-document cache must not supply ⌘E pattern.
         appState.editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
             documentIdentity: EditorDocumentIdentity(rawValue: "file://other"),
-            sourceRevision: appState.currentDocument.version,
+            sourceRevision: appState.shownSession.version,
             range: rangeA
         )
         appState.useSelectionForEditorFind()
@@ -455,7 +455,7 @@ final class EditorFindUITests: XCTestCase {
         let range = (text as NSString).range(of: "alpha")
         appState.editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
             documentIdentity: appState.activeEditorDocumentIdentity,
-            sourceRevision: appState.currentDocument.version,
+            sourceRevision: appState.shownSession.version,
             range: range
         )
         appState.useSelectionForEditorFind()
@@ -466,9 +466,9 @@ final class EditorFindUITests: XCTestCase {
         var ui = appState.editorFindHost.ui
         ui.queryText = ""
         appState.setEditorFindUI(ui)
-        let staleRevision = appState.currentDocument.version
-        appState.applyDocumentText("zzzzz beta", to: appState.currentDocument)
-        XCTAssertNotEqual(appState.currentDocument.version, staleRevision)
+        let staleRevision = appState.shownSession.version
+        appState.applyDocumentText("zzzzz beta", to: appState.shownSession)
+        XCTAssertNotEqual(appState.shownSession.version, staleRevision)
         appState.editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
             documentIdentity: appState.activeEditorDocumentIdentity,
             sourceRevision: staleRevision,

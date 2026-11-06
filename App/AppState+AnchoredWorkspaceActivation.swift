@@ -36,7 +36,7 @@ extension AppState {
             throw AppStateError.invalidSessionIdentity(key)
         }
 
-        if let cachedSession = sessionCache[key] {
+        if let cachedSession = registry.warmSession(at: key) {
             guard let cachedStateURL = sessionStateURL(for: cachedSession),
                   exactFileURLSpellingMatches(cachedStateURL, key)
             else {
@@ -125,7 +125,7 @@ extension AppState {
 
         switch activation.source {
         case .cached:
-            if session !== currentDocument {
+            if session !== shownSession {
                 cancelForegroundDocumentTasks()
                 setCurrentDocument(session, synchronizingWorkspaceTree: false)
             }
@@ -260,7 +260,7 @@ extension AppState {
     ) -> Bool {
         let key = activation.canonicalURL
         moveCurrentDocumentWorkToBackgroundForAnchoredActivation(session)
-        sessionCache[key] = session
+        registry.setWarmSession(session, at: key)
         if !reconcilesExternalChange {
             clearMissingFileActivationFence(at: key)
         }
@@ -298,8 +298,8 @@ extension AppState {
     private func moveCurrentDocumentWorkToBackgroundForAnchoredActivation(
         _ destinationSession: DocumentSession
     ) {
-        guard currentDocument !== destinationSession else { return }
-        let previousSession = currentDocument
+        guard shownSession !== destinationSession else { return }
+        let previousSession = shownSession
         moveCurrentAutosaveToBackground(for: previousSession)
         moveCurrentStatisticsToBackground(for: previousSession)
     }

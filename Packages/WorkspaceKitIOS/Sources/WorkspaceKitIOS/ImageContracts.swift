@@ -6,7 +6,7 @@ public struct IOSImageAssetRequest: Sendable {
     public let bytes: Data
     public let contentType: String
     public let preferredFilename: String
-    /// The Markdown document location; 06 persists assets relative to its parent.
+    /// The Markdown document location; assets are persisted relative to its parent.
     public let destination: IOSFileLocation
 
     public init(
@@ -89,7 +89,7 @@ public enum IOSAssetRollbackOutcome: Sendable {
     case retained(IOSAssetRecoveryReceipt)
 }
 
-/// Implemented by 06. stage throws IOSAssetStageFailure or CancellationError; validate throws IOSWorkspaceFailure or
+/// stage throws IOSAssetStageFailure or CancellationError; validate throws IOSWorkspaceFailure or
 /// CancellationError.
 /// Terminal actions are idempotent and safe-drain even when the caller is cancelled.
 /// commit transfers ownership after accepted source insertion; it cannot publish later.

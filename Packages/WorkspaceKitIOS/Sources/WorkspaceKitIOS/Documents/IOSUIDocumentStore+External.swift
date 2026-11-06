@@ -7,6 +7,7 @@ extension IOSUIDocumentStore {
         guard !entry.superseded, !entry.closed else { return }
         switch event {
         case .externalChange:
+            guard !entry.hasUnresolvedVersions else { return }
             if entry.isClosing || entry.portClosed {
                 // A notice does not authorize a read concurrent with provider close.
                 // Keep an independent barrier until close or its retained entry reads it.
@@ -18,11 +19,24 @@ extension IOSUIDocumentStore {
             }
         case .deleted:
             fenceUnavailable(entry, .access(.notFound))
-        case .becameReadOnly:
-            entry.allowsProviderWrite = false
-            if entry.session != nil, !entry.fenced {
-                setState(.ready(canWrite: false, accessGeneration: entry.accessGeneration), entry: entry)
+        case let .writePermissionChanged(writable):
+            guard entry.allowsProviderWrite != writable else { return }
+            entry.allowsProviderWrite = writable
+            guard entry.session != nil, !entry.fenced else { return }
+            if writable {
+                // Check external bytes before admitting another write.
+                handleFileEvent(.externalChange, entry: entry)
+            } else {
+                entry.autosaveTask?.cancel()
+                refreshWritableState(entry)
             }
+        case .unresolvedVersions:
+            if case let .unavailable(_, reason) = entry.state, reason != .conflict { return }
+            entry.hasUnresolvedVersions = true
+            entry.externalToken = nil
+            fenceUnavailable(entry, .conflict)
+        case .providerStateChanged:
+            break // Translated to current permissions by UIDocumentFileAdapter.
         case .downloading:
             fenceUnavailable(entry, .access(.downloading))
         case .offline:
@@ -32,7 +46,16 @@ extension IOSUIDocumentStore {
         }
     }
 
+    func invalidateReloadProposals(_ entry: IOSDocumentEntry) {
+        // New unknown/unavailable bytes retire published and still-reading reloads.
+        entry.providerAvailabilityGeneration &+= 1
+        entry.pendingProposal = nil
+        entry.explicitReloadOperationID = nil
+    }
+
     func fenceUnavailable(_ entry: IOSDocumentEntry, _ reason: IOSDocumentFailure) {
+        if reason != .conflict { entry.cloudResolution?.cancel() }
+        invalidateReloadProposals(entry)
         entry.fenced = true
         entry.allowsProviderWrite = false
         entry.autosaveTask?.cancel()
@@ -40,7 +63,7 @@ extension IOSUIDocumentStore {
     }
 
     func startExternalRead(_ entry: IOSDocumentEntry, allowsClosingObservation: Bool = false) {
-        guard !entry.isRetiring, !entry.portClosed, entry.session != nil,
+        guard !entry.isRetiring, !entry.portClosed, !entry.hasUnresolvedVersions, entry.session != nil,
               !entry.isClosing || allowsClosingObservation,
               guardCurrentAuthority(entry, generation: entry.accessGeneration)
         else { return }
@@ -48,6 +71,7 @@ extension IOSUIDocumentStore {
         entry.externalToken = token
         entry.hasDeferredExternalChange = false
         entry.pendingProposal = nil
+        entry.explicitReloadOperationID = nil
         entry.autosaveTask?.cancel()
         refreshWritableState(entry)
         let capturedVersion = entry.session?.version ?? 0
@@ -153,6 +177,7 @@ extension IOSUIDocumentStore {
         else { return }
         let failure = (mapped(error) as? IOSDocumentFailure) ?? .unavailable
         // Unknown external bytes are not permission to resume overwriting the original.
+        invalidateReloadProposals(entry)
         entry.fenced = true
         entry.externalToken = nil
         entry.autosaveTask?.cancel()
@@ -169,7 +194,9 @@ extension IOSUIDocumentStore {
         emit(.failed(entry.identity, operationID: UUID(), reason: failure))
     }
 
-    func publishReloadProposal(_ entry: IOSDocumentEntry, text: String, fileURL: URL) {
+    func publishReloadProposal(_ entry: IOSDocumentEntry, text: String, fileURL: URL,
+                               explicitlyRequested: Bool = false)
+    {
         guard let session = entry.session else { return }
         let fileKind = FileKind(url: fileURL) ?? session.fileKind
         let proposal = IOSDocumentReloadProposal(
@@ -182,7 +209,12 @@ extension IOSUIDocumentStore {
             statistics: TextStatistics(text: text)
         )
         entry.pendingProposal = proposal
+        entry.explicitReloadOperationID = explicitlyRequested ? proposal.operationID : nil
         refreshWritableState(entry)
+        // Close drains reads to prove the current buffer safe to retire. A native
+        // editor would dirty that buffer before its closing acknowledgement can
+        // rebase it. Hold the proposal until close either discards it or fails.
+        guard !entry.isClosing else { return }
         emit(.externalReloadRequested(proposal))
     }
 
@@ -201,6 +233,7 @@ extension IOSUIDocumentStore {
             session.rebaseSavedText(to: proposal.text)
             entry.lastPersistedText = proposal.text
             entry.pendingProposal = nil
+            entry.explicitReloadOperationID = nil
             entry.fenced = false
             refreshWritableState(entry)
             emitSnapshot(entry)
@@ -208,6 +241,7 @@ extension IOSUIDocumentStore {
             break
         case .refused:
             entry.pendingProposal = nil
+            entry.explicitReloadOperationID = nil
             entry.fenced = true
             entry.autosaveTask?.cancel()
             setState(.unavailable(accessGeneration: entry.accessGeneration, reason: .sourceChanged), entry: entry)
@@ -242,8 +276,10 @@ extension IOSUIDocumentStore {
     func reloadLatest(_ identity: IOSDocumentIdentity) async throws {
         let entry = try requireEntry(identity)
         guard let session = entry.session else { throw IOSDocumentFailure.unavailable }
+        guard !entry.hasUnresolvedVersions else { throw IOSDocumentFailure.conflict }
         let capturedVersion = session.version
         let generation = entry.accessGeneration
+        let availabilityGeneration = entry.providerAvailabilityGeneration
         let read = try await coordinatedAccess.read(
             entry.location,
             lease: entry.lease,
@@ -253,13 +289,16 @@ extension IOSUIDocumentStore {
         guard guardCurrentAuthority(entry, generation: generation) else {
             throw IOSDocumentFailure.documentChanged
         }
+        guard entry.providerAvailabilityGeneration == availabilityGeneration else {
+            throw IOSDocumentFailure.documentChanged
+        }
         guard session.version == capturedVersion else {
             throw IOSDocumentFailure.sourceChanged
         }
         guard let text = IOSDocumentTextCodec.decode(read.data) else {
             throw IOSDocumentFailure.access(.unsupportedType)
         }
-        publishReloadProposal(entry, text: text, fileURL: read.location.fileURL)
+        publishReloadProposal(entry, text: text, fileURL: read.location.fileURL, explicitlyRequested: true)
     }
 
     func copyOriginal(

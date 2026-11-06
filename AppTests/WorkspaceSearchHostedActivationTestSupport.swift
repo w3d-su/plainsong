@@ -211,7 +211,7 @@ extension WorkspaceSearchHostedActivationTests {
         appState: AppState
     ) async throws {
         try await waitUntil("click opens the other file and applies the exact UTF-16 match") {
-            guard appState.currentDocument.fileURL?.lastPathComponent == "z-other.md" else {
+            guard appState.shownSession.fileURL?.lastPathComponent == "z-other.md" else {
                 return false
             }
             let applied = EditorSelectionProbe.appliedEditorSelection(in: window)
@@ -229,7 +229,7 @@ extension WorkspaceSearchHostedActivationTests {
         XCTAssertTrue(applied.isDocumentInstalled)
         XCTAssertEqual(
             applied.documentIdentity,
-            appState.editorDocumentIdentity(for: appState.currentDocument)
+            appState.editorDocumentIdentity(for: appState.shownSession)
         )
         #if DEBUG
             let expectedLabel =

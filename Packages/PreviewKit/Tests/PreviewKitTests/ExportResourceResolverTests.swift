@@ -160,6 +160,7 @@ final class ExportResourceResolverTests: XCTestCase {
         XCTAssertTrue(outcomes.allSatisfy { $0.dataURI == nil })
         XCTAssertEqual(outcomes[0].reason, "escapes-root")
         XCTAssertEqual(outcomes[1].reason, "escapes-root")
+        XCTAssertEqual(outcomes[2].reason, "unresolved", "SVG export embedding is a later gate")
         XCTAssertEqual(outcomes[3].reason, "rejected-scheme")
         XCTAssertNotEqual(outcomes[0].reason, ExportResourceResolver.exportImageSizeLimitReason)
     }

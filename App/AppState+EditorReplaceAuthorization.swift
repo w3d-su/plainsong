@@ -80,7 +80,7 @@ extension AppState {
     func editorReplaceAuthorizationDecision(
         for session: DocumentSession
     ) -> EditorReplaceAuthorizationDecision {
-        guard session === currentDocument else { return .refused(.notCurrentSession) }
+        guard session === shownSession else { return .refused(.notCurrentSession) }
         if let refusal = editorReplaceRecoveryFenceRefusal(for: session)
             ?? editorReplaceExternalResolutionRefusal(for: session)
         {
@@ -148,7 +148,7 @@ extension AppState {
         for stamp: EditorReplaceAuthorityStamp,
         session: DocumentSession?
     ) -> EditorReplaceAuthorizationDecision {
-        guard let session, session === currentDocument else {
+        guard let session, session === shownSession else {
             return .refused(.notCurrentSession)
         }
         guard stamp == currentEditorReplaceAuthorityStamp(for: session) else {

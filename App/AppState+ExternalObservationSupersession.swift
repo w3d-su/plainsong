@@ -36,7 +36,7 @@ extension AppState {
 
         supersedeExternalResolutionRead(for: session)
         restartExternalResolutionIfNeeded(for: session)
-        if session === currentDocument {
+        if session === shownSession {
             restoreRecoveryPrompt(for: session)
         }
     }

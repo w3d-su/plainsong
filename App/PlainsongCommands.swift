@@ -10,8 +10,20 @@ import SwiftUI
 /// every search or statistics publish. Actions still call straight into `AppState` /
 /// `EditorCommandDispatcher`; only what the menu *displays* routes through the snapshot.
 struct PlainsongCommands: Commands {
-    let appState: AppState
     @ObservedObject var menuBarState: MenuBarState
+    @Environment(\.openWindow) private var openWindow
+
+    private var commandTarget: AppState? {
+        KeyWindowRouter.shared.menuTarget(defaultFacade: nil)
+    }
+
+    private func performFileCommand(_ action: @escaping (AppState) -> Void) {
+        WorkspaceSceneReopener.shared.performFileCommand(openScene: openWorkspaceScene, action: action)
+    }
+
+    private func openWorkspaceScene() {
+        openWindow(id: WorkspaceSceneReopener.sceneID)
+    }
 
     private var snapshot: MenuBarSnapshot {
         menuBarState.snapshot
@@ -20,14 +32,14 @@ struct PlainsongCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
             Button("New File") {
-                appState.newFile()
+                performFileCommand { $0.newFile() }
             }
             .keyboardShortcut("n", modifiers: .command)
 
             Divider()
 
             Button("Open...") {
-                appState.openFile()
+                performFileCommand { $0.openFile() }
             }
             .keyboardShortcut("o", modifiers: .command)
 
@@ -37,7 +49,7 @@ struct PlainsongCommands: Commands {
                 } else {
                     ForEach(snapshot.recentItemURLs, id: \.self) { url in
                         Button(url.lastPathComponent) {
-                            appState.openExternalFile(url)
+                            performFileCommand { $0.openExternalFile(url) }
                         }
                     }
                 }
@@ -46,7 +58,7 @@ struct PlainsongCommands: Commands {
 
         CommandGroup(replacing: .saveItem) {
             Button("Save") {
-                appState.save()
+                commandTarget?.save()
             }
             .keyboardShortcut("s", modifiers: .command)
             .disabled(!snapshot.canSave)
@@ -56,14 +68,14 @@ struct PlainsongCommands: Commands {
         // (after Save, before Print). No shortcut; PR G adds Export as PDF… / Print… nearby.
         CommandGroup(after: .importExport) {
             Button("Export as HTML…") {
-                appState.exportCurrentDocumentAsHTML()
+                commandTarget?.exportCurrentDocumentAsHTML()
             }
             .disabled(!snapshot.canExportHTML)
             .accessibilityIdentifier(ExportHTMLAccessibility.command)
             .accessibilityLabel("Export as HTML")
 
             Button("Export as PDF…") {
-                appState.exportCurrentDocumentAsPDF()
+                commandTarget?.exportCurrentDocumentAsPDF()
             }
             .disabled(!snapshot.canExportHTML)
             .accessibilityIdentifier(ExportPDFAccessibility.command)
@@ -74,7 +86,7 @@ struct PlainsongCommands: Commands {
         // the standard print panel covers paper changes.
         CommandGroup(replacing: .printItem) {
             Button("Print…") {
-                appState.printCurrentDocument()
+                commandTarget?.printCurrentDocument()
             }
             .keyboardShortcut("p", modifiers: .command)
             .disabled(!snapshot.canExportHTML)
@@ -138,7 +150,7 @@ struct PlainsongCommands: Commands {
             Divider()
 
             Button(snapshot.layoutModeCommandTitle) {
-                appState.cycleLayoutMode()
+                commandTarget?.cycleLayoutMode()
             }
             .keyboardShortcut("p", modifiers: [.command, .shift])
             .disabled(!snapshot.hasOpenDocument)

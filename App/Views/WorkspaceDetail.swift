@@ -14,8 +14,8 @@ struct EditorWorkspace: View {
         VStack(spacing: 0) {
             DocumentJumpBar(
                 rootURL: appState.workspaceRootURL,
-                fileURL: appState.currentDocument.fileURL,
-                fileKind: appState.currentDocument.fileKind,
+                fileURL: appState.shownSession.fileURL,
+                fileKind: appState.shownSession.fileKind,
                 isSaving: appState.isSaving,
                 workspaceTree: { [appState] in appState.workspaceTree },
                 openNode: { [appState] in appState.selectWorkspaceNode(id: $0) }
@@ -35,6 +35,10 @@ struct EditorWorkspace: View {
                 WYSIWYGFallbackBanner(message: fallbackMessage)
             }
 
+            if let themeNotice = appState.preferences.editorThemeFallbackNotice {
+                EditorThemeFallbackBanner(message: themeNotice)
+            }
+
             if appState.editorFindHost.ui.isBarVisible {
                 EditorFindBar()
             }
@@ -43,7 +47,7 @@ struct EditorWorkspace: View {
 
             HStack(spacing: 0) {
                 DocumentEditor(
-                    session: appState.currentDocument,
+                    session: appState.shownSession,
                     isPreviewVisible: appState.isPreviewVisible,
                     usesWYSIWYGPresentation: appState.shouldUseWYSIWYGPresentation,
                     scrollCoordinator: scrollCoordinator
@@ -58,7 +62,7 @@ struct EditorWorkspace: View {
                     Divider()
 
                     PreviewPane(
-                        session: appState.currentDocument,
+                        session: appState.shownSession,
                         controller: preview.controller { [appState, scrollCoordinator] controller in
                             Self.configure(controller, appState: appState, scrollCoordinator: scrollCoordinator)
                         }
@@ -71,7 +75,7 @@ struct EditorWorkspace: View {
 
             Divider()
 
-            WorkspaceStatusBar(statistics: appState.currentDocument.statistics)
+            WorkspaceStatusBar(statistics: appState.shownSession.statistics)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -121,6 +125,8 @@ private struct DocumentEditor: View {
             fontName: appState.preferences.editorFontName,
             fontSize: CGFloat(appState.preferences.editorFontSize),
             editorTheme: appState.preferences.editorTheme,
+            syntaxTheme: appState.preferences.resolvedEditorSyntaxTheme,
+            customTheme: appState.preferences.selectedCustomEditorTheme,
             appearanceID: appState.preferences.editorAppearanceID,
             showsLineNumbers: appState.preferences.showsLineNumbers,
             focusRequestID: appState.editorFocusRequestID,
@@ -172,8 +178,17 @@ private struct PreviewPane: View {
 
     var body: some View {
         GeometryReader { proxy in
-            MarkdownPreviewWebView(controller: controller)
-                .frame(width: proxy.size.width, height: proxy.size.height)
+            ZStack {
+                MarkdownPreviewWebView(controller: controller)
+                if controller.remoteImageNetworkUnavailable {
+                    ContentUnavailableView {
+                        Label("Preview Unavailable", systemImage: "network.slash")
+                    } description: {
+                        Text(PreviewNetworkPolicyFailure.userMessage)
+                    }
+                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .onAppear {
             controller.setWorkspaceAssetRoot(appState.previewAssetRootURL)

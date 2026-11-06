@@ -1,0 +1,12 @@
+{
+  "artifact": "PlainsongIOSM0-unsigned.ipa",
+  "sha256": "d09502242053f56dfac1bdaefb4ba886b982c1c630bed72280ba4bbac6c9bab4",
+  "architectures": "arm64",
+  "minimum_os": "26.0",
+  "device_family": [
+    1,
+    2
+  ],
+  "unsigned": true,
+  "owner_resign_install_gate": "OPEN"
+}

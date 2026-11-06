@@ -131,15 +131,7 @@ final class IOSDocumentReloadRelay {
                 retiredOperations.insert(candidate.proposal.operationID)
                 continue
             }
-            let outcome: IOSDocumentReloadOutcome = if let refusal = refusal(
-                for: candidate.proposal,
-                snapshot: snapshot,
-                installation: installation
-            ) {
-                .refused(refusal)
-            } else {
-                editor.installExternalReload(candidate.proposal)
-            }
+            let outcome = install(candidate.proposal, snapshot: snapshot, installation: installation)
             // Native installation can synchronously publish events. A replaced binding
             // must not acknowledge through the newer installation's callback lifetime.
             guard candidate.epoch == epoch else { continue }
@@ -156,6 +148,28 @@ final class IOSDocumentReloadRelay {
                 // Retry only on a later editor event, not our own acknowledgement.
                 break
             }
+        }
+    }
+
+    private func install(
+        _ proposal: IOSDocumentReloadProposal,
+        snapshot: IOSSourceEditorSnapshot?,
+        installation: Installation
+    ) -> IOSDocumentReloadOutcome {
+        // Production stores own admission even when the proposal was published
+        // before close. Contract-only test stores retain their event-driven seam.
+        let admission = (documents as? any IOSDocumentReloadAdmitting)?
+            .reloadAdmission(for: proposal) ?? .installable
+        switch admission {
+        case .held:
+            return .deferred
+        case let .refused(reason):
+            return .refused(reason)
+        case .installable:
+            if let refusal = refusal(for: proposal, snapshot: snapshot, installation: installation) {
+                return .refused(refusal)
+            }
+            return editor.installExternalReload(proposal)
         }
     }
 

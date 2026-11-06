@@ -2,6 +2,7 @@ import EditorKitIOS
 import Foundation
 import MarkdownCore
 @testable import PlainsongIOS
+import UIKit
 import WorkspaceCore
 import WorkspaceKitIOS
 import XCTest
@@ -11,6 +12,29 @@ import XCTest
 /// success path the real facade would refuse.
 @MainActor
 final class IOSShellChromeTests: XCTestCase {
+    func testBackgroundFlushAcquiresBeforeSchedulingAndEndsOnceEvenAfterExpiration() async throws {
+        let facade = FakeSceneFacade(
+            snapshot: ShellFixtures.sceneSnapshot(),
+            capabilities: IOSSceneCapabilities(editor: nil, documents: nil, workspace: nil, preview: nil, assets: nil)
+        )
+        let scene = IOSShellSceneState(facade: facade)
+        for expiresFirst in [true, false] {
+            let token = UIBackgroundTaskIdentifier(rawValue: 73)
+            var expire: (@MainActor @Sendable () -> Void)?
+            var ended: [UIBackgroundTaskIdentifier] = []
+            let task = scene.flushForBackground(assertion: IOSBackgroundFlushAssertion(acquire: { callback in
+                expire = callback
+                return token
+            }, release: { ended.append($0) }))
+            let expiration = try XCTUnwrap(expire)
+            if expiresFirst { expiration() }
+            await task.value
+            expiration()
+            XCTAssertEqual(ended, [token])
+        }
+        XCTAssertEqual(facade.flushCount, 2)
+    }
+
     // MARK: Chrome projection
 
     func testChromeProjectsDocumentStatusWithoutDocumentData() {
@@ -35,6 +59,78 @@ final class IOSShellChromeTests: XCTestCase {
         XCTAssertFalse(scene.chrome.editorFocused)
         XCTAssertFalse(scene.chrome.editorHasMarkedText)
         XCTAssertTrue(scene.chrome.hasDocument)
+        XCTAssertEqual(scene.chrome.statistics, TextStatistics(text: "# doc\n"))
+    }
+
+    func testChromePrefersMatchingEditorStatisticsOverTheStoredSnapshot() {
+        let stored = ShellFixtures.storedDocument(text: "one", path: "post.md")
+        let editor = FakeEditorBinding(text: "one two", identity: stored.revision.documentID)
+        let facade = FakeSceneFacade(
+            snapshot: ShellFixtures.sceneSnapshot(document: stored),
+            capabilities: IOSSceneCapabilities(
+                editor: editor, documents: nil, workspace: nil, preview: nil, assets: nil
+            )
+        )
+        let scene = IOSShellSceneState(facade: facade)
+        scene.startObserving()
+        defer { scene.stopObserving() }
+
+        XCTAssertEqual(scene.chrome.statistics, TextStatistics(text: "one two"))
+        editor.session.replaceTextFromAuthorizedEditor("one two three", refreshStatistics: false)
+        editor.session.applyStatistics(TextStatistics(text: editor.session.text))
+        editor.emitSnapshot()
+        XCTAssertEqual(scene.chrome.statistics, TextStatistics(text: "one two three"))
+
+        let other = FakeEditorBinding(text: "completely different words")
+        let mismatched = FakeSceneFacade(
+            snapshot: ShellFixtures.sceneSnapshot(document: stored),
+            capabilities: IOSSceneCapabilities(
+                editor: other, documents: nil, workspace: nil, preview: nil, assets: nil
+            )
+        )
+        let otherScene = IOSShellSceneState(facade: mismatched)
+        otherScene.startObserving()
+        XCTAssertEqual(otherScene.chrome.statistics, TextStatistics(text: "one"))
+    }
+
+    func testSaveEligibilityRequiresBothStoreAndEditorWritableAuthority() {
+        let editor = FakeEditorBinding()
+        let facade = FakeSceneFacade(
+            snapshot: ShellFixtures.sceneSnapshot(document: ShellFixtures.storedDocument(isDirty: true)),
+            capabilities: IOSSceneCapabilities(
+                editor: editor, documents: nil, workspace: nil, preview: nil, assets: nil
+            )
+        )
+        let scene = IOSShellSceneState(facade: facade)
+        scene.startObserving()
+        defer { scene.stopObserving() }
+        XCTAssertTrue(scene.chrome.canSave)
+
+        // An external observation or a read-only provider can retain ready
+        // status while fencing writes. A stale writable editor cannot win.
+        let blockedStates: [IOSDocumentState] = [
+            .ready(canWrite: false, accessGeneration: 1),
+            .saving(canWrite: false, accessGeneration: 1, operationID: UUID()),
+        ]
+        for state in blockedStates {
+            facade.emit(ShellFixtures.sceneSnapshot(
+                document: ShellFixtures.storedDocument(state: state, isDirty: true)
+            ))
+            XCTAssertEqual(scene.chrome.status, .ready)
+            XCTAssertTrue(scene.chrome.isDirty)
+            XCTAssertFalse(scene.chrome.editorCanWrite)
+            XCTAssertFalse(scene.chrome.canSave)
+        }
+
+        editor.canWrite = false
+        editor.emitSnapshot()
+        facade.emit(ShellFixtures.sceneSnapshot(document: ShellFixtures.storedDocument(isDirty: true)))
+        XCTAssertFalse(scene.chrome.canSave, "A writable store cannot authorize a read-only editor binding")
+        editor.canWrite = true
+        editor.emitSnapshot()
+        XCTAssertTrue(scene.chrome.canSave)
+        facade.emit(ShellFixtures.sceneSnapshot(document: ShellFixtures.storedDocument(isDirty: false)))
+        XCTAssertFalse(scene.chrome.canSave, "An already saved document has no enabled Save action")
     }
 
     func testUnavailableDocumentExposesReasonNotASource() {
@@ -115,14 +211,12 @@ final class IOSShellChromeTests: XCTestCase {
         scene.startObserving()
         let entries = scene.sceneWorkspaceEntries
 
-        scene.openEntry(entries[0]) // directory
-        scene.openEntry(entries[1]) // image
-        scene.openEntry(entries[2]) // downloading
-        try? await Task.sleep(for: .milliseconds(10))
+        for entry in entries.prefix(3) {
+            XCTAssertNil(scene.openEntry(entry))
+        }
         XCTAssertTrue(facade.openedURLs.isEmpty)
 
-        scene.openEntry(entries[3]) // markdown, available
-        try? await Task.sleep(for: .milliseconds(10))
+        await scene.openEntry(entries[3])?.value
         XCTAssertEqual(facade.openedURLs.count, 1)
         XCTAssertEqual(facade.openedURLs.first?.scope, .singleFile)
         XCTAssertEqual(facade.openedURLs.first?.url.lastPathComponent, "post.md")
@@ -184,8 +278,7 @@ final class IOSShellChromeTests: XCTestCase {
         let scene = IOSShellSceneState(facade: facade)
         scene.startObserving()
 
-        scene.saveCurrentDocument()
-        try? await Task.sleep(for: .milliseconds(10))
+        await scene.saveCurrentDocument().value
         XCTAssertEqual(facade.saveCalls, 1)
         XCTAssertNil(scene.presentedError)
 
@@ -198,8 +291,7 @@ final class IOSShellChromeTests: XCTestCase {
         )
         let emptyScene = IOSShellSceneState(facade: emptyFacade)
         emptyScene.startObserving()
-        emptyScene.saveCurrentDocument()
-        try? await Task.sleep(for: .milliseconds(10))
+        await emptyScene.saveCurrentDocument().value
         XCTAssertNotNil(emptyScene.presentedError)
     }
 
@@ -217,8 +309,7 @@ final class IOSShellChromeTests: XCTestCase {
         let scene = IOSShellSceneState(facade: facade)
         scene.startObserving()
 
-        scene.resolveExternal(.reload)
-        try? await Task.sleep(for: .milliseconds(10))
+        await scene.resolveExternal(.reload).value
         XCTAssertEqual(facade.resolvedExternal.count, 1)
     }
 

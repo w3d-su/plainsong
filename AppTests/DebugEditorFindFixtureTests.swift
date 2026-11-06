@@ -41,7 +41,7 @@
             XCTAssertTrue(appState.recentItemStore is DebugRecentItemStore)
             XCTAssertFalse(appState.shouldRestoreLastOpenedFile)
             XCTAssertTrue(appState.recentItemURLs.isEmpty)
-            XCTAssertNil(appState.currentDocument.fileURL)
+            XCTAssertNil(appState.shownSession.fileURL)
         }
 
         func testFixtureProvidesExactAndOverflowingProductionQueries() throws {

@@ -5,7 +5,9 @@
 > notarization scripted later; direct distribution first, App Store optional. This document
 > turns that into ordered work packages with gates. Owner decisions are marked **[owner]**.
 
-Created 2026-07-02. Current state (@@DATE@@): MIT `LICENSE` committed; packaging
+Created 2026-07-02. Current state (2026-10-28): `LICENSE` committed (MIT then;
+GPL-3.0-or-later since 2026-11-06, see
+`docs/decisions/2026-11-06-gpl-3.0-or-later-license.md`); packaging
 (`make release`, P3) and unsigned release CI (`release.yml`, P4) landed; v0.1.0-alpha.1 is
 published. The `v0.1.0-alpha.2` tag completed the first end-to-end P4 CI run and created a
 draft prerelease with the build-67 unsigned DMG and filename-only `.sha256`; that GitHub
@@ -29,16 +31,22 @@ which Xcode adds for the ad-hoc "Sign to Run Locally" identity and is not in
 `App/Plainsong.entitlements`; it is harmless for an unsigned alpha but must be absent from a
 Developer ID build (P1). `PLAINSONG_UNSIGNED=1 make release` was also run locally before the
 tag, from `main` at `15913f8` (build 159, one commit before the tag, without #154).
-**v0.1.0-alpha.5 was published @@DATE@@** as a GitHub prerelease, built by Release
-workflow run @@RUN_ID@@ from `main` at `@@TAG_SHA@@` (build @@BUILD@@). It is a privacy fix
+**v0.1.0-alpha.5 was published 2026-10-28** as a GitHub prerelease, built by Release
+workflow run 40542268140 from `main` at `a210f85` (build 189). It is a privacy fix
 (the live preview no longer requests remote images while Allow Remote Images is off, #193)
 and a performance release (EditorKit line numbers, cache-trim revalidation, lazy Mermaid and
-woff2-only KaTeX, single-flight preview renders, workspace scan pruning) with no new
-features. It is the first release built by #192's stripped-executable pipeline. Its asset
-`Plainsong-0.1.0-@@BUILD@@-unsigned.dmg` (SHA-256 `@@DMG_SHA256@@`) passed the alpha.3
+woff2-only KaTeX, single-flight and segment-cached preview renders (#215), viewport-only
+Experimental WYSIWYG click hit-testing (#214), workspace scan pruning). It also completes
+Workspace Search (⇧⌘F reveals a hidden sidebar, #216) and renders an unclosed leading `---`
+as a thematic break instead of frontmatter (#220). It is the first release built by #192's
+stripped-executable pipeline. The tag first pointed at `1428bf1` (build 178, Release run
+40015666675); that draft was never published, and on 2026-10-28 the tag was moved to
+`a210f85` so alpha.5 also ships the 11 commits after it (#210-#223). Its asset
+`Plainsong-0.1.0-189-unsigned.dmg` (SHA-256 `11726426a10e0675ee6db87778e83730dbc7dab8e719aea9fa63691a28415420`) passed the alpha.3
 checks (universal arm64 + x86_64, valid ad-hoc signature, sandbox entitlements present;
-`CFBundleVersion` @@BUILD@@). The private `plainsong-dsym` workflow artifact holds the
-matching dSYM. Before the tag, `PLAINSONG_UNSIGNED=1 make release` ran locally from `main`
+`CFBundleVersion` 189). The private `plainsong-dsym` workflow artifact holds the
+matching dSYM. The CI DMG is 9,787,396 bytes with a 20,065,952-byte universal executable,
+and its entitlements carry no `com.apple.security.get-task-allow`. Before the first tag, `PLAINSONG_UNSIGNED=1 make release` ran locally from `main`
 at `1428bf1` (build 178). That run produced a 9,583,665-byte DMG (alpha.4: 12,797,391), a
 19,831,696-byte universal executable (32.2 MiB before #192), and an 18.5 MB dSYM zip whose
 per-architecture UUIDs matched the executable. Its entitlements no longer carried
@@ -57,18 +65,23 @@ date). P1 pipeline work is unblocked.
 
 | # | Decision | Decided 2026-07-02 |
 |---|---|---|
-| P0.1 | License | **MIT**, copyright `w3d-su`. `LICENSE` file committed; README License section updated. |
+| P0.1 | License | **MIT**, copyright `w3d-su`. `LICENSE` file committed; README License section updated. **Superseded 2026-11-06:** GPL-3.0-or-later, because the macOS editor links STTextView under GPLv3 (`docs/decisions/2026-11-06-gpl-3.0-or-later-license.md`). |
 | P0.2 | Distribution channel for alpha | **Direct download** (DMG via GitHub Releases or site). App Store is deliberately left as a future decision — not scheduled, to be re-evaluated later; sandbox-on keeps it possible. |
 | P0.3 | Update mechanism | **None for alpha** (manual downloads). Sparkle or any updater needs its own Decision Log entry; revisit at beta. |
 | P0.4 | Crash/feedback channel | **No telemetry**; feedback via GitHub Issues. Any crash reporter is a new dependency → Decision Log. |
 | P0.5 | Version scheme | **`0.x` marketing version + monotonically increasing build number** stamped by the release script. |
+
+**License obligations for every published build (since 2026-11-06).** The app bundle must
+contain `Contents/Resources/LICENSE` (`project.yml` copies it), and the release notes must
+name the release tag as the corresponding source (GitHub lists the tag's source archives
+next to the DMG). Check both before publishing a draft release.
 
 ## P1 — Identity & signing — DEFERRED (owner decision 2026-07-02)
 
 The owner is not purchasing Apple Developer Program membership for the alpha. Alpha
 builds ship **unsigned** via `PLAINSONG_UNSIGNED=1 make release` (ad-hoc signature,
 "-unsigned" DMG suffix), with the Gatekeeper bypass documented in README "Installing
-(alpha)"; build-from-source remains the zero-friction path for the MIT-licensed repo.
+(alpha)"; build-from-source remains the zero-friction path for the open-source repo.
 P1/P2 resume unchanged when membership is purchased (target: before any beta / wider
 distribution). The steps below are retained for that moment.
 
@@ -160,7 +173,7 @@ required on the unsigned path, and public-repo macOS minutes are free.
 ## P5 — Alpha readiness checklist
 
 - [x] P0 decisions recorded in the Decision Log (2026-07-02).
-- [x] LICENSE committed (MIT); README states license + GitHub Issues feedback channel.
+- [x] LICENSE committed (MIT at the time; GPL-3.0-or-later since 2026-11-06); README states license + GitHub Issues feedback channel.
 - [x] Alpha DMG installs and launches on a second Mac via the documented Gatekeeper
   bypass, opens a folder workspace, edits/saves, and renders the preview offline
   (owner-verified 2026-07-05 with `Plainsong-0.1.0-56-unsigned.dmg`). (Original

@@ -258,7 +258,7 @@ extension WorkspaceSearchActiveRefreshTests {
         var inactiveUI = fixture.appState.workspaceSearchUI
         inactiveUI.queryText = "never-run"
         fixture.appState.workspaceSearchUI = inactiveUI
-        fixture.appState.applyAuthorizedEditorText("edited without query", to: fixture.appState.currentDocument)
+        fixture.appState.applyAuthorizedEditorText("edited without query", to: fixture.appState.shownSession)
         fixture.appState.applyDocumentText("warm without query", to: warm)
         try await Task.sleep(nanoseconds: 60_000_000)
         XCTAssertTrue(provider.requests.isEmpty)
@@ -269,7 +269,7 @@ extension WorkspaceSearchActiveRefreshTests {
             .appendingPathComponent("outside.md")
         defer { try? FileManager.default.removeItem(at: outsideURL.deletingLastPathComponent()) }
         let outsideSession = DocumentSession(text: "outside", url: outsideURL, fileKind: .markdown)
-        fixture.appState.sessionCache[outsideURL] = outsideSession
+        fixture.appState.registry.sessionCache[outsideURL] = outsideSession
         fixture.appState.applyDocumentText("outside changed", to: outsideSession)
 
         let nonEditableURL = fixture.rootURL.appendingPathComponent("notes.txt")
@@ -278,7 +278,7 @@ extension WorkspaceSearchActiveRefreshTests {
             url: nonEditableURL,
             fileKind: .markdown
         )
-        fixture.appState.sessionCache[nonEditableURL] = nonEditableSession
+        fixture.appState.registry.sessionCache[nonEditableURL] = nonEditableSession
         fixture.appState.applyDocumentText("plain text changed", to: nonEditableSession)
 
         if let warmURL = warm.fileURL {

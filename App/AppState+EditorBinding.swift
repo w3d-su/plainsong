@@ -232,10 +232,10 @@ extension AppState {
         // input may continue changing its in-memory source even though every disk
         // write stays fenced. Non-current detached sessions still require an exact
         // retirement lease before an editor installation can publish.
-        if session === currentDocument { return true }
+        if registry.isShownByAnyWindow(session) { return true }
         guard let fileURL = sessionStateURL(for: session) else { return false }
         guard !detachedSessionURLs.contains(fileURL) else { return false }
-        return sessionCache[fileURL] === session
+        return registry.isWarmSession(session, at: fileURL)
     }
 
     func removeEditorDocumentBindingRegistration(for session: DocumentSession) {
@@ -343,6 +343,7 @@ private extension AppState {
             return
         }
 
+        registry.editorInstallationWindows[installation] = RegisteredWindowState(window: windowState)
         editorBindingInstallations[installation] = session
         let sessionIdentity = ObjectIdentifier(session)
         if editorWriterInstallations[sessionIdentity] == nil {
@@ -378,9 +379,20 @@ private extension AppState {
         }
         editorDocumentSourceSynchronizers[installation] = nil
         editorBindingInstallations[installation] = nil
+        registry.editorInstallationWindows[installation] = nil
+        // Main removes a retired cold registration. Also remove one only when it is
+        // the last reference holding a retained root scope. An unshown untitled or
+        // recovery session keeps its registration.
+        let retiredCold = retiredCanonicalURL(for: session).map {
+            !registry.isWarmSession(session, at: $0)
+        } ?? false
+        let holdsRetainedRootScope = registry.retainedWorkspaceAuthorityOwners[sessionIdentity] != nil
         if !isEditorDocumentBindingInstalled(expectedBindingID, session: session),
-           let canonicalURL = retiredCanonicalURL(for: session),
-           sessionCache[canonicalURL] !== session
+           retiredCold || (
+               holdsRetainedRootScope &&
+                   !registry.isWarmSession(session) &&
+                   (isRetiredEditorSession(session) || !registry.isShownByAnyWindow(session))
+           )
         {
             removeEditorDocumentBindingRegistration(
                 for: session,
@@ -396,6 +408,7 @@ private extension AppState {
         reconcileSessionPolicyAfterEditorLeaseChange()
         synchronizePendingExternalReloadIfPossible(for: session)
         finishRetiredEditorDocumentSessionIfPossible(for: session)
+        releaseRetainedWorkspaceAuthorityIfUnreferenced(for: session)
         if endedPendingSource {
             resolveDeferredExternalChangeIfPossible(for: session)
             if session.isDirty, canAutosave(session: session) {
@@ -633,8 +646,8 @@ private extension AppState {
         else {
             return
         }
-        guard currentDocument !== session,
-              sessionCache[canonicalURL] !== session,
+        guard !registry.isShownByAnyWindow(session),
+              !registry.isWarmSession(session, at: canonicalURL),
               !retiredEditorDocumentSessions.values.contains(where: { $0.session === session })
         else {
             return

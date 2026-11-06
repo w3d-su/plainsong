@@ -25,8 +25,8 @@ extension AppState {
     func usableCachedEditorSelection() -> NSRange? {
         guard let known = editorFindHost.latestKnownEditorSelection,
               known.documentIdentity == activeEditorDocumentIdentity,
-              known.sourceRevision == currentDocument.version,
-              NSMaxRange(known.range) <= (currentDocument.text as NSString).length
+              known.sourceRevision == shownSession.version,
+              NSMaxRange(known.range) <= (shownSession.text as NSString).length
         else {
             return nil
         }
@@ -49,15 +49,15 @@ extension AppState {
               EditorFindAppliedSelectionPolicy.accepts(
                   applied,
                   identity: activeEditorDocumentIdentity,
-                  revision: currentDocument.version,
-                  textUTF16Length: (currentDocument.text as NSString).length
+                  revision: shownSession.version,
+                  textUTF16Length: (shownSession.text as NSString).length
               )
         else {
             return nil
         }
         editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
             documentIdentity: applied.documentIdentity,
-            sourceRevision: currentDocument.version,
+            sourceRevision: shownSession.version,
             range: applied.range
         )
         return applied.range

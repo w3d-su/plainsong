@@ -68,7 +68,7 @@ extension AppState {
             guard let self else { return }
             editorFindHost.isBlockedStatusCheckPending = false
             guard let reason = editorFindHost.replaceStatus?.blockedReason,
-                  editorReplaceAuthorizationDecision(for: currentDocument) != .refused(reason)
+                  editorReplaceAuthorizationDecision(for: shownSession) != .refused(reason)
             else { return }
             clearEditorReplaceStatus()
         }

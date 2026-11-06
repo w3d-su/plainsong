@@ -11,8 +11,16 @@ const closer = /(?:^|[\r\n])---[ \t]*(?:[\r\n]|$)/;
 
 /** Whether `remark-frontmatter` reads a YAML block at the start of `document`. */
 export function hasClosedFrontmatter(document: string): boolean {
+  return closedFrontmatterEnd(document) !== undefined;
+}
+
+/** Offset just after the closing fence line of the YAML block that `remark-frontmatter`
+ * reads at the start of `document`, or undefined when there is none. */
+export function closedFrontmatterEnd(document: string): number | undefined {
   const opening = opener.exec(document);
-  return opening !== null && closer.test(document.slice(opening[0].length));
+  if (opening === null) return undefined;
+  const closing = closer.exec(document.slice(opening[0].length));
+  return closing === null ? undefined : opening[0].length + closing.index + closing[0].length;
 }
 
 /**

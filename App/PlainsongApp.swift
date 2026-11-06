@@ -28,39 +28,37 @@ struct PlainsongApp: App {
     /// (see `MenuBarState` for why the menu must not track high-churn publishes).
     @StateObject private var menuBarState: MenuBarState
     @StateObject private var inspectorMenuState = InspectorMenuState.shared
+    @StateObject private var updateCenter: AppUpdateCenter
 
     init() {
         let state = makePlainsongAppState()
         _appState = StateObject(wrappedValue: state)
-        _menuBarState = StateObject(wrappedValue: MenuBarState(appState: state))
-        // Publish state before the app-active Carbon ⇧⌘F handler can receive an event.
-        PlainsongAppServices.appState = state
-        // Find menu actions → editor responder chain via EditorFindCommandDispatcher (§6.3 / F0).
+        WorkspaceSceneReopener.shared.remember(state)
+        _menuBarState = StateObject(wrappedValue: MenuBarState())
+        _updateCenter = StateObject(wrappedValue: AppUpdateCenter.make())
+        // Find menu actions → the originating editor's window (§5.1).
         EditorFindCommandDelivery.installHooks()
     }
 
     var body: some Scene {
-        WindowGroup {
-            WorkspaceWindow()
-                .environmentObject(appState)
+        WindowGroup(id: WorkspaceSceneReopener.sceneID) {
+            WindowFacadeRoot(owner: appState)
                 .tint(.accentColor)
                 .onAppear {
-                    // Keep both the adaptor delegate and the Carbon key action in sync.
                     appDelegate.appState = appState
-                    PlainsongAppServices.appState = appState
-                }
-                .onOpenURL { url in
-                    appState.openExternalFile(url)
-                }
-                .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
-                    appState.flushAutosaveIfNeeded()
                 }
         }
         .defaultSize(width: 1280, height: 800)
+        .handlesExternalEvents(matching: ["*"])
         .commands {
             if #available(macOS 27.0, *) { SidebarCommands() }
             InspectorToggleCommands(menuState: inspectorMenuState)
-            PlainsongCommands(appState: appState, menuBarState: menuBarState)
+            PlainsongCommands(menuBarState: menuBarState)
+            if let checkForUpdates = updateCenter.checkForUpdatesModel {
+                CommandGroup(after: .appInfo) {
+                    CheckForUpdatesButton(model: checkForUpdates)
+                }
+            }
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase != .active else { return }
@@ -68,7 +66,7 @@ struct PlainsongApp: App {
         }
 
         Settings {
-            SettingsView()
+            SettingsView(updateSettings: updateCenter.settingsModel)
                 .environmentObject(appState)
                 .tint(.accentColor)
         }

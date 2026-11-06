@@ -9,6 +9,7 @@ extension AppState {
     /// workspace root and opens it; in single-file mode, asks for a location first.
     func newFile() {
         do {
+            try refuseWindowFileOpenIfNeeded()
             try validateWorkspaceMutationRecoveryStoresLoaded()
         } catch {
             present(error, title: "Could Not Create File")

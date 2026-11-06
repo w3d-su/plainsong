@@ -324,10 +324,7 @@ enum WorkspaceMutationReconciliationCompletion {
 @MainActor
 extension AppState {
     func workspaceMutationRetainedRecoverySessions() -> [DocumentSession] {
-        var sessions = workspaceMutationRecoveries.values.flatMap(\.remainingSessions)
-        sessions.append(contentsOf: workspaceMutationTextRecoverySessions.values)
-        var seen: Set<ObjectIdentifier> = []
-        return sessions.filter { seen.insert(ObjectIdentifier($0)).inserted }
+        registry.sessions(from: [.mutationRecovery])
     }
 
     func nextWorkspaceMutationRecovery() -> WorkspaceMutationRecoveryContext? {
@@ -1177,7 +1174,7 @@ extension AppState {
     }
 
     func refreshWorkspaceMutationReconciliationPrompt() {
-        let sessionIdentity = ObjectIdentifier(currentDocument)
+        let sessionIdentity = ObjectIdentifier(shownSession)
         let recovery: WorkspaceMutationRecoveryContext? =
             workspaceMutationRecoveryIDBySession[sessionIdentity]
                 .flatMap { workspaceMutationRecoveries[$0] }
@@ -1210,7 +1207,7 @@ extension AppState {
             )
             return
         }
-        if isActionableWorkspaceMutationTextRecoverySession(currentDocument) {
+        if isActionableWorkspaceMutationTextRecoverySession(shownSession) {
             workspaceMutationReconciliationPrompt = nil
             return
         }
@@ -1232,7 +1229,7 @@ extension AppState {
 
     func reconcileCurrentWorkspaceMutationRecovery() {
         guard let recoveryID =
-            workspaceMutationRecoveryIDBySession[ObjectIdentifier(currentDocument)]
+            workspaceMutationRecoveryIDBySession[ObjectIdentifier(shownSession)]
                 ?? workspaceMutationReconciliationPrompt?.recoveryID
                 ?? nextWorkspaceMutationRecovery()?.id
         else {
@@ -1310,6 +1307,7 @@ extension AppState {
                 stopTrackingWorkspaceMutationTextRecovery(for: session)
             case .keepEditorCopy, .showEditorCopy:
                 setCurrentDocument(session)
+                reconcileSessionPolicyAfterEditorLeaseChange()
                 restoreRecoveryPrompt(for: session)
             }
             return
@@ -1327,6 +1325,7 @@ extension AppState {
                 return
             }
             setCurrentDocument(session)
+            reconcileSessionPolicyAfterEditorLeaseChange()
             restoreRecoveryPrompt(for: session)
         case .stopTracking:
             guard recovery.remainingSessions.isEmpty else {
@@ -1345,7 +1344,7 @@ extension AppState {
     }
 
     func keepCurrentWorkspaceMutationEditorCopy() {
-        let session = currentDocument
+        let session = shownSession
         let sessionIdentity = ObjectIdentifier(session)
         guard workspaceMutationRecoveryIDBySession[sessionIdentity] != nil,
               let oldURL = sessionStateURL(for: session)
@@ -1394,18 +1393,21 @@ extension AppState {
     }
 
     func promoteNextWorkspaceMutationRecoverySessionIfNeeded() {
-        guard workspaceMutationRecoveryIDBySession[ObjectIdentifier(currentDocument)] == nil
+        guard workspaceMutationRecoveryIDBySession[ObjectIdentifier(shownSession)] == nil
         else {
             refreshWorkspaceMutationReconciliationPrompt()
             return
         }
-        if isActionableWorkspaceMutationTextRecoverySession(currentDocument) {
+        if isActionableWorkspaceMutationTextRecoverySession(shownSession) {
             refreshWorkspaceMutationReconciliationPrompt()
             return
         }
         if let recovery = nextWorkspaceMutationRecovery() {
             if let nextSession = recovery.remainingSessions.first {
                 setCurrentDocument(nextSession)
+                // The previous shown document is countable now. Trim before the
+                // next access, matching text-recovery admission.
+                reconcileSessionPolicyAfterEditorLeaseChange()
                 restoreRecoveryPrompt(for: nextSession)
             } else {
                 refreshWorkspaceMutationReconciliationPrompt()
@@ -1414,6 +1416,7 @@ extension AppState {
         }
         if let nextSession = nextWorkspaceMutationTextRecoverySession() {
             setCurrentDocument(nextSession)
+            reconcileSessionPolicyAfterEditorLeaseChange()
             restoreRecoveryPrompt(for: nextSession)
             return
         }
@@ -1863,7 +1866,7 @@ extension AppState {
     func nextWorkspaceMutationTextRecoverySession() -> DocumentSession? {
         workspaceMutationTextRecoverySessions.values
             .filter { session in
-                guard session !== currentDocument,
+                guard session !== shownSession,
                       workspaceMutationTextRecoveryContexts[ObjectIdentifier(session)] != nil
                 else { return false }
                 return isActionableWorkspaceMutationTextRecoverySession(session)
@@ -1941,6 +1944,6 @@ extension AppState {
         for session in sessions {
             handleExternalChange(for: session, advancingDiskEvent: false)
         }
-        restoreRecoveryPrompt(for: currentDocument)
+        restoreRecoveryPrompt(for: shownSession)
     }
 }

@@ -32,7 +32,7 @@ extension EditorFindHostedGateTests {
         editor.undoManager?.undo()
         try await waitUntil("Undo refreshes the highlight viewport") {
             coordinator.lastAppliedHighlightRevision != afterEdit
-                && hosted.appState.currentDocument.text == source
+                && hosted.appState.shownSession.text == source
         }
         XCTAssertEqual(MarkdownTextView.textStorage(of: editor)?.string, source)
     }

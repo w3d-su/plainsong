@@ -59,7 +59,7 @@ extension AppState {
         guard workspaceSearchState.activeQuery != nil,
               let rootAuthority = workspaceSearchRootAuthority,
               workspaceSearchAuthorityMatchesCurrentRoot(rootAuthority),
-              session === currentDocument || sessionCache.values.contains(where: { $0 === session })
+              registry.isShownByAnyWindow(session) || registry.isWarmSession(session)
         else {
             return
         }
@@ -203,7 +203,7 @@ extension AppState {
         }
         let installedAuthority = workspaceSearchRootAuthority.flatMap { namesScannedRoot($0) ? $0 : nil }
         var retained: Set<String> = []
-        for session in [currentDocument] + Array(sessionCache.values) {
+        for session in registry.sessions(from: [.windowDocuments, .warmCache]) {
             // Every spelling that may name the session inside this root; extra entries only
             // make the scan enumerate more.
             if let location = retainedAnchoredSessionLocation(for: session),
@@ -281,7 +281,7 @@ extension AppState {
             throw CancellationError()
         }
 
-        let currentDocumentAtPreparation = currentDocument
+        let currentDocumentAtPreparation = shownSession
         let currentDocumentStateAtPreparation = workspaceReloadCurrentSessionState()
 
         var tree = WorkspaceFileTree.reconcile(
@@ -332,7 +332,7 @@ extension AppState {
         guard isCurrentWorkspaceReload(root: root, generation: generation) else {
             throw CancellationError()
         }
-        guard currentDocument === currentDocumentAtPreparation,
+        guard shownSession === currentDocumentAtPreparation,
               workspaceReloadCurrentSessionState() == currentDocumentStateAtPreparation
         else {
             // User/session lifecycle work won the suspension. Do not apply a tree selection,
@@ -436,7 +436,7 @@ extension AppState {
         tree: WorkspaceFileTree,
         rootAuthority: WorkspaceFileSystemRootAuthority
     ) async throws -> PreparedWorkspaceReloadCurrentDocumentDisposition {
-        let session = currentDocument
+        let session = shownSession
         guard let fileURL = sessionStateURL(for: session) else {
             return .unrelated
         }
@@ -550,7 +550,7 @@ extension AppState {
     }
 
     private func workspaceReloadCurrentSessionState() -> WorkspaceReloadCurrentSessionState {
-        let session = currentDocument
+        let session = shownSession
         let sessionIdentity = ObjectIdentifier(session)
         let stateURL = sessionStateURL(for: session)
         return WorkspaceReloadCurrentSessionState(

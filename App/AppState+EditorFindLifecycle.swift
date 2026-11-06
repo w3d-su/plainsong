@@ -13,7 +13,7 @@ extension AppState {
         guard editorFindHost.ui.isBarVisible || editorFindHost.controller.query != nil else { return }
         ensureEditorFindSessionObserverInstalled()
         cancelPublishedFindNavigationOnSharedChannel()
-        let session = currentDocument
+        let session = shownSession
         let binding = EditorFindDocumentBinding(
             identity: activeEditorDocumentIdentity,
             text: session.text,
@@ -52,8 +52,8 @@ extension AppState {
         editorFindHost.latestKnownEditorSelection = nil
         let binding = EditorFindDocumentBinding(
             identity: activeEditorDocumentIdentity,
-            text: currentDocument.text,
-            revision: UInt64(max(0, currentDocument.version))
+            text: shownSession.text,
+            revision: UInt64(max(0, shownSession.version))
         )
         editorFindHost.controller.rebindDocument(binding)
     }
@@ -118,8 +118,8 @@ extension AppState {
         ensureEditorFindSessionObserverInstalled()
         let binding = EditorFindDocumentBinding(
             identity: activeEditorDocumentIdentity,
-            text: currentDocument.text,
-            revision: UInt64(max(0, currentDocument.version))
+            text: shownSession.text,
+            revision: UInt64(max(0, shownSession.version))
         )
         if editorFindHost.ui.isBarVisible {
             var ui = editorFindHost.ui

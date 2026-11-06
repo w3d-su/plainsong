@@ -36,6 +36,7 @@ final class FakeSceneFacade: IOSAppSceneControlling {
     var setCommandFocusCalls: [(focused: Bool, identity: IOSDocumentIdentity, bindingID: UUID)] = []
     var commandFocusResult = true
     var openedURLs: [(url: URL, scope: IOSWorkspaceScope)] = []
+    var onOpen: ((URL, IOSWorkspaceScope) async throws -> Void)?
     var createdAt: [IOSFileLocation] = []
     var saveCalls = 0
     var resolvedExternal: [IOSExternalResolution] = []
@@ -71,6 +72,7 @@ final class FakeSceneFacade: IOSAppSceneControlling {
 
     func openSelectedURL(_ url: URL, scope: IOSWorkspaceScope) async throws {
         openedURLs.append((url, scope))
+        try await onOpen?(url, scope)
     }
 
     func createDocument(at location: IOSFileLocation) async throws {
@@ -112,7 +114,7 @@ final class FakeSceneFacade: IOSAppSceneControlling {
 @MainActor
 final class FakeEditorBinding: IOSSourceEditorBinding {
     let bindingID = UUID()
-    let identity = IOSDocumentIdentity(rawValue: UUID())
+    let identity: IOSDocumentIdentity
     let session: DocumentSession
 
     var revision = 0
@@ -132,6 +134,8 @@ final class FakeEditorBinding: IOSSourceEditorBinding {
     var detachCalls: [(identity: IOSDocumentIdentity, bindingID: UUID)] = []
     var accessUpdateCount = 0
     var commandFocusUpdates: [(identity: IOSDocumentIdentity, bindingID: UUID, focused: Bool)] = []
+    var revealCalls: [(range: NSRange, expected: IOSDocumentRevision)] = []
+    var revealResult = true
 
     private var handlers: [@MainActor (IOSSourceEditorEvent) -> Void] = []
 
@@ -140,9 +144,11 @@ final class FakeEditorBinding: IOSSourceEditorBinding {
         canWrite: Bool = true,
         isFocused: Bool = true,
         selection: NSRange = NSRange(location: 3, length: 0),
-        visibleRange: NSRange = NSRange(location: 0, length: 8)
+        visibleRange: NSRange = NSRange(location: 0, length: 8),
+        identity: IOSDocumentIdentity = IOSDocumentIdentity(rawValue: UUID())
     ) {
         session = DocumentSession(text: text)
+        self.identity = identity
         self.canWrite = canWrite
         self.isFocused = isFocused
         self.selection = selection
@@ -192,8 +198,9 @@ final class FakeEditorBinding: IOSSourceEditorBinding {
         return .applied(IOSDocumentRevision(documentID: identity, version: revision))
     }
 
-    func reveal(_: NSRange, expected _: IOSDocumentRevision) -> Bool {
-        true
+    func reveal(_ range: NSRange, expected: IOSDocumentRevision) -> Bool {
+        revealCalls.append((range, expected))
+        return revealResult
     }
 
     func undo() {

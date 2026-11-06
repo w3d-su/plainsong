@@ -11,10 +11,18 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
     var records: [IOSWorkspaceIdentity: IOSWorkspaceScopeRecord] = [:]
     var observations: [UUID: IOSWorkspaceObservation] = [:]
     var ownedAssets: [UUID: IOSOwnedAssetRecord] = [:]
-    var pendingNotices: [String: IOSQueuedWorkspaceNotice] = [:]
+    var pendingNotices: [IOSQueuedWorkspaceNotice.CoalescingKey: IOSQueuedWorkspaceNotice] = [:]
     var persistedLeaves: [UUID: IOSPersistedLeaf] = [:]
     var noticeFlushScheduled = false
+    var recentRestoreRequests: [UUID: UUID] = [:]
     public var includesHiddenEntries = false
+    /// Folder created beside a document for inserted images. Invalid names stay `assets`.
+    public private(set) var assetDirectoryName = "assets"
+
+    public func setAssetDirectoryName(_ name: String) {
+        assetDirectoryName = IOSWorkspacePathAuthority.normalizedAssetDirectory(name)
+    }
+
     public var includesAllFiles = false
     let maximumRecentItems = 10
 
@@ -39,33 +47,38 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
         do {
             resolution = try ports.bookmarks.resolve(bookmark)
         } catch {
-            markBookmark(bookmark, status: .needsReselection)
-            throw IOSWorkspaceFailureMapping.map(error)
+            markUnusableBookmark(bookmark, after: error)
+            try rethrowWorkspace(error)
         }
         // LANE06_GUARD_DENIED_BOOKMARK
         if let failure = resolution.failure {
             if failure == .offline {
                 throw IOSWorkspaceFailure.offline
             }
-            markBookmark(bookmark, status: .needsReselection)
+            markUnusableBookmark(bookmark, after: failure)
             throw failure
         }
         guard let url = resolution.url else {
             markBookmark(bookmark, status: .needsReselection)
             throw IOSWorkspaceFailure.permissionDenied
         }
-        var storedBookmark = bookmark
-        if resolution.isStale {
-            storedBookmark = try ports.bookmarks.bookmark(for: url)
-            replaceBookmark(bookmark, with: storedBookmark)
+        do {
+            // A stale bookmark must be minted by adopt, after scope admission.
+            let grant = try await adopt(
+                url: url,
+                scope: scope,
+                provenance: .bookmarkRestore,
+                bookmark: resolution.isStale ? nil : bookmark,
+                replacingGeneration: nil
+            )
+            if resolution.isStale, let refreshed = records[grant.workspaceID]?.bookmark {
+                replaceBookmark(bookmark, with: refreshed)
+            }
+            return grant
+        } catch {
+            markUnusableBookmark(bookmark, after: error)
+            try rethrowWorkspace(error)
         }
-        return try await adopt(
-            url: url,
-            scope: scope,
-            provenance: .bookmarkRestore,
-            bookmark: storedBookmark,
-            replacingGeneration: nil
-        )
     }
 
     public func acquireLease(for grant: IOSWorkspaceGrant) throws -> any IOSWorkspaceAccessLease {
@@ -111,7 +124,10 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
     }
 
     public func refresh(_ grant: IOSWorkspaceGrant) async throws -> IOSWorkspaceSnapshot {
-        let requestID = UUID()
+        try await refresh(grant, requestID: UUID())
+    }
+
+    func refresh(_ grant: IOSWorkspaceGrant, requestID: UUID) async throws -> IOSWorkspaceSnapshot {
         let lease = try acquireLease(for: grant)
         defer { lease.release() }
         return try await directorySnapshot(for: grant, lease: lease, requestID: requestID)
@@ -127,16 +143,6 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
 
     public func isCurrent(_ context: PreviewAssetAccessContext) -> Bool {
         matchingRecord(context) != nil
-    }
-
-    public func recentItems() -> [IOSRecentWorkspaceItem] {
-        ports.recents.load().map(\.item)
-    }
-
-    public func removeRecent(recordID: UUID) {
-        var items = ports.recents.load()
-        items.removeAll { $0.recordID == recordID }
-        ports.recents.save(items)
     }
 
     public func expansionState(for workspaceID: IOSWorkspaceIdentity) -> WorkspaceExpansionState? {

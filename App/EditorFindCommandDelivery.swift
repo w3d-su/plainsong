@@ -7,28 +7,27 @@ import EditorKit
 /// The selectors and the concrete editor type live behind `EditorFindCommandDispatcher` in
 /// EditorKit (agent.md §6.1); App only consumes the delivered/not-delivered result.
 ///
-/// Falls back to shared `AppState` whenever the editor is not on the responder path but the
-/// command is still eligible — the owned query field or its field editor holds focus, **or**
-/// SwiftUI focus sits on the bar's own chrome (Aa, whole-word, Previous, Next, Done), which
-/// AppKit cannot route to. `isEditorFindCommandContextActive()` is what decides eligibility
-/// in both cases.
+/// Falls back to the key window's façade whenever the editor is not on the responder path
+/// but the command is still eligible — the owned query field or its field editor holds
+/// focus, **or** SwiftUI focus sits on the bar's own chrome. A hook invoked from a text
+/// view passes that view's window, so the command cannot land on a different façade.
 @MainActor
 enum EditorFindCommandDelivery {
     static func installHooks() {
-        EditorFindActionHooks.showFind = {
-            PlainsongAppServices.appState?.showOrRefocusEditorFind()
+        EditorFindActionHooks.showFind = { window in
+            facade(for: window)?.showOrRefocusEditorFind()
         }
-        EditorFindActionHooks.findNext = {
-            PlainsongAppServices.appState?.editorFindNext()
+        EditorFindActionHooks.findNext = { window in
+            facade(for: window)?.editorFindNext()
         }
-        EditorFindActionHooks.findPrevious = {
-            PlainsongAppServices.appState?.editorFindPrevious()
+        EditorFindActionHooks.findPrevious = { window in
+            facade(for: window)?.editorFindPrevious()
         }
-        EditorFindActionHooks.useSelectionForFind = {
-            PlainsongAppServices.appState?.useSelectionForEditorFind()
+        EditorFindActionHooks.useSelectionForFind = { window in
+            facade(for: window)?.useSelectionForEditorFind()
         }
-        EditorFindActionHooks.cancelFind = {
-            PlainsongAppServices.appState?.closeEditorFindBarFromEditorEscape() ?? false
+        EditorFindActionHooks.cancelFind = { window in
+            facade(for: window)?.closeEditorFindBarFromEditorEscape() ?? false
         }
     }
 
@@ -37,8 +36,7 @@ enum EditorFindCommandDelivery {
         if EditorFindCommandDispatcher.send(.show) {
             return true
         }
-        // Find chrome owns focus (query field or a bar control): no editor on the responder path.
-        guard let appState = PlainsongAppServices.appState,
+        guard let appState = menuFacade(),
               appState.isEditorFindCommandContextActive()
         else {
             return false
@@ -52,7 +50,7 @@ enum EditorFindCommandDelivery {
         if EditorFindCommandDispatcher.send(.next) {
             return true
         }
-        guard let appState = PlainsongAppServices.appState,
+        guard let appState = menuFacade(),
               appState.isEditorFindCommandContextActive()
         else {
             return false
@@ -66,7 +64,7 @@ enum EditorFindCommandDelivery {
         if EditorFindCommandDispatcher.send(.previous) {
             return true
         }
-        guard let appState = PlainsongAppServices.appState,
+        guard let appState = menuFacade(),
               appState.isEditorFindCommandContextActive()
         else {
             return false
@@ -79,7 +77,7 @@ enum EditorFindCommandDelivery {
     /// there is no EditorKit selector because the App intent decides everything it needs.
     @discardableResult
     static func performShowFindAndReplace() -> Bool {
-        guard let appState = PlainsongAppServices.appState,
+        guard let appState = menuFacade(),
               appState.hasOpenDocument,
               appState.isEditorFindCommandContextActive()
         else {
@@ -93,13 +91,13 @@ enum EditorFindCommandDelivery {
     /// the bar visible and the row expanded; delivery reaches only that window's editor.
     @discardableResult
     static func performReplace() -> Bool {
-        PlainsongAppServices.appState?.performEditorReplaceMenuCommand() != nil
+        menuFacade()?.performEditorReplaceMenuCommand() != nil
     }
 
     /// Edit ▸ Replace All, with the same eligibility as Replace.
     @discardableResult
     static func performReplaceAll() -> Bool {
-        PlainsongAppServices.appState?.performEditorReplaceAllMenuCommand() ?? false
+        menuFacade()?.performEditorReplaceAllMenuCommand() ?? false
     }
 
     @discardableResult
@@ -107,12 +105,25 @@ enum EditorFindCommandDelivery {
         if EditorFindCommandDispatcher.send(.useSelection) {
             return true
         }
-        guard let appState = PlainsongAppServices.appState,
+        guard let appState = menuFacade(),
               appState.isEditorFindCommandContextActive()
         else {
             return false
         }
         appState.useSelectionForEditorFind()
         return true
+    }
+
+    /// The text view's window wins. Menu fallbacks, which have no originating editor, use the
+    /// key façade and do not fall back to a main window.
+    private static func facade(for window: NSWindow?) -> AppState? {
+        if let window, let facade = KeyWindowRouter.shared.facade(for: window) {
+            return facade
+        }
+        return menuFacade()
+    }
+
+    private static func menuFacade() -> AppState? {
+        KeyWindowRouter.shared.menuTarget(defaultFacade: nil)
     }
 }

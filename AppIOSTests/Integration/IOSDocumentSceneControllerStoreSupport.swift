@@ -30,6 +30,7 @@ final class IOSSceneControllerStoreDouble: IOSDocumentStore {
     var closed: [IOSDocumentIdentity] = []
     var saved: [IOSSaveAcknowledgement] = []
     var openLatch: IOSSceneControllerLatch?
+    var openFailure: IOSDocumentFailure?
     var closeLatch: IOSSceneControllerLatch?
     var saveLatch: IOSSceneControllerLatch?
     var onOpen: (() -> Void)?
@@ -42,8 +43,12 @@ final class IOSSceneControllerStoreDouble: IOSDocumentStore {
 
     func open(_ location: IOSFileLocation, lease _: any IOSWorkspaceAccessLease) async throws -> IOSDocumentHandle {
         opened.append(location)
+        let failure = openFailure
         onOpen?()
         await openLatch?.wait()
+        if let failure {
+            throw failure
+        }
         let handle = IOSDocumentHandle(
             identity: IOSDocumentIdentity(rawValue: UUID()),
             session: DocumentSession(text: initialText, url: location.fileURL), location: location

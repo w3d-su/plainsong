@@ -12,7 +12,7 @@ final class EditorReplaceUIStateTests: XCTestCase {
     private func makeAppState(text: String = "hit one hit two") -> AppState {
         let url = URL(fileURLWithPath: "/tmp/plainsong-replace-ui-\(UUID().uuidString).md")
         let session = DocumentSession(text: text, url: url, fileKind: .markdown)
-        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let appState = AppState(shownSession: session, shouldRestoreLastOpenedFile: false)
         appState.editorFindHost.controller.debounceNanoseconds = 0
         appState.editorFindHost.commandContextOverride = true
         return appState
@@ -127,7 +127,7 @@ final class EditorReplaceUIStateTests: XCTestCase {
         let pending = appState.editorFindHost.ui
         XCTAssertGreaterThan(pending.focusRequestID, pending.focusAppliedID)
 
-        appState.currentDocument = DocumentSession()
+        appState.shownSession = DocumentSession()
         appState.notifyEditorFindDocumentDidSwitch()
 
         let ui = appState.editorFindHost.ui
@@ -172,7 +172,7 @@ final class EditorReplaceUIStateTests: XCTestCase {
         openExpandedRow(appState)
         appState.editorFindHost.replaceStatus = EditorReplaceStatusText.blocked(.externalChangeAwaitingChoice)
         let generation = appState.editorReplaceAuthorityGeneration
-        appState.editorReplaceExternalResolutionDidComplete(for: appState.currentDocument)
+        appState.editorReplaceExternalResolutionDidComplete(for: appState.shownSession)
         XCTAssertNil(appState.editorFindHost.replaceStatus)
         XCTAssertGreaterThan(appState.editorReplaceAuthorityGeneration, generation)
         XCTAssertTrue(appState.editorFindHost.ui.isReplaceRowActive)

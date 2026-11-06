@@ -19,6 +19,7 @@ final class ScriptedWorkspaceFiles: IOSWorkspaceFilePort, @unchecked Sendable {
     var parkReads = false
     var parkLists = false
     var parkMetadata = false
+    var metadataFailure: Error?
     var parkRemoves = false
     var parkAfterPersist = false
     var failMetadataAfterPersist = false
@@ -46,7 +47,11 @@ final class ScriptedWorkspaceFiles: IOSWorkspaceFilePort, @unchecked Sendable {
         let item = nextMetadataItem(url: url, relativePath: relativePath, root: root)
         lock.lock()
         let shouldPark = parkMetadata
+        let failure = metadataFailure
         lock.unlock()
+        if let failure {
+            throw failure
+        }
         if shouldPark {
             return try await withCheckedThrowingContinuation { continuation in
                 lock.lock()

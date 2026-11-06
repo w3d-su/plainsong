@@ -180,7 +180,7 @@ extension EditorFindHostedGateTests {
         editor.undoManager?.undo()
         try await waitUntil("Undo restores a fresh retained set") {
             app.editorFindHost.controller.session?.total == 200
-                && app.editorFindHost.controller.documentBinding.revision == UInt64(app.currentDocument.version)
+                && app.editorFindHost.controller.documentBinding.revision == UInt64(app.shownSession.version)
         }
         let before = EditorReplaceEffectSnapshot(app, textView: editor)
         state.didBeginApplyingForTesting = {
@@ -381,7 +381,7 @@ extension EditorFindHostedGateTests {
 
         // The key window's own bar still works.
         try await click(EditorFindAccessibility.replaceButton, in: hosted.window)
-        XCTAssertEqual(app.currentDocument.text, "NEW one hit two")
+        XCTAssertEqual(app.shownSession.text, "NEW one hit two")
     }
 
     func testHostedEscapeOnAFocusedRowButtonClosesTheBarAndCancelsThePlan() async throws {
@@ -411,7 +411,7 @@ extension EditorFindHostedGateTests {
         let hosted = try await makeHostedReplaceRow()
         let app = hosted.appState
         let window = hosted.window
-        let session = app.currentDocument
+        let session = app.shownSession
         let location = try WorkspaceFileSystemLocation(fileURL: hosted.postURL)
         app.externalDiskInspectionTasks[ObjectIdentifier(session)] = ExternalDiskInspectionTask(
             token: UUID(), session: session, canonicalURL: location.fileURL, location: location,

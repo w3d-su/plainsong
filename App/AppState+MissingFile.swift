@@ -31,14 +31,14 @@ extension AppState {
             return
         }
         let key = prompt.fileURL
-        guard let currentStateURL = sessionStateURL(for: currentDocument),
+        guard let currentStateURL = sessionStateURL(for: shownSession),
               exactFileURLSpellingMatches(currentStateURL, key)
         else {
             missingFilePrompt = nil
             return
         }
 
-        let closingSession = currentDocument
+        let closingSession = shownSession
         let sessionIdentity = ObjectIdentifier(closingSession)
         if let indeterminate = indeterminateSessionWrites[sessionIdentity] {
             let retainedURL = indeterminateSessionWriteContexts[sessionIdentity]?.location.fileURL
@@ -55,51 +55,62 @@ extension AppState {
         guard clearWorkspaceMutationTextRecovery(for: closingSession) else { return }
         discardRetiredEditorDocumentSession(closingSession, canonicalURL: key)
         clearSessionState(for: closingSession, fallbackURL: key)
-        currentDocument = DocumentSession()
+        shownSession = DocumentSession()
         observeCurrentDocument()
         notifyEditorFindDocumentDidSwitch()
         promoteNextWorkspaceMutationRecoverySessionIfNeeded()
     }
 
     func restoreRecoveryPrompt(for session: DocumentSession) {
-        guard session === currentDocument else { return }
+        let windows = registry.connectedWindows.filter { $0.shownSession === session }
+        guard !windows.isEmpty else { return }
         if workspaceMutationRecoveryIDBySession[ObjectIdentifier(session)] != nil {
-            externalChangePrompt = nil
-            missingFilePrompt = nil
-            indeterminateFileWriteReconciliationPrompt = nil
+            for window in windows {
+                window.externalChangePrompt = nil
+                window.missingFilePrompt = nil
+                window.indeterminateFileWriteReconciliationPrompt = nil
+            }
             refreshWorkspaceMutationReconciliationPrompt()
             return
         }
         refreshWorkspaceMutationReconciliationPrompt()
         guard let stateURL = sessionStateURL(for: session) else {
-            externalChangePrompt = nil
-            missingFilePrompt = nil
-            indeterminateFileWriteReconciliationPrompt = nil
+            for window in windows {
+                window.externalChangePrompt = nil
+                window.missingFilePrompt = nil
+                window.indeterminateFileWriteReconciliationPrompt = nil
+            }
             return
         }
 
         if indeterminateSessionWrites[ObjectIdentifier(session)] != nil {
             refreshIndeterminateFileWriteReconciliation(for: session)
         } else if detachedSessionURLs.contains(stateURL) {
-            externalChangePrompt = nil
-            indeterminateFileWriteReconciliationPrompt = nil
-            missingFilePrompt = MissingFilePrompt(fileURL: stateURL)
+            for window in windows {
+                window.externalChangePrompt = nil
+                window.indeterminateFileWriteReconciliationPrompt = nil
+                window.missingFilePrompt = MissingFilePrompt(fileURL: stateURL)
+            }
         } else if pendingExternalTexts[stateURL] != nil ||
             pendingExternalFileVersions[stateURL] != nil
         {
-            missingFilePrompt = nil
-            indeterminateFileWriteReconciliationPrompt = nil
-            externalChangePrompt = ExternalChangePrompt(fileURL: stateURL)
+            for window in windows {
+                window.missingFilePrompt = nil
+                window.indeterminateFileWriteReconciliationPrompt = nil
+                window.externalChangePrompt = ExternalChangePrompt(fileURL: stateURL)
+            }
             resolveDeferredExternalChangeIfPossible(for: session)
         } else {
-            externalChangePrompt = nil
-            missingFilePrompt = nil
-            indeterminateFileWriteReconciliationPrompt = nil
+            for window in windows {
+                window.externalChangePrompt = nil
+                window.missingFilePrompt = nil
+                window.indeterminateFileWriteReconciliationPrompt = nil
+            }
         }
     }
 
     func clearPromptsNotMatchingCurrentDocument() {
-        guard let url = sessionStateURL(for: currentDocument) else {
+        guard let url = sessionStateURL(for: shownSession) else {
             externalChangePrompt = nil
             missingFilePrompt = nil
             indeterminateFileWriteReconciliationPrompt = nil
@@ -128,14 +139,14 @@ extension AppState {
     // swiftlint:disable:next function_body_length
     func saveDetachedCurrentDocument(to destinationURL: URL) throws {
         guard let oldURL = missingFilePrompt?.fileURL,
-              let currentStateURL = sessionStateURL(for: currentDocument),
+              let currentStateURL = sessionStateURL(for: shownSession),
               exactFileURLSpellingMatches(currentStateURL, oldURL)
         else {
             return
         }
         try validateWorkspaceMutationRecoveryStoresLoaded(at: oldURL)
 
-        let session = currentDocument
+        let session = shownSession
         let sessionIdentity = ObjectIdentifier(session)
         guard !isExternalSourceMutationFenced(for: session),
               externalDiskInspectionTasks[sessionIdentity] == nil
@@ -155,7 +166,7 @@ extension AppState {
             session: session
         )
         let destination = saveCopyLocation.fileURL
-        if let existingSession = sessionCache[destination], existingSession !== session {
+        if let existingSession = registry.warmSession(at: destination), existingSession !== session {
             throw AppStateError.invalidSessionIdentity(destination)
         }
         let saveCopyInspection = try validateWorkspaceSaveCopyDestinationOwnership(
@@ -298,7 +309,7 @@ private extension AppState {
         _ = advanceSessionLifecycle(for: completed.session)
         completed.session.markSaved(text: completed.text, url: destination)
         _ = clearWorkspaceMutationTextRecovery(for: completed.session)
-        sessionCache[destination] = completed.session
+        registry.setWarmSession(completed.session, at: destination)
         adoptAnchoredFileBinding(
             completed.binding,
             for: completed.session,
@@ -311,7 +322,7 @@ private extension AppState {
         // Rekey Find only once the retained binding names the destination: identity comes
         // from `sessionStateURL`, so notifying before `adoptAnchoredFileBinding` would
         // rebind Find to the *old* URL and never correct itself.
-        if completed.session === currentDocument {
+        if completed.session === shownSession {
             notifyEditorFindDocumentIdentityDidRekey()
         }
         rememberRecentItem(destination)
@@ -481,13 +492,9 @@ extension AppState {
     }
 
     func workspaceSaveCopyOwnershipCandidates() -> [DocumentSession] {
-        var candidates = Array(sessionCache.values)
-        candidates.append(contentsOf: retiredEditorDocumentSessions.values.map(\.session))
-        candidates.append(contentsOf: editorDocumentBindingSessions.values)
-        candidates.append(contentsOf: editorBindingInstallations.values)
-        candidates.append(contentsOf: workspaceMutationRetainedRecoverySessions())
-        candidates.append(currentDocument)
-        return candidates
+        registry.sessions(from: [
+            .warmCache, .retired, .editorBindings, .editorInstallations, .mutationRecovery, .windowDocuments,
+        ])
     }
 }
 
@@ -647,7 +654,7 @@ private extension AppState {
         _ = advanceSessionLifecycle(for: session)
         indeterminateSessionWrites[sessionIdentity] = result
         indeterminateSessionWriteContexts[sessionIdentity] = context
-        sessionCache[context.location.fileURL] = session
+        registry.setWarmSession(session, at: context.location.fileURL)
         session.reset(
             text: text,
             url: context.location.fileURL,
@@ -659,7 +666,7 @@ private extension AppState {
         // above. Rekeying before that left Find bound to the pre-quarantine URL with no
         // second rebind, so every later find command targeted a document that no longer
         // owned this session's state.
-        if session === currentDocument {
+        if session === shownSession {
             notifyEditorFindDocumentIdentityDidRekey()
         }
         cancelAutosave(for: session)

@@ -87,7 +87,7 @@ final class EditorFindNavigationOwnershipTests: XCTestCase {
             fileKind: .markdown,
             isDirty: false
         )
-        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let appState = AppState(shownSession: session, shouldRestoreLastOpenedFile: false)
         appState.editorFindHost.controller.debounceNanoseconds = 0
         appState.editorFindHost.commandContextOverride = true
         return appState

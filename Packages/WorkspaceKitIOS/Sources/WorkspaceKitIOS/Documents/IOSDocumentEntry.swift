@@ -25,13 +25,15 @@ final class IOSDocumentEntry {
     var state: IOSDocumentState
     var superseded = false
     var fenced = false
+    var cloudResolution: Progress?
+    var hasUnresolvedVersions = false
     var allowsProviderWrite: Bool
     var closed = false
     var isClosing = false
     var isRetiring = false
     var portClosed = false
     var closeTask: Task<IOSDocumentCloseOutcome, Error>?
-    var retirementTask: Task<Void, Error>?
+    var retirementTask: Task<IOSDocumentCloseOutcome, Error>?
     var externalReadTasks: [UUID: Task<Void, Never>] = [:]
     var lastPersistedText: String?
     var inFlightText: String?
@@ -46,6 +48,10 @@ final class IOSDocumentEntry {
     var externalToken: UUID?
     var hasDeferredExternalChange = false
     var pendingProposal: IOSDocumentReloadProposal?
+    var explicitReloadOperationID: UUID?
+    var providerAvailabilityGeneration: UInt64 = 0
+    var checkpoint: IOSRecoveryRecord?
+    var retainedDraft: IOSRecoveryRecord?
     var recoveryReceipt: IOSRecoveryReceipt?
     var lastAcknowledgement: IOSSaveAcknowledgement?
 

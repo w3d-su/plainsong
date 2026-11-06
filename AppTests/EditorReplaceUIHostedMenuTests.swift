@@ -79,7 +79,7 @@ extension EditorFindHostedGateTests {
         try clickIntoFindField(in: window)
         XCTAssertTrue(MenuBarSnapshot(appState: app).canReplace)
         XCTAssertTrue(EditorFindCommandDelivery.performReplace())
-        XCTAssertEqual(app.currentDocument.text, "NEW one hit two hit three")
+        XCTAssertEqual(app.shownSession.text, "NEW one hit two hit three")
         XCTAssertTrue(isFindFieldFirstResponder(in: window), "the menu action leaves focus in the query field")
 
         // Replacement field focused: eligible.
@@ -89,7 +89,7 @@ extension EditorFindHostedGateTests {
         _ = try replacementFieldEditor(in: window)
         XCTAssertTrue(app.isEditorReplaceMenuCommandEligible())
         XCTAssertTrue(EditorFindCommandDelivery.performReplace())
-        XCTAssertEqual(app.currentDocument.text, "NEW one NEW two hit three")
+        XCTAssertEqual(app.shownSession.text, "NEW one NEW two hit three")
 
         // Focus outside the editor and both fields: ineligible even with the row expanded.
         XCTAssertTrue(window.makeFirstResponder(nil))
@@ -105,7 +105,7 @@ extension EditorFindHostedGateTests {
         _ = try replacementFieldEditor(in: window)
         XCTAssertTrue(EditorFindCommandDelivery.performReplaceAll())
         await awaitBarReplaceAll(app)
-        XCTAssertEqual(app.currentDocument.text, "NEW one NEW two NEW three")
+        XCTAssertEqual(app.shownSession.text, "NEW one NEW two NEW three")
         XCTAssertEqual(app.editorFindHost.lastReplaceAnnouncement, "Changed 1 of 1 matches")
     }
 
@@ -133,7 +133,7 @@ extension EditorFindHostedGateTests {
         designateKeyWindow(windowA, in: hosted.group)
         XCTAssertTrue(app.isEditorReplaceMenuCommandEligible())
         XCTAssertTrue(EditorFindCommandDelivery.performReplace())
-        XCTAssertEqual(app.currentDocument.text, "NEW one hit two")
+        XCTAssertEqual(app.shownSession.text, "NEW one hit two")
         XCTAssertEqual(editorA.undoManager?.canUndo, true, "the replacement is A's native undo step")
     }
 
@@ -162,7 +162,7 @@ extension EditorFindHostedGateTests {
         hold.release()
         await awaitBarReplaceAll(app)
         XCTAssertEqual(app.editorFindHost.replaceBatch.lastResult, .superseded)
-        XCTAssertEqual(app.currentDocument.text, before.appText)
+        XCTAssertEqual(app.shownSession.text, before.appText)
         XCTAssertEqual(editor.undoManager?.canUndo, before.canUndo)
         try await assertFocusRemains(
             "the remounted bar never replays the spent query token",
@@ -178,6 +178,6 @@ extension EditorFindHostedGateTests {
         XCTAssertTrue(windowC.makeFirstResponder(nil))
         XCTAssertFalse(EditorFindCommandDelivery.performReplace(), "C has no bar or editor focus")
         XCTAssertFalse(EditorFindCommandDelivery.performReplaceAll())
-        XCTAssertEqual(app.currentDocument.text, before.appText)
+        XCTAssertEqual(app.shownSession.text, before.appText)
     }
 }

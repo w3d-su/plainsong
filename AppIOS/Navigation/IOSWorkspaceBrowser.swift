@@ -21,6 +21,14 @@ struct IOSWorkspaceBrowserView: View {
         }
         .navigationTitle("Files")
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                if let showRecents = scene.surfaces.showRecentWorkspaces {
+                    Button(action: showRecents) {
+                        Label("Recent Files and Folders", systemImage: "clock")
+                    }
+                    .accessibilityIdentifier("plainsong.ios.browser.recents")
+                }
+            }
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if let recovery {
                     IOSRecoveryEntry(controller: recovery)
@@ -48,6 +56,7 @@ struct IOSWorkspaceBrowserView: View {
                     }
                     .accessibilityIdentifier("plainsong.ios.browser.refresh")
                 }
+                IOSSettingsLink()
             }
         }
     }

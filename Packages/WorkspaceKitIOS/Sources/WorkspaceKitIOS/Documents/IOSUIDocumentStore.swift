@@ -8,12 +8,13 @@ import WorkspaceCore
 public final class IOSUIDocumentStore: IOSDocumentStore {
     let coordinatedAccess: any IOSCoordinatedFileAccess
     let recovery: any IOSRecoveryPersisting
-    let timing: IOSDocumentTiming
+    public var timing: IOSDocumentTiming
     let filePortFactory: @MainActor (URL) -> any IOSDocumentFilePort
     var byResource: [IOSDocumentResourceKey: IOSDocumentEntry] = [:]
     var byIdentity: [IOSDocumentIdentity: IOSDocumentEntry] = [:]
     var observations: [UUID: IOSDocumentStoreObservation] = [:]
     var grantObservations: [ObjectIdentifier: any IOSObservation] = [:]
+    let cloudVersionsAtURL: @Sendable (URL) throws -> [IOSCloudFileVersion]
     let maximumExternalBytes = 16 * 1024 * 1024
 
     public convenience init(
@@ -33,10 +34,13 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
         coordinatedAccess: any IOSCoordinatedFileAccess,
         recovery: any IOSRecoveryPersisting,
         timing: IOSDocumentTiming,
+        cloudVersionsAtURL: @escaping @Sendable (URL) throws
+            -> [IOSCloudFileVersion] = { try IOSCloudFileVersion.versions(at: $0) },
         filePortFactory: @escaping @MainActor (URL) -> any IOSDocumentFilePort
     ) {
         self.coordinatedAccess = coordinatedAccess
         self.recovery = recovery
+        self.cloudVersionsAtURL = cloudVersionsAtURL
         self.timing = timing
         self.filePortFactory = filePortFactory
     }
@@ -287,6 +291,7 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
         guard case let .invalidated(workspaceID, _) = event else { return }
         for entry in byIdentity.values where entry.location.workspaceID == workspaceID {
             guard entry.openFinished, entry.session != nil else { continue }
+            entry.cloudResolution?.cancel()
             refreshWritableState(entry)
         }
     }

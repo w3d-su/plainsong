@@ -2,3 +2,4 @@
 # No picker invocation, document file I/O, editing, preview, save/reopen, or device acceptance.
 IOSAcceptanceLaunchSmokeTests/testLaunchShowsFilesAndOpenControl
 IOSAcceptanceLaunchSmokeTests/testRecoveredDraftsOpensAndDismissesFromProductionFiles
+IOSAcceptanceLaunchSmokeTests/testRecentFilesOpensAndDismissesFromProductionFiles

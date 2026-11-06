@@ -27,6 +27,8 @@ public struct MarkdownEditorView: View {
     private let fontName: String
     private let fontSize: CGFloat
     private let editorTheme: MarkdownEditorTheme
+    private let syntaxTheme: MarkdownSyntaxTheme?
+    private let customTheme: CustomThemeDocument?
     private let appearanceID: String
     private let showsLineNumbers: Bool
     private let focusRequestID: Int
@@ -51,6 +53,8 @@ public struct MarkdownEditorView: View {
         fontName: String = MarkdownSyntaxHighlighter.systemMonospacedFontName,
         fontSize: CGFloat = MarkdownSyntaxHighlighter.defaultFont.pointSize,
         editorTheme: MarkdownEditorTheme = .standard,
+        syntaxTheme: MarkdownSyntaxTheme? = nil,
+        customTheme: CustomThemeDocument? = nil,
         appearanceID: String = "standard",
         showsLineNumbers: Bool = true,
         focusRequestID: Int = 0,
@@ -74,6 +78,8 @@ public struct MarkdownEditorView: View {
         self.fontName = fontName
         self.fontSize = fontSize
         self.editorTheme = editorTheme
+        self.syntaxTheme = syntaxTheme
+        self.customTheme = customTheme
         self.appearanceID = appearanceID
         self.showsLineNumbers = showsLineNumbers
         self.focusRequestID = focusRequestID
@@ -120,6 +126,7 @@ public struct MarkdownEditorView: View {
             selection: $selection,
             showsLineNumbers: showsLineNumbers,
             editorTheme: editorTheme,
+            syntaxTheme: syntaxTheme,
             focusRequestID: focusRequestID,
             documentIdentity: documentIdentity,
             documentBindingID: documentBindingID,
@@ -249,6 +256,7 @@ public struct MarkdownEditorView: View {
             fileKind: kind,
             visibleRange: requestedRange,
             theme: editorTheme,
+            customTheme: customTheme,
             fontName: fontName,
             fontSize: fontSize,
             developmentPresentation: developmentPresentation,

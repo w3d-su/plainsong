@@ -3,7 +3,9 @@ import Foundation
 /// Shortcut metadata for lane 10. These values do not install `UIKeyCommand`s.
 enum IOSAuthoringCatalog {
     static let installsKeyCommands = false
-    static let formattingRefusal = "無法在這裡使用這個格式"
+    static let formattingRefusal = "This format can't be applied here."
+    static let readOnlyRefusal = "This document is read-only."
+    static let focusRefusal = "Return to the editor, then try again."
     static let compositionRefusal = "Finish the current composition first."
     static let editRefusal = "The document changed. Review the draft and try again."
     static let frontmatterRefusal = "This frontmatter field can't be written back."
@@ -33,6 +35,7 @@ enum IOSAuthoringCatalog {
         action(.previousMatch, "Find Previous", .find, "g", [.shift, .command]),
         action(.useSelectionForFind, "Use Selection for Find", .find, "e", .command),
         action(.singleReplace, "Replace", .find, nil, []),
+        action(.replaceAll, "Replace All", .find, nil, []),
     ]
 
     static func title(for id: IOSAuthoringActionID) -> String {

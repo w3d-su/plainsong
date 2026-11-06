@@ -131,9 +131,9 @@ extension EditorFindHostedGateTests {
         try await waitUntil("batch fixture has current source and settled authorization", timeout: 20) {
             let app = hosted.appState
             let editor = self.editorTextView(in: hosted.window)
-            return app.editorReplaceAuthorizationDecision(for: app.currentDocument) == .allowed
-                && editor?.text == app.currentDocument.text
-                && app.editorFindHost.controller.documentBinding.revision == UInt64(app.currentDocument.version)
+            return app.editorReplaceAuthorizationDecision(for: app.shownSession) == .allowed
+                && editor?.text == app.shownSession.text
+                && app.editorFindHost.controller.documentBinding.revision == UInt64(app.shownSession.version)
         }
         // Fixture observation is already drained by the common Replace setup. `stop()`
         // is a hard boundary: no watcher handler begins after it returns, and App drops
@@ -164,7 +164,7 @@ extension EditorFindHostedGateTests {
                 previous = current
                 stableSince = Date()
             }
-            return editor.replacePresentationSnapshot?.sourceRevision == hosted.appState.currentDocument.version
+            return editor.replacePresentationSnapshot?.sourceRevision == hosted.appState.shownSession.version
                 && !current.foldedRanges.isEmpty && !current.imageMarkerRanges.isEmpty
                 && Date().timeIntervalSince(stableSince) >= 0.25
                 && (observation.map { Date().timeIntervalSince($0.lastFoldTransaction) >= 0.25 } ?? true)

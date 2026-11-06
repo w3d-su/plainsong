@@ -110,6 +110,7 @@ final class IOSSceneControllerWorkspaceDouble: IOSWorkspaceAccessProviding {
 final class IOSSceneControllerPreviewDouble: IOSPreviewControlling {
     var renders: [(IOSDocumentIdentity, Int, PreviewAssetAccessContext?)] = []
     var invalidateCount = 0
+    var eventOnObserve: IOSPreviewEvent?
     var observations: [(IOSReloadRelayObservation, @MainActor (IOSPreviewEvent) -> Void)] = []
     func render(_ snapshot: DocumentSnapshot, identity: IOSDocumentIdentity, assetAccess: PreviewAssetAccessContext?) {
         renders.append((identity, snapshot.version, assetAccess))
@@ -124,6 +125,9 @@ final class IOSSceneControllerPreviewDouble: IOSPreviewControlling {
     func observe(_ handler: @escaping @MainActor (IOSPreviewEvent) -> Void) -> any IOSObservation {
         let token = IOSReloadRelayObservation()
         observations.append((token, handler))
+        if let eventOnObserve {
+            handler(eventOnObserve)
+        }
         return token
     }
 
@@ -168,7 +172,12 @@ struct IOSSceneControllerFixture {
     let controller: IOSDocumentSceneController
     let selectedURL = URL(fileURLWithPath: "/synthetic/public.md")
 
-    init(admission: IOSSceneWriterAdmission? = nil, editorBinding: (any IOSSourceEditorBinding)? = nil) {
+    init(
+        admission: IOSSceneWriterAdmission? = nil,
+        editorBinding: (any IOSSourceEditorBinding)? = nil,
+        previewEventOnObserve: IOSPreviewEvent? = nil
+    ) {
+        preview.eventOnObserve = previewEventOnObserve
         controller = IOSDocumentSceneController(
             documents: store, workspace: workspace, editor: editorBinding ?? editor, preview: preview,
             assets: IOSSceneControllerAssetDouble(), admission: admission, assetContext: { _ in nil }

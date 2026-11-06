@@ -162,7 +162,7 @@ extension AppState {
             return .refused(.invalidPlan(.emptySession))
         }
         guard plan.request.sourceRevision == editorFindHost.controller.documentBinding.revision,
-              plan.request.sourceRevision == UInt64(max(0, currentDocument.version)),
+              plan.request.sourceRevision == UInt64(max(0, shownSession.version)),
               plan.request.documentIdentity == activeEditorDocumentIdentity
         else {
             refreshEditorFindCounterFromAppSource()
@@ -221,7 +221,7 @@ extension AppState {
         return state.actionID == capture.actionID
             && state.replacementGeneration == capture.replacementGeneration
             && editorNavigationGeneration == capture.navigationGeneration
-            && capture.plan.stamp == currentEditorReplaceAuthorityStamp(for: currentDocument)
+            && capture.plan.stamp == currentEditorReplaceAuthorityStamp(for: shownSession)
             && controller.queryGeneration == capture.plan.request.queryGeneration
             && controller.documentBinding.identity == capture.plan.request.documentIdentity
             && controller.documentBinding.revision == capture.plan.request.sourceRevision

@@ -22,6 +22,8 @@ final class EditorLineNumberGutterView: NSView {
         var font: NSFont
         var textColor: NSColor
         var currentLineTextColor: NSColor
+        /// Nil keeps the previous behavior: fill the gutter with the text view background.
+        var backgroundColor: NSColor?
     }
 
     nonisolated static let leadingInset: CGFloat = 4
@@ -170,7 +172,7 @@ final class EditorLineNumberGutterView: NSView {
         }
         guard let textView else { return }
 
-        if let backgroundColor = textView.backgroundColor {
+        if let backgroundColor = style.backgroundColor ?? textView.backgroundColor {
             backgroundColor.setFill()
             dirtyRect.fill()
         }
@@ -279,8 +281,16 @@ final class EditorLineNumberGutterView: NSView {
 extension EditorLineNumberGutterView.Style {
     /// The editor's gutter for these settings, or `nil` when line numbers are off.
     init?(showing showsLineNumbers: Bool, theme: MarkdownEditorTheme, font: NSFont) {
+        self.init(showing: showsLineNumbers, syntaxTheme: .builtIn(theme), font: font)
+    }
+
+    init?(showing showsLineNumbers: Bool, syntaxTheme: MarkdownSyntaxTheme, font: NSFont) {
         guard showsLineNumbers else { return nil }
-        let colors = MarkdownSyntaxTheme.builtIn(theme)
-        self.init(font: font, textColor: colors.mutedColor, currentLineTextColor: colors.textColor)
+        self.init(
+            font: font,
+            textColor: syntaxTheme.mutedColor,
+            currentLineTextColor: syntaxTheme.textColor,
+            backgroundColor: syntaxTheme.gutterBackgroundColor
+        )
     }
 }

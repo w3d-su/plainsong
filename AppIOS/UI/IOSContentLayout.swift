@@ -15,6 +15,13 @@ enum IOSContentLayout: Equatable {
     case single(IOSEditorPane)
     /// Regular width with content area >= 900 pt: editor and preview side by side.
     case sideBySide
+
+    var showsPreview: Bool {
+        switch self {
+        case .sideBySide, .single(.preview): true
+        case .single(.source): false
+        }
+    }
 }
 
 /// Pure layout rule (handoff 10): decide from the actual content width of the

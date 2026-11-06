@@ -4,6 +4,14 @@ import UIKit
 final class DocumentSession: NSObject {
     let editor: SourceEditor
     let probe: Probe
+    private let makeDocument: (URL) -> SpikeDocument
+    private let closeForReplacement: (SpikeDocument) async -> Bool
+    private let closeDiscardedCandidate: (SpikeDocument) async -> Bool
+    private let beginBackgroundTask: (@escaping @MainActor @Sendable () -> Void) -> UIBackgroundTaskIdentifier
+    private let endBackgroundTask: (UIBackgroundTaskIdentifier) -> Void
+    private let persistRecovery: (RecoveryEnvelope) throws -> Void
+    private var pendingCandidateClose: (document: SpikeDocument, grant: AccessGrant)?
+    private var replacementCandidate: ReplacementCandidate?
     private(set) var document: SpikeDocument?
     private(set) var grant: AccessGrant?
     private(set) var ledger: SaveLedger?
@@ -13,6 +21,8 @@ final class DocumentSession: NSObject {
     var updated: (() -> Void)?
     var delaySave = false
     private var backgroundToken = UIBackgroundTaskIdentifier.invalid
+    private var backgroundGeneration: UUID?
+    private var backgroundCaptureID: UUID?
     var dirty: Bool {
         ledger?.dirty ?? false
     }
@@ -25,9 +35,36 @@ final class DocumentSession: NSObject {
         ledger?.conflict ?? false
     }
 
-    init(editor: SourceEditor, probe: Probe) {
+    init(editor: SourceEditor, probe: Probe,
+         makeDocument: @escaping (URL) -> SpikeDocument = { SpikeDocument(fileURL: $0) },
+         closeForReplacement: @escaping (SpikeDocument) async -> Bool = { document in
+             await withCheckedContinuation { continuation in
+                 document.close { continuation.resume(returning: $0) }
+             }
+         },
+         closeDiscardedCandidate: @escaping (SpikeDocument) async -> Bool = { document in
+             await withCheckedContinuation { continuation in
+                 document.close { continuation.resume(returning: $0) }
+             }
+         },
+         beginBackgroundTask: @escaping (@escaping @MainActor @Sendable () -> Void) -> UIBackgroundTaskIdentifier = {
+             UIApplication.shared.beginBackgroundTask(withName: "M0RecoveryAndFlush", expirationHandler: $0)
+         },
+         endBackgroundTask: @escaping (UIBackgroundTaskIdentifier) -> Void = {
+             UIApplication.shared.endBackgroundTask($0)
+         },
+         persistRecovery: @escaping (RecoveryEnvelope) throws -> Void = {
+             try RecoveryStore.applicationStore().persist($0)
+         })
+    {
         self.editor = editor
         self.probe = probe
+        self.makeDocument = makeDocument
+        self.closeForReplacement = closeForReplacement
+        self.closeDiscardedCandidate = closeDiscardedCandidate
+        self.beginBackgroundTask = beginBackgroundTask
+        self.endBackgroundTask = endBackgroundTask
+        self.persistRecovery = persistRecovery
         super.init()
         editor.changed = { [weak self] in self?.sourceChanged() }
         editor.event = { [weak self] event in self?.record(event) }
@@ -63,7 +100,7 @@ final class DocumentSession: NSObject {
         do {
             let snapshot = RecoveryEnvelope(documentID: editor.documentID, revision: editor.revision,
                                             source: editor.textView.text, reason: reason, time: Date())
-            try RecoveryStore.applicationStore().persist(snapshot)
+            try persistRecovery(snapshot)
             record("recovery-readback-verified")
             return true
         } catch {
@@ -81,37 +118,93 @@ final class DocumentSession: NSObject {
             return
         }
         opening = true
+        let openingTicket = editor.ticket()
+        let previousEditable = editor.textView.isEditable
+        var replaced = false
         editor.textView.isEditable = false
-        defer { opening = false; updated?() }
-        if let previous = document {
-            let closed = await withCheckedContinuation { continuation in
-                previous.close { continuation.resume(returning: $0) }
-            }
-            guard closed else {
-                report("Close failed; original document retained.", event: "close-failed")
+        defer {
+            replacementCandidate = nil
+            opening = false
+            editor.textView.isEditable = (replaced || previousEditable) && ledger?.available == true && !conflict &&
+                !reloading &&
+                document?.documentState.contains(.closed) == false &&
+                document?.documentState.contains(.editingDisabled) == false
+            updated?()
+        }
+        // The current document and its grant remain owned until the replacement
+        // has loaded. A bad file must not retire a working editor session.
+        if let pending = pendingCandidateClose {
+            guard await closeDiscardedCandidate(pending.document) else {
+                report(
+                    "Candidate close is still pending. Original document retained.",
+                    event: "candidate-close-pending"
+                )
                 return
             }
-            document = nil
-            grant = nil
-            ledger = nil
+            pendingCandidateClose = nil
         }
-        let candidate = SpikeDocument(fileURL: url)
+        let candidate = makeDocument(url)
+        let staged = ReplacementCandidate(document: candidate, expectedURL: url)
+        replacementCandidate = staged
         let success = await withCheckedContinuation { continuation in
             candidate.open { continuation.resume(returning: $0) }
         }
         guard success else {
-            report("Open failed/unavailable. No empty document substituted.", event: "open-failed")
+            report("Open failed/unavailable. Original document retained.", event: "open-failed")
             return
         }
+        staged.didOpen()
+        guard replacementIsCurrent(openingTicket), staged.isCurrent else {
+            await closeCandidate(candidate, grant: selectedGrant)
+            report("Open superseded by composition or changed document state.", event: "open-refused-busy")
+            return
+        }
+        let previous = document
+        if let previous {
+            let closed = await closeForReplacement(previous)
+            guard closed else {
+                await closeCandidate(candidate, grant: selectedGrant)
+                report("Close failed; original document retained.", event: "close-failed")
+                return
+            }
+        }
+        let identity = UUID()
+        guard replacementIsCurrent(openingTicket), staged.isCurrent,
+              editor.attach(candidate.loadedSource, identity: identity)
+        else {
+            // Composition can arrive while UIDocument.close is suspended. Keep
+            // the original ownership and reopen it before restoring editability.
+            await closeCandidate(candidate, grant: selectedGrant)
+            if let previous {
+                let reopened = await withCheckedContinuation { continuation in
+                    previous.open { continuation.resume(returning: $0) }
+                }
+                if !reopened {
+                    ledger?.available = false
+                } else if let baseline = ledger?.savedSource, !sameSource(previous.loadedSource, baseline) {
+                    // Opening again can load newer bytes while the retained editor
+                    // still owns its earlier source and native history.
+                    ledger?.conflict = true
+                    ledger?.available = false
+                    guard recover(reason: "rollback-external-conflict") else { return }
+                    report(
+                        "Original changed while closed. Local contents retained; save a copy before reopening.",
+                        event: "rollback-external-conflict"
+                    )
+                    return
+                }
+            }
+            report(
+                "Replacement refused after document state changed. Original source retained.",
+                event: "attach-failed"
+            )
+            return
+        }
+        replaced = true
+        replacementCandidate = nil
         document = candidate
         grant = selectedGrant // Keep scope alive for the entire UIDocument lifetime.
-        let identity = UUID()
         ledger = SaveLedger(documentID: identity, source: candidate.loadedSource)
-        guard editor.attach(candidate.loadedSource, identity: identity) else {
-            ledger?.available = false
-            report("Attach refused during composition.", event: "attach-failed")
-            return
-        }
         candidate.requestAutosave = { [weak self, weak candidate] completion in
             guard let self, let candidate, document === candidate else { completion(false); return }
             // UIDocument.close invokes autosave while open-switch holds the busy
@@ -128,12 +221,27 @@ final class DocumentSession: NSObject {
         }
         candidate.editingAvailability = { [weak self, weak candidate] enabled in
             guard let self, let candidate, document === candidate else { return }
-            editor.textView.isEditable = enabled && !conflict && !reloading && ledger?.available == true
+            editor.textView.isEditable = enabled && !opening && !conflict && !reloading && ledger?.available == true
             record(enabled ? "document-enable-editing" : "document-disable-editing")
         }
         ledger?.available = !candidate.documentState.contains(.editingDisabled)
+        // A successful replacement establishes its own editing availability.
         editor.textView.isEditable = ledger?.available == true
         report("Opened in place. Single-file grant does not authorize siblings.", event: "open-succeeded")
+    }
+
+    private func replacementIsCurrent(_ ticket: PresentationTicket) -> Bool {
+        editor.documentID == ticket.documentID && editor.revision == ticket.revision &&
+            sameSource(editor.textView.text, ticket.source) && editor.textView.markedTextRange == nil &&
+            !dirty && !conflict && !reloading
+    }
+
+    private func closeCandidate(_ candidate: SpikeDocument, grant: AccessGrant) async {
+        candidate.requestAutosave = { $0(true) }
+        if await !closeDiscardedCandidate(candidate) {
+            pendingCandidateClose = (candidate, grant)
+            record("candidate-close-failed-retained")
+        }
     }
 
     func save(completion: @escaping @MainActor @Sendable (Bool) -> Void = { _ in }) {
@@ -158,10 +266,15 @@ final class DocumentSession: NSObject {
             else {
                 self?.ledger?.complete(capture, success: false)
                 self?.record("save-refused-before-write")
+                self?.finishBackground(for: capture)
                 completion(false); return
             }
             document.persist(capture.source, baseline: ledger!.savedSource) { [weak self, document] success in
-                guard let self, self.document === document else { completion(false); return }
+                guard let self else { completion(false); return }
+                guard self.document === document else {
+                    finishBackground(for: capture)
+                    completion(false); return
+                }
                 let durable = success && document.fileURL == capturedURL
                 let accepted = ledger?.complete(capture, success: durable) == true
                 if !durable {
@@ -170,6 +283,7 @@ final class DocumentSession: NSObject {
                 report(durable && accepted ? "Captured revision saved; current dirty state recalculated." :
                     "Save failed. Editor and recovery retained.",
                     event: durable && accepted ? "save-acknowledged" : "save-failed")
+                finishBackground(for: capture)
                 completion(durable && accepted)
             }
         }
@@ -216,13 +330,19 @@ final class DocumentSession: NSObject {
     }
 
     @objc private func documentStateChanged(_ notification: Notification) {
+        if let replacementCandidate, notification.object as? SpikeDocument === replacementCandidate.document {
+            replacementCandidate.observeState()
+            return
+        }
         guard let document, notification.object as? SpikeDocument === document else { return }
         if document.documentState.contains(.inConflict) {
             ledger?.conflict = true
             ledger?.available = false
             _ = recover(reason: "provider-conflict")
         }
-        if document.documentState.contains(.savingError) || document.documentState.contains(.closed) {
+        if document.documentState.contains(.savingError) ||
+            (document.documentState.contains(.closed) && !opening)
+        {
             ledger?.available = false
             _ = recover(reason: "provider-unavailable")
         }
@@ -231,22 +351,41 @@ final class DocumentSession: NSObject {
 
     @objc func background() {
         guard backgroundToken == .invalid else { return }
-        backgroundToken = UIApplication.shared.beginBackgroundTask(withName: "M0RecoveryAndFlush") { [weak self] in
-            guard let self else { return }
+        let generation = UUID()
+        backgroundGeneration = generation
+        backgroundToken = beginBackgroundTask { [weak self] in
+            guard let self, backgroundGeneration == generation else { return }
             _ = recover(reason: "background-expiration")
             report("Background time expired; save completion remains unconfirmed.", event: "background-expired")
             finishBackground()
         }
-        guard recover(reason: "background") else { finishBackground(); return }
+        let recoveryPersisted = recover(reason: "background")
         record("background-flush-request")
-        save { [weak self] _ in self?.finishBackground() }
+        if let capture = ledger?.active {
+            // A writer-busy response is not a completed flush. Its original
+            // capture keeps the assertion until completion or expiration.
+            backgroundCaptureID = capture.operationID
+            return
+        }
+        guard recoveryPersisted else { finishBackground(); return }
+        save { [weak self] _ in
+            guard let self, backgroundGeneration == generation else { return }
+            finishBackground()
+        }
+    }
+
+    private func finishBackground(for capture: SaveCapture) {
+        guard backgroundCaptureID == capture.operationID else { return }
+        finishBackground()
     }
 
     private func finishBackground() {
         if backgroundToken != .invalid {
-            UIApplication.shared.endBackgroundTask(backgroundToken)
+            endBackgroundTask(backgroundToken)
             backgroundToken = .invalid
         }
+        backgroundCaptureID = nil
+        backgroundGeneration = nil
     }
 
     @objc private func foreground() {

@@ -51,9 +51,9 @@ extension EditorFindHostedGateTests {
         deferral.reaffirmPendingMousePick(id: bID, window: host.window, event: reportedEvent)
         read.release()
         try await waitUntil("pending file pick finishes") {
-            state.currentDocument.fileURL?.lastPathComponent == "b.md" && deferral.pendingID == nil
+            state.shownSession.fileURL?.lastPathComponent == "b.md" && deferral.pendingID == nil
         }
-        XCTAssertEqual(state.currentDocument.text, "beta")
+        XCTAssertEqual(state.shownSession.text, "beta")
         XCTAssertEqual(deferral.issued, 1)
         XCTAssertEqual(deferral.openAttempts.filter(\.landed).count, 1)
         let shouldFocus = sameEvent && requestsFocus

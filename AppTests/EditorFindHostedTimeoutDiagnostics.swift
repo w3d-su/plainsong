@@ -7,7 +7,7 @@ import Foundation
 extension EditorFindHostedGateTests {
     /// Weakly registered fixture state: diagnostics must not keep a hosted app or view alive.
     func hostedFindTimeoutState(_ appState: AppState) -> String {
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let identity = ObjectIdentifier(session)
         let ui = appState.editorFindHost.ui
         let match = appState.editorFindHost.controller.session?.currentMatch?.range

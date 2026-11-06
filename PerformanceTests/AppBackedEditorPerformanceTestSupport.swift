@@ -70,7 +70,9 @@ extension AppBackedEditorPerformanceTests {
     func makeAppFixture(
         source: String,
         directoryPrefix: String,
-        fileName: String
+        fileName: String,
+        syntaxTheme: MarkdownSyntaxTheme? = nil,
+        customTheme: CustomThemeDocument? = nil
     ) async throws -> AppFixture {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("\(directoryPrefix)-\(UUID().uuidString)")
@@ -81,18 +83,20 @@ extension AppBackedEditorPerformanceTests {
         try source.write(to: documentURL, atomically: true, encoding: .utf8)
 
         let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
-        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let appState = AppState(shownSession: session, shouldRestoreLastOpenedFile: false)
         let location = try authority.location(relativePath: fileName)
         let read = try MarkdownFileStore().loadResult(at: location)
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] = AnchoredWorkspaceSessionFileBinding(
             location: location, identity: read.metadata.identity, sha256Digest: read.sha256Digest
         )
-        appState.sessionCache[documentURL.standardizedFileURL] = session
+        appState.registry.sessionCache[documentURL.standardizedFileURL] = session
         appState.recordKnownDiskText(source, for: documentURL)
         let binding = appState.editorDocumentBinding(for: session)
         let editor = MarkdownEditorView(
             text: binding.text,
             fileKind: .markdown,
+            syntaxTheme: syntaxTheme,
+            customTheme: customTheme,
             showsLineNumbers: false,
             documentIdentity: AppState.editorDocumentIdentity(for: documentURL),
             documentBindingID: binding.id,

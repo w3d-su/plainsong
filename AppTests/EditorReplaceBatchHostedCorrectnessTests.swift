@@ -49,7 +49,7 @@ extension EditorFindHostedGateTests {
             XCTAssertEqual(passes.reapplications, 1, "one authoritative post-write fold pass")
         }
         try await waitUntil("batch source reparses automatically") {
-            editor.replacePresentationSnapshot?.sourceRevision == hosted.appState.currentDocument.version
+            editor.replacePresentationSnapshot?.sourceRevision == hosted.appState.shownSession.version
         }
         assertHostedBatchRawSource(editor, source: expected)
         editor.textSelection = NSRange(location: 0, length: (expected as NSString).length)
@@ -84,10 +84,10 @@ extension EditorFindHostedGateTests {
         XCTAssertEqual(plan.totalCount, 3)
         XCTAssertEqual(plan.changedCount, 1)
         XCTAssertEqual(plan.differingRanges, [NSRange(location: 4, length: 3)])
-        XCTAssertEqual(hosted.appState.currentDocument.text, "hit hit hit")
+        XCTAssertEqual(hosted.appState.shownSession.text, "hit hit hit")
         let editor = try hostedEditor(hosted)
         editor.undoManager?.undo()
-        XCTAssertEqual(hosted.appState.currentDocument.text, "hit HIT hit")
+        XCTAssertEqual(hosted.appState.shownSession.text, "hit HIT hit")
         XCTAssertFalse(editor.undoManager?.canUndo == true)
     }
 
@@ -150,22 +150,22 @@ extension EditorFindHostedGateTests {
         let hosted = try await makeHostedBatchWorkspace()
         let app = hosted.appState
         let editor = try hostedEditor(hosted)
-        let source = app.currentDocument.text
+        let source = app.shownSession.text
         editor.insertText("!", replacementRange: NSRange(location: (source as NSString).length, length: 0))
         try await waitUntil("typing source rescans before explicit batch") {
             app.editorFindHost.controller.session != nil
-                && app.editorFindHost.controller.documentBinding.revision == UInt64(app.currentDocument.version)
+                && app.editorFindHost.controller.documentBinding.revision == UInt64(app.shownSession.version)
         }
-        let typed = app.currentDocument.text
+        let typed = app.shownSession.text
         let result = await app.performEditorReplaceAll(replacement: "NEW")
         guard case .delivered(.replaced) = result else { return XCTFail("expected batch, got \(result)") }
         editor.undoManager?.undo()
-        XCTAssertEqual(app.currentDocument.text, typed, "one Undo restores the batch's exact dirty baseline")
-        XCTAssertTrue(app.currentDocument.isDirty)
+        XCTAssertEqual(app.shownSession.text, typed, "one Undo restores the batch's exact dirty baseline")
+        XCTAssertTrue(app.shownSession.isDirty)
         XCTAssertTrue(editor.undoManager?.canUndo == true, "earlier typing history is preserved")
         editor.undoManager?.undo()
-        XCTAssertEqual(app.currentDocument.text, source)
-        XCTAssertFalse(app.currentDocument.isDirty)
+        XCTAssertEqual(app.shownSession.text, source)
+        XCTAssertFalse(app.shownSession.isDirty)
     }
 
     func testHostedReplaceAllOversizedAndNewlineReplacementRefuseBeforeAnyWrite() async throws {
@@ -189,24 +189,24 @@ extension EditorFindHostedGateTests {
         let app = hosted.appState
         let editor = try hostedEditor(hosted)
         let controller = app.editorFindHost.controller
-        let source = app.currentDocument.text
+        let source = app.shownSession.text
         let selection = editor.selectedRange()
-        let wasDirty = app.currentDocument.isDirty
-        let revision = app.currentDocument.version
+        let wasDirty = app.shownSession.isDirty
+        let revision = app.shownSession.version
         let schedules = controller.replacementScheduleCount
         let scans = controller.replacementEngineInvocationCount
         let publications = controller.recordedReplacementPublicationCount
         let result = await app.performEditorReplaceAll(replacement: replacement)
         guard case .delivered(.replaced) = result else { return XCTFail("expected batch commit, got \(result)") }
         XCTAssertEqual(app.editorFindHost.replaceAuthority.lastAuthorizationRecord?.checkpoints, [.validation, .commit])
-        XCTAssertEqual(app.currentDocument.text, expected)
-        XCTAssertEqual(app.currentDocument.version, revision + 1, "one authoritative publication")
+        XCTAssertEqual(app.shownSession.text, expected)
+        XCTAssertEqual(app.shownSession.version, revision + 1, "one authoritative publication")
         XCTAssertEqual(controller.recordedReplacementPublicationCount, publications + 1)
         XCTAssertEqual(controller.replacementScheduleCount, schedules + 1)
         let rescanBegan = Date()
         try await waitUntil("one batch rescan clears current and stores the mapped anchor", timeout: timeout) {
             controller.replacementEngineInvocationCount == scans + 1
-                && controller.documentBinding.revision == UInt64(app.currentDocument.version)
+                && controller.documentBinding.revision == UInt64(app.shownSession.version)
                 && controller.session != nil
                 && controller.session?.currentOrdinal == nil
         }
@@ -217,7 +217,7 @@ extension EditorFindHostedGateTests {
         let presentationBegan = Date()
         if editor.wysiwygZeroWidthContentStorageDelegate != nil {
             try await waitUntil("authoritative post-batch source presentation applies", timeout: timeout) {
-                editor.replacePresentationSnapshot?.sourceRevision == app.currentDocument.version
+                editor.replacePresentationSnapshot?.sourceRevision == app.shownSession.version
             }
         }
         let presentationMilliseconds = Date().timeIntervalSince(presentationBegan) * 1000
@@ -227,13 +227,13 @@ extension EditorFindHostedGateTests {
         )
         try await beforeUndo()
         editor.undoManager?.undo()
-        XCTAssertEqual(app.currentDocument.text, source)
+        XCTAssertEqual(app.shownSession.text, source)
         XCTAssertEqual(editor.selectedRange(), selection)
-        XCTAssertEqual(app.currentDocument.isDirty, wasDirty)
+        XCTAssertEqual(app.shownSession.isDirty, wasDirty)
         XCTAssertFalse(editor.undoManager?.canUndo == true, "exactly one undo step")
         XCTAssertTrue(editor.undoManager?.canRedo == true)
         editor.undoManager?.redo()
-        XCTAssertEqual(app.currentDocument.text, expected)
+        XCTAssertEqual(app.shownSession.text, expected)
         XCTAssertEqual(editor.selectedRange(), NSRange(location: caret, length: 0))
     }
 }

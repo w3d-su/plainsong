@@ -15,7 +15,7 @@ extension EditorFindHostedGateTests {
         ])
         let appState = fixture.appState
         appState.openExternalFile(fixture.root)
-        try await waitUntil("workspace opens") { appState.currentDocument.fileURL != nil }
+        try await waitUntil("workspace opens") { appState.shownSession.fileURL != nil }
         let host = makeWorkspaceHost(appState: appState)
         registerTeardown(host: host, fixture: fixture)
 

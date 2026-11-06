@@ -83,7 +83,7 @@ PY
                 echo 'FAIL: old-save baseline mutation escaped the checks'; exit 1
             fi
             cat "$attempt/mutation.log"
-            if ! rg -q 'FAIL oldSaveLeavesNewRevisionDirty' "$attempt/mutation.log"; then
+            if ! grep -F -q 'FAIL oldSaveLeavesNewRevisionDirty' "$attempt/mutation.log"; then
                 echo 'FAIL: mutation did not fail at the expected invariant'; exit 1
             fi
             echo 'PASS: negative mutation detected at oldSaveLeavesNewRevisionDirty'
@@ -99,7 +99,7 @@ PY
                 echo 'FAIL: canonical-equivalence mutation escaped the checks'; exit 1
             fi
             cat "$attempt/unicode-mutation.log"
-            if ! rg -q 'FAIL unicodeBytesDefineDirty' "$attempt/unicode-mutation.log"; then
+            if ! grep -F -q 'FAIL unicodeBytesDefineDirty' "$attempt/unicode-mutation.log"; then
                 echo 'FAIL: Unicode mutation did not fail at the expected invariant'; exit 1
             fi
             echo 'PASS: negative mutation detected at unicodeBytesDefineDirty'

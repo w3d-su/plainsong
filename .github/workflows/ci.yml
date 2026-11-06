@@ -88,6 +88,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate committed acceptance resources
+        run: sha256sum --strict -c IOSAcceptanceTests/Resources/acceptance-resource-manifest.txt
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -215,6 +218,10 @@ jobs:
       - name: Build app
         if: ${{ matrix.build_app }}
         run: make build
+
+      - name: Check built update configuration
+        if: ${{ matrix.build_app }}
+        run: Scripts/check-shipped-update-configuration.sh "$XCODE_DERIVED_DATA/Build/Products/Debug/Plainsong.app/Contents/Info.plist"
 
       - name: Capture failure environment
         if: ${{ failure() || cancelled() }}

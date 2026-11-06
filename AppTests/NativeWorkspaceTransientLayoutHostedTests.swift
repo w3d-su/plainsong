@@ -86,7 +86,7 @@ extension EditorFindHostedGateTests {
         let fixture = try makeWorkspaceFixture(files: ["post.md": "# Layout\n"])
         let state = fixture.appState
         state.openExternalFile(fixture.root)
-        try await waitUntil("transient fixture opens") { state.currentDocument.fileURL != nil }
+        try await waitUntil("transient fixture opens") { state.shownSession.fileURL != nil }
         state.setLayoutMode(mode)
         let host = makeNativeLayoutHost(
             appState: state, shell: shell, setting: NativeInspectorIntent(true)

@@ -13,6 +13,7 @@ enum IOSShellPresentation: Hashable, Identifiable {
     case frontmatter
     case findReplace
     case imagePicker
+    case workspaceSearch
 
     var id: Self {
         self
@@ -100,8 +101,14 @@ struct IOSShellFeatureSurfaces {
     /// grant; a scene snapshot or derived parent is never an implicit grant.
     var currentGrant: (() -> IOSWorkspaceGrant?)?
 
+    /// Directory-grant read used by workspace search. Nil means search cannot
+    /// read files; the sheet explains that instead of scanning arbitrary URLs.
+    var readWorkspaceDocument: (@MainActor (IOSFileLocation) async throws -> String)?
+
     /// Conflict "Save a Copy" needs a destination picker + lease owned by
     /// composition; nil hides that button (W14).
+    var reviewCloudVersions: ((IOSDocumentIdentity) async throws -> IOSCloudVersionReview)?
+    var applyCloudVersion: ((UUID, IOSCloudVersionReview) async throws -> Void)?
     var resolveConflictCopy: (() -> Void)?
 
     /// Workspace refresh requires the live grant; composition routes it (W15).
@@ -110,4 +117,16 @@ struct IOSShellFeatureSurfaces {
     /// "Open file/folder" needs a UIDocumentPicker grant that must originate
     /// from user selection; composition owns the picker (W16). Nil hides Open.
     var openWorkspace: (() -> Void)?
+
+    /// Recent rows carry opaque record IDs; the scene's existing access service
+    /// alone restores bookmarks. Composition owns the list and picker handoff.
+    var showRecentWorkspaces: (() -> Void)?
+
+    /// Unavailable access requires explicit file/folder reselection, preserving
+    /// the recorded scope. This callback does not reload or replace source.
+    var reselectUnavailableWorkspace: (() -> Void)?
+
+    /// HTML and PDF export. Nil hides the command; the shell does not render
+    /// or write the file itself.
+    var exportDocument: ((IOSDocumentExportKind) -> Void)?
 }

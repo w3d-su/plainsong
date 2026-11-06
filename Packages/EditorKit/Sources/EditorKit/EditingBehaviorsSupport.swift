@@ -212,6 +212,11 @@ extension STTextView {
     @objc func plainsongNoopCommand(_: Any?) {}
 
     private func plainsongPerform(_ command: MarkdownEditCommand, sender _: Any?) {
+        // AppKit can fall back to the main window while Settings (or another non-workspace
+        // window) is key. A text view that is not itself key must not apply the command.
+        if let window, !window.isKeyWindow, NSApp?.keyWindow != nil {
+            return
+        }
         EditorCommandResponderRegistry.perform(command, in: self)
     }
 }

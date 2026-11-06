@@ -150,11 +150,11 @@ extension IOSWorkspaceAccessService {
                     )
                 }
             )
-            await markOwnedRemoved(asset.ownershipToken)
+            markOwnedRemoved(asset.ownershipToken)
             await finishHeld(ticket)
             return .removed
         } catch let failure as IOSWorkspaceFailure where failure == .notFound {
-            await markOwnedRemoved(asset.ownershipToken)
+            markOwnedRemoved(asset.ownershipToken)
             await finishHeld(ticket)
             return .removed
         } catch let draining as IOSDrainingCoordinationFailure {

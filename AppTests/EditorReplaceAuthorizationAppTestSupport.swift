@@ -21,7 +21,7 @@ extension EditorReplaceAuthorizationAppTests {
     // swiftlint:disable:next function_body_length
     func section56Fences(_ fixture: AnchoredFixture) throws -> [FenceCase] {
         let appState = fixture.appState
-        let session = appState.currentDocument
+        let session = appState.shownSession
         let identity = ObjectIdentifier(session)
         let url = try XCTUnwrap(appState.sessionStateURL(for: session))
         let installation = EditorDocumentBindingInstallation(
@@ -118,13 +118,13 @@ extension EditorReplaceAuthorizationAppTests {
             ("key window resigned", {
                 NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: window)
             }),
-            ("installation", { appState.editorBindingInstallations[installation] = appState.currentDocument }),
+            ("installation", { appState.editorBindingInstallations[installation] = appState.shownSession }),
             ("installation revoked", { appState.editorBindingInstallations[installation] = nil }),
             ("reload replaced content", { appState.notifyEditorFindExternalContentDidReplace() }),
             ("rekey", { appState.notifyEditorFindDocumentIdentityDidRekey() }),
             ("search activation", { appState.notifyEditorFindWorkspaceSearchWillNavigate(to: NSRange()) }),
             ("rebind", { appState.notifyEditorFindDocumentDidSwitch() }),
-            ("document switch", { appState.currentDocument = DocumentSession(text: "other") }),
+            ("document switch", { appState.shownSession = DocumentSession(text: "other") }),
             ("bar close", { self.setBarVisible(false, in: appState) }),
             ("workspace close", { appState.notifyEditorFindWorkspaceDidClose() }),
         ]
@@ -136,7 +136,7 @@ extension EditorReplaceAuthorizationAppTests {
         let location: WorkspaceFileSystemLocation
 
         func inspectionTask() -> ExternalDiskInspectionTask {
-            let session = appState.currentDocument
+            let session = appState.shownSession
             return ExternalDiskInspectionTask(
                 token: UUID(),
                 session: session,
@@ -150,7 +150,7 @@ extension EditorReplaceAuthorizationAppTests {
         }
 
         func reloadTask() -> ExternalReloadTask {
-            let session = appState.currentDocument
+            let session = appState.shownSession
             return ExternalReloadTask(
                 token: UUID(),
                 generation: 0,
@@ -195,7 +195,7 @@ extension EditorReplaceAuthorizationAppTests {
         let location = try authority.location(relativePath: "post.md")
         try Data("hit one".utf8).write(to: location.fileURL)
         let session = DocumentSession(text: "hit one", url: location.fileURL, fileKind: .markdown)
-        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let appState = AppState(shownSession: session, shouldRestoreLastOpenedFile: false)
         return AnchoredFixture(appState: appState, location: location)
     }
 
@@ -203,7 +203,7 @@ extension EditorReplaceAuthorizationAppTests {
     /// a designated key window, with Find open on `pattern` and the first match applied.
     func makeInstalledUntitled(source: String, pattern: String = "a") async throws -> InstalledUntitled {
         let session = DocumentSession(text: source, fileKind: .markdown)
-        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let appState = AppState(shownSession: session, shouldRestoreLastOpenedFile: false)
         let binding = appState.editorDocumentBinding(for: session)
         let frame = NSRect(x: 0, y: 0, width: 640, height: 240)
         let scrollView = MarkdownSTTextView.scrollableTextView(frame: frame)

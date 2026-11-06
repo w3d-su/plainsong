@@ -1,0 +1,58 @@
+{
+  "schema": "IOS-FEATURE-NATIVE-v1",
+  "status": "LOCAL_NATIVE_PASS",
+  "source_sha": "24d7a633f7277de6d545539229e4cfbc2e67dacd",
+  "source_dirty": false,
+  "source_fingerprint": "5c0a8a9c93ed9db6172a232f8dfefe2a12115fe386614b74f5084b3a2a43991f",
+  "local_runs": {
+    "modules": {
+      "executed": 488,
+      "passed": 488,
+      "failed": 0,
+      "skipped": 0,
+      "required_names": 121,
+      "scheme": "PlainsongIOS",
+      "destination": "platform=iOS Simulator,id=59CB04BD-26CC-4841-8D06-E75A2EDEBC66",
+      "raw_evidence": "/private/tmp/plainsong-ios-conflict-copy-ui-20261025/modules/evidence/24d7a633f727-test-20261025-160352-50567",
+      "complete_xcresult": "/private/tmp/plainsong-ios-conflict-copy-ui-20261025/modules/evidence/24d7a633f727-test-20261025-160352-50567/Results.xcresult",
+      "post_case_diagnostic_termination_recorded": false,
+      "receipt_sha256": {
+        "source.json": "5a468ab03dcd5932fd582b7900af79ed094855e07e4c5457b325f5ef393c0029",
+        "test.json": "eda183e56c59749e8ac1e228403d0b68a297d0d2efafedf447a3d6d83112625d",
+        "test-gate.json": "dc3fd255d69e084cf16d49f28575fa832e41c852045d04aa8e8671e3c3d66ab5",
+        "test-results.json": "faa9a920ba37c43b888ac3a319f9cc836cd26f627dba2bd96972447c826d3f54",
+        "required-tests.txt": "ec2fd6dae670f1a7a3e9d380105277ef704d6aec5d0862910de0989944d0d2ca",
+        "named-tests.txt": "0bb58dab45f21c5a634e4b81962b134f1454b144e443e2dcc5e8ae7562e653f6",
+        "admission.json": "6ac04f8f0543348771cca86d6ee5e583fe0f4ed21a9d1850f884b9cd4503c0ab",
+        "resources.json": "83f7b642212306339c654013c5546466bcff200dc1c9594c57f600498351e123"
+      }
+    },
+    "launch": {
+      "executed": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "required_names": 2,
+      "scheme": "IOSAcceptance",
+      "destination": "platform=iOS Simulator,id=59CB04BD-26CC-4841-8D06-E75A2EDEBC66",
+      "raw_evidence": "/private/tmp/plainsong-ios-conflict-copy-ui-20261025/launch/evidence/24d7a633f727-acceptance-20261025-160618-52869",
+      "complete_xcresult": "/private/tmp/plainsong-ios-conflict-copy-ui-20261025/launch/evidence/24d7a633f727-acceptance-20261025-160618-52869/Results.xcresult",
+      "post_case_diagnostic_termination_recorded": false,
+      "receipt_sha256": {
+        "source.json": "5a468ab03dcd5932fd582b7900af79ed094855e07e4c5457b325f5ef393c0029",
+        "test.json": "ad7860950bb541b78ee63b172c49d7ca3703265def6c162450d4f589efb10559",
+        "test-gate.json": "a236d9bbf63cccc979142364db161103519708be5fb1c2af1aab455d7f222b6b",
+        "test-results.json": "60bc81ec7d6dba5648afc10c9f9372880528c2ef1d8d2038a6c595a5797f9832",
+        "required-tests.txt": "759bb5a51aa4363180b4573e29c73d0b7b8047ab1630dec55bc55e6bef854ceb",
+        "named-tests.txt": "79bf266d96d182adf8c1a6fc108ceaf4b1f048a069c0944fbfcae78fdc91538d",
+        "admission.json": "5f1683bccd9062f58ce7bed6211d7dfa24bced4e4bce5ab311f3e85abde85e12",
+        "resources.json": "f35e055155fd6a6f828d672051534ce5499ab0aad3e2cd0a49e6a8ade96a99c6"
+      }
+    }
+  },
+  "boundaries": [
+    "Native execution belongs only to this SHA; later documentation commits are separate.",
+    "UI smoke proves production shell/presentation only; real-provider workflows are module tests.",
+    "Exact-head CI, owner installation and Files/iCloud operations, physical iPad/minimum OS26, VoiceOver, keyboard and performance are separate gates."
+  ]
+}

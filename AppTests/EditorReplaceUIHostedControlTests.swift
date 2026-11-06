@@ -117,7 +117,7 @@ extension EditorFindHostedGateTests {
             replace.isEnabled && replaceAll.isEnabled && app.editorFindHost.ui.replacementText.isEmpty
         }
         replace.performClick(nil)
-        XCTAssertEqual(app.currentDocument.text, " one hit two")
+        XCTAssertEqual(app.shownSession.text, " one hit two")
         XCTAssertTrue(MenuBarSnapshot(appState: app).canReplace)
     }
 
@@ -128,7 +128,7 @@ extension EditorFindHostedGateTests {
         XCTAssertTrue(isReplacementFieldFirstResponder(in: window))
 
         try await click(EditorFindAccessibility.replaceButton, in: window)
-        XCTAssertEqual(app.currentDocument.text, "$1\\n one hit two hit", "literal: no escape expansion")
+        XCTAssertEqual(app.shownSession.text, "$1\\n one hit two hit", "literal: no escape expansion")
         try await waitUntil("post-write rescan advances to the next retained match") {
             app.editorFindHost.controller.session?.currentOrdinal == 1
                 && app.editorFindHost.controller.session?.total == 2
@@ -140,12 +140,12 @@ extension EditorFindHostedGateTests {
             self.appliedRange(in: window) == app.editorFindHost.controller.session?.currentMatch?.range
         }
         fieldEditor.doCommand(by: #selector(NSResponder.insertNewline(_:)))
-        XCTAssertEqual(app.currentDocument.text, "$1\\n one $1\\n two hit")
+        XCTAssertEqual(app.shownSession.text, "$1\\n one $1\\n two hit")
         XCTAssertTrue(isReplacementFieldFirstResponder(in: window), "Replace never takes focus from the field")
         XCTAssertEqual(app.editorFindHost.ui.replacementText, "$1\\n", "Return never edits the value")
         let editor = try hostedEditor(hosted)
         editor.undoManager?.undo()
-        XCTAssertEqual(app.currentDocument.text, "$1\\n one hit two hit", "each Replace is one undo step")
+        XCTAssertEqual(app.shownSession.text, "$1\\n one hit two hit", "each Replace is one undo step")
     }
 
     func testHostedReplaceAllButtonSpeaksChangedOfTotalAndNoChanges() async throws {
@@ -154,7 +154,7 @@ extension EditorFindHostedGateTests {
         let window = hosted.window
         try await click(EditorFindAccessibility.replaceAllButton, in: window)
         await awaitBarReplaceAll(app)
-        XCTAssertEqual(app.currentDocument.text, "HIT HIT HIT")
+        XCTAssertEqual(app.shownSession.text, "HIT HIT HIT")
         XCTAssertEqual(
             app.editorFindHost.replaceStatus,
             EditorReplaceStatus(kind: .result, text: "Changed 2 of 3 matches")
@@ -173,7 +173,7 @@ extension EditorFindHostedGateTests {
         }
         try await click(EditorFindAccessibility.replaceAllButton, in: window)
         await awaitBarReplaceAll(app)
-        XCTAssertEqual(app.currentDocument.text, "HIT HIT HIT")
+        XCTAssertEqual(app.shownSession.text, "HIT HIT HIT")
         XCTAssertEqual(app.editorFindHost.lastReplaceAnnouncement, "No changes")
         try await waitUntil("No changes is shown as text") {
             self.label(EditorFindAccessibility.replaceStatus, in: window)?.stringValue == "No changes"
@@ -199,7 +199,7 @@ extension EditorFindHostedGateTests {
         XCTAssertFalse(editor.undoManager?.canUndo == true)
 
         // The transient inspection window after every autosave is a momentary blocked state.
-        let session = app.currentDocument
+        let session = app.shownSession
         let location = try WorkspaceFileSystemLocation(fileURL: hosted.postURL)
         app.externalDiskInspectionTasks[ObjectIdentifier(session)] = ExternalDiskInspectionTask(
             token: UUID(), session: session, canonicalURL: location.fileURL, location: location,
@@ -225,9 +225,9 @@ extension EditorFindHostedGateTests {
 
         // Once the inspection settles, a fresh explicit action proceeds; nothing was queued.
         app.externalDiskInspectionTasks[ObjectIdentifier(session)] = nil
-        XCTAssertEqual(app.currentDocument.text, before.appText)
+        XCTAssertEqual(app.shownSession.text, before.appText)
         try await click(EditorFindAccessibility.replaceButton, in: window)
-        XCTAssertNotEqual(app.currentDocument.text, before.appText)
+        XCTAssertNotEqual(app.shownSession.text, before.appText)
         XCTAssertEqual(app.editorFindHost.replaceStatus, EditorReplaceStatus(kind: .result, text: "Replaced 1 match"))
         XCTAssertEqual(app.editorFindHost.lastReplaceAnnouncement, "Replaced 1 match")
     }
@@ -241,7 +241,7 @@ extension EditorFindHostedGateTests {
         let app = hosted.appState
         try await click(EditorFindAccessibility.replaceAllButton, in: hosted.window)
         await awaitBarReplaceAll(app)
-        XCTAssertEqual(app.currentDocument.text, String(repeating: "NEW ", count: 4000))
+        XCTAssertEqual(app.shownSession.text, String(repeating: "NEW ", count: 4000))
         #if DEBUG
             let trace = app.editorFindHost.replaceBarTrace
             XCTAssertTrue(

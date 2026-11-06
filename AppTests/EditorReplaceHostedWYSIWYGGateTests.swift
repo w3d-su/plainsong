@@ -37,13 +37,13 @@ extension EditorFindHostedGateTests {
             self.hostedImageMarker(editor) != nil
         }
         try await waitForHostedReplaceAuthorization(hosted)
-        let before = hosted.appState.currentDocument.text
+        let before = hosted.appState.shownSession.text
         let match = try XCTUnwrap(hosted.appState.editorFindHost.controller.session?.currentMatch?.range)
         XCTAssertEqual(
             hosted.appState.performEditorReplace(replacement: "新🦊"),
             .delivered(.navigatedToCurrentMatch(match))
         )
-        XCTAssertEqual(hosted.appState.currentDocument.text, before)
+        XCTAssertEqual(hosted.appState.shownSession.text, before)
         try await waitForHostedReveal(hosted, match: match)
         XCTAssertNil(hostedImageMarker(editor))
         try await commitHostedReplaceAndUndoRedo(hosted, replacement: "新🦊")
@@ -76,9 +76,9 @@ extension EditorFindHostedGateTests {
             editor.replacePresentationSnapshot?.styledText.foldPlan?.imageRegions.isEmpty == true
                 && self.hostedImageMarker(editor) == nil
         }
-        let source = hosted.appState.currentDocument.text
+        let source = hosted.appState.shownSession.text
         editor.insertText("!", replacementRange: NSRange(location: (source as NSString).length, length: 0))
-        XCTAssertEqual(hosted.appState.currentDocument.text, source + "!")
+        XCTAssertEqual(hosted.appState.shownSession.text, source + "!")
     }
 
     func testHostedReplaceInvalidDelimiterStaysRawWithoutMarkdownRepair() async throws {
@@ -95,10 +95,10 @@ extension EditorFindHostedGateTests {
         let editor = try hostedEditor(hosted)
         editor.textSelection = NSRange(location: 0, length: 0)
         try await waitUntil("malformed delimiter remains raw after post-write parse") {
-            editor.replacePresentationSnapshot?.sourceRevision == hosted.appState.currentDocument.version
+            editor.replacePresentationSnapshot?.sourceRevision == hosted.appState.shownSession.version
                 && editor.replacePresentationSnapshot?.styledText.foldPlan?.regions.isEmpty == true
         }
-        XCTAssertEqual(hosted.appState.currentDocument.text, "Intro one** tail")
+        XCTAssertEqual(hosted.appState.shownSession.text, "Intro one** tail")
     }
 
     /// PR F review: the heading owner is revealed by the selection, while the strong it
@@ -109,7 +109,7 @@ extension EditorFindHostedGateTests {
         try await waitForHostedReplaceWYSIWYG(hosted)
         try await waitForHostedReplaceAuthorization(hosted)
         let editor = try hostedEditor(hosted)
-        let source = hosted.appState.currentDocument.text
+        let source = hosted.appState.shownSession.text
         editor.textSelection = NSRange(location: (source as NSString).length, length: 0)
         try await waitUntil("heading and nested strong fold through production presentation") {
             let regions = editor.replacePresentationSnapshot?.styledText.foldPlan?.regions ?? []
@@ -120,7 +120,7 @@ extension EditorFindHostedGateTests {
             hosted.appState.performEditorReplace(replacement: "WORD"),
             .delivered(.navigatedToCurrentMatch(match))
         )
-        XCTAssertEqual(hosted.appState.currentDocument.text, source)
+        XCTAssertEqual(hosted.appState.shownSession.text, source)
         try await waitForHostedReveal(hosted, match: match)
         let regions = try XCTUnwrap(editor.replacePresentationSnapshot?.styledText.foldPlan?.regions)
         XCTAssertEqual(regions.first { $0.kind == .heading(level: 1) }?.isRevealed, true)
@@ -133,11 +133,11 @@ extension EditorFindHostedGateTests {
             ))
         }
         try await commitHostedReplaceAndUndoRedo(hosted, replacement: "WORD")
-        XCTAssertEqual(hosted.appState.currentDocument.text, "# Title **bold** WORD")
-        editor.textSelection = NSRange(location: (hosted.appState.currentDocument.text as NSString).length, length: 0)
+        XCTAssertEqual(hosted.appState.shownSession.text, "# Title **bold** WORD")
+        editor.textSelection = NSRange(location: (hosted.appState.shownSession.text as NSString).length, length: 0)
         try await waitUntil("heading and nested strong refold from post-write source") {
             let regions = editor.replacePresentationSnapshot?.styledText.foldPlan?.regions ?? []
-            return editor.replacePresentationSnapshot?.sourceRevision == hosted.appState.currentDocument.version
+            return editor.replacePresentationSnapshot?.sourceRevision == hosted.appState.shownSession.version
                 && regions.count == 2 && regions.allSatisfy { !$0.isRevealed }
         }
     }
@@ -168,10 +168,10 @@ extension EditorFindHostedGateTests {
             guard case .delivered(.replaced) = hosted.appState.performEditorReplace(replacement: "NEW") else {
                 return XCTFail("production dispatch must replace in \(mode)")
             }
-            XCTAssertEqual(hosted.appState.currentDocument.text, "# Hosted\n\nNEW one hit two")
+            XCTAssertEqual(hosted.appState.shownSession.text, "# Hosted\n\nNEW one hit two")
             XCTAssertEqual(controller.replacementScheduleCount, schedules + 1)
             XCTAssertEqual(try MarkdownTextView.textStorage(of: hostedEditor(hosted))?.string,
-                           hosted.appState.currentDocument.text)
+                           hosted.appState.shownSession.text)
             if let webView {
                 try await waitUntil("normal publication updates live preview", timeout: 8) {
                     try await (webView.evaluateJavaScript("document.body.textContent") as? String)?
@@ -199,13 +199,13 @@ extension EditorFindHostedGateTests {
             hosted.appState.performEditorReplace(replacement: replacement),
             .delivered(.navigatedToCurrentMatch(match))
         )
-        XCTAssertEqual(hosted.appState.currentDocument.text, source)
+        XCTAssertEqual(hosted.appState.shownSession.text, source)
         XCTAssertFalse(editor.undoManager?.canUndo == true)
         try await waitForHostedReveal(hosted, match: match)
         try await commitHostedReplaceAndUndoRedo(hosted, replacement: replacement)
         editor.textSelection = NSRange(location: 0, length: 0)
         try await waitUntil("valid construct refolds from post-write source") {
-            editor.replacePresentationSnapshot?.sourceRevision == hosted.appState.currentDocument.version
+            editor.replacePresentationSnapshot?.sourceRevision == hosted.appState.shownSession.version
                 && editor.replacePresentationSnapshot?.styledText.foldPlan?.regions.contains {
                     $0.kind == kind && !$0.isRevealed
                 } == true
@@ -214,7 +214,7 @@ extension EditorFindHostedGateTests {
 
     private func waitForHostedReplaceAuthorization(_ hosted: HostedReplaceWorkspace) async throws {
         try await waitUntil("initial external inspection settles before the explicit command") {
-            hosted.appState.editorReplaceAuthorizationDecision(for: hosted.appState.currentDocument) == .allowed
+            hosted.appState.editorReplaceAuthorizationDecision(for: hosted.appState.shownSession) == .allowed
         }
     }
 
@@ -243,7 +243,7 @@ extension EditorFindHostedGateTests {
     private func commitHostedReplaceAndUndoRedo(_ hosted: HostedReplaceWorkspace, replacement: String) async throws {
         let app = hosted.appState
         let editor = try hostedEditor(hosted)
-        let source = app.currentDocument.text
+        let source = app.shownSession.text
         let originalPlan = try XCTUnwrap(editor.replacePresentationSnapshot?.styledText.foldPlan)
         let match = try XCTUnwrap(app.editorFindHost.controller.session?.currentMatch?.range)
         let expected = (source as NSString).replacingCharacters(in: match, with: replacement)
@@ -253,18 +253,18 @@ extension EditorFindHostedGateTests {
             return XCTFail("second explicit action must commit through App and dispatcher")
         }
         XCTAssertEqual(app.editorFindHost.replaceAuthority.lastAuthorizationRecord?.checkpoints, [.validation, .commit])
-        XCTAssertEqual(app.currentDocument.text, expected)
+        XCTAssertEqual(app.shownSession.text, expected)
         XCTAssertEqual(app.editorFindHost.controller.replacementScheduleCount, schedules + 1)
         try await waitUntil("post-write authoritative source reparses") {
-            editor.replacePresentationSnapshot?.sourceRevision == app.currentDocument.version
+            editor.replacePresentationSnapshot?.sourceRevision == app.shownSession.version
         }
-        XCTAssertEqual(editor.replacePresentationSnapshot?.sourceRevision, app.currentDocument.version,
+        XCTAssertEqual(editor.replacePresentationSnapshot?.sourceRevision, app.shownSession.version,
                        hostedPresentationDiagnostics(hosted, editor))
         assertHostedRawValue(editor, source: expected)
         editor.undoManager?.undo()
-        XCTAssertEqual(app.currentDocument.text, source)
+        XCTAssertEqual(app.shownSession.text, source)
         try await waitUntil("undo source reparses automatically") {
-            editor.replacePresentationSnapshot?.sourceRevision == app.currentDocument.version
+            editor.replacePresentationSnapshot?.sourceRevision == app.shownSession.version
         }
         assertHostedRawValue(editor, source: source)
         XCTAssertEqual(editor.replacePresentationSnapshot?.styledText.foldPlan?.regions.map(\.sourceRange),
@@ -274,11 +274,11 @@ extension EditorFindHostedGateTests {
         XCTAssertFalse(editor.undoManager?.canUndo == true)
         XCTAssertTrue(editor.undoManager?.canRedo == true)
         editor.undoManager?.redo()
-        XCTAssertEqual(app.currentDocument.text, expected)
+        XCTAssertEqual(app.shownSession.text, expected)
         try await waitUntil("redo source reparses automatically") {
-            editor.replacePresentationSnapshot?.sourceRevision == app.currentDocument.version
+            editor.replacePresentationSnapshot?.sourceRevision == app.shownSession.version
         }
-        XCTAssertEqual(editor.replacePresentationSnapshot?.sourceRevision, app.currentDocument.version,
+        XCTAssertEqual(editor.replacePresentationSnapshot?.sourceRevision, app.shownSession.version,
                        hostedPresentationDiagnostics(hosted, editor))
         assertHostedRawValue(editor, source: expected)
     }
@@ -287,7 +287,7 @@ extension EditorFindHostedGateTests {
                                                _ editor: MarkdownSTTextView) -> String
     {
         let coordinator = editor.textDelegate as? MarkdownTextViewCoordinator
-        return "source=\(hosted.appState.currentDocument.text) selection=\(editor.selectedRange()) editing=\(String(describing: coordinator?.isUserEditing)) applied=\(String(describing: coordinator?.lastAppliedHighlightRevision)) currentView=\(editor === editorTextView(in: hosted.window)) parsed=\(String(describing: editor.replacePresentationSnapshot?.styledText.range))"
+        return "source=\(hosted.appState.shownSession.text) selection=\(editor.selectedRange()) editing=\(String(describing: coordinator?.isUserEditing)) applied=\(String(describing: coordinator?.lastAppliedHighlightRevision)) currentView=\(editor === editorTextView(in: hosted.window)) parsed=\(String(describing: editor.replacePresentationSnapshot?.styledText.range))"
     }
 
     private func assertHostedRawValue(_ editor: MarkdownSTTextView, source: String) {

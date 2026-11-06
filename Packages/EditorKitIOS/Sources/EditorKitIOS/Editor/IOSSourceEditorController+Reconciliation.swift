@@ -63,6 +63,7 @@ extension IOSSourceEditorController {
             of: textView,
             theme: theme
         )
+        rebuildLineIndex()
         scheduleHighlight()
         emitSnapshot()
         return .installed(currentRevision(installation))

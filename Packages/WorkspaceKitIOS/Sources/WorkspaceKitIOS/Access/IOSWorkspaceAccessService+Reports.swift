@@ -31,9 +31,13 @@ extension IOSWorkspaceAccessService {
 
     func remember(record: IOSWorkspaceScopeRecord, bookmark: Data) {
         var items = ports.recents.load()
+        let restoringID = items.first {
+            recentRestoreRequests[$0.recordID] != nil && $0.bookmark == bookmark && $0.scope == record.scope
+        }?.recordID
         let matchingIDs = Set(items.filter { matchesRecent($0, record: record) }.map(\.recordID))
-        let recentID = items.first { matchingIDs.contains($0.recordID) }?.recordID ?? UUID()
-        items.removeAll { matchingIDs.contains($0.recordID) }
+        let recentID = restoringID ?? items.first { matchingIDs.contains($0.recordID) }?.recordID ?? UUID()
+        items.removeAll { $0.recordID == recentID || matchingIDs.contains($0.recordID) }
+        record.recentRecordID = recentID
         items.insert(
             IOSStoredRecentWorkspace(
                 recordID: recentID,
@@ -84,6 +88,17 @@ extension IOSWorkspaceAccessService {
         }
     }
 
+    func markUnusableBookmark(_ bookmark: Data, after error: Error) {
+        guard !(error is CancellationError) else { return }
+        switch IOSWorkspaceFailureMapping.map(error) {
+        case .permissionDenied, .invalidPath, .outsideGrant, .requiresDirectoryGrant, .notFound:
+            markBookmark(bookmark, status: .needsReselection)
+        default:
+            // A transient provider or coordination failure leaves the stored bytes retryable.
+            break
+        }
+    }
+
     func replaceBookmark(_ bookmark: Data, with refreshed: Data) {
         var items = ports.recents.load()
         var changed = false
@@ -111,6 +126,18 @@ extension IOSWorkspaceAccessService {
         guard let record = records[queued.workspaceID], !record.stopped else { return }
         guard record.generation == queued.generation, record.rootToken == queued.rootToken else { return }
         switch queued.notice {
+        case .rootChanged:
+            refreshRoot(record)
+        case .rootDeleted:
+            _ = invalidate(record.workspaceID)
+            publish(.unavailable(workspaceID: record.workspaceID, reason: .notFound))
+        case .rootMoved:
+            // The frozen grant has an immutable root; require a newly proved selection.
+            if let bookmark = record.bookmark {
+                markBookmark(bookmark, status: .needsReselection)
+            }
+            _ = invalidate(record.workspaceID)
+            publish(.unavailable(workspaceID: record.workspaceID, reason: .grantChanged))
         case .offlineRoot:
             publish(.unavailable(workspaceID: record.workspaceID, reason: .offline))
         case let .changed(path), let .deleted(path), let .availability(path, _):
@@ -122,6 +149,35 @@ extension IOSWorkspaceAccessService {
             if let destination = reportLocation(to, record: record) {
                 publish(.resourceChanged(destination))
             }
+        }
+    }
+
+    func refreshRoot(_ record: IOSWorkspaceScopeRecord) {
+        if record.scope == .singleFile {
+            if let location = reportLocation(record.displayName, record: record) {
+                publish(.resourceChanged(location))
+            }
+            return
+        }
+        let grant = record.grant
+        Task { @MainActor in
+            await self.refreshRoot(grant)
+        }
+    }
+
+    func refreshRoot(_ grant: IOSWorkspaceGrant) async {
+        let requestID = UUID()
+        do {
+            _ = try await refresh(grant, requestID: requestID)
+        } catch {
+            guard !(error is CancellationError), !Task.isCancelled else { return }
+            let failure = IOSWorkspaceFailureMapping.map(error)
+            guard failure != .grantChanged,
+                  let record = records[grant.workspaceID], !record.revoked, !record.stopped,
+                  record.generation == grant.accessGeneration,
+                  record.latestRequestID == requestID
+            else { return }
+            publish(.unavailable(workspaceID: grant.workspaceID, reason: failure))
         }
     }
 

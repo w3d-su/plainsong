@@ -39,7 +39,7 @@ extension ExportHTMLCommandAppTests {
                 let fixture = try makeFixture()
                 let destination = fixture.exportsDirectory.appendingPathComponent("stale.html")
                 let change = {
-                    fixture.appState.currentDocument = DocumentSession(
+                    fixture.appState.shownSession = DocumentSession(
                         text: close ? "" : "# Another document", fileKind: .markdown
                     )
                 }
@@ -183,7 +183,7 @@ extension ExportHTMLCommandAppTests {
             if recovery { fixture.appState.workspaceMutationTextRecoveryLoadFailed = true }
             else {
                 let other = DocumentSession(text: "# Recovered", fileKind: .markdown)
-                fixture.appState.sessionCache[fixture.root.appendingPathComponent("other.md")] = other
+                fixture.appState.registry.sessionCache[fixture.root.appendingPathComponent("other.md")] = other
                 fixture.appState
                     .unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(other)] = .unavailable(fileURL: nil)
             }

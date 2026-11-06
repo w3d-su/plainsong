@@ -1,5 +1,7 @@
 # Plainsong
 
+English | [繁體中文](README.zh-Hant.md)
+
 A native macOS Markdown/MDX editor, built with Swift (SwiftUI shell + AppKit/TextKit 2
 editor core) — in the spirit of Typora, tuned for blog authoring workflows
 (Astro/Next.js content folders, YAML frontmatter, CJK-friendly).
@@ -80,23 +82,48 @@ supported. Live fixture coverage: `Fixtures/math.md`.
   as a workspace to grant directory scope.
 - **MDX components render as placeholder cards** (imports as chips, JSX as component
   cards); components are not executed.
-- **Preview images** are limited to PNG/JPEG/GIF/WebP up to 10 MiB; SVG is not rendered.
-  Remote images are off by default, and enabling them allows `https:` images only.
+- **Preview images** are PNG/JPEG/GIF/WebP up to 10 MiB, plus workspace SVG up to 1 MiB
+  shown only as an image after a structural check. `data:` SVG, inline `<svg>`, and SVG
+  in HTML/PDF export are not supported. Remote images are off by default, and enabling
+  them allows `https:` images only; a remote SVG is left to WebKit and is not validated.
+- **Editor color themes** can be imported from Settings ▸ Editor. A theme is a JSON
+  palette (`#RRGGBB` or `#RRGGBBAA` only; text, caret, and background must be opaque).
+  Imported themes are listed separately from Plainsong and Graphite. The preview still
+  uses the built-in system, light, and dark palettes. User CSS and per-slot fonts are
+  not supported.
 - **WYSIWYG is inline-only** (headings, emphasis/strike, inline code,
   list/quote styling, inline `[text](url)` links, and thumbnails for local PNG/JPEG/GIF/WebP
   images up to 10 MiB in a folder workspace). Reference links, autolinks, remote/SVG/
   single-file images, tables, code fences, and Mermaid/math stay as raw Markdown in the
   editor; the preview pane renders everything.
 - **Very large documents (about 1 MiB):** typing and scrolling work but are not instant.
-  The preview re-renders the whole document after each typing pause (one render at a
-  time).
+  After each typing pause the preview re-renders only the blocks you changed; a document
+  with link reference definitions or footnotes still re-renders whole.
 - **Sidebar:** The sidebar is fixed-width on macOS 14–26. On macOS 27+ it is resizable
   (220–320 pt) and collapsible with ⌃⌘S.
 - **No auto-update:** alpha builds are manual downloads.
 
 ## License
 
-Plainsong is open source under the [MIT License](LICENSE).
+Copyright © 2026 w3d-su.
+
+Plainsong is free software: you can redistribute it and/or modify it under the terms of the
+[GNU General Public License](LICENSE) as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version (SPDX: `GPL-3.0-or-later`).
+It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even
+the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
+[`LICENSE`](LICENSE) for details.
+
+The macOS editor links [STTextView](https://github.com/krzyzanowskim/STTextView) 2.4.1, which
+its author offers to open-source applications under the GPLv3
+([`docs/third-party/STTextView-2.4.1-LICENSE.md`](docs/third-party/STTextView-2.4.1-LICENSE.md)).
+That is why Plainsong is GPL. Earlier versions, including every release through
+`v0.1.0-alpha.5`, were published under the MIT License and remain available under it.
+
+The App target also links [Sparkle](https://github.com/sparkle-project/Sparkle) 2.10.0.
+Updates stay off unless `PLAINSONG_UPDATES_ENABLED` is YES. Sparkle is MIT and bundles
+bsdiff, sais-lite, and orlp/ed25519; those notices are in
+[`docs/third-party/Sparkle-2.10.0-LICENSE.txt`](docs/third-party/Sparkle-2.10.0-LICENSE.txt).
 
 Feedback and bug reports: [GitHub Issues](https://github.com/w3d-su/plainsong/issues).
 The app collects no telemetry; alpha builds are distributed as direct downloads
