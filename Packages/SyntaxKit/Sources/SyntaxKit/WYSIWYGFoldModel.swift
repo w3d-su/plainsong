@@ -9,17 +9,23 @@ public struct WYSIWYGFoldPlan: Equatable {
     /// Syntax-only image metadata. Presentation deliberately ignores these regions until
     /// the later image-thumbnail render-policy gates are complete.
     public let imageRegions: [MarkdownInlineImageRegion]
+    /// Every pipe table in the parse range, eligible or raw. Empty unless the parse was
+    /// asked for table regions (`docs/table-wysiwyg-gates.md` T1); nothing presents them
+    /// until the later table gates pass.
+    public let tableRegions: [WYSIWYGTableRegion]
     public let linkFoldingEnabled: Bool
 
     public init(
         visibleRange: NSRange,
         regions: [WYSIWYGFoldRegion],
         imageRegions: [MarkdownInlineImageRegion] = [],
+        tableRegions: [WYSIWYGTableRegion] = [],
         linkFoldingEnabled: Bool = false
     ) {
         self.visibleRange = visibleRange
         self.regions = regions
         self.imageRegions = imageRegions
+        self.tableRegions = tableRegions
         self.linkFoldingEnabled = linkFoldingEnabled
     }
 

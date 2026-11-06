@@ -828,7 +828,7 @@ editor *folds* markdown tokens via rendering, not text mutation:
 - Tables in WYSIWYG: the paragraph projection turns cell-starting pipes into `\t` with
   per-row left tab stops, hides other structure, and collapses the delimiter row; cells edit
   in place and structural edits reveal the whole table (`docs/table-wysiwyg-gates.md`). T0
-  passed; tables stay raw with the table helper (§6.3) until T1–T11 pass. Mermaid stays raw.
+  and T1 passed; tables stay raw with the table helper (§6.3) until T2–T11 pass. Mermaid stays raw.
 - Undo, IME composition (Chinese input!), and selection across folded tokens are the risk
   areas — write exploratory tests early. **IME correctness is non-negotiable: test with
   Traditional Chinese (Zhuyin/Pinyin) marked text at every change.**
