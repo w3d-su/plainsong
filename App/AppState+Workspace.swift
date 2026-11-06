@@ -680,15 +680,14 @@ extension AppState {
         _ result: WorkspaceNotCommittedFileWrite,
         destinationURL: URL
     ) -> MarkdownFileStoreError {
-        guard result.artifactState != .none else {
-            return .unwritable(destinationURL)
+        if result.artifactState != .none {
+            retainFileWriteArtifactNotice(
+                destinationURL: destinationURL,
+                destinationWasCommitted: false,
+                artifactState: result.artifactState
+            )
         }
-        retainFileWriteArtifactNotice(
-            destinationURL: destinationURL,
-            destinationWasCommitted: false,
-            artifactState: result.artifactState
-        )
-        return .writeNotCommittedWithCleanupRequired(destinationURL, result)
+        return .notCommitted(result, destinationURL: destinationURL)
     }
 
     /// A typed writer precondition can discover the same external B version before an FSEvent

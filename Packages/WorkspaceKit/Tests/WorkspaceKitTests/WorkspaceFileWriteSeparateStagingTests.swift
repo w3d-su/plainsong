@@ -282,10 +282,51 @@ extension WorkspaceAnchoredFileSystemTests {
             )
         )
 
-        XCTAssertNotNil(requireNotCommitted(outcome, reason: .unreadable))
+        XCTAssertNotNil(requireNotCommitted(outcome, reason: .writeNotPermitted))
         XCTAssertTrue(staging.anchoredSeparateDirectory, "EACCES on the sibling falls back")
         XCTAssertEqual(try writeText(at: fixture.destination), "original")
         XCTAssertEqual(try writeFileIdentity(at: fixture.destination), originalIdentity)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: stagingURL.path))
+        try assertNoWriteArtifacts(for: fixture)
+        try assertFixtureSentinel(fixture)
+    }
+
+    /// The same real `0500` parent for a new file: the exclusive commit rename is refused with
+    /// `EACCES`, and that errno, not a generic failure, is the reported reason.
+    func testPermissionDeniedParentFallsBackAndReportsDeniedExclusiveCreate() throws {
+        let fixture = try makeWriteFixture(originalText: nil)
+        let destinationParent = fixture.destination.deletingLastPathComponent()
+        defer {
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o700],
+                ofItemAtPath: destinationParent.path
+            )
+            try? FileManager.default.removeItem(at: fixture.parent)
+        }
+        let stagingURL = try makeStagingDirectory(in: fixture)
+        let staging = StagingDirectoryRecorder()
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o500],
+            ofItemAtPath: destinationParent.path
+        )
+        try XCTSkipIf(
+            Darwin.access(destinationParent.path, W_OK) == 0,
+            "Running as a user that bypasses directory permissions"
+        )
+
+        let outcome = write(
+            to: fixture,
+            expecting: .missing,
+            hooks: WorkspaceAnchoredFileSystem.Hooks(
+                eventHandler: staging.record,
+                itemReplacementDirectory: staging.provider { _ in stagingURL }
+            )
+        )
+
+        let result = try XCTUnwrap(requireNotCommitted(outcome, reason: .writeNotPermitted))
+        XCTAssertEqual(result.artifactState, .none)
+        XCTAssertTrue(staging.anchoredSeparateDirectory, "EACCES on the sibling falls back")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.destination.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: stagingURL.path))
         try assertNoWriteArtifacts(for: fixture)
         try assertFixtureSentinel(fixture)

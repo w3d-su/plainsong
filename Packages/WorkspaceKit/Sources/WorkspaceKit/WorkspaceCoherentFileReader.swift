@@ -219,7 +219,8 @@ extension WorkspaceCoherentFileReader {
                 .namespaceChanged
             case .changedContent, .unstable:
                 .unstable
-            case .durabilityFailed, .cleanupFailed:
+            case .durabilityFailed, .cleanupFailed, .unsupportedVolume, .insufficientSpace,
+                 .readOnlyVolume, .writeNotPermitted:
                 .unreadable
             case .cancelled:
                 {
@@ -363,7 +364,11 @@ public enum WorkspaceNoFollowFileInspector {
                  .unstable,
                  .durabilityFailed,
                  .cleanupFailed,
-                 .cancelled:
+                 .cancelled,
+                 .unsupportedVolume,
+                 .insufficientSpace,
+                 .readOnlyVolume,
+                 .writeNotPermitted:
                 .unreadable
             }
         } catch {
