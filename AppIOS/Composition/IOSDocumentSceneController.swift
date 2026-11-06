@@ -263,9 +263,10 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
             clearInstallation()
             clearUnavailableReasonForCurrentGrant()
         case .retained:
-            // Keep the ticket/session/editor. A recovered draft is not permission
-            // to retire its live writer or replace it with a second open.
-            throw IOSDocumentFailure.closeFailed
+            guard let store = documents as? IOSUIDocumentStore else { throw IOSDocumentFailure.closeFailed }
+            try await store.retireRetainedWriter(handle.identity, disconnecting: isShuttingDown)
+            clearInstallation()
+            clearUnavailableReasonForCurrentGrant()
         }
     }
 

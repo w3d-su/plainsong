@@ -70,6 +70,9 @@ final class AppDocumentRegistry: ObservableObject {
         didSet { noteEditorReplaceAuthorityInputDidChange() }
     }
 
+    var editorInstallationWindows: [EditorDocumentBindingInstallation: RegisteredWindowState] = [:]
+    var retainedWorkspaceAuthorityOwners: [ObjectIdentifier: [RetiredWorkspaceAuthorityOwner]] = [:]
+
     var editorWriterInstallations: [ObjectIdentifier: EditorDocumentBindingInstallation] = [:]
     var pendingEditorSourceInstallations: [
         EditorDocumentBindingInstallation: DocumentSession

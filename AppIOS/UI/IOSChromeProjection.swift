@@ -36,6 +36,7 @@ struct IOSShellChromeSnapshot: Equatable {
     var isDirty = false
     var isSaving = false
     var status: Status = .noDocument
+    var hasCloudVersionConflict = false
     var statusDetail: String?
     var hasWorkspace = false
     var editorCanWrite = false
@@ -90,7 +91,10 @@ struct IOSShellChromeSnapshot: Equatable {
                 : "The file changed outside this editor. A recovery copy of your edits was saved."
         case let .unavailable(_, reason):
             status = .unavailable
-            statusDetail = IOSShellChromeSnapshot.describe(reason)
+            hasCloudVersionConflict = reason == .conflict
+            statusDetail = hasCloudVersionConflict
+                ? "iCloud has conflicting versions. Review the versions and choose which one to keep."
+                : IOSShellChromeSnapshot.describe(reason)
         case .closed:
             status = .closed
         }

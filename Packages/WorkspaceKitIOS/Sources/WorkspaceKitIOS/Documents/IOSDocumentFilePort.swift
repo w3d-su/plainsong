@@ -14,7 +14,9 @@ struct IOSDocumentFileOpenResult: Sendable {
 enum IOSDocumentFileEvent: Equatable, Sendable {
     case externalChange
     case deleted
-    case becameReadOnly
+    case writePermissionChanged(Bool)
+    case providerStateChanged
+    case unresolvedVersions
     case downloading
     case offline
     /// UIDocument relocated a file on its own. The new URL is not a grant.

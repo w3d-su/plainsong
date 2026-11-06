@@ -156,6 +156,74 @@ final class WorkspaceKitTests: XCTestCase {
         )
     }
 
+    func testWriteRefusalsExplainTheCauseAndTheNextStep() {
+        let url = URL(fileURLWithPath: "/Volumes/USB/post.md")
+
+        XCTAssertEqual(
+            MarkdownFileStoreError.unsupportedVolume(url).localizedDescription,
+            "Could not save changes to post.md because its disk cannot replace files safely. Plainsong " +
+                "saves by swapping in a complete new copy in one step, which disks formatted as exFAT, " +
+                "FAT32, or Mac OS Extended do not support. Copy the file to a folder on your Mac or to " +
+                "an APFS disk and edit it there."
+        )
+        XCTAssertEqual(
+            MarkdownFileStoreError.insufficientSpace(url).localizedDescription,
+            "Could not save changes to post.md because its disk is full. Free up space on the disk, " +
+                "then save again."
+        )
+        XCTAssertEqual(
+            MarkdownFileStoreError.readOnlyVolume(url).localizedDescription,
+            "Could not save changes to post.md because its disk is read-only. Copy the file to a " +
+                "folder you can write to and edit it there."
+        )
+        XCTAssertEqual(
+            MarkdownFileStoreError.writeNotPermitted(url).localizedDescription,
+            "Could not save changes to post.md because writing to it is not permitted. The file may " +
+                "be locked, its permissions may have changed, or access to its folder may have been " +
+                "revoked. Check the file with Get Info in the Finder, or open it again."
+        )
+    }
+
+    func testNotCommittedErrorKeepsArtifactsAndNamesActionableReasons() throws {
+        let destinationURL = URL(fileURLWithPath: "/tmp/post.md")
+        let reasons: [(WorkspaceAnchoredFileSystemError, MarkdownFileStoreError)] = [
+            (.unsupportedVolume, .unsupportedVolume(destinationURL)),
+            (.insufficientSpace, .insufficientSpace(destinationURL)),
+            (.readOnlyVolume, .readOnlyVolume(destinationURL)),
+            (.writeNotPermitted, .writeNotPermitted(destinationURL)),
+            (.unreadable, .unwritable(destinationURL)),
+            (.durabilityFailed, .unwritable(destinationURL)),
+            (.namespaceChanged, .unwritable(destinationURL)),
+        ]
+        for (reason, expected) in reasons {
+            let result = WorkspaceNotCommittedFileWrite(reason: reason, artifactState: .none)
+            XCTAssertEqual(MarkdownFileStoreError.notCommitted(result, destinationURL: destinationURL), expected)
+            XCTAssertThrowsError(
+                try MarkdownFileStore.mapLegacySaveOutcome(.notCommitted(result), destinationURL: destinationURL)
+            ) { error in
+                XCTAssertEqual(error as? MarkdownFileStoreError, expected)
+            }
+        }
+
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let artifact = try WorkspaceFileSystemRootAuthority(rootURL: root)
+            .location(relativePath: ".plainsong-write-1.tmp")
+        let full = WorkspaceNotCommittedFileWrite(reason: .insufficientSpace, artifactState: .retained(artifact))
+        let fullError = MarkdownFileStoreError.notCommitted(full, destinationURL: destinationURL)
+        XCTAssertEqual(fullError, .writeNotCommittedWithCleanupRequired(destinationURL, full))
+        XCTAssertEqual(
+            fullError.localizedDescription,
+            "post.md was not replaced because its disk is full, but a recovery artifact was retained at " +
+                "\(artifact.fileURL.path)."
+        )
+        let generic = WorkspaceNotCommittedFileWrite(reason: .unreadable, artifactState: .retained(artifact))
+        XCTAssertEqual(
+            MarkdownFileStoreError.notCommitted(generic, destinationURL: destinationURL).localizedDescription,
+            "post.md was not replaced, but a recovery artifact was retained at \(artifact.fileURL.path)."
+        )
+    }
+
     func testLastOpenedFileStorePersistsRestoresAndClearsBookmark() throws {
         let directory = try makeTemporaryDirectory()
         let url = directory.appendingPathComponent("post.markdown")

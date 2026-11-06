@@ -130,6 +130,20 @@ installed.
 
 ## Transactional writes
 
+Before anything is staged, and after the target expectation has been checked, the writer reads
+the destination volume through the retained parent descriptor (`fstatfs` and
+`fgetattrlist(ATTR_VOL_CAPABILITIES)`). It returns `notCommitted` with no artifact as
+`readOnlyVolume` for a read-only mount, and as `unsupportedVolume` for a volume that does not
+advertise `RENAME_EXCL`, or `RENAME_SWAP` when replacing. A volume that cannot answer is also
+refused as `unsupportedVolume`. The advertised bits decide because the renames cannot be trusted
+to fail: FAT32 returns success for a `RENAME_SWAP` that it performs as a plain rename. exFAT and
+FAT32 advertise neither rename, and Mac OS Extended advertises no swap
+(`docs/decisions/2026-11-06-refuse-saves-on-volumes-without-atomic-rename.md`). A failure of the
+temporary file's create, truncate, write, `fsync` or `fchmod`, or of a commit rename, reports
+`unsupportedVolume` for `ENOTSUP`, `insufficientSpace` for `ENOSPC` or `EDQUOT`, `readOnlyVolume`
+for `EROFS`, and `writeNotPermitted` for `EPERM` or `EACCES`. Other codes keep `unreadable`, or
+`durabilityFailed` for `fsync`.
+
 All writes first create a same-directory, exclusive `.plainsong-write-*.tmp` file through an
 `O_RDWR` descriptor: `0600` when it will replace an existing destination, and `0666` with the
 process umask applied when the destination is missing (Save As, Save Copy to a new name), so
@@ -246,9 +260,12 @@ same mutable URL again; reconciliation must first establish fresh authority.
 `MarkdownFileStore.save(text:at:expecting:)` returns this outcome unchanged. Its legacy URL
 save returns normally only for durable success with no cleanup artifact. Durable success with a
 retained or removal-indeterminate artifact throws `committedWithCleanupRequired`, explicitly
-stating that the destination committed; proven non-commit maps to `unwritable` only when no
-artifact remains, otherwise `writeNotCommittedWithCleanupRequired` preserves the exact typed
-artifact. Indeterminate commit state remains `writeRequiresReconciliation` rather than claiming
+stating that the destination committed. A proven non-commit with a remaining artifact throws
+`writeNotCommittedWithCleanupRequired`, which preserves the exact typed artifact. Without one it
+throws `unsupportedVolume`, `insufficientSpace`, `readOnlyVolume` or `writeNotPermitted` when the
+writer reason is one of those, and `unwritable` otherwise. App saves and Save Copy map
+`notCommitted` through the same `MarkdownFileStoreError.notCommitted(_:destinationURL:)`.
+Indeterminate commit state remains `writeRequiresReconciliation` rather than claiming
 failure.
 That synchronous compatibility facade finishes its transaction even when it inherits a
 cancelled scheduling task; the typed location API continues to honor cancellation and expose

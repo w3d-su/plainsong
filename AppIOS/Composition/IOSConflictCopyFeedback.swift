@@ -37,7 +37,7 @@ enum IOSConflictCopyFeedback {
                 title: "Copy Saved",
                 message: "Saved \(filename). " + (sourceUnavailable
                     ? "The original is still unavailable. Your current text is retained. " +
-                    "After restarting the app, open the saved copy from Files to continue."
+                    "Open the saved copy from Files to continue."
                     : "The original document still has a conflict. Your text and any existing recovery draft " +
                     "are retained. Use Reload only when you want to replace the editor text with the file on disk.")
             )

@@ -471,6 +471,7 @@ private extension AppState {
         session: DocumentSession,
         context: ExternalResolutionReadContext
     ) {
+        defer { releaseRetainedWorkspaceAuthorityIfUnreferenced(for: session) }
         let sessionIdentity = ObjectIdentifier(session)
         guard let operation = externalReloadTasks[sessionIdentity],
               operation.token == context.token,
@@ -749,6 +750,7 @@ private extension AppState {
         session: DocumentSession,
         context: ExternalDiskInspectionReadContext
     ) {
+        defer { releaseRetainedWorkspaceAuthorityIfUnreferenced(for: session) }
         let sessionIdentity = ObjectIdentifier(session)
         guard let inspection = externalDiskInspectionTasks[sessionIdentity],
               inspection.token == context.token,

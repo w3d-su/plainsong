@@ -41,7 +41,8 @@ final class WindowStatePartitionAppTests: XCTestCase {
             // `cleanDetachedSessionRecords` is per-file external-change state added after B1.
             WindowStatePartitionInventory.registry.union(["onEditorReplaceAuthorityInputChange",
                                                           "replaceAuthority", "registeredWindows",
-                                                          "menuEnablementDidChange",
+                                                          "menuEnablementDidChange", "editorInstallationWindows",
+                                                          "retainedWorkspaceAuthorityOwners",
                                                           "cleanDetachedSessionRecords"])
         )
         XCTAssertEqual(

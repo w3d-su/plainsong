@@ -868,7 +868,8 @@ private extension WorkspaceAnchoredItemCreator {
             .rollbackFailed
         case .cancelled:
             .cancelled
-        case .unreadable, .changedContent:
+        case .unreadable, .changedContent, .unsupportedVolume, .insufficientSpace, .readOnlyVolume,
+             .writeNotPermitted:
             .unreadable
         }
     }
