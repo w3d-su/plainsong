@@ -50,18 +50,33 @@ public struct FrontmatterField: Identifiable, Equatable, Sendable {
 }
 
 public struct FrontmatterBlock: Equatable, Sendable {
+    public enum Format: Equatable, Sendable {
+        case yaml
+        /// A leading `+++` block (Hugo, Zola). It is recognized so the inspector neither
+        /// offers to add a second block above it nor parses or rewrites it.
+        case toml
+    }
+
+    /// The source between the block's fences (TOML source when `format` is `.toml`).
     public let rawYAML: String
     public let fields: [FrontmatterField]
     public let lineEnding: String
+    public let format: Format
 
     public var fieldValues: [String: FrontmatterValue] {
         Dictionary(uniqueKeysWithValues: fields.map { ($0.key, $0.value) })
     }
 
-    public init(rawYAML: String, fields: [FrontmatterField], lineEnding: String) {
+    public init(
+        rawYAML: String,
+        fields: [FrontmatterField],
+        lineEnding: String,
+        format: Format = .yaml
+    ) {
         self.rawYAML = rawYAML
         self.fields = fields
         self.lineEnding = lineEnding
+        self.format = format
     }
 }
 
@@ -135,18 +150,36 @@ public enum Frontmatter {
             )
         case let .closed(bounds):
             parseClosedBlock(bounds)
+        case let .toml(bounds):
+            FrontmatterParseResult(
+                block: FrontmatterBlock(
+                    rawYAML: bounds.rawYAML,
+                    fields: [],
+                    lineEnding: bounds.lineEnding,
+                    format: .toml
+                ),
+                error: FrontmatterError(message: "TOML frontmatter is read-only here. Edit it in the source.")
+            )
         }
     }
 
+    /// Rewrites one key of a closed YAML block, or returns `nil` when the block cannot be
+    /// parsed or the edit would not read back as `value` (a duplicate key, a lost key, or
+    /// a value YAML would load as another type or structure).
     public static func updating(_ text: String, key: String, value: FrontmatterValue) -> String? {
         switch scanFences(in: text) {
         case let .closed(bounds):
             guard parseClosedBlock(bounds).error == nil else { return nil }
             guard let updatedYAML = try? replacing(
                 rawYAML: bounds.rawYAML, key: key, value: value, lineEnding: bounds.lineEnding
+            ), writebackReadsBack(
+                updatedYAML,
+                originalYAML: bounds.rawYAML,
+                key: key,
+                value: value
             ) else { return nil }
             return "---" + bounds.lineEnding + updatedYAML + "---" + bounds.afterClosingDelimiter
-        case .absent, .missingClosing:
+        case .absent, .missingClosing, .toml:
             return nil
         }
     }
@@ -180,14 +213,7 @@ private extension Frontmatter {
         case absent
         case missingClosing(rawYAML: String, lineEnding: String)
         case closed(Bounds)
-    }
-
-    enum ParseError: Error, CustomStringConvertible {
-        case notMapping
-
-        var description: String {
-            "Frontmatter must be a YAML mapping."
-        }
+        case toml(Bounds)
     }
 
     static func parseClosedBlock(_ bounds: Bounds) -> FrontmatterParseResult {
@@ -213,20 +239,21 @@ private extension Frontmatter {
         }
     }
 
+    /// Fences match the preview's `remark-frontmatter` gate (`preview-src/src/frontmatter.ts`)
+    /// and the editor's fence scanner: `---` at the very start, then only spaces or tabs on
+    /// that line; the first later line of `---` and optional spaces or tabs closes it. A
+    /// closed `+++` block is TOML. Disagreeing here let the inspector offer Add over a block
+    /// the editor already highlighted as frontmatter, inserting a second block above it.
     static func scanFences(in text: String) -> FenceScan {
         let storage = text as NSString
-        guard storage.length >= 3,
-              storage.substring(with: NSRange(location: 0, length: 3)) == "---"
+        guard storage.length >= 3 else { return .absent }
+        let marker = storage.substring(with: NSRange(location: 0, length: 3))
+        guard marker == "---" || marker == "+++",
+              let openingDelimiterEnd = fenceLineEnd(marker, from: 0, in: storage)
         else {
             return .absent
         }
-
-        let openingDelimiterEnd = 3
-        guard openingDelimiterEnd == storage.length ||
-            isNewline(storage.character(at: openingDelimiterEnd))
-        else {
-            return .absent
-        }
+        let isTOML = marker == "+++"
 
         let openingEnding = lineEnding(at: openingDelimiterEnd, in: storage) ?? "\n"
         let rawStart = openingDelimiterEnd + (lineEndingLength(at: openingDelimiterEnd, in: storage) ?? 0)
@@ -234,15 +261,13 @@ private extension Frontmatter {
 
         while lineStart < storage.length {
             let lineEnd = endOfLine(startingAt: lineStart, in: storage)
-            let lineText = storage.substring(with: NSRange(location: lineStart, length: lineEnd - lineStart))
-            if lineText == "---" {
-                let rawYAML = storage.substring(with: NSRange(location: rawStart, length: lineStart - rawStart))
-                let afterClosingDelimiter = storage.substring(from: lineEnd)
-                return .closed(Bounds(
-                    rawYAML: rawYAML,
+            if fenceLineEnd(marker, from: lineStart, in: storage) == lineEnd {
+                let bounds = Bounds(
+                    rawYAML: storage.substring(with: NSRange(location: rawStart, length: lineStart - rawStart)),
                     lineEnding: openingEnding,
-                    afterClosingDelimiter: afterClosingDelimiter
-                ))
+                    afterClosingDelimiter: storage.substring(from: lineEnd)
+                )
+                return isTOML ? .toml(bounds) : .closed(bounds)
             }
 
             guard let endingLength = lineEndingLength(at: lineEnd, in: storage) else {
@@ -251,30 +276,28 @@ private extension Frontmatter {
             lineStart = lineEnd + endingLength
         }
 
-        return .missingClosing(rawYAML: storage.substring(from: rawStart), lineEnding: openingEnding)
+        // An unclosed `+++` line is ordinary text, as it is to the editor's fence scanner.
+        return isTOML
+            ? .absent
+            : .missingClosing(rawYAML: storage.substring(from: rawStart), lineEnding: openingEnding)
     }
 
-    static func loadMapping(from rawYAML: String) throws -> [String: Any] {
-        let trimmedYAML = rawYAML.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedYAML.isEmpty else { return [:] }
-
-        let loaded = try Yams.load(yaml: rawYAML)
-        if let mapping = loaded as? [String: Any] {
-            return mapping
+    /// The end of a fence line that starts at `start` with `marker` followed only by spaces
+    /// or tabs: the index of its line terminator or the end of `storage`, else `nil`.
+    static func fenceLineEnd(_ marker: String, from start: Int, in storage: NSString) -> Int? {
+        guard start + 3 <= storage.length,
+              storage.substring(with: NSRange(location: start, length: 3)) == marker
+        else {
+            return nil
         }
-
-        if let mapping = loaded as? [AnyHashable: Any] {
-            var stringMapping: [String: Any] = [:]
-            for (key, value) in mapping {
-                guard let stringKey = key as? String else {
-                    throw ParseError.notMapping
-                }
-                stringMapping[stringKey] = value
-            }
-            return stringMapping
+        var index = start + 3
+        while index < storage.length {
+            let character = storage.character(at: index)
+            if isNewline(character) { return index }
+            guard character == 32 || character == 9 else { return nil }
+            index += 1
         }
-
-        throw ParseError.notMapping
+        return index
     }
 
     static func orderedKeys(in rawYAML: String, mapping: [String: Any]) -> [String] {
@@ -339,56 +362,6 @@ private extension Frontmatter {
         }
 
         return .raw(rawValue ?? "")
-    }
-
-    static func replacing(
-        rawYAML: String,
-        key: String,
-        value: FrontmatterValue,
-        lineEnding: String
-    ) throws -> String {
-        var lines = linesWithoutTerminators(rawYAML)
-        if hasLineTerminatorSuffix(rawYAML), lines.last == "" {
-            lines.removeLast()
-        }
-
-        let replacementLines = try formattedLines(key: key, value: value)
-        if let startIndex = lines.firstIndex(where: { topLevelKey(in: $0) == key }) {
-            let endIndex = valueSpanEndIndex(startingAt: startIndex, in: lines)
-            lines.replaceSubrange(startIndex ..< endIndex, with: replacementLines)
-        } else {
-            lines.append(contentsOf: replacementLines)
-        }
-
-        guard !lines.isEmpty else { return "" }
-        return lines.joined(separator: lineEnding) + lineEnding
-    }
-
-    static func formattedLines(key: String, value: FrontmatterValue) throws -> [String] {
-        switch value {
-        case let .bool(value):
-            return ["\(key): \(value ? "true" : "false")"]
-        case let .date(value):
-            return ["\(key): \(value)"]
-        case let .string(value):
-            return try ["\(key): \(formattedScalar(value))"]
-        case let .raw(value):
-            return ["\(key): \(value)"]
-        case let .stringList(values):
-            if values.isEmpty {
-                return ["\(key): []"]
-            }
-            return try ["\(key):"] + values.map { try "  - \(formattedScalar($0))" }
-        }
-    }
-
-    static func formattedScalar(_ value: String) throws -> String {
-        // Quote strings explicitly so YAML implicit typing cannot turn form input into
-        // booleans/numbers. LibYAML owns escaping, including newlines and control scalars.
-        // Disable line wrapping to keep each localized field/list item on one source line.
-        let node = Node.scalar(Node.Scalar(value, Tag(.str), .doubleQuoted))
-        let yaml = try Yams.serialize(node: node, width: -1)
-        return yaml.hasSuffix("\n") ? String(yaml.dropLast()) : yaml
     }
 
     static func scalarStrings(from values: [Any]) -> [String]? {

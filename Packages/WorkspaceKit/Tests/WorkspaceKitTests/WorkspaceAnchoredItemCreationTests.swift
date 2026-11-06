@@ -34,6 +34,24 @@ final class WorkspaceAnchoredItemCreationTests: XCTestCase {
         XCTAssertTrue(try creationStagingEntries(in: fixture.root).isEmpty)
     }
 
+    func testCreatedFileModeFollowsTheUmask() throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+
+        let file = try requireCreated(WorkspaceFileOperations().createFile(
+            named: "new.md",
+            inDirectoryRelativePath: "drafts",
+            rootAuthority: fixture.authority,
+            expectingDirectory: fixture.draftsExpectation
+        ))
+
+        var status = stat()
+        XCTAssertEqual(file.location.fileURL.path.withCString { lstat($0, &status) }, 0)
+        let umaskValue = umask(0o022)
+        umask(umaskValue)
+        XCTAssertEqual(status.st_mode & mode_t(0o777), mode_t(0o666) & ~umaskValue)
+    }
+
     func testAnchoredFacadeRejectsInvalidNamesAndDirectoryTraversal() throws {
         let fixture = try Fixture()
         defer { fixture.cleanUp() }
