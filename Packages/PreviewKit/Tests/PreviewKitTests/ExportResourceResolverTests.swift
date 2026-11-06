@@ -5,6 +5,7 @@ import MarkdownCore
 @testable import PreviewKit
 import UniformTypeIdentifiers
 import XCTest
+import zlib
 
 final class ExportResourceResolverTests: XCTestCase {
     func testContainedPNGAtTenMebibyteBoundaryEmbedsAndOneExtraByteIsOmitted() throws {
@@ -349,15 +350,10 @@ enum ExportRasterFixture {
         return chunk
     }
 
+    /// zlib, because a byte-at-a-time CRC of a 10 MiB fixture takes seconds in a debug build.
     private static func pngCRC(_ data: Data) -> UInt32 {
-        var crc: UInt32 = 0xFFFF_FFFF
-        for byte in data {
-            crc ^= UInt32(byte)
-            for _ in 0 ..< 8 {
-                let mask: UInt32 = (crc & 1) == 1 ? 0xEDB8_8320 : 0
-                crc = (crc >> 1) ^ mask
-            }
+        data.withUnsafeBytes { bytes in
+            UInt32(crc32(0, bytes.bindMemory(to: UInt8.self).baseAddress, UInt32(bytes.count)))
         }
-        return crc ^ 0xFFFF_FFFF
     }
 }

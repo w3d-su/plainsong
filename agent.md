@@ -99,7 +99,7 @@ blogeditor/
 │   ├── src/pipeline.ts       # unified pipeline (md and mdx variants)
 │   ├── src/styles/           # preview CSS (Apple system palette, Xcode-style syntax colors)
 │   └── test/                 # vitest specs
-└── .github/workflows/ci.yml  # parallel jobs: preview (Linux npm), packages (lint + swift test), hosted XCTest shards; `build-and-test` gate; docs-only PRs skip the test jobs (`changes`)
+└── .github/workflows/ci.yml  # parallel jobs: preview and lint (Linux), packages (swift test), one hosted build plus three XCTest shards; `build-and-test` gate; docs-only PRs skip the test jobs (`changes`)
 ```
 
 Build artifacts: `preview-src` builds to `App/Resources/preview/` (`index.html`, `bundle.js`,
@@ -907,18 +907,24 @@ make generate         # xcodegen generate  (run after editing project.yml)
 make preview-bundle   # build preview-src → App/Resources/preview/ (commit the output)
 make build            # xcodebuild -scheme Plainsong build
 make test             # test-packages (swift test) + test-hosted (xcodebuild test) + test-preview (npm test)
-make test-hosted XCODE_TEST_TARGETS=PlainsongTests  # one hosted bundle subset, as a CI shard runs it
+make test-hosted XCODE_TEST_TARGETS=PlainsongTests  # one hosted bundle subset
 make release          # DMG pipeline (Scripts/release.sh); PLAINSONG_UNSIGNED=1 for the alpha path
 cd preview-src && npm run typecheck  # preview TypeScript check; CI runs this separately
 make format           # swiftformat . && swiftlint --fix
 ```
 
-- CI installs **SwiftFormat 0.62.1** as a SHA-256-verified release binary
-  (`.github/workflows/ci.yml`, mirrored by `SWIFTFORMAT_VERSION` in the Makefile), not via
-  Homebrew, so lint results cannot drift with the runner image. Local `make lint` warns when
-  the Homebrew version differs; CI is authoritative. Bumping the pin means updating the
-  version + SHA-256 in `ci.yml`, the Makefile constant, and reformatting the tree in the
-  same PR if rule behavior changed.
+- CI installs **SwiftFormat 0.62.1** and **SwiftLint 0.65.1** as SHA-256-verified Linux
+  release binaries in the Ubuntu `lint` job (`.github/workflows/ci.yml`, mirrored by
+  `SWIFTFORMAT_VERSION` and `SWIFTLINT_VERSION` in the Makefile), not via Homebrew, so lint
+  results cannot drift with the runner image. Local `make lint` warns when the Homebrew
+  versions differ; CI is authoritative. Bumping a pin means updating the version + SHA-256
+  in `ci.yml`, the Makefile constant, and reformatting the tree in the same PR if rule
+  behavior changed. `make check-preview-layering` runs on macOS because it needs xcodegen.
+- CI builds the hosted test bundles once (`make test-hosted-build`) and three shards run
+  those products (`make test-hosted-shard`). A shard that names a class also skips it in
+  its bundle's catch-all shard, so a new or renamed class still runs. `make test` is unchanged.
+- Pull requests cancel their older run. Every non-docs commit on `main` runs in full,
+  never cancelled or queued out, and seeds the caches pull requests restore.
 - The preview CI job verifies every pinned acceptance resource against the committed
   bytes before installing preview dependencies. Regenerated resources must update
   `IOSAcceptanceTests/Resources/acceptance-resource-manifest.txt` in the same PR.
@@ -936,8 +942,8 @@ make format           # swiftformat . && swiftlint --fix
   `SUVerifyUpdateBeforeExtraction`. The key check matches Sparkle 2.10.0: trim
   Foundation's whitespace set only, require padding, and reject interior
   whitespace. Non-zero trailing base64 bits are accepted. The feed check strips
-  quotes only. CI runs the guard on the Debug Info.plist after the ui-performance
-  `make build`.
+  quotes only. CI runs the guard on the Debug Info.plist in
+  the `hosted (build)` job.
 
 ---
 
