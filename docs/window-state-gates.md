@@ -5,15 +5,18 @@
 > and splits D1 into D1a, D1b, and D1c. D1a implements W11 bullet 3: installed
 > documents stay outside the global LRU capacity of 8 and cannot be evicted.
 > D1b scopes last-root release to that root's eligible sessions (W3 bullet 7 and
-> W6 bullets 4–6).
+> W6 bullets 4–6). D1c shares one canonical root context (W6 bullets 1–3, 7, 8a,
+> and 9) and transfers writer ownership across windows (W4 bullets 3–4). W6 bullet
+> 8b stays with D2.
 > Each workspace window has its own `AppState` façade over a `WindowState` and a
 > `WorkspaceRootContext`. Those façades share one `AppDocumentRegistry`. `KeyWindowRouter`
 > resolves the key façade. Creation stays guarded until D2, and native tabbing stays off
 > until F. A scene gets the app-owned façade whenever no open scene shows it, so closing the
 > only window and reopening it keeps working. Checked: all W1 bullets, W2 bullet 5, W3
-> bullets 1–8, W6 bullets 4–6, all W5 bullets, and W11 bullet 3. W2 bullets 1–3 have a
-> production-path hosted test but stay open until D2 tests two mounted `WorkspaceWindow`s.
-> W0's hosted probes are recorded; its owner-smoke boxes stay open for D2. D1c and D2 are
+> bullets 1–8, W4 bullets 3–4, W6 bullets 1–7, 8a, and 9, all W5 bullets, and W11
+> bullet 3. W2 bullets 1–3 have a production-path hosted test but stay open until D2 tests
+> two mounted `WorkspaceWindow`s.
+> W0's hosted probes are recorded; its owner-smoke boxes stay open for D2. D2 is
 > not done. WD5 and
 > WD6's residency and budget half stay open. §12.2 assigns later `agent.md`
 > edits; §9 assigns owner-decision deadlines. Check gates only with named-test or
@@ -106,12 +109,12 @@ in two editors (§4.1 b), or bridge changes (`PROTOCOL_VERSION` stays unchanged)
 | "Destination ownership is App-global". | `App/AppState+WorkspaceMutationPreflight.swift:111-113` | The rule this spec keeps. |
 | Export checks a leaf-path destination against the Save Copy owner walk and the mutation inventory (`workspaceMutationManagedSessions()` plus owned state URLs). | `App/AppState+MissingFile.swift:374-481`, `App/AppState+ExportDestinationOwnership.swift:37-97` | Export inherits both inventories, so it spans windows once they do. |
 | Export's app-private staging root comes from the process environment and home directory. | `App/AppState+ExportAppPrivateRoot.swift:9-26` | App-global, with no window coupling. |
-| Known hand-built session lists read one `AppState`: autosave flush, retained-authority collision, physical duplicate, LRU protection, workspace closure, Save Copy candidates, mutation-managed sessions, termination sessions. | `App/AppState+Autosave.swift:7`, `App/AppState+WorkspaceSessions.swift:239-241`, `:298-300`, `:404-406`, `App/AppState+WorkspaceRetirement.swift:97-109`, `App/AppState+MissingFile.swift:483-487`, `App/AppState+WorkspaceMutationPreflight.swift:22-26`, `App/AppState+WorkspaceMutationTextRecovery.swift:442-447` | These are examples, not an exhaustive inventory; I2 defines the migration rule. |
+| Known hand-built session lists read one `AppState`: autosave flush, retained-authority collision, physical duplicate, LRU protection, workspace closure, Save Copy candidates, mutation-managed sessions, termination sessions. | `App/AppState+Autosave.swift:7`, `App/AppState+WorkspaceSessions.swift:239-241`, `:298-300`, `:404-406`, `App/AppState+WorkspaceRetirement.swift:115-127`, `App/AppState+MissingFile.swift:483-487`, `App/AppState+WorkspaceMutationPreflight.swift:22-26`, `App/AppState+WorkspaceMutationTextRecovery.swift:442-447` | These are examples, not an exhaustive inventory; I2 defines the migration rule. |
 | Hard links and case aliases are detected by physical identity. | `App/AppState+WorkspaceSessions.swift:294-315` | The basis for "same file" (§4.1). |
-| Opening a workspace closes the previous one, starts one security scope, and starts one watcher. | `App/AppState+Workspace.swift:335-394` | Per root. |
+| Opening a workspace closes the previous one, starts one security scope, and starts one watcher. | `App/AppState+WorkspaceOpen.swift:7`, `App/AppState+WorkspaceWatcher.swift:11` | Per root. D1c starts the scope and watcher once, then attaches another window to that context. |
 | Opening a single file closes the workspace. | `App/AppState+Workspace.swift:271-273` | Must become "this window's root". |
-| Closing one root releases only sessions whose retained authority or installed membership belongs to that root. | `workspaceSessionsForRootPreflight`, `clearClosedWorkspaceState`, and `pruneMetadataAfterRootRelease` in `App/AppState+WorkspaceRetirement.swift` | Another root, a standalone warm session, and a session another window shows or installs stay warm, with their tasks, metadata, and LRU recency (D1b, §6.2). |
-| A watcher event inspects only sessions of that root authority. An unanchored session records membership in at most one installed root. | `App/AppState+Workspace.swift:127-147`, `App/AppState+SessionOwnership.swift:503-550` (early return at `:508`) | Overlapping roots are unsafe (§4.3). |
+| Closing one root releases only sessions whose retained authority or installed membership belongs to that root. | `workspaceSessionsForRootPreflight` and `clearClosedWorkspaceState` in `App/AppState+WorkspaceRetirement.swift`; `pruneMetadataAfterRootRelease` in `App/AppState+WorkspaceRootReleasePruning.swift` | Another root, a standalone warm session, and a session another window shows or installs stay warm, with their tasks, metadata, and LRU recency (D1b, §6.2). |
+| A watcher event inspects only sessions of that root authority. An unanchored session records membership in at most one installed root. | `App/AppState+WorkspaceWatcher.swift:15-32`, `App/AppState+Workspace.swift:87`, `App/AppState+SessionOwnership.swift:503-550` (early return at `:508`) | Overlapping roots are unsafe (§4.3). |
 | `WorkspaceFileTree` bundles the scanned root with `expandedNodeIDs` and `selectedNodeID`. | `Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceFileTree.swift:89-100` | Share the snapshot only. Each window owns its entire filtered tree and reload disposition (`App/AppState+WorkspaceReload.swift:284-302`, `Packages/WorkspaceCore/Sources/WorkspaceCore/WorkspacePureTree.swift:155-158`). |
 | One last-opened bookmark key and ten recents. Restore runs once per `AppState` and re-saves stale bookmarks. A restored workspace selects its first file, not the last document. | `Packages/WorkspaceKit/Sources/WorkspaceKit/LastOpenedFileStore.swift:4`, `:25-43`, `Packages/WorkspaceKit/Sources/WorkspaceKit/RecentItemStore.swift:4`, `:12-20`, `App/AppState+DocumentCommands.swift:9-37`, `App/AppState+Workspace.swift:389-393` | Per-window restoration needs a list (§6.4). |
 | Restoration starts from every window's `.task`, guarded only per `AppState`. | `App/Views/WorkspaceWindow.swift` (`WorkspaceWindowContent.task`), `App/AppState+DocumentCommands.swift:10-11` | Per-window state would restore into every new window. |
@@ -124,7 +127,7 @@ Additional consumers of `currentDocument` / `sessionCache` that I2 must migrate:
 
 | Consumer | Evidence | Migration obligation |
 |---|---|---|
-| `retainMetadataOnlyForRetiredEditorSessions` | `App/AppState+WorkspaceSessions.swift:319-362`. Root release does not call it; it uses `pruneMetadataAfterRootRelease` (`App/AppState+WorkspaceRetirement.swift:305`). | Preserve sessions outside the release set. The global helper still clears save fences (`App/AppDocumentRegistry.swift:118-128`), bindings, proofs, quarantine, and detached URLs when a caller uses it. |
+| `retainMetadataOnlyForRetiredEditorSessions` | `App/AppState+WorkspaceSessions.swift:319-362`. Root release does not call it; it uses `pruneMetadataAfterRootRelease` (`App/AppState+WorkspaceRootReleasePruning.swift:9`). | Preserve sessions outside the release set. The global helper still clears save fences (`App/AppDocumentRegistry.swift:118-128`), bindings, proofs, quarantine, and detached URLs when a caller uses it. |
 | `firstUnretirableExternalConflict` | `App/AppState+WorkspaceSessions.swift:155-173` | Enumerate globally, or only the release set when closing one root (`among:`). |
 | `isAddressableExternalResolutionSession` | `App/AppState+ExternalChanges.swift:958-972` | Accept registry-owned sessions, including another window's current session. |
 | `canAutosave` membership | `App/AppState+Autosave.swift:141-143` | Registry membership; never one window's cache/current document. |
@@ -202,8 +205,8 @@ is added to `AppState` itself.
 | `anchoredSessionFileBindings`, `unanchoredManagedSessionOwnershipProofs`, `editorImageAssetDocumentAuthorities`, `indeterminateSessionWrites`, `indeterminateSessionWriteContexts` | File | Authority and quarantine belong to the file. |
 | `sessionCache`, `sessionPolicy` | App-global | One warm set and one LRU (WD6). |
 | `workspaceMutationWriteFences`, `workspaceMutationNamespaceDepth` | App-global | One namespace transaction app-wide in v1; the registry holds its affected-session fences and root identity. It fences relocation records, not every session under a root (`App/AppState+WorkspaceMutationPlanning.swift:190-206`). |
-| `workspaceMutationRefreshPending`, `workspaceMutationExternalRefreshPending`, `workspaceMutationRefreshRootAuthority` | Root | Each root retains its own deferred watcher/refresh intent, even while another root's transaction runs. Drain all queued roots; today's single-root drain loses an R2 event during R1 mutation (`App/AppState+Workspace.swift:14-24`, `App/AppState+WorkspaceMutationTransaction.swift:62-70`). |
-| `workspaceImageAssetInsertionCount`, `editorImageAssetDiscardEventHandler` | Root | Root-owned image-placement fence/callback; namespace begin checks the root's count under the app-wide transaction lock (`App/AppState+WorkspaceMutationTransaction.swift:24-29`). |
+| `workspaceMutationRefreshPending`, `workspaceMutationExternalRefreshPending`, `workspaceMutationRefreshRootAuthority` | Root | Each root retains its own deferred watcher/refresh intent, even while another root's transaction runs. Drain all queued roots (`App/AppState+WorkspaceNamespace.swift:64`). D1c services every pending root when the transaction ends. |
+| `workspaceImageAssetInsertionCount`, `editorImageAssetDiscardEventHandler` | Root | Root-owned image-placement fence/callback; namespace begin checks the root's count under the app-wide transaction lock (`App/AppState+WorkspaceNamespace.swift`). Quit tracks active placements in the registry until commit or discard finishes, including after the last window leaves the root. |
 | `indeterminateWorkspaceMutationSessions`, `workspaceMutationRecoveries`, `workspaceMutationOperationRecoveryRecords`, `workspaceMutationOperationRecoveryIDsWithUnpromotedText`, `workspaceMutationRecoveryIDBySession`, `workspaceMutationTextRecoveryContexts`, `workspaceMutationTextRecoverySessions`, `workspaceMutationTextRecoveryTasks`, `pendingWorkspaceMutationTextRecoveryRecords`, `pendingWorkspaceMutationOperationRecoveryRecords`, `workspaceMutationRecoveryLoadErrors`, `workspaceMutationOperationRecoveryLoadError`, `workspaceMutationTextRecoveryLoadError`, `workspaceMutationOperationRecoveryLoadFailed`, `workspaceMutationTextRecoveryLoadFailed`, `workspaceMutationReconciliationPrompt` | App-global | The durable stores are single files. One loader, one fence, one prompt. |
 | `fileWriteArtifactNotices`, `workspaceTrashCleanupNotices`, `recentItemURLs` | App-global | Registry stores notices with an initiating/home window ID and affected session/root. Show them there, else in a window showing that session/root, else the frontmost workspace window; queue if none. Recents are shared. |
 | `shouldRestoreLastOpenedFile`, `didAttemptRestore` | App-global | Restoration runs once per launch, not once per window (§6.4). |
@@ -280,7 +283,7 @@ close (§6.2). Reopening focuses the owner, following the NSDocument convention.
 
 | Option | Behavior | What it needs | Risks |
 |---|---|---|---|
-| **(i) Shared root context — recommended** | One `WorkspaceRootContext` per canonical root: security scope, watcher, shared scan snapshot/generation, and image-placement fence. The registry transaction fences affected sessions in every window (I4). Each window owns its whole filtered tree, document, and search. Last release retires only this root's eligible sessions (§6.2). | Share `workspaceSnapshot`, build each tree separately, and scope closure by retained authority or installed root membership. Other-root and single-file warm sessions survive; remove selected LRU entries only (`App/AppState+WorkspaceRetirement.swift:97-109`, `:273-276`). A reference-counted scope (precedent: `App/AppStateSupportingTypes.swift:143-218`). | The most code, in D1b (scoped release) and D1c (the shared context). A rename in one window reloads both sidebars, which is the desired result. |
+| **(i) Shared root context — recommended** | One `WorkspaceRootContext` per canonical root: security scope, watcher, shared scan snapshot/generation, and image-placement fence. The registry transaction fences affected sessions in every window (I4). Each window owns its whole filtered tree, document, and search. Last release retires only this root's eligible sessions (§6.2). | Share `workspaceSnapshot`, build each tree separately, and scope closure by retained authority or installed root membership. Other-root and single-file warm sessions survive; remove selected LRU entries only (`App/AppState+WorkspaceRetirement.swift:115-127`, `:273-276`). A reference-counted scope (precedent: `App/AppStateSupportingTypes.swift:143-218`). | The most code, in D1b (scoped release) and D1c (the shared context). A rename in one window reloads both sidebars, which is the desired result. |
 | (ii) Focus the existing window for the same root | One window per root. Opening the root again focuses that window. | The same lookup as WD1. | Tabs lose their main use (several posts of one blog as tabs). "Open in New Window" becomes impossible inside one root. |
 | (iii) Refuse | An error. | Least code. | Hostile. |
 | (iv) Independent duplicates | Two scans, watchers, and fences for one root. | None. | **Never allowed.** A rename in A would not fence B's session, which violates I4. |
@@ -405,7 +408,7 @@ In order (closing a tab is closing a window):
    untitled, text-recovery, or external-conflict state may stay warm **only** with proven
    registry retention of text, authority, prompts, and LRU protection; otherwise refuse.
    Preflight all sessions belonging to step 4's closing root, including preserved sessions, before revoking installation; compare closure/termination rules
-   (`App/AppState+WorkspaceRetirement.swift:16-88`,
+   (`App/AppState+WorkspaceRetirement.swift:16-106`,
    `App/AppState+WorkspaceMutationTextRecovery.swift:300-400`).
 2. **Flush:** save a dirty current document when `canAutosave`
    (`App/AppState+Autosave.swift:131-153`). A failed save cancels close. A prompt-blocked
@@ -430,12 +433,15 @@ In order (closing a tab is closing a window):
    that only its retained scope still needs is dropped. An operation recovery blocks only a
    closure of the root its recorded locations name or of a session it still holds; an
    unavailable record blocks every closure. Only the home façade's close cancels the shared
-   foreground autosave.
+   foreground autosave. A participant that is not the last applies the same preflight to
+   its own documents outside the root, then retires and releases only those before it
+   detaches; the root's sessions, scope, watcher, and generation stay with the context.
    Remove only eligible cache/LRU entries; never reset the whole LRU. Scope metadata pruning
    to those retired sessions, preserving fences, bindings, proofs, quarantine, detached URLs,
    other roots' warm sessions, and standalone warm sessions. D1b does this in
-   `workspaceSessionsForRootPreflight`, `clearClosedWorkspaceState`, and
-   `pruneMetadataAfterRootRelease` in `App/AppState+WorkspaceRetirement.swift`.
+   `workspaceSessionsForRootPreflight` and `clearClosedWorkspaceState` in
+   `App/AppState+WorkspaceRetirement.swift`, and `pruneMetadataAfterRootRelease` in
+   `App/AppState+WorkspaceRootReleasePruning.swift`.
    It does not call `cancelWorkspaceSessionTasks(excluding:)`, `registry.removeAllWarmSessions()`,
    reset the LRU policy, or `retainMetadataOnlyForRetiredEditorSessions()`.
    Release installed membership explicitly; retained authority/security-scope references
@@ -783,9 +789,9 @@ C's fallback. W8 then verifies D2's routing to an existing or new window under W
 
 - [ ] Every §5.2 entry point that targets a file current in another window focuses that window and creates no second installation. *Named hosted tests, one per entry point.*
 - [ ] Hard links and case or NFC/NFD aliases count as the same file. *Named hosted test.*
-- [ ] Every session has ≤ 1 writer always and ≤ 1 live installation after SwiftUI teardown settles. Adoption revokes the old writer synchronously; late teardown cannot revoke the new writer. *Debug assertions + named hosted test with delayed teardown (D1c).* Drive the delayed writer-release and revoked-installation events through the editor-binding installation-release path on admitted façade fixtures; a mounted `WorkspaceWindow` is not required.
-- [ ] A warm session adopted by window 2 after window 1 switched away transfers the writer; window 1's stale installation cannot publish. *Named hosted test.*
-- Evidence: _open_
+- [x] Every session has ≤ 1 writer always and ≤ 1 live installation after SwiftUI teardown settles. Adoption revokes the old writer synchronously; late teardown cannot revoke the new writer. *Debug assertions + named hosted test with delayed teardown (D1c).* Drive the delayed writer-release and revoked-installation events through the editor-binding installation-release path on admitted façade fixtures; a mounted `WorkspaceWindow` is not required.
+- [x] A warm session adopted by window 2 after window 1 switched away transfers the writer; window 1's stale installation cannot publish. *Named hosted test.*
+- Evidence (D1c): `assertSingleCrossWindowEditorInstallation` checks, at installation and writer activation, that non-superseded installations of one session do not span two windows. Same-window delayed teardown can still hold two installations until revoke. `WindowWriterAdoptionAppTests/testWarmAdoptionRevokesTheOldWriterBeforeTheNewInstallationExists` refuses stale publication and activation immediately at adoption. `testDelayedWriterReleaseAndInstallationRevocationCannotRevokeTheAdoptedWriter` drives late release and revoke through production binding lifecycle, verifies the new writer remains authorized, and leaves one live installation. `testLeavingTheAdoptingWindowRestoresTheWriterStillShown` drives the adopter's release followed by revoke, then publishes from the earlier window. `testStaleAdopterKeepsTheEarlierWindowSupersededUntilItsSynchronizedRetry` covers writer synchronization while both windows show the session. These are admitted facade fixtures; WD1 entry-point routing and mounted production windows remain D2. Typing evidence is recorded in `docs/perf/2026-10-30-windows-d1c-typing-ab.md`.
 
 ### PR C scheduling re-verification (R22)
 
@@ -813,20 +819,31 @@ scheduling root cause remains unknown. This is an additional gate, not closure b
 
 ### W6 — Same-workspace shared root context
 
-- [ ] Two windows on one root share one watcher, one security-scope start, and one scan per refresh. *Named hosted test.*
-- [ ] A rename in window 1 of the file current in window 2 relocates window 2's session. Window 2's saves are refused during the fence. Both trees update with each window preserving its own Show All Files filter, expansion, selection, and reload disposition. *Named hosted test.*
-- [ ] Closing window 1 keeps its root alive. Last release checks only eligible R1 sessions once; any still-installed session/authority survives. *Named hosted test.*
+- [x] Two windows on one root share one watcher, one security-scope start, and one scan per refresh. *Named hosted test.*
+- [x] A rename in window 1 of the file current in window 2 relocates window 2's session. Window 2's saves are refused during the fence. Both trees update with each window preserving its own Show All Files filter, expansion, selection, and reload disposition. *Named hosted test.*
+- [x] Closing window 1 keeps its root alive. Last release checks only eligible R1 sessions once; any still-installed session/authority survives. *Named hosted test.*
 - [x] Last R1 release preserves R2 warm sessions and standalone warm sessions, their tasks/metadata and LRU entries/recency; no global LRU reset or prune. *Named hosted test.*
-- [x] Last R1 release leaves every session another window shows registered and warm: its editor binding registration, its background autosave and statistics tasks, and its warm-cache entry all survive. The same holds when that window shows a file from another root. Those removals run only for the release set (`App/AppState+WorkspaceRetirement.swift:267-276`). *Named hosted tests, one per item.*
+- [x] Last R1 release leaves every session another window shows registered and warm: its editor binding registration, its background autosave and statistics tasks, and its warm-cache entry all survive. The same holds when that window shows a file from another root. Those removals run only for the release set (`App/AppState+WorkspaceRetirement.swift:313-323`). *Named hosted tests, one per item.*
 - [x] R2 fenced/quarantined/conflicted state does not block an otherwise-safe R1 release and is unchanged by it. Global transaction/store-load fences remain enforced. *Named hosted tests.*
-- [ ] An R2 watcher event during R1 mutation stays queued and refreshes R2 after drain; every deferred root is serviced. *Named hosted test.*
-- [ ] **8a.** Overlapping roots and a root containing an installed standalone file refuse before installation. *Named hosted tests (D1c).*
+- [x] An R2 watcher event during R1 mutation stays queued and refreshes R2 after drain; every deferred root is serviced. *Named hosted test.*
+- [x] **8a.** Overlapping roots and a root containing an installed standalone file refuse before installation. *Named hosted tests (D1c).*
 - [ ] **8b.** A single file inside an open root routes per §4.3 (WD1, then WD7). *Named hosted tests (D2).*
-- [ ] **9.** A second namespace transaction, from any window or root, is refused while one runs. *Named hosted test.*
-- Evidence (D1b), `WindowRootReleaseAppTests`. Bullets 1–3, 7, 8a, 8b, and 9 stay open for D1c or D2.
+- [x] **9.** A second namespace transaction, from any window or root, is refused while one runs. *Named hosted test.*
+- Evidence (D1b), `WindowRootReleaseAppTests`. D1c evidence follows; bullet 8b stays open for D2.
   - Bullet 4: `testLastR1ReleasePreservesOtherRootAndStandaloneSessionsAndLRURecency` drops only the closing root's warm session. The other root's warm session, a standalone session, its background task, its pending external text, the standalone detached URL, and LRU recency all survive. There is no global LRU reset.
   - Bullet 5: `testLastR1ReleaseKeepsAnotherWindowsEditorBindingRegistration`, `testLastR1ReleaseKeepsAnotherWindowsBackgroundTasks`, `testLastR1ReleaseKeepsAnotherWindowsWarmCacheEntry`, and `testLastR1ReleaseKeepsASessionShownFromAnotherRoot`.
   - Bullet 6: `testOtherRootFencedQuarantinedAndConflictedStateDoesNotBlockR1Release` leaves the other root's fence, quarantine, conflict text, and warm session in place. `testGlobalTransactionAndStoreLoadFencesStillBlockR1Release` still refuses the close.
+  - Final revoke keeps a retired cold registration removal and otherwise removes a registration only when it is the last reference on a retained root scope. `WindowRetainedAuthorityLifecycleAppTests/testRevokingAnUnshownUntitledSessionKeepsItsBindingRegistration` keeps an unshown untitled registration and can show it again. `testLastRevokeReleasesScopeWhenOnlyAnotherWindowsInstallationKeptTheSession` still stops that scope. `/tmp/plainsong-d1c-evidence/lifecycle-1.xcresult` executed 6 tests with 0 failures.
+
+- Evidence (D1c), 18 named hosted tests in `/tmp/plainsong-d1c-evidence/hosted-7.xcresult` (zero failures):
+  - Bullet 1: `WindowSharedRootAppTests/testSameCanonicalRootSharesOneWatcherScopeAndScanPerRefresh` opens a symlink alias, counts one real scope start and scanner invocation, and shares watcher identity. `testWatcherSurvivesTheCreatingFacadeLeavingAndBeingReleased` drives a real watcher after the creator deallocates. `testInFlightInitialScanSurvivesItsInitiatorDetaching` holds the first scan across detach.
+  - Bullet 2: `WindowSharedRootMutationAppTests/testRenameRelocatesTheOtherWindowsSessionFencesSaveAndPreservesWindowTreesAndSearches` checks relocation, a save refusal during the global fence, independent filters/expansion/selection and each query's refresh generation from one scan. `testRefreshKeepsEachWindowsMissingAndPresentDocumentDisposition` pins independent missing/present outcomes. `testOneWindowsInvalidDocumentDoesNotBlockTheRemainingRefreshRecipients` updates the third participant after the second refuses an invalid document.
+  - Bullet 3: `WindowSharedRootAppTests/testOnlyLastReleaseRunsRootRetirementAndRetainsInstalledAuthority` keeps the shared generation/snapshot/scope on detach and retains installed authority at last release. `testDetachingClearsOnlyItsOwnSearchAndKeepsThePeersQueryAndGeneration` pins window task/search isolation. D1b's root quarantine and retained-authority tests still apply to the last release. Detach review follow-up (2026-11-06): `testDetachingParticipantRetiresItsOwnStandaloneDocument` keeps the shared root and its generation while the departing window retires its own standalone document, whose edit then reaches disk. `testDetachRefusesWhileItsOwnStandaloneDocumentIsQuarantined` keeps that window attached when the document is quarantined. Both fail before the repair (`/tmp/plainsong-pr240-fix-results/repro.xcresult`).
+  - Bullet 7: `WindowSharedRootMutationAppTests/testR2WatcherEventsDuringR1MutationDrainEveryPendingRoot` queues both R2 and R3 under an R1 transaction and verifies all three refresh exactly once on drain.
+  - Bullet 8a: `WindowSharedRootAdmissionAppTests` covers ancestor, descendant, filesystem `/`, shown standalone, delayed standalone, and `testDelayedStandaloneInstallationStillRefusesAfterItsWindowOpensAnotherRoot`. Refusal happens before scope or root installation and offers Show. `/tmp/plainsong-d1c-evidence/related-1.xcresult` then ran the window, workspace and session regression: 651 tests, 1 skipped, 0 failures. After rebasing onto `e7eaa94e`, `/tmp/plainsong-d1c-evidence/rebase-related-1.xcresult` at `cff0cafc` repeated those classes: 652 tests, 1 skipped, 0 failures.
+  - Bullet 9: `WindowSharedRootMutationAppTests/testNamespaceTransactionIsGlobalWhileImagePlacementCountStaysPerRoot` pins the app-wide namespace fence and per-root image count.
+  - `WindowSharedRootAppTests/testBodyEditsDoNotFanOutPublishesOrScansToTheOtherWindow` performs 200 body edits with zero peer facade publishes or scans. Debug typing A/B is recorded in `docs/perf/2026-10-30-windows-d1c-typing-ab.md`; four-window W12 and Release/residency acceptance remain G.
+  - Limits: `make lint` reported 0 serious violations and `make test-preview` passed 229 tests. The full hosted run `/tmp/plainsong-d1c-evidence/full-hosted-1.xcresult` was interrupted after native UI timeouts while the screen was locked; it is not a complete suite result. The same AX filename failure reproduces on `main`, while fresh-host WKWebView and Save Panel cases passed on both trees (`main-ui-counterprobe-1.xcresult`, `d1c-ui-counterprobe-1.xcresult`).
 
 ### W7 — Window close lifecycle
 

@@ -135,6 +135,7 @@ extension AppState {
             pendingEditorSourceInstallations[installation] = nil
             editorBindingInstallations[installation] = nil
             registry.editorInstallationWindows[installation] = nil
+            supersededEditorWriterInstallations.remove(installation)
         }
         editorWriterInstallations[sessionIdentity] = nil
         externalDiskInspectionTasks.removeValue(forKey: sessionIdentity)?.task.cancel()

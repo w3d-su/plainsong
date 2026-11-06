@@ -187,14 +187,14 @@ final class WindowFacadeLifecycleAppTests: XCTestCase {
     func testTerminationRefusesWhileAnotherWindowInsertsAnImage() {
         let primary = makePrimary()
         let second = primary.makeSiblingFacade(admitsFileOperations: true)
-        second.workspaceImageAssetInsertionCount += 1
+        let lease = WorkspaceImageAssetInsertionLease(appState: second, rootURL: URL(fileURLWithPath: "/test-root"))
 
         XCTAssertFalse(primary.prepareForTermination())
         XCTAssertEqual(second.presentedError?.title, "Could Not Quit")
         XCTAssertNil(primary.presentedError)
         XCTAssertTrue(KeyWindowRouter.shared.focusedWindowState === second.windowState)
 
-        second.workspaceImageAssetInsertionCount -= 1
+        lease.release()
         second.dismissError()
         XCTAssertTrue(primary.prepareForTermination())
     }

@@ -152,7 +152,7 @@ extension EditorFindHostedGateTests {
     #if DEBUG
         /// Handoff 27c M3 / 27d: an accepted hop attributes the resulting
         /// `handleExternalChange` to the hop's own call site in
-        /// `App/AppState+Workspace.swift` (the site its decision trace names), proving the
+        /// `App/AppState+WorkspaceWatcher.swift` (the site its decision trace names), proving the
         /// fileID/line forwarding end to end. Passing row-test runs show the only
         /// `advancing=true` producers near the press are test-injected refreshes and this
         /// watcher hop: a real FSEvent for fixture-setup activity under the root (e.g. the
@@ -189,7 +189,7 @@ extension EditorFindHostedGateTests {
             let hopEntry = trace[hopIndex]
             let siteStart = try XCTUnwrap(hopEntry.range(of: " (", options: .backwards)).lowerBound
             let hopSite = String(hopEntry[siteStart...])
-            XCTAssertTrue(hopSite.hasPrefix(" (Plainsong/AppState+Workspace.swift:"), "hop site: \(hopSite)")
+            XCTAssertTrue(hopSite.hasPrefix(" (Plainsong/AppState+WorkspaceWatcher.swift:"), "hop site: \(hopSite)")
             XCTAssertTrue(
                 entry.hasSuffix(hopSite),
                 "the producer is the watcher hop's own call site\(hopSite); got: \(entry)"
