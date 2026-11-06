@@ -3,15 +3,20 @@
 The owner reported that Experimental WYSIWYG shows a GFM table as styled raw pipe text.
 `docs/wysiwyg-release-checklist.md` §E deferred tables and requires a dedicated gate pass
 before they become user-facing; `docs/table-wysiwyg-gates.md` is that gate (T0–T11). This
-entry records the proposed mechanism and reveal policy. Status: **proposed, pending the T0
-spike and owner approval**; nothing is wired, and tables stay raw in every mode until then.
+entry records the mechanism and reveal policy. Status: **owner-approved on 2026-11-06; T0 GO
+the same day** (evidence in the gate doc). Tables stay raw in every user-facing mode until
+T1–T11 pass.
 
-Mechanism (candidate A, to be proven by T0): inside the existing `NSTextContentStorage`
+Mechanism (candidate A, proven by T0): inside the existing `NSTextContentStorage`
 paragraph projection (`WYSIWYGZeroWidthTextContentProjection.swift`, chosen 2026-06-26),
 each row of an eligible table projects its cell-boundary pipes to `\t` and its padding,
 trailing pipe and leading spaces to U+200B. Both are one UTF-16 unit, so every raw offset
 survives. The projected paragraph carries `NSTextTab` stops at the table's column
-positions, aligned left, center or right from the delimiter row. The delimiter row collapses
+positions. The stops are all left-aligned, one per cell, computed per row and offset inside
+the column for center and right alignment, so one TextKit tab path covers every column. The
+row's last structural character projects to a space that hangs past the line end, because
+U+200B at a line end reports x = 0 and collapsed the last cell's selection and caret rects
+(T0). A click past a tab's middle resolves to the offset after it. The delimiter row collapses
 to a header rule, and a passive layer draws grid lines from laid-out fragments. The backing
 string never changes, cell content stays real glyphs (IME, selection, Find and copy keep
 their source-mode paths), and no attachment or U+FFFC is involved. Column widths come from

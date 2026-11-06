@@ -73,13 +73,26 @@ enum EditorLineNumberGutterFragments {
             if lineFragment.isExtraLineFragment {
                 result.extraLine = line
             } else {
-                if result.firstLine == nil {
+                // A collapsed WYSIWYG table delimiter row has no text to number, and its
+                // half-height line would put the number over its neighbors'.
+                if result.firstLine == nil, !isCollapsedTableRow(lineFragment) {
                     result.firstLine = line
                 }
                 result.bodyFrame = result.bodyFrame?.union(line.frame) ?? line.frame
             }
         }
         return result
+    }
+
+    private static func isCollapsedTableRow(_ lineFragment: NSTextLineFragment) -> Bool {
+        let attributed = lineFragment.attributedString
+        guard attributed.length > 0 else { return false }
+        let location = min(lineFragment.characterRange.location, attributed.length - 1)
+        return attributed.attribute(
+            WYSIWYGTableRowPresentationMarker.collapsedRowAttribute,
+            at: location,
+            effectiveRange: nil
+        ) as? Bool == true
     }
 
     /// STTextView paints each line fragment raised by half of the height that its line

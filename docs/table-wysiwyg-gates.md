@@ -1,8 +1,8 @@
 # Tables in WYSIWYG — Sub-Gate Specification
 
-> **Status: SPECIFICATION. T0–T11 unchecked. Nothing is wired.**
-> Tables stay raw in every mode until T0 passes and the owner approves the mechanism and
-> reveal policy below. This document is the dedicated sub-gate that
+> **Status: T0 checked (mechanism A GO, 2026-11-06). T1–T11 unchecked.**
+> The owner approved the mechanism and reveal policy on 2026-11-06. The T0 spike is reachable
+> only through an internal test hook; tables stay raw in every mode until T1–T11 pass. This document is the dedicated sub-gate that
 > `docs/wysiwyg-release-checklist.md` §E requires before a deferred construct becomes
 > user-facing, following the link-folding (`docs/link-folding-gates.md`) and image-thumbnail
 > (`docs/image-thumbnail-gates.md`) pattern. When every gate is checked, tables render only in
@@ -24,7 +24,8 @@ Created 2026-11-06 after an owner report: in Experimental WYSIWYG a table such a
   grid lines separate rows and columns. Cell content stays real text: it is typed, selected,
   composed (IME), copied and found exactly as in source mode.
 - **Stays raw text (v1), deterministically:** tables nested in a block quote or list item;
-  tables whose source contains U+0009 (a literal tab would jump a tab stop); tables in which
+  tables whose source contains U+0009 (a literal tab would jump a tab stop); tables whose
+rows disagree on having a leading pipe; tables in which
   any row has more cells than the header (GFM drops the extra cells, and hiding them would
   hide source text); tables without a leading pipe whose first column is center- or
   right-aligned (there is no character to carry the first tab, §3); tables whose natural
@@ -58,7 +59,7 @@ Every shipped fold is inline and lives inside one paragraph. Tables break three 
 
 | Option | Sketch | Pros | Risks | Stance |
 |---|---|---|---|---|
-| **A. Tab-stop row projection** | Inside the existing paragraph projection, for each row of an eligible table: every cell-boundary pipe becomes `\t` (U+0009, one UTF-16 unit, so the projected paragraph keeps every offset); cell padding, a trailing pipe and line-leading spaces become U+200B, like folded delimiters. The projected paragraph gets an `NSParagraphStyle` whose `NSTextTab` stops sit at the table's column positions (left stop at the column's left edge, center stop at its center, right stop at its right edge, per the delimiter row). The delimiter row projects to U+200B with a collapsed line height and is drawn as the header rule. A passive grid layer draws rules from laid-out fragment frames and the stop positions. | One mechanism family with the shipped §A projection; backing string untouched; cell glyphs are the real characters, so IME, selection, Find highlight and copy need no new text path; native TextKit line layout, caret rects and hit-testing; no attachment, no U+FFFC. | Column widths must be measured across all rows (§2.1); a projected `\t` must never leak into copy, AX or undo; hit-testing in a tab gap returns a structural offset (snap, §T3); collapsed delimiter-row geometry and the line-number gutter; cell content wider than its column jumps to the next stop during IME composition before re-measure. | **Primary candidate — spike first** |
+| **A. Tab-stop row projection** | Inside the existing paragraph projection, for each row of an eligible table: every cell-boundary pipe becomes `\t` (U+0009, one UTF-16 unit, so the projected paragraph keeps every offset); cell padding, a trailing pipe and line-leading spaces become U+200B, like folded delimiters. The projected paragraph gets an `NSParagraphStyle` with one left-aligned `NSTextTab` per cell, computed per row and offset inside the column for center and right alignment (per the delimiter row). The row's last structural character projects to a hanging space instead (T0). The delimiter row projects to U+200B with a collapsed line height and is drawn as the header rule. A passive grid layer draws rules from laid-out fragment frames and the stop positions. | One mechanism family with the shipped §A projection; backing string untouched; cell glyphs are the real characters, so IME, selection, Find highlight and copy need no new text path; native TextKit line layout, caret rects and hit-testing; no attachment, no U+FFFC. | Column widths must be measured across all rows (§2.1); a projected `\t` must never leak into copy, AX or undo; hit-testing in a tab gap returns a structural offset (snap, §T3); collapsed delimiter-row geometry and the line-number gutter; cell content wider than its column jumps to the next stop during IME composition before re-measure. | **Primary candidate — spike first** |
 | **B. Zero-width pipes + kern padding** | Same projection, but every structural character becomes U+200B, and alignment comes from `.kern` on the last content glyph (left), or on the U+200B before the content (right/center), sized to the column. | No tab characters anywhere, even in projection. | Kern is per-glyph advance padding: caret and selection rects inside the padded glyph look wrong; widths are summed by hand per row instead of laid out by TextKit; rounding drift across rows. | Fallback if A fails T0 hit-testing or tab-leak proofs |
 | **C. Custom `NSTextLayoutFragment`** | Owner-drawn table fragment. | "Correct" TextKit 2 answer on paper; could draw a real grid. | STTextView owns `textLayoutManager.delegate` and returns `STTextLayoutFragment` (rejected for the same reason on 2026-06-26, §A.2); one fragment per paragraph still cannot span rows. | Rejected unless STTextView grows an API |
 | **D. Embedded table view (attachment)** | Project the first row to one attachment that hosts a rendered table view; collapse the other rows. | Full visual control (borders, padding, wrapping). | Cell content stops being text: in-place editing, IME, Find highlight, selection and copy would need a second editor inside the view; N hidden paragraphs stay caret-reachable; U+FFFC risk returns at block scale. | Rejected |
@@ -100,7 +101,7 @@ reveals a construct's raw syntax when the caret touches it. For tables v1 combin
 ## 5. Gates
 
 ### T0 — Mechanism spike (blocks everything, mirrors checklist §A)
-- [ ] A spike PR proves option A on one hardcoded 3×3 table behind the development hook:
+- [x] A spike PR proves option A on one hardcoded 3×3 table behind the development hook:
   backing string byte-identical; projected paragraph length equals the raw length on every
   row (the existing precondition); cell content starts align across rows within 0.5 pt for
   left, center and right columns; the collapsed delimiter row adds no line inflation and does
@@ -110,6 +111,30 @@ reveals a construct's raw syntax when the caret touches it. For tables v1 combin
   pasteboard (plain and RTF), `AXValue`, `AXSelectedText` or the undo stack. If A fails any
   of these, B is spiked against the same list. The Decision Log entry records the result
   before any production PR.
+  **Evidence (2026-11-06):** `setWYSIWYGTableT0SpikeEnabled(_:)` (internal; a line scan
+  stands in for T1's tree-sitter model) on a 3×3 table with left, center and right columns.
+  - `WYSIWYGTableMechanismSpikeTests`
+    (`testT0ProjectionKeepsBackingStringAndEveryRawOffset`,
+    `testT0HeaderCellsAreBoldOnlyInProjection`,
+    `testT0CellContentAlignsAcrossRowsForLeftCenterAndRightColumns`,
+    `testT0CollapsedDelimiterRowDoesNotInflateOrDisplaceSiblingLines`,
+    `testT0GutterNumbersEveryRowButTheCollapsedDelimiterWithoutOverlap`,
+    `testT0RealPointerClicksInTabGapsSnapToTheNearestCellContentEdge`,
+    `testT0ArrowsSkipHiddenStructureBetweenCells`,
+    `testT0CopyAccessibilityAndUndoCarryNoProjectionCharacters`,
+    `testT0DisablingTheSpikeRestoresRawLayout`) and `WYSIWYGTableRowCaretSnapTests`.
+  - MarkdownCore `MarkdownTableRowStructure` (`MarkdownTableRowStructureTests`) is now the one
+    cell-boundary definition; `TableEditing` reads cells through it and its tests are unchanged.
+  - Findings that amend option A: (1) U+200B at the end of a line reports x = 0 in TextKit's
+    layout, so the last cell's segment frame (selection, caret and IME rects) collapsed; the
+    row's last structural character now projects to one hanging space. (2) TextKit's
+    `characterIndex(for:)` returns a tab's own index for any click inside it, so
+    `WYSIWYGPointerHitTest` resolves a click past a tab's middle to the offset after it.
+    (3) Alignment uses per-row left tab stops only, so one TextKit tab path covers every
+    column. (4) The collapsed delimiter row draws no line number; every other row keeps its
+    number and none overlap. Option B was not needed.
+  - Outside this gate: the same line-end U+200B behavior already empties the segment frame
+    of shipped folds whose closing delimiter ends a line (`A **bold**`); tracked separately.
 
 ### T1 — Model correctness
 - [ ] A pure table region model (SyntaxKit, from tree-sitter `pipe_table`,
