@@ -42,7 +42,7 @@ final class IOSUnavailableCopyTests: XCTestCase {
                 return XCTFail("Copy must not clear unavailable status")
             }
             fixture.copy.nameSheetDidDismiss(request.draftID)
-            XCTAssertTrue(fixture.copy.notice?.message.contains("After restarting") == true)
+            XCTAssertTrue(fixture.copy.notice?.message.contains("Open the saved copy") == true)
         }
     }
 

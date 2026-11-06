@@ -23,7 +23,24 @@ extension IOSUIDocumentStore {
             allowsClosing: allowsClosing
         )
         entry.nextSequence = operation.sequence
-        return try await enqueue(entry, operation)
+        let acknowledgement = try await enqueue(entry, operation)
+        if let record = entry.checkpoint, record.revisionVersion == operation.capturedVersion,
+           !entry.fenced, !session.isDirty, session.version == operation.capturedVersion
+        {
+            do {
+                try await recovery.discard(
+                    recordID: record.recordID, persistedText: acknowledgement.savedText,
+                    liveText: session.text, liveVersion: session.version
+                )
+                if entry.checkpoint?.recordID == record.recordID {
+                    entry.checkpoint = nil
+                }
+                if entry.recoveryReceipt?.recordID == record.recordID {
+                    entry.recoveryReceipt = nil
+                }
+            } catch { /* Keep unconfirmed checkpoints available for recovery. */ }
+        }
+        return acknowledgement
     }
 
     func watchEdits(_ entry: IOSDocumentEntry) {

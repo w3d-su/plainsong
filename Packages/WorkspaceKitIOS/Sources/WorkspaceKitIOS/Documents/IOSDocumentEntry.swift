@@ -25,6 +25,8 @@ final class IOSDocumentEntry {
     var state: IOSDocumentState
     var superseded = false
     var fenced = false
+    var cloudResolution: Progress?
+    var hasUnresolvedVersions = false
     var allowsProviderWrite: Bool
     var closed = false
     var isClosing = false
@@ -48,6 +50,8 @@ final class IOSDocumentEntry {
     var pendingProposal: IOSDocumentReloadProposal?
     var explicitReloadOperationID: UUID?
     var providerAvailabilityGeneration: UInt64 = 0
+    var checkpoint: IOSRecoveryRecord?
+    var retainedDraft: IOSRecoveryRecord?
     var recoveryReceipt: IOSRecoveryReceipt?
     var lastAcknowledgement: IOSSaveAcknowledgement?
 
