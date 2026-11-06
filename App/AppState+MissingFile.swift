@@ -136,7 +136,6 @@ extension AppState {
         }
     }
 
-    // swiftlint:disable:next function_body_length
     func saveDetachedCurrentDocument(to destinationURL: URL) throws {
         guard let oldURL = missingFilePrompt?.fileURL,
               let currentStateURL = sessionStateURL(for: shownSession),
@@ -144,6 +143,15 @@ extension AppState {
         else {
             return
         }
+        try saveShownSessionCopy(from: oldURL, to: destinationURL)
+    }
+
+    // Writes the shown session's text to `destinationURL` and rehomes the session there.
+    // Missing File Save Copy and File › Save As (`AppState+SaveAs.swift`) share this path;
+    // each caller proves first that `oldURL` is the shown session's state URL. The file at
+    // `oldURL`, if it still exists, is left as it was on disk.
+    // swiftlint:disable:next function_body_length
+    func saveShownSessionCopy(from oldURL: URL, to destinationURL: URL) throws {
         try validateWorkspaceMutationRecoveryStoresLoaded(at: oldURL)
 
         let session = shownSession

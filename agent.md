@@ -398,6 +398,7 @@ replacement local to EditorKit.
 | Format table | ⌥⌘F | |
 | Toggle checkbox | ⌘L | |
 | New file | ⌘N | workspace: dedup `Untitled.md` at root; single-file: save panel |
+| Save As… | ⇧⌘S | File menu: write the current text to the chosen file and keep editing it there; the original keeps its on-disk bytes. Uses Missing File Save Copy's write and ownership checks; choosing the current file is a plain Save; for a missing file it is that banner's Save Copy |
 | Print… | ⌘P | File menu: print the captured light-theme PDF through the standard panel |
 
 All commands appear in the menu bar (Format menu) — menu first, shortcut second, so they
