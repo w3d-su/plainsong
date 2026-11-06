@@ -4,6 +4,27 @@ import WorkspaceKit
 
 @MainActor
 extension AppState {
+    /// WD1: another window shows the file this reload would select. A reload never moves
+    /// focus, so this window keeps its document and selects nothing.
+    private func prepareWorkspaceReloadActivation(
+        _ preparedFile: PreparedWorkspaceReloadFile?,
+        tree: inout WorkspaceFileTree
+    ) throws -> PreparedAnchoredFileSessionActivation? {
+        guard let preparedFile else { return nil }
+        do {
+            return try prepareAnchoredFileSessionActivation(
+                file: preparedFile.file,
+                at: preparedFile.location,
+                metadata: preparedFile.metadata,
+                sha256Digest: preparedFile.sha256Digest,
+                preparedImageAssetAuthority: preparedFile.preparedImageAssetAuthority
+            )
+        } catch is DocumentShownInAnotherWindow {
+            tree.selectNode(id: nil)
+            return nil
+        }
+    }
+
     func applyWorkspaceReload(
         root: URL,
         capture: WorkspaceDirectorySnapshotCapture,
@@ -91,15 +112,7 @@ extension AppState {
         // Cache and retirement state can change while the final root proof suspends. Re-derive the
         // activation source now, then commit it without another suspension so a stale cached or
         // retired source can neither be resurrected nor trip a commit precondition.
-        let preparedActivation = try preparedFile.map { preparedFile in
-            try prepareAnchoredFileSessionActivation(
-                file: preparedFile.file,
-                at: preparedFile.location,
-                metadata: preparedFile.metadata,
-                sha256Digest: preparedFile.sha256Digest,
-                preparedImageAssetAuthority: preparedFile.preparedImageAssetAuthority
-            )
-        }
+        let preparedActivation = try prepareWorkspaceReloadActivation(preparedFile, tree: &tree)
 
         // Every throwing filesystem and cache validation is complete. From here through capture
         // installation there is no suspension or throwing operation, so activation and the

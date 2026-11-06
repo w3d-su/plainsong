@@ -297,9 +297,9 @@ final class WindowStateRegistryAppTests: XCTestCase {
         )
     }
 
-    /// The Save Copy owner walk fails closed on a candidate with no binding or proof, and every
-    /// window's document is a candidate. So an untitled document with no ownership record in
-    /// another window refuses every Save Copy until PR D2 decides that window's filter.
+    /// The Save Copy owner walk fails closed on a candidate with no binding or proof. PR D2
+    /// skips only an empty window's untouched document (`isPristineEmptyDocument`); this
+    /// untitled document holds text, so another window's Save Copy still refuses.
     func testAnUntitledRecordlessDocumentInASecondWindowFailsSaveCopyClosed() throws {
         let fixture = try SecondWindowRegistryFixture.make(testCase: self)
         _ = try fixture.showDetachedSessionInSharedWindow()

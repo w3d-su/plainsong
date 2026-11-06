@@ -1306,6 +1306,7 @@ extension AppState {
             case .stopTracking:
                 stopTrackingWorkspaceMutationTextRecovery(for: session)
             case .keepEditorCopy, .showEditorCopy:
+                guard !focusOtherWindowShowing(session) else { return }
                 setCurrentDocument(session)
                 reconcileSessionPolicyAfterEditorLeaseChange()
                 restoreRecoveryPrompt(for: session)
@@ -1324,6 +1325,7 @@ extension AppState {
                 refreshWorkspaceMutationReconciliationPrompt()
                 return
             }
+            guard !focusOtherWindowShowing(session) else { return }
             setCurrentDocument(session)
             reconcileSessionPolicyAfterEditorLeaseChange()
             restoreRecoveryPrompt(for: session)
@@ -1403,7 +1405,10 @@ extension AppState {
             return
         }
         if let recovery = nextWorkspaceMutationRecovery() {
-            if let nextSession = recovery.remainingSessions.first {
+            // WD1: a recovery copy another window already shows stays there.
+            if let nextSession = recovery.remainingSessions.first,
+               otherWindowShowingFile(location: nil, fileURL: nil, identity: nil, session: nextSession) == nil
+            {
                 setCurrentDocument(nextSession)
                 // The previous shown document is countable now. Trim before the
                 // next access, matching text-recovery admission.
@@ -1415,6 +1420,12 @@ extension AppState {
             return
         }
         if let nextSession = nextWorkspaceMutationTextRecoverySession() {
+            // WD1: a recovery copy another window already shows stays there.
+            guard otherWindowShowingFile(location: nil, fileURL: nil, identity: nil, session: nextSession) == nil
+            else {
+                refreshWorkspaceMutationReconciliationPrompt()
+                return
+            }
             setCurrentDocument(nextSession)
             reconcileSessionPolicyAfterEditorLeaseChange()
             restoreRecoveryPrompt(for: nextSession)
