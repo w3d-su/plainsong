@@ -143,7 +143,6 @@ extension AppState {
         }
     }
 
-    // swiftlint:disable:next function_body_length
     func saveDetachedCurrentDocument(to destinationURL: URL) throws {
         guard let oldURL = missingFilePrompt?.fileURL,
               let currentStateURL = sessionStateURL(for: shownSession),
@@ -151,6 +150,15 @@ extension AppState {
         else {
             return
         }
+        try saveShownSessionCopy(from: oldURL, to: destinationURL)
+    }
+
+    // Writes the shown session's text to `destinationURL` and rehomes the session there.
+    // Missing File Save Copy and File › Save As (`AppState+SaveAs.swift`) share this path;
+    // each caller proves first that `oldURL` is the shown session's state URL. The file at
+    // `oldURL`, if it still exists, is left as it was on disk.
+    // swiftlint:disable:next function_body_length
+    func saveShownSessionCopy(from oldURL: URL, to destinationURL: URL) throws {
         try validateWorkspaceMutationRecoveryStoresLoaded(at: oldURL)
 
         let session = shownSession
@@ -329,9 +337,7 @@ private extension AppState {
         // Rekey Find only once the retained binding names the destination: identity comes
         // from `sessionStateURL`, so notifying before `adoptAnchoredFileBinding` would
         // rebind Find to the *old* URL and never correct itself.
-        if completed.session === shownSession {
-            notifyEditorFindDocumentIdentityDidRekey()
-        }
+        notifyEditorFindDocumentIdentityDidRekey(inWindowsShowing: completed.session)
         rememberRecentItem(destination)
         restoreRecoveryPrompt(for: completed.session)
         finishRetiredEditorDocumentSessionIfPossible(for: completed.session)
@@ -673,9 +679,7 @@ private extension AppState {
         // above. Rekeying before that left Find bound to the pre-quarantine URL with no
         // second rebind, so every later find command targeted a document that no longer
         // owned this session's state.
-        if session === shownSession {
-            notifyEditorFindDocumentIdentityDidRekey()
-        }
+        notifyEditorFindDocumentIdentityDidRekey(inWindowsShowing: session)
         cancelAutosave(for: session)
         refreshIndeterminateFileWriteReconciliation(for: session)
     }

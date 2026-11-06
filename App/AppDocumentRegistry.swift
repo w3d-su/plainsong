@@ -186,6 +186,11 @@ final class AppDocumentRegistry: ObservableObject {
         }
     }
 
+    /// Sessions whose File › Save As panel is open. Autosave from any window — its timer or
+    /// the focus-loss flush the panel itself triggers — must not write the unsaved text to
+    /// the original before the user picks (or cancels) a destination.
+    var saveAsPanelSessions: Set<ObjectIdentifier> = []
+
     /// A namespace mutation fences image placement across the workspace, including mutations
     /// whose selected item is not itself an open document (for example an asset directory).
     var workspaceMutationNamespaceDepth = 0
