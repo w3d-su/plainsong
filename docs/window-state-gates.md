@@ -210,6 +210,7 @@ is added to `AppState` itself.
 | `workspaceSidebarHiddenWindows` | Window | Whether this window's split-view sidebar is hidden, so ⇧⌘F opens Search there (#216). B1 keeps the `NSWindow`-keyed table in the one `WindowState`; C reduces it to this window's flag. |
 | `registeredWindows` (B2) | App-global | Each connected `WindowState`, weakly. Every registry inventory includes each window's `shownSession` (§3.4 I2). `AppState.connect(_:)` adds a window after wiring its hooks. |
 | `menuEnablementDidChange` (C) | App-global | Save enablement only. Fences, quarantine, and the synchronous `isSaving` guard stay unpublished so they do not wake every window; this subject tells `MenuBarState` to re-read `canSave`. |
+| `saveAsPanelSessions` (Save As) | App-global | Sessions whose File › Save As panel is open. `canAutosave` refuses them in every window, so the focus-loss flush the panel triggers cannot write unsaved text over the original. Held only while the app-modal panel runs. |
 | `exportHTMLStatus`, `exportHTMLOperations` | Window | The Export as HTML…/Print banner and operation bookkeeping belong to the origin window, which fences publication when it closes. C decides whether `exportHTMLOperations.lastPrintInfo` (paper settings) stays per window. |
 
 Recovery-banner placement (`App/AppState+WorkspaceMutationRecoveryLoadFailure.swift:5-13`)

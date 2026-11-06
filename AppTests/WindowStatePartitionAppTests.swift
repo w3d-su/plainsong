@@ -37,10 +37,12 @@ final class WindowStatePartitionAppTests: XCTestCase {
         )
         XCTAssertEqual(
             Self.storedPropertyNames(of: appState.registry),
-            // `registeredWindows` is B2's window list for inventories (§3.4 I2).
+            // `registeredWindows` is B2's window list for inventories (§3.4 I2);
+            // `saveAsPanelSessions` is the File › Save As autosave fence.
             WindowStatePartitionInventory.registry.union(["onEditorReplaceAuthorityInputChange",
                                                           "replaceAuthority", "registeredWindows",
-                                                          "menuEnablementDidChange"])
+                                                          "menuEnablementDidChange",
+                                                          "saveAsPanelSessions"])
         )
         XCTAssertEqual(
             WindowStatePartitionInventory.window.count + WindowStatePartitionInventory.root.count
