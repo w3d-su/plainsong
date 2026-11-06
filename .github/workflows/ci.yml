@@ -183,8 +183,17 @@ jobs:
           key: swiftformat-${{ env.SWIFTFORMAT_VERSION }}-${{ hashFiles('.swiftformat', 'Makefile') }}-${{ github.run_id }}
           restore-keys: swiftformat-${{ env.SWIFTFORMAT_VERSION }}-${{ hashFiles('.swiftformat', 'Makefile') }}-
 
+      # The static SwiftLint has no SourceKit, so it skips statement_position, which only
+      # warns. Fail if a SwiftLint upgrade or config change makes it skip any other rule.
       - name: Lint
-        run: make lint-style SWIFTFORMAT_CACHE="$RUNNER_TEMP/swiftformat-cache"
+        run: |
+          set -euo pipefail
+          make lint-style SWIFTFORMAT_CACHE="$RUNNER_TEMP/swiftformat-cache" 2>&1 | tee "$RUNNER_TEMP/lint.log"
+          skipped="$(grep -o "Skipping enabled rule '[a-z_]*'" "$RUNNER_TEMP/lint.log" | sort -u | grep -v "'statement_position'" || true)"
+          if [ -n "$skipped" ]; then
+            echo "SwiftLint skipped rules that need SourceKit: $skipped" >&2
+            exit 1
+          fi
 
   packages:
     needs: changes
@@ -221,7 +230,8 @@ jobs:
 
   # Hosted XCTest bundles: one job builds every bundle once (~3 min) and the shards
   # run the same products. A shard that names a class also skips it in that bundle's
-  # catch-all shard, so a renamed or new class always still runs. Three shards, not
+  # catch-all shard, so a renamed or new class always still runs; a new bundle fails
+  # `Check every test bundle has a shard` until a shard names it. Three shards, not
   # four: CodeQL's default setup holds a macOS runner for ~12 minutes per push, so a
   # fourth shard waits for a free runner longer than it saves. Balanced from measured
   # class times on macos-15 (runs 41338975839 and 41340274653).
@@ -261,6 +271,14 @@ jobs:
 
       - name: Build for testing
         run: make test-hosted-build
+
+      # The shards select bundles by name; a new scheme test bundle would build but run in
+      # no shard while the gate stays green. Keep this list equal to the shards' targets.
+      - name: Check every test bundle has a shard
+        run: |
+          set -euo pipefail
+          xctestruns=("$XCODE_DERIVED_DATA"/Build/Products/*.xctestrun)
+          python3 Scripts/check-xctestrun-bundles.py "${xctestruns[0]}" PerformanceTests PlainsongTests PlainsongUITests
 
       - name: Check built update configuration
         run: Scripts/check-shipped-update-configuration.sh "$XCODE_DERIVED_DATA/Build/Products/Debug/Plainsong.app/Contents/Info.plist"

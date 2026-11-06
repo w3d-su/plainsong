@@ -18,12 +18,15 @@ above GitHub's 10 GB limit.
 - **Three shards, not four.** CodeQL's default setup runs `Analyze (swift)` on
   `macos-latest` for about 12 minutes per push, and that shares the 5-runner macOS cap. With
   `packages`, CodeQL and four shards, one shard queued for 193 s. A shard that names a class
-  also skips it in the bundle's catch-all shard, so a new or renamed class still runs.
+  also skips it in the bundle's catch-all shard, so a new or renamed class still runs. A
+  new test bundle is not covered that way: `hosted (build)` fails unless the bundles in the
+  built `.xctestrun` are exactly the ones the shards name (`Scripts/check-xctestrun-bundles.py`).
 - **Style lint on Ubuntu.** SwiftFormat and SwiftLint are SHA-256-verified release binaries.
   SwiftFormat's content-keyed cache is restored between runs, because it takes about 110 s
   cold on Ubuntu. The static SwiftLint binary has no SourceKit, so CI skips
   `statement_position`, the only affected rule. It only warns, so it never changed whether
-  lint passed, and local `make lint` still reports it.
+  lint passed, and local `make lint` still reports it. The lint step fails if SwiftLint
+  reports skipping any other rule, so an upgrade cannot silently drop more.
 - **Every main commit runs.** A `push` trigger on `main` replaces the 2026-07-02
   pull-request-only rule, which existed because of private-repository macOS pricing; the
   repository is public now and macOS minutes are free. `main` also seeds the caches every PR
