@@ -35,7 +35,7 @@ extension MarkdownSTTextView {
         }
 
         let changedRanges = changedKeys.map(\.range)
-        performImagePresentationMutation(in: textStorage) {
+        performPresentationAttributeMutation(in: textStorage) {
             textStorage.beginEditing()
             for range in changedRanges {
                 let target = range.clamped(toLength: textStorage.length)
@@ -54,7 +54,7 @@ extension MarkdownSTTextView {
             }
             textStorage.endEditing()
         }
-        invalidateImagePresentationParagraphs(containing: changedRanges)
+        invalidatePresentationParagraphs(containing: changedRanges)
     }
 
     func removeAllWYSIWYGImagePresentationMarkers() {
@@ -64,13 +64,13 @@ extension MarkdownSTTextView {
             return
         }
 
-        performImagePresentationMutation(in: textStorage) {
+        performPresentationAttributeMutation(in: textStorage) {
             textStorage.removeAttribute(
                 WYSIWYGImagePresentationMarker.attribute,
                 range: NSRange(location: 0, length: textStorage.length)
             )
         }
-        invalidateImagePresentationParagraphs(
+        invalidatePresentationParagraphs(
             containing: [NSRange(location: 0, length: textStorage.length)]
         )
     }
@@ -83,7 +83,7 @@ extension MarkdownSTTextView {
             return
         }
         wysiwygZeroWidthContentStorageDelegate?.imagePresentationGeneration = generation
-        invalidateImagePresentationParagraphs(containing: ranges)
+        invalidatePresentationParagraphs(containing: ranges)
     }
 
     func wysiwygImagePresentationSnappedCaretOffset(
@@ -107,10 +107,10 @@ extension MarkdownSTTextView {
             return
         }
 
-        performImagePresentationMutation(in: textStorage) {
+        performPresentationAttributeMutation(in: textStorage) {
             textStorage.removeAttribute(WYSIWYGImagePresentationMarker.attribute, range: range)
         }
-        invalidateImagePresentationParagraphs(containing: [range])
+        invalidatePresentationParagraphs(containing: [range])
     }
 }
 
@@ -166,54 +166,6 @@ private extension MarkdownSTTextView {
             }
         }
         return nil
-    }
-
-    func performImagePresentationMutation(
-        in textStorage: NSTextStorage,
-        _ mutation: () -> Void
-    ) {
-        let originalSelection = selectedRange()
-        let clipView = enclosingScrollView?.contentView
-        let visibleOrigin = clipView?.bounds.origin
-        let manager = undoManager
-        let restoresUndoRegistration = manager?.isUndoRegistrationEnabled == true
-        if restoresUndoRegistration {
-            manager?.disableUndoRegistration()
-        }
-        mutation()
-        if restoresUndoRegistration {
-            manager?.enableUndoRegistration()
-        }
-        if selectedRange() != originalSelection {
-            textSelection = originalSelection.clamped(toLength: textStorage.length)
-        }
-        if let clipView, let visibleOrigin {
-            clipView.scroll(to: visibleOrigin)
-            enclosingScrollView?.reflectScrolledClipView(clipView)
-        }
-    }
-
-    func invalidateImagePresentationParagraphs(containing ranges: [NSRange]) {
-        guard !ranges.isEmpty,
-              let textStorage = (textContentManager as? NSTextContentStorage)?.textStorage
-        else {
-            return
-        }
-
-        let storage = textStorage.string as NSString
-        let paragraphRanges = ranges
-            .map { storage.paragraphRange(for: $0.clamped(toLength: storage.length)) }
-            .reduce(into: [NSRange]()) { accumulated, range in
-                guard !accumulated.contains(range) else { return }
-                accumulated.append(range)
-            }
-        for paragraphRange in paragraphRanges {
-            guard let textRange = NSTextRange(paragraphRange, in: textContentManager) else {
-                continue
-            }
-            textLayoutManager.invalidateLayout(for: textRange)
-        }
-        needsDisplay = true
     }
 }
 

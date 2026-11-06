@@ -12,6 +12,13 @@ extension MarkdownSTTextView {
             return imageSnappedOffset
         }
 
+        if let tableSnappedOffset = wysiwygTablePresentationSnappedCaretOffset(
+            offset,
+            preferring: direction
+        ) {
+            return tableSnappedOffset
+        }
+
         guard let foldedRange = wysiwygFoldedDelimiterRange(containingInterior: offset) else {
             return offset
         }

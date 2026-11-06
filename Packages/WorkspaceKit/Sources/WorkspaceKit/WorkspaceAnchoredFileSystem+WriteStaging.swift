@@ -73,6 +73,9 @@ extension WorkspaceAnchoredFileSystem {
             return notCommitted(reason: normalizedError(error), artifactState: .none)
         }
         defer { closeWriteTarget(target) }
+        if let refusal = volumeRefusal(for: target, parentDescriptor: parentDescriptor, hooks: hooks) {
+            return notCommitted(reason: refusal, artifactState: .none)
+        }
         let destination = WriteDestination(
             location: location,
             chain: chain,

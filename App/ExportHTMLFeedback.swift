@@ -385,6 +385,7 @@ enum ExportHTMLNoticeMapper {
         "\(String(cString: strerror(code))), error \(code)"
     }
 
+    // swiftlint:disable:next cyclomatic_complexity
     static func writeErrorDescription(_ error: WorkspaceAnchoredFileSystemError) -> String {
         switch error {
         case .missing: "a file it needed was missing"
@@ -396,6 +397,10 @@ enum ExportHTMLNoticeMapper {
         case .durabilityFailed: "the data could not be flushed to disk"
         case .cleanupFailed: "temporary files could not be cleaned up"
         case .cancelled: "the write was cancelled"
+        case .unsupportedVolume: "the volume does not support safe file replacement"
+        case .insufficientSpace: "the disk is full"
+        case .readOnlyVolume: "the disk is read-only"
+        case .writeNotPermitted: "permission to write was denied"
         }
     }
 }

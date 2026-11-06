@@ -230,6 +230,7 @@ struct IOSWindowSceneDisconnectAnchor: UIViewRepresentable {
 final class IOSWindowSceneDisconnectObserver {
     private weak var scene: UIWindowScene?
     private var token: (any NSObjectProtocol)?
+    private var disconnectTask: Task<Void, Never>?
     private let onDisconnect: @MainActor () async -> Void
 
     init(onDisconnect: @escaping @MainActor () async -> Void) {
@@ -243,11 +244,16 @@ final class IOSWindowSceneDisconnectObserver {
         token = NotificationCenter.default.addObserver(
             forName: UIScene.didDisconnectNotification, object: scene, queue: .main
         ) { [self] _ in
-            Task { @MainActor in await self.onDisconnect() }
+            MainActor.assumeIsolated {
+                guard self.disconnectTask == nil else { return }
+                self.disconnectTask = Task { await self.onDisconnect() }
+            }
         }
     }
 
     func stop() {
+        disconnectTask?.cancel()
+        disconnectTask = nil
         if let token {
             NotificationCenter.default.removeObserver(token)
         }

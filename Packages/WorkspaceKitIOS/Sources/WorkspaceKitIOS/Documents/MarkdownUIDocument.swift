@@ -134,7 +134,7 @@ final class MarkdownUIDocument: UIDocument {
 
     override func presentedItemDidGain(_ version: NSFileVersion) {
         super.presentedItemDidGain(version)
-        emit(.externalChange)
+        emit(version.isConflict && !version.isResolved ? .unresolvedVersions : .externalChange)
     }
 
     override func presentedItemDidMove(to newURL: URL) {
@@ -151,13 +151,7 @@ final class MarkdownUIDocument: UIDocument {
     }
 
     private func relayDocumentState() {
-        let state = documentState
-        if state.contains(.inConflict) {
-            emit(.externalChange)
-        }
-        if state.contains(.editingDisabled) {
-            emit(.becameReadOnly)
-        }
+        emit(.providerStateChanged)
     }
 
     private func relayUnexpectedRelocation(oldURL: URL?) {
