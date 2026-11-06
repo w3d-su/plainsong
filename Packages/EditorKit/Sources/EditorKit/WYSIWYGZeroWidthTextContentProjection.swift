@@ -4,7 +4,8 @@ import AppKit
 ///
 /// The backing NSTextStorage remains exact Markdown. Folded delimiters become equal-length
 /// U+200B runs, while active image spans become one U+FFFC attachment plus equal-length
-/// U+200B padding only inside the ephemeral paragraph copy.
+/// U+200B padding only inside the ephemeral paragraph copy. A projected U+200B that ends a
+/// line becomes a near-zero-width hanging space (`WYSIWYGLineEndHangingSpace`).
 final class WYSIWYGZeroWidthTextContentStorageDelegate: NSObject, NSTextContentStorageDelegate {
     weak var previousDelegate: NSTextContentStorageDelegate?
     var imagePresentationGeneration: UInt64?
@@ -80,6 +81,11 @@ final class WYSIWYGZeroWidthTextContentStorageDelegate: NSObject, NSTextContentS
                 range: NSRange(location: imageMarker.range.location, length: 1)
             )
         }
+
+        WYSIWYGLineEndHangingSpace.apply(
+            to: paragraph,
+            projectedRanges: foldedRanges + imageMarkers.map(\.range)
+        )
 
         precondition(
             paragraph.length == range.length,
