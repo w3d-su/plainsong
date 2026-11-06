@@ -3,7 +3,7 @@ import AppKit
 extension MarkdownSTTextView {
     /// Snaps a collapsed-caret offset out of any folded delimiter interior, reading the
     /// live fold attributes so it reflects exactly what is currently hidden. Used by the
-    /// non-user-facing WYSIWYG hook for keyboard arrow and pointer click rest positions.
+    /// WYSIWYG presentation for keyboard arrow and pointer click rest positions.
     func wysiwygSnappedCaretOffset(_ offset: Int, preferring direction: WYSIWYGCaretSnap.Direction) -> Int {
         if let imageSnappedOffset = wysiwygImagePresentationSnappedCaretOffset(
             offset,
