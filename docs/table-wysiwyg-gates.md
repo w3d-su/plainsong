@@ -1,8 +1,8 @@
 # Tables in WYSIWYG — Sub-Gate Specification
 
-> **Status: T0 checked (mechanism A GO, 2026-11-06). T1–T11 unchecked.**
+> **Status: T0 checked (mechanism A GO, 2026-11-06). T1 checked (2026-11-06). T2–T11 unchecked.**
 > The owner approved the mechanism and reveal policy on 2026-11-06. The T0 spike is reachable
-> only through an internal test hook; tables stay raw in every mode until T1–T11 pass. This document is the dedicated sub-gate that
+> only through an internal test hook; tables stay raw in every mode until T2–T11 pass. This document is the dedicated sub-gate that
 > `docs/wysiwyg-release-checklist.md` §E requires before a deferred construct becomes
 > user-facing, following the link-folding (`docs/link-folding-gates.md`) and image-thumbnail
 > (`docs/image-thumbnail-gates.md`) pattern. When every gate is checked, tables render only in
@@ -137,7 +137,7 @@ reveals a construct's raw syntax when the caret touches it. For tables v1 combin
     of shipped folds whose closing delimiter ends a line (`A **bold**`); tracked separately.
 
 ### T1 — Model correctness
-- [ ] A pure table region model (SyntaxKit, from tree-sitter `pipe_table`,
+- [x] A pure table region model (SyntaxKit, from tree-sitter `pipe_table`,
   `pipe_table_header`, `pipe_table_delimiter_row`, `pipe_table_row` and `|` nodes) produces
   exact UTF-16 ranges for the table, each row, each cell's content, and each structural run
   (leading spaces, pipes, padding, trailing pipe), plus per-column alignment. Cell
@@ -147,6 +147,36 @@ reveals a construct's raw syntax when the caret touches it. For tables v1 combin
   ineligibility rule is decided per table and provably leaves it raw. The visible-range parse
   expands to whole eligible tables (bounded by the T10 caps), so scrolling never changes
   column widths. Table regions do not alter existing inline fold regions inside cells.
+  **Evidence (2026-11-06):** SyntaxKit `WYSIWYGTableRegion` (`WYSIWYGTableModel.swift`) and
+  `WYSIWYGTableParser.swift`; `WYSIWYGFoldPlan.tableRegions`, filled only when a parse passes
+  `tableRegionsEnabled: true` (no production caller yet, so nothing user-facing changes).
+  - `WYSIWYGTableModelTests`: exact table, row, cell-content and structural ranges, which tile
+    every row with no gap or overlap; every content range equals the `TableEditing` Tab
+    selection; `\|` stays in its cell and an unescaped `|` inside a code span splits it (GFM);
+    one test per raw reason (nested quote and list, U+0009, leading-pipe disagreement, extra
+    cells, unanchored first column, row/column/length caps, truncation, structure mismatch);
+    fewer cells than the header stays eligible; CRLF and a table ending the document; inline
+    fold regions, image regions, tokens and the visible range are identical with table regions
+    on and off; MDX uses the same model.
+  - `WYSIWYGTableParseRangeTests`: five viewports over a 302-row table (longer than the
+    4,096-unit minimum window), including ones that start or end mid-table, all see the same
+    whole region; a prose edge or a pipe-bearing block without a delimiter line does not grow
+    the range; the scan stops at the 32 KiB cap and reports the cut; a grown range never starts
+    inside fenced code.
+  - EditorKit `WYSIWYGTableModelPresentationTests`: the internal hook now reads the model
+    (the T0 line scan is gone), presents each row of every eligible table, gives a raw table no
+    marker, and leaves a table wider than the text container raw until it fits. The planner's
+    duplicate row rules moved into the model; only the width check stays in EditorKit.
+  - Model decisions: every rule runs in the `RawReason` order and the first wins. A row the
+    grammar reports must parse as a `MarkdownTableRowStructure` whose unescaped pipes are
+    exactly the grammar's `|` nodes, so a pipe-less body row (GFM allows one) leaves the table
+    raw (`structureMismatch`). The range grows at an edge only when the edge line's block of
+    non-blank lines holds a delimiter-shaped line, scanning at most 32 KiB each way; fence and
+    frontmatter context is restored after growing. A table starting or ending exactly at a
+    capped cut stays raw (`truncated`), as one larger than the caps would.
+  - Finding for T2: tree-sitter gives `pipe_table_cell` no `inline` child, so cells have no
+    inline fold candidates today (bold in a cell is styled but not folded). T2 decides whether
+    cells get an inline parse before widths account for folded delimiters.
 
 ### T2 — Render policy
 - [ ] Column widths are the maximum measured width of each column's *presented* cell
