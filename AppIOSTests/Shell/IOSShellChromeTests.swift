@@ -2,6 +2,7 @@ import EditorKitIOS
 import Foundation
 import MarkdownCore
 @testable import PlainsongIOS
+import UIKit
 import WorkspaceCore
 import WorkspaceKitIOS
 import XCTest
@@ -11,6 +12,29 @@ import XCTest
 /// success path the real facade would refuse.
 @MainActor
 final class IOSShellChromeTests: XCTestCase {
+    func testBackgroundFlushAcquiresBeforeSchedulingAndEndsOnceEvenAfterExpiration() async throws {
+        let facade = FakeSceneFacade(
+            snapshot: ShellFixtures.sceneSnapshot(),
+            capabilities: IOSSceneCapabilities(editor: nil, documents: nil, workspace: nil, preview: nil, assets: nil)
+        )
+        let scene = IOSShellSceneState(facade: facade)
+        for expiresFirst in [true, false] {
+            let token = UIBackgroundTaskIdentifier(rawValue: 73)
+            var expire: (@MainActor @Sendable () -> Void)?
+            var ended: [UIBackgroundTaskIdentifier] = []
+            let task = scene.flushForBackground(assertion: IOSBackgroundFlushAssertion(acquire: { callback in
+                expire = callback
+                return token
+            }, release: { ended.append($0) }))
+            let expiration = try XCTUnwrap(expire)
+            if expiresFirst { expiration() }
+            await task.value
+            expiration()
+            XCTAssertEqual(ended, [token])
+        }
+        XCTAssertEqual(facade.flushCount, 2)
+    }
+
     // MARK: Chrome projection
 
     func testChromeProjectsDocumentStatusWithoutDocumentData() {
@@ -187,14 +211,12 @@ final class IOSShellChromeTests: XCTestCase {
         scene.startObserving()
         let entries = scene.sceneWorkspaceEntries
 
-        scene.openEntry(entries[0]) // directory
-        scene.openEntry(entries[1]) // image
-        scene.openEntry(entries[2]) // downloading
-        try? await Task.sleep(for: .milliseconds(10))
+        for entry in entries.prefix(3) {
+            XCTAssertNil(scene.openEntry(entry))
+        }
         XCTAssertTrue(facade.openedURLs.isEmpty)
 
-        scene.openEntry(entries[3]) // markdown, available
-        try? await Task.sleep(for: .milliseconds(10))
+        await scene.openEntry(entries[3])?.value
         XCTAssertEqual(facade.openedURLs.count, 1)
         XCTAssertEqual(facade.openedURLs.first?.scope, .singleFile)
         XCTAssertEqual(facade.openedURLs.first?.url.lastPathComponent, "post.md")
@@ -256,8 +278,7 @@ final class IOSShellChromeTests: XCTestCase {
         let scene = IOSShellSceneState(facade: facade)
         scene.startObserving()
 
-        scene.saveCurrentDocument()
-        try? await Task.sleep(for: .milliseconds(10))
+        await scene.saveCurrentDocument().value
         XCTAssertEqual(facade.saveCalls, 1)
         XCTAssertNil(scene.presentedError)
 
@@ -270,8 +291,7 @@ final class IOSShellChromeTests: XCTestCase {
         )
         let emptyScene = IOSShellSceneState(facade: emptyFacade)
         emptyScene.startObserving()
-        emptyScene.saveCurrentDocument()
-        try? await Task.sleep(for: .milliseconds(10))
+        await emptyScene.saveCurrentDocument().value
         XCTAssertNotNil(emptyScene.presentedError)
     }
 
@@ -289,8 +309,7 @@ final class IOSShellChromeTests: XCTestCase {
         let scene = IOSShellSceneState(facade: facade)
         scene.startObserving()
 
-        scene.resolveExternal(.reload)
-        try? await Task.sleep(for: .milliseconds(10))
+        await scene.resolveExternal(.reload).value
         XCTAssertEqual(facade.resolvedExternal.count, 1)
     }
 

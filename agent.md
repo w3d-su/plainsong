@@ -47,6 +47,7 @@ projects such as Astro/Next.js content directories).
 | Documentation language | English (this file). |
 | Min deployment target | macOS 14 (Sonoma). |
 | UI framework | SwiftUI app shell; AppKit (`NSViewRepresentable`) for the text editor. |
+| License | GPL-3.0-or-later, because the macOS editor links STTextView under GPLv3 (`docs/decisions/2026-11-06-gpl-3.0-or-later-license.md`). |
 
 ---
 
@@ -69,8 +70,9 @@ projects such as Astro/Next.js content directories).
 | JS tooling | Node 20+, npm, esbuild, vitest (preview pipeline unit tests) | |
 
 **Dependency policy:** keep the dependency list short. Adding any new Swift package or npm
-package requires a `docs/decisions/` entry explaining why. `docs/decision-log.md` is the
-archive and does not take new rows.
+package requires a `docs/decisions/` entry explaining why, and its license must be
+compatible with GPL-3.0-or-later. `docs/decision-log.md` is the archive and does not take
+new rows.
 
 ---
 
@@ -214,6 +216,7 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   Recent single-file restoration uses that same availability classification and retains
   a live pending selection for Refresh/retry. Cancelled, superseded, revoked or retired
   operations cannot keep an uninstalled scope; returned writers still drain safely.
+- iOS protects the recovery-first background flush with a UIKit background task. A fenced writer can retire after durable recovery and provider close. iCloud version conflicts require explicit selection and a coordinated recheck of the reviewed versions before resolution (Decision Log 2026-11-06).
 - An iOS external reload rechecks its store's current proposal and lifecycle immediately
   before native installation, including proposals deferred before close. Closing holds
   the proposal without retiring its operation; failed close can resume it. Root watcher
@@ -232,6 +235,11 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   sibling staging. Any recovery artifact is reported at its staging-directory path;
   the emptied directory is removed. `Scripts/check-single-file-save-sandbox.sh` exercises
   this in a signed sandboxed probe under a LaunchServices file-only grant.
+- Before staging, a save reads the destination volume through the retained parent descriptor.
+  It creates nothing and fails when the mount is read-only or the volume does not advertise
+  `RENAME_EXCL` (and `RENAME_SWAP` when replacing): exFAT and FAT32 for every save, Mac OS
+  Extended for a replacement. Write-path `errno` becomes a typed reason (unsupported volume,
+  disk full, read-only, not permitted) that the save error names together with a next step.
 - Window chrome: a native `NavigationSplitView` with a resizable, collapsible sidebar
   (Files / Search navigators; ⇧⌘F in a window whose sidebar is hidden reveals it in
   Search) on macOS 27+, a fixed-width sidebar in an `HStack` before
@@ -828,8 +836,10 @@ editor *folds* markdown tokens via rendering, not text mutation:
   framed code block (custom `NSTextLayoutFragment`).
 - When the cursor enters a node's range → reveal raw markdown for that node only
   (Typora's behavior).
-- Tables and mermaid in WYSIWYG: custom layout fragments embedding views — hardest part;
-  tables may initially stay raw with the table helper (§6.3).
+- Tables in WYSIWYG: the paragraph projection turns cell-starting pipes into `\t` with
+  per-row left tab stops, hides other structure, and collapses the delimiter row; cells edit
+  in place and structural edits reveal the whole table (`docs/table-wysiwyg-gates.md`). T0
+  passed; tables stay raw with the table helper (§6.3) until T1–T11 pass. Mermaid stays raw.
 - Undo, IME composition (Chinese input!), and selection across folded tokens are the risk
   areas — write exploratory tests early. **IME correctness is non-negotiable: test with
   Traditional Chinese (Zhuyin/Pinyin) marked text at every change.**

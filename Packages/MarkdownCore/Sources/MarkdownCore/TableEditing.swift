@@ -178,34 +178,13 @@ private struct TableRow {
     }
 
     init?(line: MarkdownLine) {
-        var pipePositions = TableRow.pipePositions(in: line.text)
-        guard let firstPipe = pipePositions.first, let lastPipe = pipePositions.last else { return nil }
-        let storage = line.text as NSString
-        // Outer pipes are optional. Virtual boundaries preserve the edge cells
-        // and their original UTF-16 source ranges when either pipe is omitted.
-        if !storage.substring(to: firstPipe).allSatisfy({ $0 == " " || $0 == "\t" }) {
-            pipePositions.insert(-1, at: 0)
+        // One definition of cell boundaries, shared with WYSIWYG table presentation.
+        guard let structure = MarkdownTableRowStructure(line: line.text, lineStart: line.range.location) else {
+            return nil
         }
-        if !storage.substring(from: lastPipe + 1).allSatisfy({ $0 == " " || $0 == "\t" }) {
-            pipePositions.append(storage.length)
-        }
-        guard pipePositions.count >= 2 else { return nil }
-
         self.line = line
-        var cells: [TableCell] = []
-        var ranges: [TableCellRange] = []
-        for pairIndex in 0 ..< pipePositions.count - 1 {
-            let start = pipePositions[pairIndex] + 1
-            let end = pipePositions[pairIndex + 1]
-            let rawRange = NSRange(location: start, length: max(0, end - start))
-            let rawCell = (line.text as NSString).substring(with: rawRange)
-            let trimmedRange = TableRow.trimmedContentRange(rawRange, in: line.text, lineStart: line.range.location)
-            cells.append(TableCell(raw: MarkdownTextEditingSupport.trimSpaces(rawCell)))
-            ranges.append(TableCellRange(rowRange: line.range, contentRange: trimmedRange))
-        }
-
-        self.cells = cells
-        cellRanges = ranges
+        cells = structure.cells.map { TableCell(raw: $0.trimmedText) }
+        cellRanges = structure.cells.map { TableCellRange(rowRange: line.range, contentRange: $0.contentRange) }
     }
 
     func isAtEnd(_ location: Int) -> Bool {
@@ -221,64 +200,25 @@ private struct TableRow {
         }
         return location == line.range.location + end
     }
-
-    private static func pipePositions(in line: String) -> [Int] {
-        var positions: [Int] = []
-        let storage = line as NSString
-        var backslashCount = 0
-        for index in 0 ..< storage.length {
-            let unit = storage.character(at: index)
-            if unit == 124, backslashCount.isMultiple(of: 2) {
-                positions.append(index)
-            }
-            backslashCount = unit == 92 ? backslashCount + 1 : 0
-        }
-        return positions
-    }
-
-    private static func trimmedContentRange(_ range: NSRange, in line: String, lineStart: Int) -> NSRange {
-        let storage = line as NSString
-        var start = range.location
-        var end = range.location + range.length
-        while start < end, isSpace(storage.character(at: start)) {
-            start += 1
-        }
-        while end > start, isSpace(storage.character(at: end - 1)) {
-            end -= 1
-        }
-        if start == end, range.length > 0 {
-            start = range.location
-            end = range.location + 1
-        }
-        return NSRange(location: lineStart + start, length: max(0, end - start))
-    }
-
-    private static func isSpace(_ unit: unichar) -> Bool {
-        unit == 32 || unit == 9
-    }
 }
 
 private struct TableCell {
     let raw: String
 
     var isSeparator: Bool {
-        let trimmed = raw.trimmingCharacters(in: .whitespaces)
-        return trimmed.contains("-") && trimmed.allSatisfy { character in
-            character == "-" || character == ":" || character == " "
-        }
+        MarkdownTableRowStructure.isDelimiterCell(raw)
     }
 
     var alignment: TableAlignment {
-        let trimmed = raw.trimmingCharacters(in: .whitespaces)
-        switch (trimmed.hasPrefix(":"), trimmed.hasSuffix(":")) {
-        case (true, true):
-            return .center
-        case (true, false):
-            return .left
-        case (false, true):
-            return .right
-        case (false, false):
-            return .none
+        switch MarkdownTableRowStructure.alignment(ofDelimiterCell: raw) {
+        case .center:
+            .center
+        case .left:
+            .left
+        case .right:
+            .right
+        case .none:
+            .none
         }
     }
 }

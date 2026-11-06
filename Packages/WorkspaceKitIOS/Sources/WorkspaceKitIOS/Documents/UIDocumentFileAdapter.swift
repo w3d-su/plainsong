@@ -15,7 +15,7 @@ final class UIDocumentFileAdapter: IOSDocumentFilePort {
 
     func setHandler(_ handler: (@MainActor (IOSDocumentFileEvent) -> Void)?) {
         self.handler = handler
-        document?.setEventHandler(handler)
+        installHandler()
     }
 
     func open() async throws -> IOSDocumentFileOpenResult {
@@ -25,7 +25,12 @@ final class UIDocumentFileAdapter: IOSDocumentFilePort {
             throw map(document.takeError(), fallback: .unavailable)
         }
         try rejectPlaceholder(at: document.fileURL)
-        let canWrite = try writePermission(at: document.fileURL)
+        if document.documentState.contains(.inConflict) ||
+            !(NSFileVersion.unresolvedConflictVersionsOfItem(at: document.fileURL) ?? []).isEmpty
+        {
+            handler?(.unresolvedVersions)
+        }
+        let canWrite = canEdit(document)
         return IOSDocumentFileOpenResult(data: data, canWrite: canWrite)
     }
 
@@ -48,6 +53,11 @@ final class UIDocumentFileAdapter: IOSDocumentFilePort {
         completion: @escaping @MainActor (IOSDocumentFileWriteDisposition) -> Void
     ) {
         let document = prepareDocument()
+        guard !document.documentState.contains(.inConflict), canEdit(document) else {
+            publishState(document)
+            completion(.failed)
+            return
+        }
         document.installSnapshot(snapshot)
         // save(to:) invokes this completion on the caller queue. This method is main-actor isolated.
         let finish = DocumentSaveFinish(document: document, completion: completion)
@@ -58,7 +68,7 @@ final class UIDocumentFileAdapter: IOSDocumentFilePort {
     }
 
     func close() async throws {
-        guard let document else { return }
+        guard let document, !document.documentState.contains(.closed) else { return }
         let success = await close(document)
         if !success {
             throw map(document.takeError(), fallback: .closeFailed)
@@ -70,8 +80,8 @@ final class UIDocumentFileAdapter: IOSDocumentFilePort {
             return document
         }
         let document = MarkdownUIDocument(fileURL: fileURL)
-        document.setEventHandler(handler)
         self.document = document
+        installHandler()
         return document
     }
 
@@ -115,9 +125,30 @@ final class UIDocumentFileAdapter: IOSDocumentFilePort {
         }
     }
 
-    private func writePermission(at url: URL) throws -> Bool {
-        let values = try? url.resourceValues(forKeys: [.isWritableKey])
-        return values?.isWritable ?? true
+    private func installHandler() {
+        document?.setEventHandler { [weak self] event in
+            guard let self, let document else { return }
+            if event == .providerStateChanged {
+                publishState(document)
+            } else {
+                handler?(event)
+            }
+        }
+    }
+
+    private func publishState(_ document: MarkdownUIDocument) {
+        if document.documentState.contains(.inConflict) {
+            handler?(.unresolvedVersions)
+        } else if !document.documentState.contains(.closed) {
+            handler?(.writePermissionChanged(canEdit(document)))
+        }
+    }
+
+    private func canEdit(_ document: MarkdownUIDocument) -> Bool {
+        guard !document.documentState.contains(.editingDisabled) else { return false }
+        var url = document.fileURL
+        url.removeAllCachedResourceValues()
+        return (try? url.resourceValues(forKeys: [.isWritableKey]).isWritable) == true
     }
 
     private func map(_ error: Error?, fallback: IOSDocumentFailure) -> IOSDocumentFailure {

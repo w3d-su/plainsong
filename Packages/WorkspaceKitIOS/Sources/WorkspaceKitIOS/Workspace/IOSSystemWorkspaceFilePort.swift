@@ -2,6 +2,9 @@ import Foundation
 import WorkspaceCore
 
 struct IOSSystemWorkspaceFilePort: IOSWorkspaceFilePort {
+    private static let coordinationQueue = DispatchQueue(
+        label: "app.plainsong.workspace-coordination", qos: .userInitiated, attributes: .concurrent
+    )
     var timeoutNanoseconds: UInt64 = IOSWorkspaceAccessPorts.defaultTimeoutNanoseconds
 
     func metadata(url: URL, relativePath: String, root: URL) async throws -> IOSWorkspaceFileItem {
@@ -183,7 +186,7 @@ struct IOSSystemWorkspaceFilePort: IOSWorkspaceFilePort {
         return .available(canWrite: values.isWritable ?? false)
     }
 
-    private func coordinate<T: Sendable>(
+    func coordinate<T: Sendable>(
         url: URL,
         reading options: NSFileCoordinator.ReadingOptions,
         body: @escaping @Sendable (URL) throws -> T
@@ -202,7 +205,7 @@ struct IOSSystemWorkspaceFilePort: IOSWorkspaceFilePort {
         }
     }
 
-    private func coordinate(
+    func coordinate(
         url: URL,
         writing options: NSFileCoordinator.WritingOptions,
         body: @escaping @Sendable (URL) throws -> Void
@@ -238,7 +241,7 @@ struct IOSSystemWorkspaceFilePort: IOSWorkspaceFilePort {
                     }
                     handle.cancel()
                 }
-                Task.detached {
+                Self.coordinationQueue.async {
                     let coordinator = handle.begin()
                     let result = Result { try body(coordinator) }
                     timeout.cancel()

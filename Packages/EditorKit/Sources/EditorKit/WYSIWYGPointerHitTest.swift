@@ -155,12 +155,35 @@ enum WYSIWYGPointerHitTest {
         // Like `characterRange`, the index counts from the paragraph's start, not the line's:
         // adding the line's start again put clicks on a wrapped paragraph's later visual
         // lines at that line's end.
-        let index = nearest.lineFragment.characterIndex(for: CGPoint(
-            x: point.x - nearest.frame.minX,
-            y: point.y - nearest.frame.minY
-        ))
+        let localPoint = CGPoint(x: point.x - nearest.frame.minX, y: point.y - nearest.frame.minY)
         let lineRange = nearest.lineFragment.characterRange
+        let index = afterTabIfPastItsMiddle(
+            nearest.lineFragment.characterIndex(for: localPoint),
+            pointX: localPoint.x,
+            in: nearest.lineFragment
+        )
         return elementLocation + min(max(index, lineRange.location), NSMaxRange(lineRange))
+    }
+
+    /// `characterIndex(for:)` returns the index of the glyph under the point. For a tab, which
+    /// can be wide (a projected WYSIWYG table cell boundary), a click past its middle belongs
+    /// after it, as an insertion point would.
+    private static func afterTabIfPastItsMiddle(
+        _ index: Int,
+        pointX: CGFloat,
+        in lineFragment: NSTextLineFragment
+    ) -> Int {
+        let attributed = lineFragment.attributedString
+        guard index >= lineFragment.characterRange.location,
+              index < NSMaxRange(lineFragment.characterRange),
+              index < attributed.length,
+              (attributed.string as NSString).character(at: index) == 0x0009
+        else {
+            return index
+        }
+        let start = lineFragment.locationForCharacter(at: index).x
+        let end = lineFragment.locationForCharacter(at: index + 1).x
+        return end > start && pointX >= (start + end) / 2 ? index + 1 : index
     }
 }
 
