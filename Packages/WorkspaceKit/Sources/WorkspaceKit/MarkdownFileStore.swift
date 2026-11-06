@@ -33,10 +33,38 @@ public enum MarkdownFileStoreError: LocalizedError, Equatable {
     case unsupportedExtension(URL)
     case unreadable(URL)
     case unwritable(URL)
+    /// Proven not committed: the volume cannot publish the save with an atomic rename (exFAT
+    /// and FAT32 for every save, Mac OS Extended for a replacement).
+    case unsupportedVolume(URL)
+    /// Proven not committed: the disk or the user's quota is full.
+    case insufficientSpace(URL)
+    /// Proven not committed: the volume is mounted read-only.
+    case readOnlyVolume(URL)
+    /// Proven not committed: the file system or the App Sandbox refused the write.
+    case writeNotPermitted(URL)
     case changedIdentity(URL)
     case writeNotCommittedWithCleanupRequired(URL, WorkspaceNotCommittedFileWrite)
     case committedWithCleanupRequired(URL, WorkspaceDurableFileWrite)
     case writeRequiresReconciliation(URL, WorkspaceIndeterminateFileWrite)
+
+    /// The error for a proven non-commit. A remaining artifact is always reported; otherwise a
+    /// writer reason the user can act on picks its own case, and any other reason stays
+    /// `unwritable`.
+    public static func notCommitted(
+        _ result: WorkspaceNotCommittedFileWrite,
+        destinationURL: URL
+    ) -> MarkdownFileStoreError {
+        guard result.artifactState == .none else {
+            return .writeNotCommittedWithCleanupRequired(destinationURL, result)
+        }
+        return switch result.reason {
+        case .unsupportedVolume: .unsupportedVolume(destinationURL)
+        case .insufficientSpace: .insufficientSpace(destinationURL)
+        case .readOnlyVolume: .readOnlyVolume(destinationURL)
+        case .writeNotPermitted: .writeNotPermitted(destinationURL)
+        default: .unwritable(destinationURL)
+        }
+    }
 
     public var errorDescription: String? {
         switch self {
@@ -46,33 +74,58 @@ public enum MarkdownFileStoreError: LocalizedError, Equatable {
             "Could not read \(url.lastPathComponent) as UTF-8 Markdown."
         case let .unwritable(url):
             "Could not save changes to \(url.lastPathComponent)."
+        case let .unsupportedVolume(url):
+            Self.refusalDescription(destinationURL: url, reason: .unsupportedVolume)
+        case let .insufficientSpace(url):
+            Self.refusalDescription(destinationURL: url, reason: .insufficientSpace)
+        case let .readOnlyVolume(url):
+            Self.refusalDescription(destinationURL: url, reason: .readOnlyVolume)
+        case let .writeNotPermitted(url):
+            Self.refusalDescription(destinationURL: url, reason: .writeNotPermitted)
         case let .changedIdentity(url):
             "\(url.lastPathComponent) changed before it could be opened."
         case let .writeNotCommittedWithCleanupRequired(url, result):
             Self.artifactDescription(
                 destinationURL: url,
                 artifactState: result.artifactState,
-                destinationWasCommitted: false
+                destinationWasCommitted: false,
+                reason: result.reason
             )
         case let .committedWithCleanupRequired(url, result):
             Self.artifactDescription(
                 destinationURL: url,
                 artifactState: result.cleanupState,
-                destinationWasCommitted: true
+                destinationWasCommitted: true,
+                reason: nil
             )
         case let .writeRequiresReconciliation(url, _):
             "\(url.lastPathComponent) may already contain the new bytes and must be reconciled."
         }
     }
 
+    private static func refusalDescription(
+        destinationURL: URL,
+        reason: WorkspaceAnchoredFileSystemError
+    ) -> String {
+        let failure = "Could not save changes to \(destinationURL.lastPathComponent)"
+        guard let refusal = WriteRefusal(reason) else { return "\(failure)." }
+        return "\(failure) because \(refusal.cause). \(refusal.nextStep)"
+    }
+
     private static func artifactDescription(
         destinationURL: URL,
         artifactState: WorkspaceFileWriteArtifactState,
-        destinationWasCommitted: Bool
+        destinationWasCommitted: Bool,
+        reason: WorkspaceAnchoredFileSystemError?
     ) -> String {
-        let outcome = destinationWasCommitted
-            ? "\(destinationURL.lastPathComponent) was saved"
-            : "\(destinationURL.lastPathComponent) was not replaced"
+        let name = destinationURL.lastPathComponent
+        let outcome = if destinationWasCommitted {
+            "\(name) was saved"
+        } else if let refusal = reason.flatMap(WriteRefusal.init) {
+            "\(name) was not replaced because \(refusal.cause)"
+        } else {
+            "\(name) was not replaced"
+        }
         return switch artifactState {
         case .none:
             outcome
@@ -80,6 +133,35 @@ public enum MarkdownFileStoreError: LocalizedError, Equatable {
             "\(outcome), but a recovery artifact was retained at \(location.fileURL.path)."
         case let .removalIndeterminate(location):
             "\(outcome), but removal of the recovery artifact at \(location.fileURL.path) could not be confirmed."
+        }
+    }
+}
+
+/// The cause and next step shown for a writer reason the user can act on.
+private struct WriteRefusal {
+    /// Completes "Could not save changes to post.md because …".
+    let cause: String
+    let nextStep: String
+
+    init?(_ reason: WorkspaceAnchoredFileSystemError) {
+        switch reason {
+        case .unsupportedVolume:
+            cause = "its disk cannot replace files safely"
+            nextStep = "Plainsong saves by swapping in a complete new copy in one step, which disks " +
+                "formatted as exFAT, FAT32, or Mac OS Extended do not support. Copy the file to a " +
+                "folder on your Mac or to an APFS disk and edit it there."
+        case .insufficientSpace:
+            cause = "its disk is full"
+            nextStep = "Free up space on the disk, then save again."
+        case .readOnlyVolume:
+            cause = "its disk is read-only"
+            nextStep = "Copy the file to a folder you can write to and edit it there."
+        case .writeNotPermitted:
+            cause = "writing to it is not permitted"
+            nextStep = "The file may be locked, its permissions may have changed, or access to its " +
+                "folder may have been revoked. Check the file with Get Info in the Finder, or open it again."
+        default:
+            return nil
         }
     }
 }
@@ -195,13 +277,7 @@ public struct MarkdownFileStore: Sendable {
             guard result.cleanupState != .none else { return }
             throw MarkdownFileStoreError.committedWithCleanupRequired(destinationURL, result)
         case let .notCommitted(result):
-            guard result.artifactState != .none else {
-                throw MarkdownFileStoreError.unwritable(destinationURL)
-            }
-            throw MarkdownFileStoreError.writeNotCommittedWithCleanupRequired(
-                destinationURL,
-                result
-            )
+            throw MarkdownFileStoreError.notCommitted(result, destinationURL: destinationURL)
         case let .committedButIndeterminate(indeterminate):
             throw MarkdownFileStoreError.writeRequiresReconciliation(
                 destinationURL,

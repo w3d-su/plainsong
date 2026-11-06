@@ -170,9 +170,19 @@ final class IOSProductionRuntime: ObservableObject {
     func observeSceneDisconnection(_ scene: UIWindowScene) {
         guard !isShutDown else { return }
         if disconnectObserver == nil {
-            disconnectObserver = IOSWindowSceneDisconnectObserver { [self] in _ = await shutdown() }
+            disconnectObserver = IOSWindowSceneDisconnectObserver { [self] in
+                await shutdownDisconnectedScene()
+            }
         }
         disconnectObserver?.bind(to: scene)
+    }
+
+    func shutdownDisconnectedScene() async {
+        var delay = 1
+        while await !shutdown() {
+            do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+            delay = min(delay * 2, 60)
+        }
     }
 
     func shutdown() async -> Bool {

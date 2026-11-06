@@ -303,21 +303,23 @@ final class IOSShellSceneState: ObservableObject {
         workspaceSnapshot?.entries ?? []
     }
 
-    func openSelectedURL(_ url: URL, scope: IOSWorkspaceScope) {
+    @discardableResult
+    func openSelectedURL(_ url: URL, scope: IOSWorkspaceScope) -> Task<Void, Never> {
         perform {
             try await self.facade.openSelectedURL(url, scope: scope)
         }
     }
 
     /// Open a file entry from the workspace browser.
-    func openEntry(_ entry: IOSWorkspaceEntry) {
+    @discardableResult
+    func openEntry(_ entry: IOSWorkspaceEntry) -> Task<Void, Never>? {
         guard case .document = entry.kind,
               case .available = entry.availability
         else {
-            return
+            return nil
         }
         selectedEntryID = entry.id
-        openSelectedURL(entry.location.fileURL, scope: .singleFile)
+        return openSelectedURL(entry.location.fileURL, scope: .singleFile)
     }
 
     /// Compact stacks push `.document` when the user taps a file row (even the
@@ -362,13 +364,15 @@ final class IOSShellSceneState: ObservableObject {
         }
     }
 
-    func saveCurrentDocument() {
+    @discardableResult
+    func saveCurrentDocument() -> Task<Void, Never> {
         perform {
             _ = try await self.facade.saveCurrentDocument()
         }
     }
 
-    func resolveExternal(_ choice: IOSExternalResolution) {
+    @discardableResult
+    func resolveExternal(_ choice: IOSExternalResolution) -> Task<Void, Never> {
         perform {
             try await self.facade.resolveExternal(choice)
         }
@@ -381,13 +385,17 @@ final class IOSShellSceneState: ObservableObject {
         surfaces.reselectUnavailableWorkspace?()
     }
 
-    func flushForBackground() {
-        Task { @MainActor in
+    @discardableResult
+    func flushForBackground(assertion: IOSBackgroundFlushAssertion = .init()) -> Task<Void, Never> {
+        assertion.begin()
+        return Task { @MainActor in
+            defer { assertion.end() }
             _ = await facade.flushForBackground()
         }
     }
 
-    private func perform(_ operation: @escaping @MainActor () async throws -> Void) {
+    @discardableResult
+    private func perform(_ operation: @escaping @MainActor () async throws -> Void) -> Task<Void, Never> {
         Task { @MainActor in
             do {
                 try await operation()
@@ -519,5 +527,43 @@ extension IOSShellSceneState {
 
     private func sameWorkspacePath(_ lhs: IOSFileLocation, _ rhs: IOSFileLocation) -> Bool {
         lhs.workspaceID == rhs.workspaceID && lhs.relativePath.utf8.elementsEqual(rhs.relativePath.utf8)
+    }
+}
+
+/// One assertion per background transition. An old expiration can only end its own flush.
+@MainActor
+final class IOSBackgroundFlushAssertion {
+    private var id: UIBackgroundTaskIdentifier = .invalid
+
+    typealias Begin = @MainActor @Sendable (@escaping @MainActor @Sendable () -> Void) -> UIBackgroundTaskIdentifier
+    private let acquire: Begin
+    private let release: @MainActor @Sendable (UIBackgroundTaskIdentifier) -> Void
+
+    nonisolated init(
+        acquire: @escaping Begin = {
+            UIApplication.shared.beginBackgroundTask(
+                withName: "Save document and recovery draft",
+                expirationHandler: $0
+            )
+        },
+        release: @escaping @MainActor @Sendable (UIBackgroundTaskIdentifier) -> Void = {
+            UIApplication.shared.endBackgroundTask($0)
+        }
+    ) {
+        self.acquire = acquire
+        self.release = release
+    }
+
+    func begin() {
+        id = acquire { [weak self] in
+            self?.end()
+        }
+    }
+
+    func end() {
+        guard id != .invalid else { return }
+        let finished = id
+        id = .invalid
+        release(finished)
     }
 }

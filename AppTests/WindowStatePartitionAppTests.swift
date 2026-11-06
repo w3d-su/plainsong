@@ -41,8 +41,8 @@ final class WindowStatePartitionAppTests: XCTestCase {
             // `saveAsPanelSessions` is the File › Save As autosave fence.
             WindowStatePartitionInventory.registry.union(["onEditorReplaceAuthorityInputChange",
                                                           "replaceAuthority", "registeredWindows",
-                                                          "menuEnablementDidChange",
-                                                          "saveAsPanelSessions"])
+                                                          "menuEnablementDidChange", "editorInstallationWindows",
+                                                          "retainedWorkspaceAuthorityOwners", "saveAsPanelSessions"])
         )
         XCTAssertEqual(
             WindowStatePartitionInventory.window.count + WindowStatePartitionInventory.root.count

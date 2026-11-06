@@ -114,12 +114,27 @@ extension IOSUIDocumentStore {
         }
     }
 
+    /// A scene may leave an unavailable file after its latest edits are durable
+    /// and the provider has actually relinquished its writer.
+    public func retireRetainedWriter(_ identity: IOSDocumentIdentity, disconnecting: Bool) async throws {
+        if case .closed = state(for: identity) { return }
+        let entry = try requireEntry(identity)
+        guard disconnecting || entry.fenced || !entry.allowsProviderWrite || !leaseStillAuthorizes(
+            entry,
+            generation: entry.accessGeneration
+        ),
+            disconnecting || entry.explicitReloadOperationID == nil
+        else { throw IOSDocumentFailure.closeFailed }
+        try await retireForReplacement(entry)
+    }
+
     /// A replacement keeps the old registry slot until every old operation is drained.
     func retireForReplacement(_ entry: IOSDocumentEntry) async throws {
         if let retirement = entry.retirementTask {
             _ = try await retirement.value
             return
         }
+        entry.cloudResolution?.cancel()
         entry.isRetiring = true
         entry.isClosing = true
         entry.autosaveTask?.cancel()
@@ -158,6 +173,11 @@ extension IOSUIDocumentStore {
             }
             // Edits received during either drain or close must also be durable.
             retainedRecovery = try await persistRetirementRecovery(entry) ?? retainedRecovery
+            if let session = entry.session, session.isDirty || entry.fenced {
+                guard retainedRecovery?.revision.version == session.version else {
+                    throw IOSDocumentFailure.sourceChanged
+                }
+            }
             publishClosed(entry, superseded: true)
             if let retainedRecovery {
                 return .retained(recovery: retainedRecovery)
@@ -194,6 +214,8 @@ extension IOSUIDocumentStore {
     }
 
     func publishClosed(_ entry: IOSDocumentEntry, superseded: Bool) {
+        entry.checkpoint = nil
+        entry.retainedDraft = nil
         entry.closed = true
         entry.superseded = superseded
         entry.fenced = true

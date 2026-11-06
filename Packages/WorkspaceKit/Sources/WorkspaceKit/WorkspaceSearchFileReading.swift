@@ -276,7 +276,11 @@ extension WorkspaceSearchDiskFileReader {
              .namespaceChanged,
              .unstable,
              .durabilityFailed,
-             .cleanupFailed:
+             .cleanupFailed,
+             .unsupportedVolume,
+             .insufficientSpace,
+             .readOnlyVolume,
+             .writeNotPermitted:
             WorkspaceSearchFileReadError.unreadable
         case .cancelled: CancellationError()
         }

@@ -35,7 +35,7 @@ a milestone or gate as accepted.
 |---|---|---|
 | Local dogfood | Yes | Core editor/workspace/preview features are in place. |
 | Private alpha with trusted users | Yes | Covered by the public alpha below. |
-| Public alpha (unsigned) | Yes | MIT `LICENSE` and unsigned packaging are done and R14/P5 closed on 2026-07-05. `v0.1.0-alpha.1`, `alpha.3` and `alpha.4` are published GitHub prereleases (`alpha.2` stayed a draft) with an ad-hoc-signed DMG and a `.sha256`; the README documents the Gatekeeper bypass. Developer ID signing, hardened runtime and notarization stay deferred (release plan P1/P2) until Apple Developer Program membership. |
+| Public alpha (unsigned) | Yes | `LICENSE` (MIT at the time; GPL-3.0-or-later since 2026-11-06) and unsigned packaging are done and R14/P5 closed on 2026-07-05. `v0.1.0-alpha.1`, `alpha.3` and `alpha.4` are published GitHub prereleases (`alpha.2` stayed a draft) with an ad-hoc-signed DMG and a `.sha256`; the README documents the Gatekeeper bypass. Developer ID signing, hardened runtime and notarization stay deferred (release plan P1/P2) until Apple Developer Program membership. |
 | Phase 2 WYSIWYG Experimental dogfood | Yes, off by default | Native input/selection gates are complete and manual UI sign-off passed; users must opt in through `WYSIWYG mode (Experimental)`. |
 | Phase 2 WYSIWYG stable/default | No | Stable/default promotion remains blocked by `docs/wysiwyg-release-checklist.md`; do not remove the Experimental label or turn it on by default without the explicit promotion gate and Decision Log entry. |
 

@@ -224,12 +224,15 @@ extension WorkspaceAnchoredFileSystem {
         guard descriptor >= 0,
               let artifactLocation = staging.location(named: name)
         else {
-            if descriptor >= 0 { Darwin.close(descriptor) }
+            if descriptor >= 0 {
+                Darwin.close(descriptor)
+                throw WorkspaceAnchoredFileSystemError.unreadable
+            }
             // Nothing was created, so a refused sibling can be retried in a separate directory.
-            if descriptor < 0, !staging.isSeparateDirectory, isSiblingStagingRefusal(createError) {
+            if !staging.isSeparateDirectory, isSiblingStagingRefusal(createError) {
                 throw SiblingStagingRefused()
             }
-            throw WorkspaceAnchoredFileSystemError.unreadable
+            throw writeFailure(errorNumber: createError, otherwise: .unreadable)
         }
         let expectedByteCount = Int64(data.count)
         let expectedDigest = sha256Digest(data)
@@ -251,11 +254,11 @@ extension WorkspaceAnchoredFileSystem {
 
         do {
             guard Darwin.ftruncate(descriptor, 0) == 0 else {
-                throw WorkspaceAnchoredFileSystemError.unreadable
+                throw writeFailure(errorNumber: errno, otherwise: .unreadable)
             }
             try writeAllBytes(data, descriptor: descriptor)
             guard Darwin.fsync(descriptor) == 0 else {
-                throw WorkspaceAnchoredFileSystemError.durabilityFailed
+                throw writeFailure(errorNumber: errno, otherwise: .durabilityFailed)
             }
             try validatePreparedContent(
                 descriptor: descriptor,
@@ -266,10 +269,10 @@ extension WorkspaceAnchoredFileSystem {
             if case let .existing(_, _, permissions, _) = target,
                Darwin.fchmod(descriptor, permissions) != 0
             {
-                throw WorkspaceAnchoredFileSystemError.unreadable
+                throw writeFailure(errorNumber: errno, otherwise: .unreadable)
             }
             guard Darwin.fsync(descriptor) == 0 else {
-                throw WorkspaceAnchoredFileSystemError.durabilityFailed
+                throw writeFailure(errorNumber: errno, otherwise: .durabilityFailed)
             }
             try validatePreparedContent(
                 descriptor: descriptor,
