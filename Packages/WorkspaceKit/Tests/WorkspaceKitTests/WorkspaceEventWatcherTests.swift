@@ -30,6 +30,27 @@ final class WorkspaceEventWatcherTests: XCTestCase {
         }
     }
 
+    /// The first handler invocation's time, recorded under a lock by the handler itself so
+    /// a test can read it without racing a producer that keeps delivering batches.
+    private final class FirstDelivery: @unchecked Sendable {
+        private let lock = NSLock()
+        private var date: Date?
+
+        var value: Date? {
+            lock.lock()
+            defer { lock.unlock() }
+            return date
+        }
+
+        func record() {
+            lock.lock()
+            if date == nil {
+                date = Date()
+            }
+            lock.unlock()
+        }
+    }
+
     private func makeWatcher(
         debounceNanoseconds: UInt64 = 20_000_000,
         handler: @escaping @Sendable () -> Void
@@ -95,26 +116,57 @@ final class WorkspaceEventWatcherTests: XCTestCase {
     }
 
     func testContinuousBatchesStillReachTheHandlerByTheMaximumDelay() async throws {
-        let calls = HandlerCallCount()
+        let firstDelivery = FirstDelivery()
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("WorkspaceEventWatcherTests-\(UUID().uuidString)")
         let watcher = WorkspaceEventWatcher(
             rootURL: root,
             debounceNanoseconds: 60_000_000,
             maximumDelayNanoseconds: 200_000_000
-        ) { calls.increment() }
+        ) { firstDelivery.record() }
         watcher.start()
         defer { watcher.stop() }
 
         // A batch every 20 ms keeps restarting the 60 ms debounce; without a maximum
-        // delay the handler would never run while the writer keeps going.
+        // delay the handler would never run while the writer keeps going. Only the first
+        // delivery's deadline is asserted: a batch enqueued just as the handler runs
+        // legitimately starts another debounce period, so the total count of this
+        // still-running stream is not fixed (exact coalescing has its own finite test).
         let start = Date()
-        while calls.value == 0, Date().timeIntervalSince(start) < 2 {
+        while firstDelivery.value == nil, Date().timeIntervalSince(start) < 2 {
             watcher.simulateDeliveredEventForTesting()
             try await Task.sleep(nanoseconds: 20_000_000)
         }
+        watcher.stop()
+
+        let delivered = try XCTUnwrap(firstDelivery.value, "continuous batches never reached the handler")
+        XCTAssertLessThan(delivered.timeIntervalSince(start), 1.0)
+    }
+
+    func testAFiniteBurstOfBatchesCoalescesIntoOneHandlerCall() async throws {
+        let calls = HandlerCallCount()
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("WorkspaceEventWatcherTests-\(UUID().uuidString)")
+        // A maximum delay far beyond the burst, so only the debounce decides delivery.
+        let watcher = WorkspaceEventWatcher(
+            rootURL: root,
+            debounceNanoseconds: 100_000_000,
+            maximumDelayNanoseconds: 10_000_000_000
+        ) { calls.increment() }
+        watcher.start()
+        defer { watcher.stop() }
+
+        // Five batches back to back, all well inside one 100 ms debounce period.
+        for _ in 0 ..< 5 {
+            watcher.simulateDeliveredEventForTesting()
+        }
+
+        let deadline = Date().addingTimeInterval(2)
+        while calls.value == 0, Date() < deadline {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        try await Task.sleep(nanoseconds: 300_000_000)
         XCTAssertEqual(calls.value, 1)
-        XCTAssertLessThan(Date().timeIntervalSince(start), 1.0)
     }
 
     func testBatchesInsideIgnoredDirectoriesDoNotReachTheHandler() async throws {
