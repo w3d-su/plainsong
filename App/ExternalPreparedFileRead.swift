@@ -14,6 +14,7 @@ struct ExternalDiskInspectionReadContext {
     let token: UUID
     let lifecycleGeneration: UInt64
     let diskEventGeneration: UInt64
+    var transientRetry = 0
 }
 
 func prepareExternalFileRead(

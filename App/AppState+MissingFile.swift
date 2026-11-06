@@ -5,6 +5,13 @@ import WorkspaceKit
 
 @MainActor
 extension AppState {
+    /// Whether the shown detached document was edited beyond the text its file last held
+    /// (M2): it was dirty when the file vanished, or has changed since.
+    var missingFileHasEditsBeyondLastDiskText: Bool {
+        guard let prompt = missingFilePrompt else { return false }
+        return !isUneditedSinceCleanDetach(shownSession, at: prompt.fileURL)
+    }
+
     func saveMissingFileCopy() {
         guard let prompt = missingFilePrompt else { return }
 

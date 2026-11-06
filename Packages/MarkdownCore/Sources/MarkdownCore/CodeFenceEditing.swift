@@ -26,12 +26,15 @@ enum CodeFenceEditing {
             return nil
         }
 
-        let replacement = "\n\(indent)\n\(indent)```"
+        let newline = MarkdownTextEditingSupport.insertedLineTerminator(on: line, in: text)
+        let replacement = "\(newline)\(indent)\(newline)\(indent)```"
         return MarkdownTextEditingSupport.replacement(
             range: selection,
             string: replacement,
             selection: NSRange(
-                location: selection.location + 1 + MarkdownTextEditingSupport.utf16Length(indent),
+                location: selection.location
+                    + MarkdownTextEditingSupport.utf16Length(newline)
+                    + MarkdownTextEditingSupport.utf16Length(indent),
                 length: 0
             )
         )
