@@ -144,6 +144,7 @@ extension AppState {
         guard let url = sessionStateURL(for: session) else { return false }
         let sessionIdentity = ObjectIdentifier(session)
         guard !hasWorkspaceMutationRecoveryLoadFailure,
+              !registry.saveAsPanelSessions.contains(sessionIdentity),
               indeterminateSessionWrites[sessionIdentity] == nil,
               !workspaceMutationWriteFences.contains(sessionIdentity),
               !indeterminateWorkspaceMutationSessions.contains(sessionIdentity)

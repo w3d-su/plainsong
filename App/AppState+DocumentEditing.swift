@@ -91,14 +91,12 @@ extension AppState {
     }
 
     func openPreviewLink(_ href: String) {
-        guard !href.hasPrefix("#"),
-              let baseURL = shownSession.fileURL?.deletingLastPathComponent()
+        guard let baseURL = shownSession.fileURL?.deletingLastPathComponent(),
+              let path = Self.previewLinkRelativePath(href)
         else {
             return
         }
 
-        let path = href.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false).first
-            .map(String.init) ?? href
         let url = URL(fileURLWithPath: path, relativeTo: baseURL).standardizedFileURL
         guard FileKind(url: url) != nil else { return }
 
@@ -109,6 +107,39 @@ extension AppState {
             // A file outside this window's root follows the Open rule from this window (§5.2).
             routeOpen(url)
         }
+    }
+
+    /// The relative file path a preview link names, decoded, or `nil` when the link does
+    /// not name one.
+    ///
+    /// The preview sends the rendered `href` attribute, which remark percent-encodes:
+    /// `[中文](文章.md)` arrives as `%E6%96%87%E7%AB%A0.md` and a space as `%20` (MDX JSX
+    /// attributes may arrive unencoded, which decoding leaves alone). Only a scheme-less
+    /// relative path qualifies: `#anchor` links stay in the preview, and a scheme (`file:`,
+    /// `mailto:`, …), an absolute path or a `//host` reference is refused before and after
+    /// decoding. The query and fragment are cut off before decoding, so an encoded `%23`
+    /// or `%3F` stays part of the file name. Malformed escapes are refused.
+    static func previewLinkRelativePath(_ href: String) -> String? {
+        let pathEnd = href.firstIndex { $0 == "#" || $0 == "?" } ?? href.endIndex
+        let encodedPath = href[..<pathEnd]
+        guard !encodedPath.isEmpty,
+              !encodedPath.hasPrefix("/"),
+              !encodedPath.hasPrefix("\\")
+        else {
+            return nil
+        }
+        // RFC 3986 §4.2: a colon in the first segment makes it a scheme, not a path.
+        if let colon = encodedPath.firstIndex(of: ":"), !encodedPath[..<colon].contains("/") {
+            return nil
+        }
+        guard let decoded = encodedPath.removingPercentEncoding,
+              !decoded.isEmpty,
+              !decoded.hasPrefix("/"),
+              !decoded.contains("\0")
+        else {
+            return nil
+        }
+        return decoded
     }
 
     var activeEditorDocumentIdentity: EditorDocumentIdentity? {

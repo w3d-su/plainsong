@@ -7,9 +7,16 @@ final class TextSearchInstrumentation {
     private(set) var previewUTF16UnitsCopied = 0
     private(set) var literalSourceUTF16UnitsVisited = 0
     private(set) var literalKeyUTF16UnitsVisited = 0
+    private(set) var wordSegmentationWindows = 0
+    private(set) var wordSegmentationUTF16UnitsVisited = 0
 
     func recordCandidate() {
         literalCandidatesExamined += 1
+    }
+
+    func recordWordSegmentationWindow(length: Int) {
+        wordSegmentationWindows += 1
+        wordSegmentationUTF16UnitsVisited += length
     }
 
     func recordLineVisit(length: Int) {
@@ -129,8 +136,9 @@ struct TextSearchScanner {
         }
 
         // A valid whole-word match must begin at this composed boundary with a
-        // non-word predecessor. Restarting there also keeps Foundation from
-        // preferring a later collation-equivalent hit over an earlier valid one.
+        // non-word predecessor, or where word segmentation may break a script written
+        // without spaces. Restarting there also keeps Foundation from preferring a later
+        // collation-equivalent hit over an earlier valid one.
         return findNextEligibleWholeWordStart(from: nextLocation)
     }
 
@@ -149,8 +157,14 @@ struct TextSearchScanner {
             if !TextSearchWordBoundary.isWordCharacter(in: previous, storage: storage) {
                 return location
             }
+            let current = composedSequences.range(containing: location)
+            if TextSearchWordBoundary.usesWordSegmentation(in: previous, storage: storage)
+                || TextSearchWordBoundary.usesWordSegmentation(in: current, storage: storage)
+            {
+                return location
+            }
 
-            location = NSMaxRange(composedSequences.range(containing: location))
+            location = NSMaxRange(current)
         }
         return storage.length
     }

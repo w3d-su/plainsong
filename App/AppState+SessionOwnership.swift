@@ -292,6 +292,8 @@ extension AppState {
     /// they cannot make a changed disk version writable. A detached session still requires an
     /// explicit Reload/Keep Mine even when a restored leaf has the same identity and bytes: the
     /// missing-file transition intentionally invalidated its saved-text baseline and save fence.
+    /// The exception is a session detached while clean and unedited since (M2): it has no
+    /// edits to lose, so it re-attaches like a clean document and adopts the observed bytes.
     @discardableResult
     func reconcileObservedRetainedFileVersion(
         _ observation: ObservedRetainedFileVersion,
@@ -302,13 +304,14 @@ extension AppState {
         let hasPendingConflict = pendingExternalTexts[canonicalURL] != nil
             || pendingExternalFileVersions[canonicalURL] != nil
         let isDetached = detachedSessionURLs.contains(canonicalURL)
+        let reattachesClean = isDetached && isUneditedSinceCleanDetach(session, at: canonicalURL)
         let changed = observedRetainedFileVersionDiffers(observation, for: session)
         let hasPendingEditorSource = hasPendingEditorSource(for: session)
         guard !hasPendingConflict,
-              !isDetached,
+              !isDetached || reattachesClean,
               indeterminateSessionWrites[sessionIdentity] == nil,
               !indeterminateWorkspaceMutationSessions.contains(sessionIdentity),
-              !changed || (!session.isDirty && !hasPendingEditorSource)
+              !changed || ((!session.isDirty || reattachesClean) && !hasPendingEditorSource)
         else {
             recordExternalChangeConflict(
                 observation,
@@ -318,7 +321,7 @@ extension AppState {
             return false
         }
 
-        if changed {
+        if changed || reattachesClean {
             session.reset(
                 text: observation.file.text,
                 url: canonicalURL,
@@ -326,9 +329,10 @@ extension AppState {
                 isDirty: false
             )
             detachedSessionURLs.remove(canonicalURL)
+            cleanDetachedSessionRecords[sessionIdentity] = nil
             if session === shownSession {
                 missingFilePrompt = nil
-                notifyEditorFindExternalContentDidReplace()
+                if changed { notifyEditorFindExternalContentDidReplace() }
             }
         }
         recordKnownSessionDiskText(

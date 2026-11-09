@@ -116,6 +116,15 @@ final class AppPublishHygieneTests: XCTestCase {
             "---\ntags:\n  - a\n  - b\ndraft: true\ndate: 2026-10-22\n---\n# Heading\n",
             "---\ntitle: \"caf\u{00E9}\"\n---\ncafe\u{0301}",
             "---\n  ---\n---\nBody",
+            "--- \ntitle: A\n---\t\nBody",
+            "---\t\r\ntitle: A\r\n--- \r\nBody",
+            "---  ",
+            "---\ntitle: A\n--- x\n---\nBody",
+            "+++\ntitle = \"x\"\n+++\nBody",
+            "+++\r\ntitle = 1\r\n+++ \r\nBody",
+            "+++\ntitle = \"x\"\n",
+            "+++x\n",
+            "++++\n+++\n",
         ]
         for text in cases {
             let prefix = FrontmatterParseMemo.determiningPrefix(of: text)

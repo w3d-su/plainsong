@@ -55,6 +55,9 @@ document_folder="$work/documents"
 mkdir -p "$document_folder"
 document="$document_folder/post.md"
 printf '# Original\n' > "$document"
+# Save must carry the replaced file's extended attributes (Finder tags live in one) onto
+# the new inode, inside the sandbox as well.
+xattr -w org.plainsong.probe kept "$document"
 output="$work/probe.out"
 open -W -n -g -a "$bundle" --stdout "$output" --stderr "$output" "$document" &
 open_pid=$!
@@ -73,6 +76,10 @@ cat "$output"
 grep -q '^PASS:' "$output" || { echo "FAIL: the sandbox probe did not pass" >&2; exit 1; }
 
 [[ "$(cat "$document")" == "# Saved 2" ]] || { echo "FAIL: unexpected saved bytes" >&2; exit 1; }
+[[ "$(xattr -p org.plainsong.probe "$document" 2>/dev/null)" == "kept" ]] || {
+    echo "FAIL: the save dropped the document's extended attributes" >&2
+    exit 1
+}
 leftovers="$(/usr/bin/find "$document_folder" -mindepth 1 ! -name post.md -print)"
 [[ -z "$leftovers" ]] || { echo "FAIL: the save left entries beside the document: $leftovers" >&2; exit 1; }
 staging_root="$HOME/Library/Containers/$bundle_id/Data/tmp/TemporaryItems"
