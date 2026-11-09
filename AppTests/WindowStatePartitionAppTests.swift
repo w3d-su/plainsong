@@ -33,7 +33,7 @@ final class WindowStatePartitionAppTests: XCTestCase {
         )
         XCTAssertEqual(
             Self.storedPropertyNames(of: appState.workspaceRootContext),
-            WindowStatePartitionInventory.root.union(["onExportHTMLContextChange"])
+            WindowStatePartitionInventory.root.union(["onExportHTMLContextChange", "registrationAuthority", "windows"])
         )
         XCTAssertEqual(
             Self.storedPropertyNames(of: appState.registry),
@@ -43,7 +43,9 @@ final class WindowStatePartitionAppTests: XCTestCase {
             WindowStatePartitionInventory.registry.union(["onEditorReplaceAuthorityInputChange",
                                                           "replaceAuthority", "registeredWindows",
                                                           "menuEnablementDidChange", "editorInstallationWindows",
-                                                          "retainedWorkspaceAuthorityOwners",
+                                                          "retainedWorkspaceAuthorityOwners", "workspaceRoots",
+                                                          "workspaceScopeStarter", "activeImageInsertions",
+                                                          "supersededEditorWriterInstallations",
                                                           "cleanDetachedSessionRecords", "saveAsPanelSessions"])
         )
         XCTAssertEqual(

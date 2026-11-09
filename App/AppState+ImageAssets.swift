@@ -63,25 +63,25 @@ final class WorkspaceEditorImageThumbnailAdapter: EditorImageThumbnailLoading {
 }
 
 @MainActor
-private final class WorkspaceImageAssetInsertionLease {
-    private weak var appState: AppState?
-    private var isActive = true
+final class WorkspaceImageAssetInsertionLease {
+    private let id = UUID()
+    private weak var registry: AppDocumentRegistry?
+    private var context: WorkspaceRootContext?
 
-    init(appState: AppState) {
-        self.appState = appState
-        appState.workspaceImageAssetInsertionCount += 1
+    init(appState: AppState, rootURL: URL) {
+        let context = appState.workspaceRootContext
+        self.context = context
+        registry = appState.registry
+        context.workspaceImageAssetInsertionCount += 1
+        appState.registry.activeImageInsertions[id] = (RegisteredWindowState(window: appState.windowState), rootURL)
     }
 
     func release() {
-        guard isActive else {
-            return
-        }
-        isActive = false
-        guard let appState else {
-            return
-        }
-        precondition(appState.workspaceImageAssetInsertionCount > 0)
-        appState.workspaceImageAssetInsertionCount -= 1
+        guard let context else { return }
+        self.context = nil
+        precondition(context.workspaceImageAssetInsertionCount > 0)
+        context.workspaceImageAssetInsertionCount -= 1
+        registry?.activeImageInsertions[id] = nil
     }
 }
 
@@ -266,7 +266,9 @@ extension AppState {
         _ assets: [EditorImageAsset],
         documentAuthority: EditorImageAssetDocumentAuthority
     ) async -> EditorImageAssetInsertion {
-        let namespaceLease = WorkspaceImageAssetInsertionLease(appState: self)
+        let namespaceLease = WorkspaceImageAssetInsertionLease(
+            appState: self, rootURL: documentAuthority.location.rootAuthority.originalRootURL
+        )
         let assetFolderRelativePath = preferences.assetFolderRelativePath
         let discardEventHandler = editorImageAssetDiscardEventHandler
 

@@ -104,6 +104,7 @@ struct AppStateUserVisibleError: Identifiable {
     let id = UUID()
     let title: String
     let message: String
+    var showWindow: (@MainActor () -> Void)?
 }
 
 struct WorkspaceTrashCleanupNotice: Identifiable, Equatable {
