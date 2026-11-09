@@ -572,7 +572,7 @@ deferred until Apple Developer Program membership.
 # Status snapshot — 2026-07-12 (PR #83 image-thumbnail enablement)
 
 - **v0.1.0-alpha.1 is publicly released** (`Plainsong-0.1.0-56-unsigned.dmg` + SHA-256 on
-  GitHub Releases). The repo is **public under MIT**; secret scanning + push protection,
+  GitHub Releases). The repo is **public** (MIT at the time; GPL-3.0-or-later since 2026-11-06); secret scanning + push protection,
   Dependabot (graph/alerts/security updates, grouped), and a `main` branch ruleset
   (PR-only, `build-and-test` required, no bypass) are enabled.
 - R14 closed (P5 fully checked); R15 broadened (all wall-clock perf budgets are
