@@ -88,11 +88,25 @@ blogeditor/
 │   ├── AppState.swift        # one façade per workspace window: WindowState + WorkspaceRootContext, sharing AppDocumentRegistry; KeyWindowRouter picks the key façade
 │   ├── Views/                # SwiftUI views: WorkspaceWindow (split view), WorkspaceSidebar, WorkspaceDetail, DocumentJumpBar, WorkspaceInspector, WorkspaceToolbar, WorkspaceStatusBar
 │   └── Resources/            # Assets, preview dist bundle (generated), themes
+├── AppIOS/                   # iOS/iPadOS app target (`docs/ios/README.md`)
 ├── Packages/
 │   ├── MarkdownCore/         # Pure logic: document model, markdown utilities, completion engine, scroll-sync mapping. No AppKit/SwiftUI imports. Testable via `swift test`.
 │   ├── EditorKit/            # STTextView wrapper, tree-sitter highlighting, editing behaviors (AppKit)
 │   ├── PreviewKit/           # WKWebView controller, JS bridge, asset URL scheme handler
-│   └── WorkspaceKit/         # File tree model, FS watching, security-scoped bookmarks, atomic save
+│   ├── WorkspaceKit/         # File tree model, FS watching, security-scoped bookmarks, atomic save
+│   ├── SyntaxKit/            # tree-sitter parsing shared by EditorKit and EditorKitIOS; vendored TSX and YAML grammars
+│   ├── WorkspaceCore/        # Portable workspace tree and path logic shared by WorkspaceKit and WorkspaceKitIOS
+│   ├── EditorKitIOS/         # iOS source editor (UIKit)
+│   └── WorkspaceKitIOS/      # iOS document access, recovery, and workspace (Files/iCloud)
+├── AppTests/                 # Hosted app tests (`PlainsongTests`)
+├── PerformanceTests/         # §12 budget tests
+├── PlainsongUITests/         # XCUITest smoke
+├── AppIOSTests/              # iOS app tests (`PlainsongIOSTests`)
+├── IOSAcceptanceTests/       # iOS acceptance UI tests and pinned resources
+├── Fixtures/                 # Shared Markdown/MDX fixtures (§16)
+├── Scripts/                  # Release, sandbox-probe, lint-guard, and iOS tooling
+├── Prototypes/iOSM0/         # iOS M0 device-gate prototype
+├── docs/                     # Gate documents, `decisions/`, `perf/`, retained evidence
 ├── preview-src/              # JS/TS source for the preview pipeline (npm workspace)
 │   ├── package.json
 │   ├── src/index.ts          # bridge protocol impl, render(), morphdom patching, scroll sync
@@ -918,9 +932,11 @@ Phase 1 milestones were delivered in order and are all accepted; each lists the 
 - ✅ Accept: open a real Astro/Next.js content folder; every `.mdx` post renders without
   blanking; all §12 budgets measured and recorded in `docs/perf-log.md`.
 
-**Phase 2 = WYSIWYG (§13). Phase 3 candidates:** export (HTML/PDF via preview print),
-window tabs, search across workspace (ripgrep-style), publish integrations, real MDX
-component rendering. The independent iOS lane follows `docs/ios/contracts.md`: iOS 26+,
+**Phase 2 = WYSIWYG (§13). Phase 3:** shipped so far are export (HTML, PDF, Print;
+`docs/export-gates.md`), workspace search (`docs/workspace-search-plan.md`), document
+Find and Replace, editor color theme import, and Save As. Independent windows are in
+progress (`docs/window-state-gates.md` §10); native window tabs follow them. Publish
+integrations and real MDX component rendering are not scheduled. The independent iOS lane follows `docs/ios/contracts.md`: iOS 26+,
 source plus preview, Files/iCloud in-place access, native UIKit editor and UIDocument
 persistence. The first C0 PR owns declarations/scaffolds only; 02/03 perform shared
 core extraction, 13 retains contracts/composition, and 12 receives global build
