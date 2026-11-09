@@ -40,6 +40,27 @@ above GitHub's 10 GB limit.
   10 MiB in a debug build, and 11 tests spent 105 s on it locally. zlib computes the same
   CRC-32, and those tests now take 0.5 s.
 
+## Measured (2026-11-10)
+
+From the job timestamps of the 150 CI runs between 2026-10-25 and 2026-11-06. "Critical
+path" is the longest chain of job run times with queueing removed; "macOS minutes" is the
+sum of the macOS jobs' run times. All figures are medians of successful full runs.
+
+| Layout | Runs | Critical path | macOS minutes |
+|---|---:|---:|---:|
+| Before (`packages` + two hosted jobs), whole window | 86 | 11.8 min | 32.3 |
+| Before, 2026-11-01 onward | 25 | 12.7 min | 34.1 |
+| After (this decision), before `main` seeds any cache | 4 | 10.2 min | 27.1 |
+
+The four "after" runs ranged 9.5–10.7 min and 26.6–27.7 macOS minutes. Four runs is a
+small sample; re-measure after `main` has run with this layout.
+
+Queueing, not execution, sets the worst case, and this decision does not remove it. Median
+wall time of a before-layout run by how many test runs started within ten minutes of it:
+alone 13.1 min (34 runs), two 14.9, three 19.7, four 22.5, five or more 60.4 (7 runs, max
+63.4). A run here holds four macOS runners where the old layout held three, so two
+simultaneous runs still queue; fewer macOS minutes per run is what shortens that queue.
+
 ## Stays on macOS
 
 `make check-preview-layering` resolves `project.yml` through xcodegen, which has no Linux
