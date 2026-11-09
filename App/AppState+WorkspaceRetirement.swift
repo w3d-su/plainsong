@@ -23,11 +23,21 @@ extension AppState {
                     ?? URL(fileURLWithPath: "/")
             )
         }
-        if let recovery = nextWorkspaceMutationRecovery() {
+        if let recovery = nextWorkspaceMutationRecoveryBlockingClosure() {
             throw WorkspaceMutationError.indeterminateSession(recovery.sourceURL)
         }
-        let sessionsToClose = workspaceSessionsForClosure()
-        if let quarantinedSession = sessionsToClose.first(where: {
+        let detachesSharedRoot = workspaceRootURL != nil
+            && workspaceRootContext.facades.contains(where: { $0 !== self })
+        // D1b: preflight and release only this root. Another root's fence, quarantine,
+        // or conflict must not block, and must not be swept up with this close.
+        let rootSessions = workspaceSessionsForRootPreflight(detachingSharedRoot: detachesSharedRoot)
+        let sessionsToClose = rootSessions.filter { !isPreservedForAnotherWindow($0) }
+        // Another window keeps these. Only a session the root's authority proves it owns
+        // keeps the root's grant; the window's own document from elsewhere does not.
+        let preservedRootSessions = rootSessions.filter {
+            isPreservedForAnotherWindow($0) && sessionBelongsToClosingRoot($0)
+        }
+        if let quarantinedSession = rootSessions.first(where: {
             indeterminateWorkspaceMutationSessions.contains(ObjectIdentifier($0))
         }) {
             throw WorkspaceMutationError.indeterminateSession(
@@ -41,17 +51,18 @@ extension AppState {
         var retiringSessionIdentities = Set(retirementPlans.map {
             ObjectIdentifier($0.session)
         })
-        retiringSessionIdentities.formUnion(retiredEditorDocumentSessions.values.map {
-            ObjectIdentifier($0.session)
+        retiringSessionIdentities.formUnion(retiredEditorDocumentSessions.values.compactMap { retirement in
+            sessionsToClose.contains { $0 === retirement.session } ? ObjectIdentifier(retirement.session) : nil
         })
 
         if let conflictURL = firstUnretirableExternalConflict(
-            excluding: retiringSessionIdentities
+            excluding: retiringSessionIdentities,
+            among: rootSessions
         ) {
             throw AppStateError.unresolvedExternalChange(conflictURL)
         }
 
-        if let quarantinedSession = sessionsToClose.first(where: { session in
+        if let quarantinedSession = rootSessions.first(where: { session in
             !retiringSessionIdentities.contains(ObjectIdentifier(session))
                 && indeterminateSessionWrites[ObjectIdentifier(session)] != nil
         }) {
@@ -75,27 +86,60 @@ extension AppState {
             throw AppStateError.missingFile(detachedPlan.canonicalURL)
         }
 
-        for session in sessionsToClose
+        for session in rootSessions
             where !retiringSessionIdentities.contains(ObjectIdentifier(session)) && session.isDirty
         {
             try save(session: session)
         }
+        if detachesSharedRoot {
+            // D1c: the root, its sessions, and its scope stay with the other participants.
+            // This window still retires and releases its own documents the root does not own.
+            releaseSessionsLeavingSharedRoot(sessionsToClose, retirementPlans: retirementPlans)
+            detachSharedWorkspaceRoot()
+            return
+        }
         commitWorkspaceClosure(
             sessions: sessionsToClose,
-            retirementPlans: retirementPlans
+            retirementPlans: retirementPlans,
+            preserving: preservedRootSessions
         )
     }
 }
 
 @MainActor
 private extension AppState {
-    func workspaceSessionsForClosure() -> [DocumentSession] {
+    /// Root closure covers the closing window's own document and installations and the
+    /// root's sessions, preserved ones included (`isCoveredByWorkspaceClosure`). Without a
+    /// root, replacement retires only this window's shown and installed documents. A
+    /// participant leaving a shared root covers only its own documents the root does not own.
+    func workspaceSessionsForRootPreflight(detachingSharedRoot: Bool) -> [DocumentSession] {
         registry.sessions(from: [
             .warmCache, .retired, .editorBindings, .editorInstallations, .mutationRecovery, .fileBackedWindowDocuments,
-        ]).sorted { first, second in
+        ]).filter { session in
+            detachingSharedRoot
+                ? isOwnedByClosingWindow(session) && !sessionBelongsToClosingRoot(session)
+                : isCoveredByWorkspaceClosure(session)
+        }.sorted { first, second in
             sessionClosureIdentity(first).utf8.lexicographicallyPrecedes(
                 sessionClosureIdentity(second).utf8
             )
+        }
+    }
+
+    /// The closing window's own document still releases with its root. Another window's
+    /// shown session, or a live installation that window holds, stays out of the set.
+    func isPreservedForAnotherWindow(_ session: DocumentSession) -> Bool {
+        if registry.connectedWindows.contains(where: { window in
+            window !== windowState && window.shownSession === session
+        }) {
+            return true
+        }
+        return editorBindingInstallations.contains { installation, owner in
+            guard owner === session,
+                  let window = registry.editorInstallationWindows[installation]?.window,
+                  window !== windowState
+            else { return false }
+            return registry.connectedWindows.contains { $0 === window }
         }
     }
 
@@ -160,7 +204,8 @@ private extension AppState {
 
     func commitWorkspaceClosure(
         sessions: [DocumentSession],
-        retirementPlans: [EditorDocumentRetirementPlan]
+        retirementPlans: [EditorDocumentRetirementPlan],
+        preserving preservedSessions: [DocumentSession]
     ) {
         _ = advanceWorkspaceGeneration()
         workspaceReloadTask?.cancel()
@@ -169,20 +214,32 @@ private extension AppState {
         completionWorkspaceTask = nil
         workspaceWatcher?.stop()
         workspaceWatcher = nil
-        transferWorkspaceAuthority(to: retirementPlans)
+        transferWorkspaceAuthority(to: retirementPlans, preserving: preservedSessions)
         clearClosedWorkspaceState(
             sessions: sessions,
             retirementPlans: retirementPlans
         )
+        let context = workspaceRootContext
+        context.detach(self)
+        if let authority = context.registrationAuthority {
+            registry.workspaceRoots[authority] = nil
+            context.registrationAuthority = nil
+        }
     }
 
     func transferWorkspaceAuthority(
-        to retirementPlans: [EditorDocumentRetirementPlan]
+        to retirementPlans: [EditorDocumentRetirementPlan],
+        preserving preservedSessions: [DocumentSession]
     ) {
         let activeAuthority = workspaceAccess
         workspaceAccess = nil
         let authorityOwner = activeAuthority.map(RetiredWorkspaceAuthorityOwner.init(authority:))
 
+        if let authorityOwner {
+            for session in preservedSessions {
+                retainWorkspaceAuthority(authorityOwner, for: session)
+            }
+        }
         for plan in retirementPlans {
             beginEditorDocumentSessionRetirement(
                 canonicalURL: plan.canonicalURL,
@@ -212,7 +269,37 @@ private extension AppState {
         // Close/switch clears query chrome and mode; Files/Search mode flip does not.
         resetWorkspaceSearchUIState()
         notifyEditorFindWorkspaceDidClose()
+        releaseClosedWorkspaceSessions(sessions, retirementPlans: retirementPlans, closesRoot: true)
+    }
 
+    /// A participant leaving a shared root retires and releases only its own documents the
+    /// root does not own. The root's sessions, scope, watcher and generation stay with the
+    /// context, so no authority moves and the generation does not advance.
+    func releaseSessionsLeavingSharedRoot(
+        _ sessions: [DocumentSession],
+        retirementPlans: [EditorDocumentRetirementPlan]
+    ) {
+        guard !sessions.isEmpty else { return }
+        for plan in retirementPlans {
+            assert(!plan.requiresWorkspaceAuthority, "A detach never retires a document the root owns")
+            beginEditorDocumentSessionRetirement(
+                canonicalURL: plan.canonicalURL,
+                session: plan.session,
+                installations: plan.installations,
+                securityScopedAuthorityOwner: nil
+            )
+        }
+        releaseClosedWorkspaceSessions(sessions, retirementPlans: retirementPlans, closesRoot: false)
+    }
+
+    /// Releases the sessions leaving with a closure. A shared-root detach keeps the window's
+    /// foreground work and prompts unless its shown document is one of those sessions.
+    func releaseClosedWorkspaceSessions(
+        _ sessions: [DocumentSession],
+        retirementPlans: [EditorDocumentRetirementPlan],
+        closesRoot: Bool
+    ) {
+        let releasesShownSession = closesRoot || sessions.contains { $0 === shownSession }
         let retainedSessionIdentities = Set(retiredEditorDocumentSessions.values.map {
             ObjectIdentifier($0.session)
         })
@@ -220,19 +307,20 @@ private extension AppState {
         for session in registry.sessions(from: [.fileBackedWindowDocuments]) {
             proofRetainedSessionIdentities.insert(ObjectIdentifier(session))
         }
-        if !retainedSessionIdentities.contains(ObjectIdentifier(shownSession)) {
-            autosaveTask?.cancel()
-            autosaveTask = nil
-            statisticsTask?.cancel()
-            statisticsTask = nil
+        if releasesShownSession {
+            cancelForegroundWorkForClosedShownDocument(retaining: retainedSessionIdentities)
         }
-        cancelWorkspaceSessionTasks(excluding: retainedSessionIdentities)
-        for session in sessions
-            where !retainedSessionIdentities.contains(ObjectIdentifier(session))
-        {
+        for session in sessions where !retainedSessionIdentities.contains(ObjectIdentifier(session)) {
+            let sessionIdentity = ObjectIdentifier(session)
+            sessionAutosaveTasks.removeValue(forKey: sessionIdentity)?.task.cancel()
+            sessionStatisticsTasks.removeValue(forKey: sessionIdentity)?.task.cancel()
             removeEditorDocumentBindingRegistration(for: session)
         }
-        registry.removeAllWarmSessions()
+        for session in sessions {
+            guard let url = sessionStateURL(for: session) else { continue }
+            registry.setWarmSession(nil, at: url)
+            sessionPolicy.remove(url)
+        }
         for session in sessions
             where !proofRetainedSessionIdentities.contains(ObjectIdentifier(session))
         {
@@ -243,18 +331,38 @@ private extension AppState {
             indeterminateSessionWrites[sessionIdentity] = nil
             indeterminateSessionWriteContexts[sessionIdentity] = nil
         }
-        sessionPolicy = WorkspaceSessionLRUPolicy(limit: 8)
-        retainMetadataOnlyForRetiredEditorSessions()
+        pruneMetadataAfterRootRelease(releasing: sessions)
+        if releasesShownSession {
+            resetWindowPromptsAfterClosure()
+        }
+
+        for plan in retirementPlans {
+            finishRetiredEditorDocumentSessionIfPossible(for: plan.session)
+        }
+        for session in sessions {
+            releaseRetainedWorkspaceAuthorityIfUnreferenced(for: session)
+        }
+    }
+
+    /// The shared foreground autosave serves the home façade's document
+    /// (`scheduleAutosave()`), so a sibling's close leaves it running.
+    func cancelForegroundWorkForClosedShownDocument(retaining retainedSessionIdentities: Set<ObjectIdentifier>) {
+        guard !retainedSessionIdentities.contains(ObjectIdentifier(shownSession)) else { return }
+        if (KeyWindowRouter.shared.home(for: registry) ?? self) === self {
+            autosaveTask?.cancel()
+            autosaveTask = nil
+        }
+        statisticsTask?.cancel()
+        statisticsTask = nil
+    }
+
+    func resetWindowPromptsAfterClosure() {
         externalChangePrompt = nil
         missingFilePrompt = nil
         indeterminateFileWriteReconciliationPrompt = nil
         restoreRecoveryPrompt(for: shownSession)
         if indeterminateSessionWrites[ObjectIdentifier(shownSession)] != nil {
             refreshIndeterminateFileWriteReconciliation(for: shownSession)
-        }
-
-        for plan in retirementPlans {
-            finishRetiredEditorDocumentSessionIfPossible(for: plan.session)
         }
     }
 }

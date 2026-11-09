@@ -212,24 +212,28 @@ extension WorkspaceAnchoredFileSystem {
         if !staging.isSeparateDirectory, hooks.injectedFailure?(.createSiblingTemporary) != nil {
             throw SiblingStagingRefused()
         }
+        // `0600` for a replacement, `0666` under the umask for a new file.
         let descriptor = name.withCString {
             Darwin.openat(
                 staging.descriptor,
                 $0,
                 O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW,
-                mode_t(S_IRUSR | S_IWUSR)
+                stagingCreationMode(for: target)
             )
         }
         let createError = errno
         guard descriptor >= 0,
               let artifactLocation = staging.location(named: name)
         else {
-            if descriptor >= 0 { Darwin.close(descriptor) }
+            if descriptor >= 0 {
+                Darwin.close(descriptor)
+                throw WorkspaceAnchoredFileSystemError.unreadable
+            }
             // Nothing was created, so a refused sibling can be retried in a separate directory.
-            if descriptor < 0, !staging.isSeparateDirectory, isSiblingStagingRefusal(createError) {
+            if !staging.isSeparateDirectory, isSiblingStagingRefusal(createError) {
                 throw SiblingStagingRefused()
             }
-            throw WorkspaceAnchoredFileSystemError.unreadable
+            throw writeFailure(errorNumber: createError, otherwise: .unreadable)
         }
         let expectedByteCount = Int64(data.count)
         let expectedDigest = sha256Digest(data)
@@ -251,11 +255,11 @@ extension WorkspaceAnchoredFileSystem {
 
         do {
             guard Darwin.ftruncate(descriptor, 0) == 0 else {
-                throw WorkspaceAnchoredFileSystemError.unreadable
+                throw writeFailure(errorNumber: errno, otherwise: .unreadable)
             }
             try writeAllBytes(data, descriptor: descriptor)
             guard Darwin.fsync(descriptor) == 0 else {
-                throw WorkspaceAnchoredFileSystemError.durabilityFailed
+                throw writeFailure(errorNumber: errno, otherwise: .durabilityFailed)
             }
             try validatePreparedContent(
                 descriptor: descriptor,
@@ -263,13 +267,14 @@ extension WorkspaceAnchoredFileSystem {
                 expectedByteCount: expectedByteCount,
                 expectedDigest: expectedDigest
             )
-            if case let .existing(_, _, permissions, _) = target,
-               Darwin.fchmod(descriptor, permissions) != 0
-            {
-                throw WorkspaceAnchoredFileSystemError.unreadable
+            if case let .existing(originalDescriptor, _, permissions, _) = target {
+                guard Darwin.fchmod(descriptor, permissions) == 0 else {
+                    throw writeFailure(errorNumber: errno, otherwise: .unreadable)
+                }
+                copyPreservedMetadata(from: originalDescriptor, to: descriptor)
             }
             guard Darwin.fsync(descriptor) == 0 else {
-                throw WorkspaceAnchoredFileSystemError.durabilityFailed
+                throw writeFailure(errorNumber: errno, otherwise: .durabilityFailed)
             }
             try validatePreparedContent(
                 descriptor: descriptor,

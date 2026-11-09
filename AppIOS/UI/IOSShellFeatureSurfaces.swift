@@ -107,6 +107,8 @@ struct IOSShellFeatureSurfaces {
 
     /// Conflict "Save a Copy" needs a destination picker + lease owned by
     /// composition; nil hides that button (W14).
+    var reviewCloudVersions: ((IOSDocumentIdentity) async throws -> IOSCloudVersionReview)?
+    var applyCloudVersion: ((UUID, IOSCloudVersionReview) async throws -> Void)?
     var resolveConflictCopy: (() -> Void)?
 
     /// Workspace refresh requires the live grant; composition routes it (W15).

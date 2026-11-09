@@ -7,6 +7,7 @@ extension IOSUIDocumentStore {
         guard !entry.superseded, !entry.closed else { return }
         switch event {
         case .externalChange:
+            guard !entry.hasUnresolvedVersions else { return }
             if entry.isClosing || entry.portClosed {
                 // A notice does not authorize a read concurrent with provider close.
                 // Keep an independent barrier until close or its retained entry reads it.
@@ -18,11 +19,24 @@ extension IOSUIDocumentStore {
             }
         case .deleted:
             fenceUnavailable(entry, .access(.notFound))
-        case .becameReadOnly:
-            entry.allowsProviderWrite = false
-            if entry.session != nil, !entry.fenced {
-                setState(.ready(canWrite: false, accessGeneration: entry.accessGeneration), entry: entry)
+        case let .writePermissionChanged(writable):
+            guard entry.allowsProviderWrite != writable else { return }
+            entry.allowsProviderWrite = writable
+            guard entry.session != nil, !entry.fenced else { return }
+            if writable {
+                // Check external bytes before admitting another write.
+                handleFileEvent(.externalChange, entry: entry)
+            } else {
+                entry.autosaveTask?.cancel()
+                refreshWritableState(entry)
             }
+        case .unresolvedVersions:
+            if case let .unavailable(_, reason) = entry.state, reason != .conflict { return }
+            entry.hasUnresolvedVersions = true
+            entry.externalToken = nil
+            fenceUnavailable(entry, .conflict)
+        case .providerStateChanged:
+            break // Translated to current permissions by UIDocumentFileAdapter.
         case .downloading:
             fenceUnavailable(entry, .access(.downloading))
         case .offline:
@@ -40,6 +54,7 @@ extension IOSUIDocumentStore {
     }
 
     func fenceUnavailable(_ entry: IOSDocumentEntry, _ reason: IOSDocumentFailure) {
+        if reason != .conflict { entry.cloudResolution?.cancel() }
         invalidateReloadProposals(entry)
         entry.fenced = true
         entry.allowsProviderWrite = false
@@ -48,7 +63,7 @@ extension IOSUIDocumentStore {
     }
 
     func startExternalRead(_ entry: IOSDocumentEntry, allowsClosingObservation: Bool = false) {
-        guard !entry.isRetiring, !entry.portClosed, entry.session != nil,
+        guard !entry.isRetiring, !entry.portClosed, !entry.hasUnresolvedVersions, entry.session != nil,
               !entry.isClosing || allowsClosingObservation,
               guardCurrentAuthority(entry, generation: entry.accessGeneration)
         else { return }
@@ -261,6 +276,7 @@ extension IOSUIDocumentStore {
     func reloadLatest(_ identity: IOSDocumentIdentity) async throws {
         let entry = try requireEntry(identity)
         guard let session = entry.session else { throw IOSDocumentFailure.unavailable }
+        guard !entry.hasUnresolvedVersions else { throw IOSDocumentFailure.conflict }
         let capturedVersion = session.version
         let generation = entry.accessGeneration
         let availabilityGeneration = entry.providerAvailabilityGeneration

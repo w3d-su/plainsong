@@ -30,19 +30,24 @@ final class FrontmatterParseMemo {
 
     /// The shortest-safe prefix of `text` whose `Frontmatter.parse` equals that of `text`.
     ///
-    /// - No opening `---` line: the empty string (no frontmatter).
-    /// - An opening `---` line ended by LF or CRLF and a later `---` line ended by LF or CRLF:
-    ///   the text through that closing `---`, without its line ending. The parser splits lines
-    ///   on CR as well, so it can only close earlier, which is still inside this prefix.
+    /// Mirrors `Frontmatter`'s fence rules: an opening line of `---` or `+++` followed only
+    /// by spaces or tabs, closed by the first later line of the same marker followed only
+    /// by spaces or tabs.
+    /// - No opening delimiter line: the empty string (no frontmatter).
+    /// - An opening line ended by LF or CRLF and a later closing line ended by LF or CRLF:
+    ///   the text through that closing line, without its line ending. The parser splits
+    ///   lines on CR as well, so it can only close earlier, which is still inside this prefix.
     /// - Anything else (an unclosed block, a lone-CR opening): the whole text.
     nonisolated static func determiningPrefix(of text: String) -> String {
         let utf8 = text.utf8
-        let dash = UInt8(ascii: "-")
         let lineFeed = UInt8(ascii: "\n")
         let carriageReturn = UInt8(ascii: "\r")
 
-        guard utf8.starts(with: [dash, dash, dash]) else { return "" }
-        var index = utf8.index(utf8.startIndex, offsetBy: 3)
+        guard let marker = utf8.first,
+              marker == UInt8(ascii: "-") || marker == UInt8(ascii: "+"),
+              utf8.starts(with: [marker, marker, marker])
+        else { return "" }
+        var index = skipSpacesAndTabs(in: utf8, from: utf8.index(utf8.startIndex, offsetBy: 3))
         guard index < utf8.endIndex else { return text }
         switch utf8[index] {
         case lineFeed:
@@ -51,7 +56,7 @@ final class FrontmatterParseMemo {
             index = utf8.index(after: index)
             guard index < utf8.endIndex, utf8[index] == lineFeed else { return text }
         default:
-            // `----…` or `---x`: not an opening delimiter line.
+            // `----…`, `---x` or `+++x`: not an opening delimiter line.
             return ""
         }
 
@@ -63,7 +68,8 @@ final class FrontmatterParseMemo {
                 contentEnd = utf8.index(before: contentEnd)
             }
             if lineEnd < utf8.endIndex,
-               utf8[lineStart ..< contentEnd].elementsEqual([dash, dash, dash])
+               utf8[lineStart ..< contentEnd].starts(with: [marker, marker, marker]),
+               skipSpacesAndTabs(in: utf8, from: utf8.index(lineStart, offsetBy: 3)) >= contentEnd
             {
                 return String(text[..<contentEnd])
             }
@@ -71,5 +77,16 @@ final class FrontmatterParseMemo {
             lineStart = utf8.index(after: lineEnd)
         }
         return text
+    }
+
+    private nonisolated static func skipSpacesAndTabs(
+        in utf8: String.UTF8View,
+        from start: String.UTF8View.Index
+    ) -> String.UTF8View.Index {
+        var index = start
+        while index < utf8.endIndex, utf8[index] == UInt8(ascii: " ") || utf8[index] == UInt8(ascii: "\t") {
+            index = utf8.index(after: index)
+        }
+        return index
     }
 }

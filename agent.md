@@ -47,6 +47,7 @@ projects such as Astro/Next.js content directories).
 | Documentation language | English (this file). |
 | Min deployment target | macOS 14 (Sonoma). |
 | UI framework | SwiftUI app shell; AppKit (`NSViewRepresentable`) for the text editor. |
+| License | GPL-3.0-or-later, because the macOS editor links STTextView under GPLv3 (`docs/decisions/2026-11-06-gpl-3.0-or-later-license.md`). |
 
 ---
 
@@ -69,8 +70,9 @@ projects such as Astro/Next.js content directories).
 | JS tooling | Node 20+, npm, esbuild, vitest (preview pipeline unit tests) | |
 
 **Dependency policy:** keep the dependency list short. Adding any new Swift package or npm
-package requires a `docs/decisions/` entry explaining why. `docs/decision-log.md` is the
-archive and does not take new rows.
+package requires a `docs/decisions/` entry explaining why, and its license must be
+compatible with GPL-3.0-or-later. `docs/decision-log.md` is the archive and does not take
+new rows.
 
 ---
 
@@ -86,18 +88,32 @@ blogeditor/
 │   ├── AppState.swift        # one façade per workspace window: WindowState + WorkspaceRootContext, sharing AppDocumentRegistry; KeyWindowRouter picks the key façade
 │   ├── Views/                # SwiftUI views: WorkspaceWindow (split view), WorkspaceSidebar, WorkspaceDetail, DocumentJumpBar, WorkspaceInspector, WorkspaceToolbar, WorkspaceStatusBar
 │   └── Resources/            # Assets, preview dist bundle (generated), themes
+├── AppIOS/                   # iOS/iPadOS app target (`docs/ios/README.md`)
 ├── Packages/
 │   ├── MarkdownCore/         # Pure logic: document model, markdown utilities, completion engine, scroll-sync mapping. No AppKit/SwiftUI imports. Testable via `swift test`.
 │   ├── EditorKit/            # STTextView wrapper, tree-sitter highlighting, editing behaviors (AppKit)
 │   ├── PreviewKit/           # WKWebView controller, JS bridge, asset URL scheme handler
-│   └── WorkspaceKit/         # File tree model, FS watching, security-scoped bookmarks, atomic save
+│   ├── WorkspaceKit/         # File tree model, FS watching, security-scoped bookmarks, atomic save
+│   ├── SyntaxKit/            # tree-sitter parsing shared by EditorKit and EditorKitIOS; vendored TSX and YAML grammars
+│   ├── WorkspaceCore/        # Portable workspace tree and path logic shared by WorkspaceKit and WorkspaceKitIOS
+│   ├── EditorKitIOS/         # iOS source editor (UIKit)
+│   └── WorkspaceKitIOS/      # iOS document access, recovery, and workspace (Files/iCloud)
+├── AppTests/                 # Hosted app tests (`PlainsongTests`)
+├── PerformanceTests/         # §12 budget tests
+├── PlainsongUITests/         # XCUITest smoke
+├── AppIOSTests/              # iOS app tests (`PlainsongIOSTests`)
+├── IOSAcceptanceTests/       # iOS acceptance UI tests and pinned resources
+├── Fixtures/                 # Shared Markdown/MDX fixtures (§16)
+├── Scripts/                  # Release, sandbox-probe, lint-guard, and iOS tooling
+├── Prototypes/iOSM0/         # iOS M0 device-gate prototype
+├── docs/                     # Gate documents, `decisions/`, `perf/`, retained evidence
 ├── preview-src/              # JS/TS source for the preview pipeline (npm workspace)
 │   ├── package.json
 │   ├── src/index.ts          # bridge protocol impl, render(), morphdom patching, scroll sync
 │   ├── src/pipeline.ts       # unified pipeline (md and mdx variants)
 │   ├── src/styles/           # preview CSS (Apple system palette, Xcode-style syntax colors)
 │   └── test/                 # vitest specs
-└── .github/workflows/ci.yml  # parallel jobs: preview (Linux npm), packages (lint + swift test), hosted XCTest shards; `build-and-test` gate; docs-only PRs skip the test jobs (`changes`)
+└── .github/workflows/ci.yml  # parallel jobs: preview and lint (Linux), packages (swift test), one hosted build plus three XCTest shards; `build-and-test` gate; docs-only PRs skip the test jobs (`changes`)
 ```
 
 Build artifacts: `preview-src` builds to `App/Resources/preview/` (`index.html`, `bundle.js`,
@@ -200,7 +216,9 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 
 - **App Sandbox: ON.** All file access via user-selected URLs; persist
   security-scoped bookmarks for recents/workspaces; always wrap access in
-  `startAccessingSecurityScopedResource()` pairs (helper in WorkspaceKit).
+  `startAccessingSecurityScopedResource()` pairs (helper in WorkspaceKit). Each recent item
+  resolves on its own: one that cannot (an unplugged drive) is hidden but kept, and a stale
+  bookmark is refreshed in place.
 - Open single file: standard `NSOpenPanel` / drag onto Dock / Finder "Open With"
   (import-declare `net.daringfireball.markdown`, and export a UTI for `.mdx`:
   `app.plainsong.mdx` conforming to `public.plain-text` — the `public.*` namespace
@@ -214,6 +232,7 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   Recent single-file restoration uses that same availability classification and retains
   a live pending selection for Refresh/retry. Cancelled, superseded, revoked or retired
   operations cannot keep an uninstalled scope; returned writers still drain safely.
+- iOS protects the recovery-first background flush with a UIKit background task. A fenced writer can retire after durable recovery and provider close. iCloud version conflicts require explicit selection and a coordinated recheck of the reviewed versions before resolution (Decision Log 2026-11-06).
 - An iOS external reload rechecks its store's current proposal and lifecycle immediately
   before native installation, including proposals deferred before close. Closing holds
   the proposal without retiring its operation; failed close can resume it. Root watcher
@@ -232,6 +251,11 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   sibling staging. Any recovery artifact is reported at its staging-directory path;
   the emptied directory is removed. `Scripts/check-single-file-save-sandbox.sh` exercises
   this in a signed sandboxed probe under a LaunchServices file-only grant.
+- Before staging, a save reads the destination volume through the retained parent descriptor.
+  It creates nothing and fails when the mount is read-only or the volume does not advertise
+  `RENAME_EXCL` (and `RENAME_SWAP` when replacing): exFAT and FAT32 for every save, Mac OS
+  Extended for a replacement. Write-path `errno` becomes a typed reason (unsupported volume,
+  disk full, read-only, not permitted) that the save error names together with a next step.
 - Window chrome: a native `NavigationSplitView` with a resizable, collapsible sidebar
   (Files / Search navigators; ⇧⌘F in a window whose sidebar is hidden reveals it in
   Search) on macOS 27+, a fixed-width sidebar in an `HStack` before
@@ -247,12 +271,22 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   the list Search ignores) without enumerating them; only the chain down to an open
   session's file in that root is scanned inside them. "Show all files" rescans everything.
 - File tree operations: create/rename/delete/move file & folder (Finder-style, with
-  trash not hard delete). Watch root recursively via `FSEventStream`; debounce 300 ms;
-  reconcile tree diff instead of full reload to preserve expansion state.
+  trash not hard delete). Watch root recursively via `FSEventStream`; debounce 300 ms,
+  never more than 2 s after the first unhandled batch, so a tool that keeps writing cannot
+  postpone the refresh forever. With "Show all files" off, a batch whose every path lies in a
+  subtree the scan skips (an ignored directory off the chain to an open document) is
+  dropped; the scan's pruning is handed to the watcher at each reload and document switch.
+  Reconcile tree diff instead of full reload to preserve expansion state.
   A reload whose final proof is superseded by document/session changes retries with a
   fresh capture in the same generation; a newer reload, workspace switch, or close cancels it.
 - External change to the open file: if editor is clean → silently reload; if dirty →
-  non-modal banner "File changed on disk: Reload / Keep mine".
+  non-modal banner "File changed on disk: Reload / Keep mine". A read that catches the
+  file mid-replacement (its identity or size changing, or briefly unreadable) is retried
+  after 0.2 s, 0.5 s and 1 s before the document detaches. A missing file detaches at once,
+  and a detached document stays marked edited because its text is then the only copy. One
+  that was clean when it detached and has not been edited since reloads silently when its
+  file returns (a `git checkout` unlinks before it writes), instead of raising Reload /
+  Keep mine. The missing-file banner's Close asks before discarding that copy.
 - An active workspace search refreshes for document edits only after a 500 ms typing
   pause, and only while the Search navigator shows (an edit made while Files shows
   refreshes when Search shows again); typing never resets the search state.
@@ -260,8 +294,15 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   debouncing provider notices. A per-file content notice drops only that path; changed
   trees and explicit searches read again. In-flight reads cannot restore an invalidated
   cache entry, including a size or encoding refusal.
-- Each workspace window has its own `AppState` façade, `WindowState`, and
-  `WorkspaceRootContext`, and they share one `AppDocumentRegistry`. The warm-session
+- Each workspace window has its own `AppState` façade and `WindowState`. Windows on
+  the same canonical physical root share one `WorkspaceRootContext`, indexed weakly by
+  the shared `AppDocumentRegistry` (D1c). A root has one scope start, watcher, snapshot,
+  generation and scan per refresh; each participant keeps its own filtered tree,
+  expansion, selection, reload disposition and search. Namespace mutation is app-wide;
+  deferred refresh and image-placement counts stay per root, and drain services every
+  queued root. A departing participant clears only its own window tasks and search, and
+  retires and releases only its own documents the root does not own, under the last
+  release's preflight; the last reference runs D1b release. The warm-session
   LRU is one global cache: 8 warm sessions plus every installed document. An installed
   document is an editor-binding installation or any connected window's shown session;
   it does not count toward the 8 and cannot be evicted. Other protected sessions still
@@ -270,8 +311,23 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
   created per visible document pane. A scene gets the app-owned façade whenever no open
   scene shows it, so closing the only window and reopening it works. A scene opened while
   another shows that façade refuses file and root opens and closes itself until PR D2, and
-  native tabbing stays off until PR F. Same-file focus (WD1), shared-root
-  release (WD2), and a user-facing New Window (D2) are not implemented yet.
+  native tabbing stays off until PR F. Closing a root saves or retires the closing
+  window's own document and installations wherever they live, and releases them with
+  that root's eligible sessions; only sessions the root's authority proves it owns keep
+  its scope. Another root's operation recovery does not block the close, and a sibling's
+  close leaves the home window's foreground autosave running. Another root, a
+  standalone warm session, and any session another window shows or installs stay warm
+  with their tasks, metadata, and LRU
+  recency (D1b). Last-root preflight includes every session belonging to that root,
+  including a session another window preserves. Preserved sessions retain the original
+  security scope until eviction or final ownership release. Editor installations record
+  their owning window, so delayed teardown in the closing window uses retirement.
+  Adopting a warm document in another window synchronously supersedes old writers;
+  the previous window can resume writing after the adopter’s last eligible installation
+  is revoked. Quit waits for image placement and cleanup even if the originating window
+  leaves its root. Root overlap and a root containing
+  another window's installed standalone file refuse before installation and offer Show.
+  Same-file routing (WD1) and a user-facing New Window remain with D2.
 - With no attached workspace window, New File, Open, and Open Recent wait for a scene
   that has claimed the owner. A three-second attach timeout lets the next command retry;
   a tracked façade alone does not establish that a scene exists.
@@ -355,7 +411,10 @@ replacement local to EditorKit.
 - **List continuation:** Enter inside `-`/`*`/`1.`/`- [ ]` list inserts next marker
   (renumbering ordered lists); Enter on an empty item removes the marker (exits list).
   Tab / Shift-Tab indents/outdents list items, including every list item overlapped by
-  a multi-line selection.
+  a multi-line selection. An ordered marker has 1–9 digits (CommonMark §5.2); a longer
+  number is paragraph text, which keeps the renumbering arithmetic far from `Int` overflow.
+  Every Enter helper (list, code fence, table) inserts the line's own terminator (the
+  previous line's on the last line), so CRLF and CR documents never gain mixed endings.
 - **Auto-pairing:** `_`, `` ` ``, `(`, `[`, `{`, `"`, `<` (mdx) auto-close at the
   caret. `*` wraps a selection as italic (`*…*`) but does not auto-close at a bare
   caret so bullets and manually typed italics stay natural. Wrapping: with a selection,
@@ -370,7 +429,10 @@ replacement local to EditorKit.
   `assets/` if outside the workspace).
 - **Table helper:** Tab/Shift-Tab navigate cells; Enter adds a row; `Format Table`
   command (⌥⌘F) realigns pipes, preserving edge cells when outer pipes are omitted
-  and treating escaped pipes as cell content. Pure formatting function lives in MarkdownCore.
+  and treating escaped pipes as cell content. As in GFM, a table starts at the header row
+  directly above its first delimiter row: earlier lines that merely contain `|` stay
+  paragraph text, and a delimiter row with no header is not a table. Formatting keeps each
+  row's own line terminator. Pure formatting function lives in MarkdownCore.
 - **Checkbox toggle:** ⌘L toggles `- [ ]`/`- [x]` on current line(s).
 
 ### 6.4 Formatting commands & shortcuts
@@ -398,6 +460,7 @@ replacement local to EditorKit.
 | Format table | ⌥⌘F | |
 | Toggle checkbox | ⌘L | |
 | New file | ⌘N | workspace: dedup `Untitled.md` at root; single-file: save panel |
+| Save As… | ⇧⌘S | File menu: write the current text to the chosen file and keep editing it there; the original keeps its on-disk bytes. Uses Missing File Save Copy's write and ownership checks; choosing the current file is a plain Save; for a missing file it is that banner's Save Copy |
 | Print… | ⌘P | File menu: print the captured light-theme PDF through the standard panel |
 
 All commands appear in the menu bar (Format menu) — menu first, shortcut second, so they
@@ -415,7 +478,7 @@ the trigger characters below, or ⌃Space manually. Engine is pure Swift in Mark
 | Context | Trigger | Completions |
 |---|---|---|
 | Line start | typing `#`, `>`, `-` … | snippet list: headings, table skeleton, fenced block, task item, frontmatter block (only at file top) |
-| After ```` ``` ```` | fence info | language ids (`swift`, `ts`, `python`, `mermaid`, …) |
+| After ```` ``` ```` | fence info | language ids (`swift`, `ts`, `python`, `mermaid`, …); none on a line inside an open fence (any indentation), where the run is code or the closing fence |
 | Inside `](` or `](./` | `(`, `/` | workspace-relative file paths (md files and images), anchors `#heading` within current file |
 | Inside `![](` | `(` | image files in workspace |
 | `:` + 2 chars | `:` | emoji shortcodes → insert unicode |
@@ -495,7 +558,9 @@ republishes only when its value changes literally.
   `<svg>` stay blocked. HTML and PDF export do not embed SVG yet. Other active or
   ambiguous formats are rejected.
 - Link clicks: intercepted in Swift. `http(s)` → `NSWorkspace.open` (external browser).
-  Relative `.md`/`.mdx` → open that file in the editor. `#anchor` stays in JavaScript
+  Relative `.md`/`.mdx` → open that file in the editor. The `href` arrives percent-encoded
+  (remark encodes non-ASCII and spaces), so the App cuts the query and fragment, decodes the
+  path and opens it only when it is a scheme-less relative path. `#anchor` stays in JavaScript
   and scrolls the preview to a generated heading ID (Unicode and duplicate headings supported).
   On iOS, PreviewKit also owns external browser opening; production scene observation
   must not open its informational external-link event a second time.
@@ -662,7 +727,11 @@ attempt without a Decision Log entry.
 
 ## 10. Frontmatter Panel
 
-- Detect YAML frontmatter (`---` fences at byte 0). Parse with `Yams` (SPM).
+- Detect YAML frontmatter (`---` fences at byte 0). Parse with `Yams` (SPM). Fence lines
+  follow the preview's `remark-frontmatter` gate: the marker, then only spaces or tabs. A
+  closed leading `+++` block is TOML: the panel shows it read-only and offers no Add, since
+  adding would insert a second block above it. Documents never start with a BOM here:
+  `String(data:encoding:)` drops it when the file is read.
 - Inspector form (right column, ⌃⌘I, Frontmatter section): key/value editing with
   type-aware controls (string, date picker for `date`, tag token field for `tags`, toggle
   for `draft`).
@@ -674,6 +743,11 @@ attempt without a Decision Log entry.
   cannot parse.
 - String and string-list form writes use explicitly quoted YAML scalars with serializer-owned
   escaping, preserving literal contents and string types through parse/writeback.
+- A writeback replaces the entry under the source's own key spelling (`"title":` and
+  `'title':` included), writes a `date` plain only when YAML reads it back as exactly that
+  plain scalar and the source had not quoted it, and is re-parsed before it is applied: an
+  edit whose block would not load with the same keys and the requested value (a duplicate
+  key, a mapping typed into the date field) is refused.
 
 ---
 
@@ -772,10 +846,15 @@ editor *folds* markdown tokens via rendering, not text mutation:
   fragment customization or attribute folding), apply real styles (heading size, bold,
   italic), replace image links with `NSTextAttachment` thumbnails, render fences with a
   framed code block (custom `NSTextLayoutFragment`).
+- A projected U+200B that ends a line (fold or image padding) lays out at x = 0, so the
+  projection turns it into a 0.01 pt space with a negative kern that cancels its advance.
+  The content before it keeps its segment, caret and IME rects (`WYSIWYGLineEndHangingSpace`).
 - When the cursor enters a node's range → reveal raw markdown for that node only
   (Typora's behavior).
-- Tables and mermaid in WYSIWYG: custom layout fragments embedding views — hardest part;
-  tables may initially stay raw with the table helper (§6.3).
+- Tables in WYSIWYG: the paragraph projection turns cell-starting pipes into `\t` with
+  per-row left tab stops, hides other structure, and collapses the delimiter row; cells edit
+  in place and structural edits reveal the whole table (`docs/table-wysiwyg-gates.md`). T0
+  and T1 passed; tables stay raw with the table helper (§6.3) until T2–T11 pass. Mermaid stays raw.
 - Undo, IME composition (Chinese input!), and selection across folded tokens are the risk
   areas — write exploratory tests early. **IME correctness is non-negotiable: test with
   Traditional Chinese (Zhuyin/Pinyin) marked text at every change.**
@@ -865,9 +944,11 @@ Phase 1 milestones were delivered in order and are all accepted; each lists the 
 - ✅ Accept: open a real Astro/Next.js content folder; every `.mdx` post renders without
   blanking; all §12 budgets measured and recorded in `docs/perf-log.md`.
 
-**Phase 2 = WYSIWYG (§13). Phase 3 candidates:** export (HTML/PDF via preview print),
-window tabs, search across workspace (ripgrep-style), publish integrations, real MDX
-component rendering. The independent iOS lane follows `docs/ios/contracts.md`: iOS 26+,
+**Phase 2 = WYSIWYG (§13). Phase 3:** shipped so far are export (HTML, PDF, Print;
+`docs/export-gates.md`), workspace search (`docs/workspace-search-plan.md`), document
+Find and Replace, editor color theme import, and Save As. Independent windows are in
+progress (`docs/window-state-gates.md` §10); native window tabs follow them. Publish
+integrations and real MDX component rendering are not scheduled. The independent iOS lane follows `docs/ios/contracts.md`: iOS 26+,
 source plus preview, Files/iCloud in-place access, native UIKit editor and UIDocument
 persistence. The first C0 PR owns declarations/scaffolds only; 02/03 perform shared
 core extraction, 13 retains contracts/composition, and 12 receives global build
@@ -905,18 +986,24 @@ make generate         # xcodegen generate  (run after editing project.yml)
 make preview-bundle   # build preview-src → App/Resources/preview/ (commit the output)
 make build            # xcodebuild -scheme Plainsong build
 make test             # test-packages (swift test) + test-hosted (xcodebuild test) + test-preview (npm test)
-make test-hosted XCODE_TEST_TARGETS=PlainsongTests  # one hosted bundle subset, as a CI shard runs it
+make test-hosted XCODE_TEST_TARGETS=PlainsongTests  # one hosted bundle subset
 make release          # DMG pipeline (Scripts/release.sh); PLAINSONG_UNSIGNED=1 for the alpha path
 cd preview-src && npm run typecheck  # preview TypeScript check; CI runs this separately
 make format           # swiftformat . && swiftlint --fix
 ```
 
-- CI installs **SwiftFormat 0.62.1** as a SHA-256-verified release binary
-  (`.github/workflows/ci.yml`, mirrored by `SWIFTFORMAT_VERSION` in the Makefile), not via
-  Homebrew, so lint results cannot drift with the runner image. Local `make lint` warns when
-  the Homebrew version differs; CI is authoritative. Bumping the pin means updating the
-  version + SHA-256 in `ci.yml`, the Makefile constant, and reformatting the tree in the
-  same PR if rule behavior changed.
+- CI installs **SwiftFormat 0.62.1** and **SwiftLint 0.65.1** as SHA-256-verified Linux
+  release binaries in the Ubuntu `lint` job (`.github/workflows/ci.yml`, mirrored by
+  `SWIFTFORMAT_VERSION` and `SWIFTLINT_VERSION` in the Makefile), not via Homebrew, so lint
+  results cannot drift with the runner image. Local `make lint` warns when the Homebrew
+  versions differ; CI is authoritative. Bumping a pin means updating the version + SHA-256
+  in `ci.yml`, the Makefile constant, and reformatting the tree in the same PR if rule
+  behavior changed. `make check-preview-layering` runs on macOS because it needs xcodegen.
+- CI builds the hosted test bundles once (`make test-hosted-build`) and three shards run
+  those products (`make test-hosted-shard`). A shard that names a class also skips it in
+  its bundle's catch-all shard, so a new or renamed class still runs. `make test` is unchanged.
+- Pull requests cancel their older run. Every non-docs commit on `main` runs in full,
+  never cancelled or queued out, and seeds the caches pull requests restore.
 - The preview CI job verifies every pinned acceptance resource against the committed
   bytes before installing preview dependencies. Regenerated resources must update
   `IOSAcceptanceTests/Resources/acceptance-resource-manifest.txt` in the same PR.
@@ -934,8 +1021,8 @@ make format           # swiftformat . && swiftlint --fix
   `SUVerifyUpdateBeforeExtraction`. The key check matches Sparkle 2.10.0: trim
   Foundation's whitespace set only, require padding, and reject interior
   whitespace. Non-zero trailing base64 bits are accepted. The feed check strips
-  quotes only. CI runs the guard on the Debug Info.plist after the ui-performance
-  `make build`.
+  quotes only. CI runs the guard on the Debug Info.plist in
+  the `hosted (build)` job.
 
 ---
 

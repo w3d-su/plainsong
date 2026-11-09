@@ -1,6 +1,7 @@
 import AppKit
 import EditorKit
 import Foundation
+import MarkdownCore
 
 /// Document-lifecycle notifications for in-document find: edits, external replacement,
 /// identity rekey, workspace-search hand-off, document switch, and workspace close.
@@ -56,6 +57,19 @@ extension AppState {
             revision: UInt64(max(0, shownSession.version))
         )
         editorFindHost.controller.rebindDocument(binding)
+    }
+
+    /// A rekey of a shared session reaches every window showing it: each façade has its own
+    /// Find host, and a sibling left bound to the old identity would keep searching and
+    /// replacing under a document that no longer owns the session's state.
+    func notifyEditorFindDocumentIdentityDidRekey(inWindowsShowing session: DocumentSession) {
+        var facades = KeyWindowRouter.shared.facades(in: registry)
+        if !facades.contains(where: { $0 === self }) {
+            facades.insert(self, at: 0)
+        }
+        for facade in facades where facade.shownSession === session {
+            facade.notifyEditorFindDocumentIdentityDidRekey()
+        }
     }
 
     /// Workspace search is about to take the editor selection for `selection`.

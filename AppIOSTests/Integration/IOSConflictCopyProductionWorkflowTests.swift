@@ -11,6 +11,45 @@ import XCTest
 /// Conflict admission uses the existing testable method; provider UI is not exercised.
 @MainActor
 final class IOSConflictCopyProductionWorkflowTests: XCTestCase {
+    func testConfirmedCloudChoiceReopensSelectedBytesAndPreservesDirtyNativeSource() async throws {
+        let fixture = try IOSConflictCopyRealFixture(simulatedCloudVersions: true)
+        addTeardownBlock { @MainActor in await fixture.cleanup() }
+        let original = try await fixture.openConflict()
+        let expectedDraft = original.session.text
+        let entry = try XCTUnwrap(fixture.store.byIdentity[original.identity])
+        fixture.store.handleFileEvent(.unresolvedVersions, entry: entry)
+        let review = try await fixture.controller.reviewVersions(original.identity)
+        let chosen = try XCTUnwrap(review.choices.first { !$0.isCurrent })
+        XCTAssertEqual(chosen.source, "iPad version")
+        try await fixture.controller.chooseVersion(chosen.id, from: review)
+        let reopened = try XCTUnwrap(fixture.controller.handle)
+        XCTAssertTrue(entry.lease.isReleased)
+        XCTAssertNotEqual(reopened.identity, original.identity)
+        XCTAssertEqual(reopened.session.text, chosen.source)
+        XCTAssertFalse(reopened.session.isDirty)
+        XCTAssertTrue(try XCTUnwrap(fixture.store.state(for: reopened.identity)).canWrite)
+        XCTAssertEqual(try Data(contentsOf: fixture.original), Data(chosen.source.utf8))
+        let drafts = await fixture.store.recoveryList()
+        XCTAssertEqual(drafts.records.map(\.source), [expectedDraft])
+    }
+
+    func testNavigationAfterDeletionRetiresOnlyAfterRecoveringLatestEdit() async throws {
+        let fixture = try IOSConflictCopyRealFixture()
+        addTeardownBlock { @MainActor in await fixture.cleanup() }
+        let original = try await fixture.openConflict()
+        let entry = try XCTUnwrap(fixture.store.byIdentity[original.identity])
+        fixture.store.handleFileEvent(.deleted, entry: entry)
+        let next = fixture.destinationFolder.appendingPathComponent("next.md")
+        try Data("next".utf8).write(to: next)
+        try await fixture.controller.openPickedURL(next, scope: .singleFile)
+        XCTAssertEqual(fixture.controller.handle?.session.text, "next")
+        XCTAssertTrue(entry.closed)
+        XCTAssertTrue(entry.lease.isReleased)
+        let drafts = await fixture.store.recoveryList()
+        XCTAssertEqual(drafts.records.map(\.source), [original.session.text])
+        XCTAssertEqual(try String(contentsOf: fixture.original, encoding: .utf8), "# Original\n")
+    }
+
     func testRealProviderCopyPreservesOriginalConflictSourceUndoRecoveryAndAutosaveBarrier() async throws {
         let fixture = try IOSConflictCopyRealFixture()
         addTeardownBlock { @MainActor in await fixture.cleanup() }
@@ -260,18 +299,40 @@ private struct IOSConflictCopyRealFixture {
     let controller: IOSDocumentSceneController
     let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
 
-    init(autosaveDelayNanoseconds: UInt64 = 100_000_000) throws {
+    init(autosaveDelayNanoseconds: UInt64 = 100_000_000, simulatedCloudVersions: Bool = false) throws {
         root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         original = root.appendingPathComponent("original.md")
         destinationFolder = root.appendingPathComponent("copies", isDirectory: true)
         try FileManager.default.createDirectory(at: destinationFolder, withIntermediateDirectories: true)
         try Data("# Original\n".utf8).write(to: original)
-        store = IOSUIDocumentStore(
-            coordinatedAccess: access, recoveryDirectory: root.appendingPathComponent("recovery", isDirectory: true),
-            timing: IOSDocumentTiming(
-                autosaveDelayNanoseconds: autosaveDelayNanoseconds, backgroundFlushNanoseconds: 500_000_000
-            )
+        let timing = IOSDocumentTiming(
+            autosaveDelayNanoseconds: autosaveDelayNanoseconds, backgroundFlushNanoseconds: 500_000_000
         )
+        let recovery = root.appendingPathComponent("recovery", isDirectory: true)
+        if simulatedCloudVersions {
+            let alternate = root.appendingPathComponent("conflict.md")
+            try Data("iPad version".utf8).write(to: alternate)
+            store = IOSUIDocumentStore(
+                coordinatedAccess: access, recovery: IOSDocumentRecoveryStore(directory: recovery), timing: timing,
+                cloudVersionsAtURL: { original in
+                    [
+                        IOSCloudFileVersion(
+                            key: IOSCloudVersionKey(identifier: "current", isCurrent: true), url: original,
+                            device: nil, date: nil, install: { _ in XCTFail("Unexpected install") },
+                            resolve: { XCTFail("Unexpected resolution") }
+                        ),
+                        IOSCloudFileVersion(
+                            key: IOSCloudVersionKey(identifier: "iPad", isCurrent: false), url: alternate,
+                            device: "iPad", date: nil, install: { target in
+                                try Data(contentsOf: alternate).write(to: target)
+                            }, resolve: {}
+                        ),
+                    ]
+                }, filePortFactory: { UIDocumentFileAdapter(fileURL: $0) }
+            )
+        } else {
+            store = IOSUIDocumentStore(coordinatedAccess: access, recoveryDirectory: recovery, timing: timing)
+        }
         let destinationAccess = access
         controller = IOSDocumentSceneController(
             documents: store, workspace: access, editor: editor, preview: IOSSceneControllerPreviewDouble(),

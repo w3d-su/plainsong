@@ -6,13 +6,30 @@ A native macOS Markdown/MDX editor, built with Swift (SwiftUI shell + AppKit/Tex
 editor core) — in the spirit of Typora, tuned for blog authoring workflows
 (Astro/Next.js content folders, YAML frontmatter, CJK-friendly).
 
-**Status: in development.** M0-M5 have landed and M5 is accepted.
-M5 performance and security hardening have landed: PR #15 added the infrastructure,
-PR #20 measured visible-range highlighting, PR #21 measured the two-webview
-host-process RSS memory gate, and PR #24/#27 closed issue #17 with the MDX
-sanitizer/asset/SVG policy. PR #26 landed Settings/themes and closed #16. The
-2026-06-25 final sweeps fixed scroll sync, launch/Open Recent, MDX error liveness, and
-live MDX completion-popup checklist blockers; `docs/m5-checklist.md` now passes.
+**Status: public alpha.** Builds are unsigned and published on
+[GitHub Releases](https://github.com/w3d-su/plainsong/releases). Everything listed under
+Features is on `main`; a published build can lag behind it.
+
+## Features
+
+- **Source editor** with parser-based highlighting for Markdown, YAML frontmatter, fenced
+  code, and JSX in `.mdx`. List continuation, auto-pairing, a table formatter, and
+  checkbox toggling are built in.
+- **Live preview** beside the editor, with scroll sync in both directions. GFM, KaTeX
+  math, Mermaid diagrams, and code highlighting are bundled, so it works offline.
+- **Files:** open one file or a folder workspace with a file tree (create, rename, move,
+  move to Trash). Autosave, Save As, and a banner when the file changes on disk.
+- **Find and Replace** in the document, and **workspace search** (⇧⌘F) across the folder.
+- **Completion** for snippets, link and image paths, heading anchors, fence languages,
+  frontmatter keys, emoji shortcodes, and MDX component names.
+- **Images and links:** paste or drag an image to copy it into `assets/` and insert the
+  link; paste a URL over selected text to make a link.
+- **Frontmatter inspector** (⌃⌘I) with typed controls for dates, tags, and drafts.
+- **Export** as self-contained HTML or PDF, and **Print** (⌘P).
+- **Themes:** two built-in editor themes, imported JSON color themes, and system, light,
+  and dark preview palettes.
+- **Private by default:** sandboxed, no telemetry, and the preview loads nothing from the
+  network unless you turn on **Allow remote images** in Settings.
 
 Phase 2 WYSIWYG is still experimental. The inline fold/reveal mechanism and native interaction gates
 exist behind an off-by-default **WYSIWYG mode (Experimental)** setting; source-only and source+preview
@@ -106,7 +123,21 @@ supported. Live fixture coverage: `Fixtures/math.md`.
 
 ## License
 
-Plainsong is open source under the [MIT License](LICENSE).
+Copyright © 2026 w3d-su.
+
+Plainsong is free software: you can redistribute it and/or modify it under the terms of the
+[GNU General Public License](LICENSE) as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version (SPDX: `GPL-3.0-or-later`).
+It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even
+the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
+[`LICENSE`](LICENSE) for details.
+
+The macOS editor links [STTextView](https://github.com/krzyzanowskim/STTextView) 2.4.1, which
+its author offers to open-source applications under the GPLv3
+([`docs/third-party/STTextView-2.4.1-LICENSE.md`](docs/third-party/STTextView-2.4.1-LICENSE.md)).
+That is why Plainsong is GPL. Earlier versions, including every release through
+`v0.1.0-alpha.5`, were published under the MIT License and remain available under it.
+
 The App target also links [Sparkle](https://github.com/sparkle-project/Sparkle) 2.10.0.
 Updates stay off unless `PLAINSONG_UPDATES_ENABLED` is YES. Sparkle is MIT and bundles
 bsdiff, sais-lite, and orlp/ed25519; those notices are in

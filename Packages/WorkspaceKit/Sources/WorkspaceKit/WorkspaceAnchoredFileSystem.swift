@@ -208,6 +208,16 @@ public enum WorkspaceAnchoredFileSystemError: Error, Sendable, Equatable {
     case durabilityFailed
     case cleanupFailed
     case cancelled
+    /// The destination volume does not advertise the atomic renames a write commits and cleans
+    /// up with (`RENAME_EXCL`, plus `RENAME_SWAP` to replace), or a commit rename failed with
+    /// `ENOTSUP`.
+    case unsupportedVolume
+    /// A write-path call failed with `ENOSPC` or `EDQUOT`.
+    case insufficientSpace
+    /// The destination volume is mounted read-only, or a write-path call failed with `EROFS`.
+    case readOnlyVolume
+    /// A write-path call failed with `EPERM` or `EACCES`.
+    case writeNotPermitted
 }
 
 public enum WorkspaceNoFollowFileWriteExpectation: Sendable, Equatable {
@@ -271,6 +281,10 @@ public struct WorkspaceIndeterminateFileWrite: Sendable, Equatable {
 /// The three states callers must arbitrate explicitly after a transactional write.
 public enum WorkspaceFileWriteOutcome: Sendable, Equatable {
     case notCommitted(WorkspaceNotCommittedFileWrite)
+    /// The requested bytes are published and `fsync` succeeded for the file and its parent
+    /// directory. This is durability at the syscall boundary, not `F_FULLFSYNC`: the drive
+    /// may still hold the data in its cache across a sudden power loss
+    /// (`docs/workspace-filesystem-contract.md`, "Transactional writes").
     case committedAndDurable(WorkspaceDurableFileWrite)
     case committedButIndeterminate(WorkspaceIndeterminateFileWrite)
 }
@@ -379,15 +393,19 @@ enum WorkspaceAnchoredFileSystem {
         let eventHandler: (@Sendable (Event) -> Void)?
         let injectedFailure: (@Sendable (InjectedCall) -> WorkspaceAnchoredFileSystemError?)?
         let itemReplacementDirectoryProvider: (@Sendable (URL) throws -> URL)?
+        /// Replaces the capabilities read from the destination parent's descriptor.
+        let volumeWriteCapabilitiesProvider: (@Sendable (Int32) -> VolumeWriteCapabilities?)?
 
         init(
             eventHandler: (@Sendable (Event) -> Void)? = nil,
             injectedFailure: (@Sendable (InjectedCall) -> WorkspaceAnchoredFileSystemError?)? = nil,
-            itemReplacementDirectory: (@Sendable (URL) throws -> URL)? = nil
+            itemReplacementDirectory: (@Sendable (URL) throws -> URL)? = nil,
+            volumeWriteCapabilities: (@Sendable (Int32) -> VolumeWriteCapabilities?)? = nil
         ) {
             self.eventHandler = eventHandler
             self.injectedFailure = injectedFailure
             itemReplacementDirectoryProvider = itemReplacementDirectory
+            volumeWriteCapabilitiesProvider = volumeWriteCapabilities
         }
 
         func emit(_ event: Event) {
