@@ -1,7 +1,7 @@
 # Release 1.0 Scope
 
-> **Status: V1, V2, V5 and V6 decided by the owner on 2026-11-10
-> (`docs/decisions/2026-11-10-release-1.0-scope.md`). V3 and V4 are open.** Drafted
+> **Status: V1, V2, V4, V5 and V6 decided by the owner on 2026-11-10
+> (`docs/decisions/2026-11-10-release-1.0-scope.md`). V3 is open.** Drafted
 > 2026-10-29; refreshed 2026-11-10 against `main` at `2a555d9` (#253). This file says
 > what "1.0" means for each platform and lists the remaining work against the gates that
 > already exist. It does not replace those gate documents; each row points at the source
@@ -29,9 +29,9 @@ Tiers used below:
 | V1 | Do macOS and iOS ship 1.0 together? | **Decided 2026-11-10: no.** macOS 1.0 first; iOS follows as its own 1.0 | iOS still has every device gate open; tying them blocks macOS on hardware evidence |
 | V2 | Is multi-window (Windows PR C–G) in macOS 1.0? | **Decided 2026-11-10: yes, through D2**; native tabs (F), restoration (E) and residency (G) are Should | Without D2 a user cannot work in a second window: New Window is not offered, and a second scene refuses file and root opens and closes itself (agent.md §5). D2 is draft #246 |
 | V3 | WYSIWYG at 1.0? | **Ships Experimental, off by default** (no promotion) | Promotion needs the `docs/wysiwyg-release-checklist.md` §D.4 gate and a Decision Log entry. Draft #213 prepares it but waits on the owner's Zhuyin/Pinyin dogfood; the last real IME runs predate STTextView 2.4.1 (R9) |
-| V4 | Distribution channel | **Open.** The draft default was a Developer ID-signed, notarized direct DMG. On 2026-11-10 the owner said the Apple Developer Program membership will not be bought in the short term, so §2 assumes an **unsigned direct DMG** (ad-hoc signature, README bypass) until the owner confirms that or changes it | agent.md §15 locks direct distribution first. Without the membership there is no Developer ID, notarization, or Mac App Store build |
-| V5 | Updates | **Decided 2026-11-10: in-app updates are Must.** Sparkle 2 is integrated and off (U1, #232); turning it on needs U2 and U3 (`docs/auto-update-plan.md` §4). Under the V4 assumption this means updating unsigned builds (U-D2) | An owner-run probe on 2026-11-10 updated an unsigned build with no second Gatekeeper prompt (`docs/auto-update-plan.md` §5). U-D4–U-D7 are open; U-D6 reverses the 2026-07-02 no-secrets rule. README keeps "no auto-update" until U3 |
-| V6 | Version and channel naming | **Decided 2026-11-10: `1.0.0`**, with `0.9.x` betas before it. Whether those builds are signed follows V4 | `MARKETING_VERSION` is still `0.1.0` (release plan P0.5) |
+| V4 | Distribution channel | **Decided 2026-11-10: unsigned direct DMG** (ad-hoc signature, README Gatekeeper bypass on first install). The Apple Developer Program membership is not planned in the short term; Developer ID signing, notarization and a Mac App Store build wait for it | agent.md §15 locks direct distribution first. The draft default was a signed, notarized DMG |
+| V5 | Updates | **Decided 2026-11-10: in-app updates are Must.** Sparkle 2 is integrated and off (U1, #232); turning it on needs U2 and U3 (`docs/auto-update-plan.md` §4). With V4 this means updating unsigned builds (U-D2) | An owner-run probe on 2026-11-10 updated an unsigned build with no second Gatekeeper prompt (`docs/auto-update-plan.md` §5). U-D4–U-D7 are open; U-D6 reverses the 2026-07-02 no-secrets rule. README keeps "no auto-update" until U3 |
+| V6 | Version and channel naming | **Decided 2026-11-10: `1.0.0`**, with `0.9.x` betas before it; all unsigned, per V4 | `MARKETING_VERSION` is still `0.1.0` (release plan P0.5) |
 
 ## 2. macOS 1.0
 
@@ -39,14 +39,12 @@ Tiers used below:
 
 | Item | Remaining work | Source of truth |
 |---|---|---|
-| Developer ID signing + hardened runtime | **Depends on V4.** Not on the 1.0 path while V4's unsigned assumption holds; needs the Apple Developer Program membership, then P1 | `docs/release-engineering-plan.md` P1 |
-| Notarization + stapling | **Depends on V4**, as above; P2 in the release workflow | `docs/release-engineering-plan.md` P2, P4 |
 | Independent windows | C (#230), D1-0 (#236), D1a (#238), D1b (#239) and D1c (#252) are merged. D2 is draft #246, up to date with `main` and green; it waits on the owner smoke for W0 bullets 1–4, W7 bullet 3 and W8 bullet 1 | `docs/window-state-gates.md` §10, §11 |
 | Export acceptance | HTML/PDF/Print shipped (PR F #138, PR G #147). Open: E3 kitchen-sink output; E5 shared snapshot for PDF and Print; E6 fresh-panel URL and leaf-grant owner smoke; E7 PDF panel defaults, the real HTML panel, PDF failure/Print cancel feedback, and the keyboard/VoiceOver owner smoke; E9 keyboard-only HTML and PDF/Print accessibility, typing-path isolation while exporting, and the regression bullet | `docs/export-gates.md` §8 |
 | R17 sidebar stability | macOS 15 exact-head CI and owner macOS 27 F9/WS4A UI re-verification | `docs/risk-register.md` R17 |
 | Release §12 budgets | Re-run all budgets on the Release configuration at the 1.0 candidate commit; new `docs/perf/` entry | `agent.md` §12, release plan P5 |
-| In-app updates | U2 (appcast script, feed workflow, keys, CI secret) after U-D4, U-D6 and U-D7 are decided and the owner generates the EdDSA key; then U3's end-to-end gates U-G4–U-G8 on the builds V4 ships | `docs/auto-update-plan.md` §4, §5 |
-| Clean-machine install | The release DMG on a second Mac: workspace, edit/save, offline preview. Under V4's unsigned assumption this uses the documented Gatekeeper bypass once; a signed build must need none | release plan P5 |
+| In-app updates | U2 (appcast script, feed workflow, keys, CI secret) after U-D4, U-D6 and U-D7 are decided and the owner generates the EdDSA key; then U3's end-to-end gates U-G4–U-G8 on unsigned builds | `docs/auto-update-plan.md` §4, §5 |
+| Clean-machine install | The unsigned release DMG on a second Mac, through the documented Gatekeeper bypass: workspace, edit/save, offline preview | release plan P5 |
 | Docs | README: refresh Known limitations and replace "no auto-update"; keep the bypass instructions while builds are unsigned; Traditional Chinese README in sync | `README.md` |
 
 ### Should
@@ -70,7 +68,8 @@ Tiers used below:
   and validation of remote SVG. Workspace SVG in the preview landed in #229
   (`docs/svg-preview-design.md`).
 - Single-file sibling images without a folder grant.
-- Mac App Store build.
+- Developer ID signing, notarization and stapling (release plan P1/P2), and a Mac App
+  Store build: all wait for the Apple Developer Program membership (V4).
 
 ## 3. iOS 1.0
 
@@ -105,7 +104,7 @@ items need the owner with physical hardware.
 
 ## 4. Proposed order
 
-1. Owner confirms V4 and decides V3 after the Zhuyin/Pinyin dogfood (#213).
+1. Owner decides V3 after the Zhuyin/Pinyin dogfood (#213).
 2. Owner smoke for D2 (#246), then merge it. C, D1-0 and D1a–D1c are already merged.
 3. Owner decides U-D4, U-D6 and U-D7 and generates the EdDSA key → U2 → first `0.9.0`
    beta with updates on → U3 against the real feed.
@@ -118,8 +117,8 @@ items need the owner with physical hardware.
 
 ## 5. Exit checklist (macOS 1.0)
 
-- [ ] V1–V6 recorded in `docs/decisions/` (V1, V2, V5 and V6: 2026-11-10; V3 and V4 open).
-- [ ] The DMG V4 calls for, built by release CI (signed, notarized and stapled if V4 ends up signed).
+- [ ] V1–V6 recorded in `docs/decisions/` (V1, V2, V4, V5 and V6: 2026-11-10; V3 open).
+- [ ] Unsigned DMG built by release CI (V4).
 - [ ] Windows PR C, D1a–D1c, and D2 merged with their named gates (all but D2, #246, are
   merged).
 - [ ] In-app updates on: U2 merged and U-G4–U-G8 checked.
@@ -127,5 +126,5 @@ items need the owner with physical hardware.
 - [ ] R17 re-verification done. (R21's accepted residual is already recorded: #231,
   2026-10-29.)
 - [ ] §12 budgets re-measured on the Release configuration at the candidate commit.
-- [ ] Clean-machine install (no Gatekeeper bypass if V4 ends up signed).
+- [ ] Clean-machine install through the documented Gatekeeper bypass.
 - [ ] README (both languages) updated; WYSIWYG still labelled Experimental.

@@ -2,7 +2,7 @@
 
 > **Status: U1 adopted U-D1 and U-D3, 2026-10-29. V5 was decided on 2026-11-10: in-app
 > updates are Must for 1.0 (`docs/decisions/2026-11-10-release-1.0-scope.md`).**
-> U-D2 follows from V5 and the open V4; U-D4–U-D7 stay owner 待決定. Adding Sparkle is a new Swift dependency, so the
+> U-D2 follows from V5 and V4 (unsigned DMG); U-D4–U-D7 stay owner 待決定. Adding Sparkle is a new Swift dependency, so the
 > implementing PR carries a `docs/decisions/` entry (agent.md §2, §17.7). Sparkle facts
 > below come from sparkle-project.org documentation (sandboxing, publishing, programmatic
 > setup, customization), fetched 2026-10-29 and re-checked against Sparkle 2.10.0.
@@ -32,7 +32,7 @@
 | ID | Question | Proposed answer | U1 |
 |---|---|---|---|
 | U-D1 | Mechanism | **Sparkle 2** (alternatives in §7) | 已採用 |
-| U-D2 | Ship before or after Developer ID signing? | **Before, on unsigned builds, while V4's unsigned assumption holds** (`docs/release-1.0-scope.md` §1). The original proposal was after P1/P2; the 2026-11-10 probe in §5 removed its main reason | 2026-11-10: follows from V5; the owner confirms it with V4 |
+| U-D2 | Ship before or after Developer ID signing? | **Before, on unsigned builds.** V4 ships unsigned and V5 makes updates Must (`docs/release-1.0-scope.md` §1). The original proposal was after P1/P2; the 2026-11-10 probe in §5 removed its main reason | 已採用 (2026-11-10, from V4 and V5) |
 | U-D3 | Default behavior | Ask on second launch (Sparkle's default); "Automatically check" on, "Automatically download and install" off until 1.0 | 已採用 |
 | U-D4 | Feed host | `appcast.xml` on GitHub Pages (`gh-pages` branch), written by the release workflow | owner 待決定 |
 | U-D5 | Channels | One stable feed plus a `beta` channel (`sparkle:channel`) that users opt into in Settings | owner 待決定 |
@@ -123,7 +123,7 @@ quit, such as a save that cannot complete.
 |---|---|---|
 | U1 | Decision entry; Sparkle package; updater controller; menu item; Settings toggles; Info.plist keys and entitlements; release-script re-signing; unit and hosted tests (§5) | No. `SUFeedURL` and `SUPublicEDKey` are empty strings until U2. YES is covered with a fake client, not a live Sparkle check |
 | U2 | `make-appcast.sh`; `publish-appcast` workflow; `gh-pages` feed; README update | **Yes**: generate the keys and add the secret |
-| U3 | End-to-end update gate (§5 U-G4–U-G7) against a local test feed, then against the real feed with the builds V4 ships | **Yes**: the owner runs the clean-machine pass; signed builds need P1/P2 |
+| U3 | End-to-end update gate (§5 U-G4–U-G7) against a local test feed, then against the real feed with unsigned builds | **Yes**: the owner runs the clean-machine pass |
 
 U1 is merged. U2 and U3 wait for the keys and for U-D4, U-D6 and U-D7.
 
