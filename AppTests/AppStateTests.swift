@@ -8074,7 +8074,8 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
                 )
         }
         XCTAssertTrue(appState.isEditorDocumentBindingInstalled(bindingB.id, session: sessionB))
-        XCTAssertNil(appState.registry.sessionCache[documentAURL.standardizedFileURL])
+        // B is the installed shown document, so it does not consume the one warm slot.
+        XCTAssertTrue(appState.registry.sessionCache[documentAURL.standardizedFileURL] === sessionA)
         XCTAssertEqual(fixture.coordinator.currentDocumentIdentity, AppState.editorDocumentIdentity(for: documentBURL))
 
         _ = bindingA.sourceContract.publish(EditorDocumentSourcePublication(
@@ -8116,7 +8117,10 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: documentBURL, encoding: .utf8), finalSourceB)
         XCTAssertFalse(sessionA.isDirty)
         XCTAssertFalse(sessionB.isDirty)
-        XCTAssertNil(appState.sessionPolicy.dirtyState(for: documentAURL))
+        XCTAssertEqual(
+            try appState.sessionPolicy.dirtyState(for: XCTUnwrap(appState.sessionStateURL(for: sessionA))),
+            false
+        )
         XCTAssertEqual(appState.sessionPolicy.dirtyState(for: documentBURL), false)
     }
 

@@ -70,6 +70,9 @@ final class AppDocumentRegistry: ObservableObject {
         didSet { noteEditorReplaceAuthorityInputDidChange() }
     }
 
+    var editorInstallationWindows: [EditorDocumentBindingInstallation: RegisteredWindowState] = [:]
+    var retainedWorkspaceAuthorityOwners: [ObjectIdentifier: [RetiredWorkspaceAuthorityOwner]] = [:]
+
     var editorWriterInstallations: [ObjectIdentifier: EditorDocumentBindingInstallation] = [:]
     var pendingEditorSourceInstallations: [
         EditorDocumentBindingInstallation: DocumentSession
@@ -131,8 +134,26 @@ final class AppDocumentRegistry: ObservableObject {
     }
 
     var detachedSessionURLs: Set<URL> = [] {
-        didSet { noteEditorReplaceAuthorityInputDidChange() }
+        didSet {
+            noteEditorReplaceAuthorityInputDidChange()
+            // A record lives only while its URL is detached: every path that reattaches a
+            // file (Reload, Keep Mine, Save Copy, relocation, reactivation) drops it here, so
+            // a later detach can never reuse a revision recorded for an earlier one.
+            let reattached = oldValue.subtracting(detachedSessionURLs)
+            if !reattached.isEmpty, !cleanDetachedSessionRecords.isEmpty {
+                cleanDetachedSessionRecords = cleanDetachedSessionRecords.filter {
+                    !reattached.contains($0.value.stateURL)
+                }
+            }
+        }
     }
+
+    /// The state URL and revision at which a clean session was detached (M2). While the
+    /// session still has that revision at that URL it holds no edits a reload could lose,
+    /// so when its file reads back it reloads like any clean document instead of raising
+    /// Reload/Keep Mine. Detaching still marks it dirty: if the file stays gone, the editor
+    /// copy is the only copy left.
+    var cleanDetachedSessionRecords: [ObjectIdentifier: CleanDetachedSessionRecord] = [:]
 
     /// Exact authority, identity, and content installed for each anchored workspace session.
     /// Saves use this proof instead of recapturing the session's mutable URL.
@@ -164,6 +185,11 @@ final class AppDocumentRegistry: ObservableObject {
             noteMenuEnablementDidChange()
         }
     }
+
+    /// Sessions whose File › Save As panel is open. Autosave from any window — its timer or
+    /// the focus-loss flush the panel itself triggers — must not write the unsaved text to
+    /// the original before the user picks (or cancels) a destination.
+    var saveAsPanelSessions: Set<ObjectIdentifier> = []
 
     /// A namespace mutation fences image placement across the workspace, including mutations
     /// whose selected item is not itself an open document (for example an asset directory).

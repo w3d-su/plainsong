@@ -777,7 +777,8 @@ private extension WorkspaceAnchoredItemMutator {
             .durabilityFailed
         case .cancelled:
             .cancelled
-        case .unreadable, .changedContent, .cleanupFailed:
+        case .unreadable, .changedContent, .cleanupFailed, .unsupportedVolume, .insufficientSpace,
+             .readOnlyVolume, .writeNotPermitted:
             .unreadable
         }
     }

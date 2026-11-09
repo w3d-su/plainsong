@@ -64,7 +64,9 @@ regular-expression feature in the first release.
   - Explicit case-insensitive at the model layer, even if the first UI exposes only a
     case-sensitive toggle over smart-case.
 - Optional whole-word matching. Unicode letters, numbers, and underscore are word
-  characters.
+  characters. Where a match edge touches a script written without spaces between words
+  (Han, kana, Thai, Lao, Khmer, Myanmar), ICU word segmentation in the root locale
+  decides the edge instead, so 中文 matches in 我喜歡中文 and Swift in 使用Swift開發.
 - Non-overlapping matches, ordered by workspace-relative path and source position.
 - One-based line numbers in the UI and UTF-16 `NSRange` values for editor navigation.
 - LF and CRLF documents, CJK text, emoji, combining marks, and files without a trailing
@@ -209,8 +211,12 @@ UTF-16 units per side. If the match occupies only part of a source grapheme and 
 that grapheme's boundary would exceed the per-side cap, the engine uses the exact-match
 boundary on that side rather than copying the entire pathological context into every result.
 After a rejected whole-word hit, matching advances directly to the next composed boundary
-whose predecessor is not a word character; starts inside the same word cannot succeed and
-must not be enumerated one UTF-16 unit at a time.
+whose predecessor is not a word character, or whose predecessor or successor belongs to a
+segmented script (where segmentation may place a word boundary); starts inside the same
+word cannot succeed and must not be enumerated one UTF-16 unit at a time. Segmentation reads
+one tokenized window at a time (128 units before the queried edge, 1,024 after, trusting
+only boundaries at least 64 units inside it), so an unbroken run of Han text still costs
+linear work.
 
 ### 4.2 WorkspaceKit model
 
@@ -1134,7 +1140,8 @@ Required semantics:
 - Smart case is case-sensitive when the query contains a cased uppercase character and
   case-insensitive otherwise.
 - Whole-word mode treats Unicode letters, Unicode numbers, and underscore as word
-  characters.
+  characters, and uses ICU word segmentation at edges that touch Han, kana, Thai, Lao,
+  Khmer or Myanmar text.
 - Handle LF, CRLF, empty lines, and a final line without a newline.
 - All source and preview ranges use UTF-16 `NSRange` so they can be passed directly to
   the existing STTextView-based editor.

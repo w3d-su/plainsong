@@ -213,6 +213,23 @@ final class IOSProductionSurfaceTests: XCTestCase {
         XCTAssertEqual(harness.facade.setCommandFocusCalls.last?.identity, identity)
     }
 
+    func testSceneDisconnectRetriesFailedCloseAndReleasesRuntime() async throws {
+        let closed = expectation(description: "Disconnected writer closed on retry")
+        var attempts = 0
+        let harness = try makeHarness(shutdown: {
+            attempts += 1
+            if attempts == 2 { closed.fulfill() }
+            return attempts >= 2
+        }) { _, _ in }
+        let shutdown = Task { await harness.runtime.shutdownDisconnectedScene() }
+        await fulfillment(of: [closed], timeout: 5)
+        await shutdown.value
+        let finished = await harness.runtime.shutdown()
+        XCTAssertTrue(finished)
+        XCTAssertEqual(attempts, 2)
+        XCTAssertNil(harness.runtime.preview.webView.navigationDelegate)
+    }
+
     func testShutdownPreservesARetainedWriterThenInvalidatesOnlyAfterClose() async throws {
         var canClose = false
         var closes = 0

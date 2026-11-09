@@ -498,6 +498,7 @@ extension AppState {
         cancelPendingEditorNavigationIfNeeded()
         shownSession = session
         releaseUnreferencedSessionOwnership(for: previousSession)
+        refreshWorkspaceWatcherEventFilter()
         clearPromptsNotMatchingCurrentDocument()
         restoreRecoveryPrompt(for: session)
         if indeterminateSessionWrites[ObjectIdentifier(session)] != nil {
@@ -512,7 +513,8 @@ extension AppState {
         let evictions = sessionPolicy.access(
             url,
             isDirty: isDirty,
-            protectedURLs: protectedSessionURLs()
+            protectedURLs: protectedSessionURLs(),
+            installedURLs: installedSessionURLs()
         )
         handleSessionEvictions(evictions)
     }
@@ -679,15 +681,14 @@ extension AppState {
         _ result: WorkspaceNotCommittedFileWrite,
         destinationURL: URL
     ) -> MarkdownFileStoreError {
-        guard result.artifactState != .none else {
-            return .unwritable(destinationURL)
+        if result.artifactState != .none {
+            retainFileWriteArtifactNotice(
+                destinationURL: destinationURL,
+                destinationWasCommitted: false,
+                artifactState: result.artifactState
+            )
         }
-        retainFileWriteArtifactNotice(
-            destinationURL: destinationURL,
-            destinationWasCommitted: false,
-            artifactState: result.artifactState
-        )
-        return .writeNotCommittedWithCleanupRequired(destinationURL, result)
+        return .notCommitted(result, destinationURL: destinationURL)
     }
 
     /// A typed writer precondition can discover the same external B version before an FSEvent

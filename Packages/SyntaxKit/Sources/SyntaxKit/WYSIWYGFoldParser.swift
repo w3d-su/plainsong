@@ -22,13 +22,15 @@ public final class WYSIWYGFoldParser {
         in source: String,
         fileKind: FileKind,
         visibleRange requestedRange: NSRange,
-        selection: NSRange
+        selection: NSRange,
+        tableRegionsEnabled: Bool = false
     ) -> WYSIWYGFoldPlan {
         parser.foldPlan(
             in: source,
             fileKind: fileKind,
             visibleRange: requestedRange,
-            selection: selection
+            selection: selection,
+            tableRegionsEnabled: tableRegionsEnabled
         )
     }
 }
@@ -39,7 +41,8 @@ public extension MarkdownSyntaxParser {
         fileKind: FileKind,
         visibleRange requestedRange: NSRange,
         selection: NSRange,
-        linkFoldingEnabled: Bool = false
+        linkFoldingEnabled: Bool = false,
+        tableRegionsEnabled: Bool = false
     ) -> (visibleRange: NSRange, tokens: [MarkdownSyntaxToken], foldPlan: WYSIWYGFoldPlan) {
         let sourceLength = (source as NSString).length
         guard sourceLength > 0 else {
@@ -55,10 +58,12 @@ public extension MarkdownSyntaxParser {
             )
         }
 
-        let visibleRange = MarkdownSyntaxParser.visibleHighlightRange(
+        let parseRange = Self.wysiwygParseRange(
             in: source,
-            requestedRange: requestedRange.clamped(toLength: sourceLength)
+            requestedRange: requestedRange.clamped(toLength: sourceLength),
+            tableRegionsEnabled: tableRegionsEnabled
         )
+        let visibleRange = parseRange.range
         guard
             let fragment = source.fragment(in: visibleRange),
             let tree = markdownParser.parse(fragment),
@@ -135,6 +140,9 @@ public extension MarkdownSyntaxParser {
             visibleRange: foldPlan.visibleRange,
             regions: foldPlan.regions,
             imageRegions: imageRegions,
+            tableRegions: tableRegionsEnabled
+                ? tableRegions(in: root, fragment: fragment, parseRange: parseRange)
+                : [],
             linkFoldingEnabled: foldPlan.linkFoldingEnabled
         )
 
@@ -145,17 +153,20 @@ public extension MarkdownSyntaxParser {
         in source: String,
         fileKind _: FileKind,
         visibleRange requestedRange: NSRange,
-        selection: NSRange
+        selection: NSRange,
+        tableRegionsEnabled: Bool = false
     ) -> WYSIWYGFoldPlan {
         let sourceLength = (source as NSString).length
         guard sourceLength > 0 else {
             return WYSIWYGFoldPlan(visibleRange: NSRange(location: 0, length: 0), regions: [])
         }
 
-        let visibleRange = MarkdownSyntaxParser.visibleHighlightRange(
+        let parseRange = Self.wysiwygParseRange(
             in: source,
-            requestedRange: requestedRange.clamped(toLength: sourceLength)
+            requestedRange: requestedRange.clamped(toLength: sourceLength),
+            tableRegionsEnabled: tableRegionsEnabled
         )
+        let visibleRange = parseRange.range
         guard
             let fragment = source.fragment(in: visibleRange),
             let tree = markdownParser.parse(fragment),
@@ -192,8 +203,34 @@ public extension MarkdownSyntaxParser {
             visibleRange: foldPlan.visibleRange,
             regions: foldPlan.regions,
             imageRegions: imageRegions,
+            tableRegions: tableRegionsEnabled
+                ? tableRegions(in: root, fragment: fragment, parseRange: parseRange)
+                : [],
             linkFoldingEnabled: foldPlan.linkFoldingEnabled
         )
+    }
+
+    /// The visible highlight range, grown to whole tables when table regions are requested.
+    private static func wysiwygParseRange(
+        in source: String,
+        requestedRange: NSRange,
+        tableRegionsEnabled: Bool
+    ) -> WYSIWYGTableParseRange {
+        let visibleRange = visibleHighlightRange(in: source, requestedRange: requestedRange)
+        guard tableRegionsEnabled else {
+            return WYSIWYGTableParseRange(range: visibleRange)
+        }
+        return tableParseRange(in: source, expanding: visibleRange)
+    }
+
+    private func tableRegions(
+        in root: Node,
+        fragment: String,
+        parseRange: WYSIWYGTableParseRange
+    ) -> [WYSIWYGTableRegion] {
+        var regions: [WYSIWYGTableRegion] = []
+        appendTableRegions(from: root, fragment: fragment as NSString, parseRange: parseRange, to: &regions)
+        return regions
     }
 
     private func uniqueCandidates(_ candidates: [WYSIWYGFoldCandidate]) -> [WYSIWYGFoldCandidate] {

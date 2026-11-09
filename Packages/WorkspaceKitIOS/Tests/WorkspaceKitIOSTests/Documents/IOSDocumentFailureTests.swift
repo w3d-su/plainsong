@@ -175,6 +175,41 @@ final class IOSDocumentFailureTests: XCTestCase {
         XCTAssertEqual(handle.session.text, "unflushed 繁中")
     }
 
+    func testProviderPermissionReturnChecksDiskBeforeEnablingEditing() async throws {
+        let harness = DocumentIOHarness()
+        let handle = try await harness.openNote(text: "baseline")
+        let port = try XCTUnwrap(harness.port(for: handle))
+        port.emit(.writePermissionChanged(false))
+        XCTAssertFalse(harness.store.state(for: handle.identity)?.canWrite ?? true)
+        await harness.coordinator.setBytes(Data("baseline".utf8))
+        port.emit(.writePermissionChanged(true))
+        XCTAssertFalse(harness.store.state(for: handle.identity)?.canWrite ?? true)
+        await waitUntil { harness.store.state(for: handle.identity)?.canWrite == true }
+        port.emit(.unresolvedVersions)
+        port.emit(.externalChange)
+        port.emit(.writePermissionChanged(true))
+        do {
+            try await harness.store.resolveExternal(handle.identity, choice: .reload)
+            XCTFail("Reload cannot resolve competing versions by reading current bytes")
+        } catch {
+            XCTAssertEqual(error as? IOSDocumentFailure, .conflict)
+        }
+        XCTAssertFalse(harness.store.state(for: handle.identity)?.canWrite ?? true)
+        XCTAssertTrue(port.written.isEmpty)
+    }
+
+    func testConfirmedBackgroundSaveRemovesOnlyItsOwnCheckpoint() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let harness = DocumentIOHarness(recovery: IOSDocumentRecoveryStore(directory: directory))
+        let handle = try await harness.openNote(text: "baseline")
+        handle.session.replaceText("latest local draft")
+        let outcomes = await harness.store.flushForBackground()
+        guard case .saved = outcomes.first else { return XCTFail("expected confirmed save") }
+        let list = await harness.store.recoveryList()
+        XCTAssertTrue(list.records.isEmpty)
+    }
+
     func testScopeRevokeRejectsTheNextSave() async throws {
         let harness = DocumentIOHarness()
         let location = harness.location(relativePath: "Note.md", generation: 1)

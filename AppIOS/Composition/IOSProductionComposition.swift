@@ -112,6 +112,22 @@ struct IOSProductionComposition {
             conflictCopy: IOSConflictCopyCoordinator(controller: controller),
             readWorkspaceDocument: readWorkspaceDocument
         )
+        runtime.scene.surfaces.reviewCloudVersions = { [weak controller, weak runtime] id in
+            guard let controller else { throw IOSDocumentFailure.unavailable }
+            runtime?.prepareForReadOnlyPresentation()
+            return try await controller.reviewVersions(id)
+        }
+        runtime.scene.surfaces.applyCloudVersion = { [weak controller, weak scene = runtime.scene] id, review in
+            guard let controller else { throw IOSDocumentFailure.unavailable }
+            do {
+                try await controller.chooseVersion(id, from: review)
+            } catch is IOSCloudVersionReopenFailure {
+                scene?.presentedError = IOSShellError(
+                    title: "Version Saved",
+                    message: "Open the document again in Files to continue editing the chosen version. Your earlier text is in Recovered Drafts."
+                )
+            }
+        }
         runtime.recentPresentation.install(
             access: access,
             openRecent: { [weak controller] recordID in

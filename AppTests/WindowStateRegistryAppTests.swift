@@ -42,7 +42,11 @@ final class WindowStateRegistryAppTests: XCTestCase {
             XCTAssertTrue(sessions.contains { $0 === fixture.second }, name)
             XCTAssertTrue(sessions.contains { $0 === fixture.first }, name)
         }
-        XCTAssertTrue(appState.protectedSessionURLs().contains(fixture.secondURL), "LRU protection")
+        XCTAssertTrue(appState.installedSessionURLs().contains(fixture.secondURL), "shown session is installed")
+        XCTAssertFalse(
+            appState.protectedSessionURLs().contains(fixture.secondURL),
+            "a shown session does not use protected capacity"
+        )
         XCTAssertTrue(appState.isManagedEditorSession(fixture.second))
         XCTAssertTrue(
             appState.isAddressableExternalResolutionSession(fixture.second, canonicalURL: fixture.secondURL)
@@ -53,6 +57,7 @@ final class WindowStateRegistryAppTests: XCTestCase {
         for (name, sessions) in inventories() {
             XCTAssertFalse(sessions.contains { $0 === fixture.second }, "\(name) control")
         }
+        XCTAssertFalse(appState.installedSessionURLs().contains(fixture.secondURL))
         XCTAssertFalse(appState.protectedSessionURLs().contains(fixture.secondURL))
         XCTAssertFalse(appState.isManagedEditorSession(fixture.second))
         XCTAssertFalse(
@@ -329,7 +334,8 @@ final class WindowStateRegistryAppTests: XCTestCase {
         XCTAssertEqual(appState.pendingExternalTexts[fixture.secondURL], "changed on disk")
         XCTAssertTrue(appState.detachedSessionURLs.contains(fixture.secondURL))
 
-        // A quarantined write in window 2 refuses the close instead of being pruned.
+        // R1's own quarantined session still blocks the last-root release, even when
+        // another window shows it. W6 only exempts another root's quarantine.
         let quarantined = try SecondWindowRegistryFixture.make(testCase: self)
         let write = WorkspaceIndeterminateFileWrite(
             reason: .durabilityFailed,
@@ -338,6 +344,7 @@ final class WindowStateRegistryAppTests: XCTestCase {
         )
         quarantined.appState.indeterminateSessionWrites[ObjectIdentifier(quarantined.second)] = write
         XCTAssertThrowsError(try quarantined.appState.closeWorkspaceForReplacement())
+        XCTAssertNotNil(quarantined.appState.workspaceRootURL)
         XCTAssertEqual(quarantined.appState.indeterminateSessionWrites[ObjectIdentifier(quarantined.second)], write)
 
         let control = try SecondWindowRegistryFixture.make(testCase: self)

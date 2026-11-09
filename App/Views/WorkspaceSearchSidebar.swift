@@ -50,10 +50,13 @@ struct WorkspaceSearchSidebar: View {
     /// router and must complete the query→editor transition directly.
     @State private var isResultsToQueryHandoffPending = false
     /// Memoized pure presentation. Rebuilds only when the exact presenter inputs change
-    /// (plain `Equatable`, copy-on-write-cheap while arrays are untouched), so streaming
-    /// re-renders skip full section rebuilds and in-place rewrites can never serve stale rows.
+    /// (plain `Equatable`, copy-on-write-cheap while arrays are untouched), so in-place
+    /// rewrites can never serve stale rows. The inputs include the streamed progress counts,
+    /// which change on every completed file, so the rows come from `sectionsCache`: a
+    /// progress-only update reuses every section and an appended file builds one.
     @State private var presentationMemoInputs: WorkspaceSearchResultsPresentationInputs?
     @State private var presentationMemoValue = WorkspaceSearchResultsPresentation.empty
+    @State private var sectionsCache = WorkspaceSearchResultSectionsCache()
     #if DEBUG
         @State private var debugFocusSurface = "unknown"
         @State private var debugReducerEvent = "none"
@@ -260,7 +263,7 @@ struct WorkspaceSearchSidebar: View {
         )
         guard presentationMemoInputs != inputs else { return }
         presentationMemoInputs = inputs
-        presentationMemoValue = WorkspaceSearchResultsPresenter.make(inputs)
+        presentationMemoValue = WorkspaceSearchResultsPresenter.make(inputs, sections: sectionsCache)
     }
 
     private var queryField: some View {

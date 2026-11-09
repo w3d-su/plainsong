@@ -134,6 +134,7 @@ extension AppState {
         for installation in discardedInstallations {
             pendingEditorSourceInstallations[installation] = nil
             editorBindingInstallations[installation] = nil
+            registry.editorInstallationWindows[installation] = nil
         }
         editorWriterInstallations[sessionIdentity] = nil
         externalDiskInspectionTasks.removeValue(forKey: sessionIdentity)?.task.cancel()
@@ -153,9 +154,11 @@ extension AppState {
     }
 
     func firstUnretirableExternalConflict(
-        excluding retiredSessions: Set<ObjectIdentifier>
+        excluding retiredSessions: Set<ObjectIdentifier>,
+        among candidates: [DocumentSession]? = nil
     ) -> URL? {
-        registry.sessions(from: [.warmCache, .fileBackedWindowDocuments])
+        let pool = candidates ?? registry.sessions(from: [.warmCache, .fileBackedWindowDocuments])
+        return pool
             .filter { !retiredSessions.contains(ObjectIdentifier($0)) }
             .compactMap { session -> URL? in
                 guard session.isDirty,
@@ -375,27 +378,38 @@ extension AppState {
             pending.append(contentsOf: sessionPolicy.access(
                 eviction.url,
                 isDirty: session.isDirty,
-                protectedURLs: protectedSessionURLs().union(retainedURLs)
+                protectedURLs: protectedSessionURLs().union(retainedURLs),
+                installedURLs: installedSessionURLs()
             ))
         }
     }
 
     func reconcileSessionPolicyAfterEditorLeaseChange() {
-        handleSessionEvictions(sessionPolicy.trim(protectedURLs: protectedSessionURLs()))
+        handleSessionEvictions(sessionPolicy.trim(
+            protectedURLs: protectedSessionURLs(),
+            installedURLs: installedSessionURLs()
+        ))
     }
 
-    func protectedSessionURLs() -> Set<URL> {
-        var urls = Set(retiredEditorDocumentSessions.keys)
-        for session in registry.sessions(from: [.windowDocuments]) {
-            if let shownURL = sessionStateURL(for: session) {
-                urls.insert(shownURL)
-            }
-        }
+    /// Editor-binding installations, plus every connected window's shown session.
+    /// These stay warm without consuming the eight-session capacity.
+    func installedSessionURLs() -> Set<URL> {
+        var urls: Set<URL> = []
         for session in editorBindingInstallations.values {
             if let installedURL = sessionStateURL(for: session) {
                 urls.insert(installedURL)
             }
         }
+        for session in registry.sessions(from: [.windowDocuments]) {
+            if let shownURL = sessionStateURL(for: session) {
+                urls.insert(shownURL)
+            }
+        }
+        return urls
+    }
+
+    func protectedSessionURLs() -> Set<URL> {
+        var urls = Set(retiredEditorDocumentSessions.keys)
         for (sessionIdentity, context) in indeterminateSessionWriteContexts
             where indeterminateSessionWrites[sessionIdentity] != nil
         {
@@ -468,10 +482,12 @@ private extension AppState {
         session: DocumentSession
     ) -> Bool {
         let sessionIdentity = ObjectIdentifier(session)
-        if protectedSessionURLs().contains(eviction.url) || indeterminateSessionWrites[sessionIdentity] != nil ||
-            indeterminateWorkspaceMutationSessions.contains(sessionIdentity) ||
-            workspaceMutationWriteFences.contains(sessionIdentity)
-        {
+        let blocksEviction = protectedSessionURLs().contains(eviction.url)
+            || installedSessionURLs().contains(eviction.url)
+            || indeterminateSessionWrites[sessionIdentity] != nil
+            || indeterminateWorkspaceMutationSessions.contains(sessionIdentity)
+            || workspaceMutationWriteFences.contains(sessionIdentity)
+        if blocksEviction {
             return false
         }
         if eviction.requiresSave || session.isDirty {
@@ -494,6 +510,7 @@ private extension AppState {
         if !isRetiredEditorSession(session) {
             removeEditorDocumentBindingRegistration(for: session)
         }
+        releaseRetainedWorkspaceAuthorityIfUnreferenced(for: session)
         return true
     }
 

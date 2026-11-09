@@ -17,6 +17,21 @@ enum WorkspaceSearchResultsPresenter {
         )
     }
 
+    /// As `make(_:)`, with section rows taken from `sections`, which rebuilds only the file
+    /// results that changed since its last call.
+    static func make(
+        _ inputs: WorkspaceSearchResultsPresentationInputs,
+        sections: WorkspaceSearchResultSectionsCache
+    ) -> WorkspaceSearchResultsPresentation {
+        make(
+            searchState: inputs.searchState,
+            queryText: inputs.queryText,
+            canUseWorkspaceSearch: inputs.canUseWorkspaceSearch,
+            isWorkspaceSearchReady: inputs.isWorkspaceSearchReady,
+            sectionsCache: sections
+        )
+    }
+
     /// Maps App search + chrome readiness into a pure presentation model.
     ///
     /// Partial `fileResults` are preserved for searching and service-failure phases so an error
@@ -25,7 +40,8 @@ enum WorkspaceSearchResultsPresenter {
         searchState: WorkspaceSearchState,
         queryText: String,
         canUseWorkspaceSearch: Bool,
-        isWorkspaceSearchReady: Bool
+        isWorkspaceSearchReady: Bool,
+        sectionsCache: WorkspaceSearchResultSectionsCache? = nil
     ) -> WorkspaceSearchResultsPresentation {
         if !canUseWorkspaceSearch {
             return WorkspaceSearchResultsPresentation(
@@ -55,7 +71,10 @@ enum WorkspaceSearchResultsPresenter {
         }
 
         let generation = searchState.queryGeneration
-        let sections = makeSections(
+        let sections = sectionsCache?.sections(
+            for: searchState.fileResults,
+            queryGeneration: generation
+        ) ?? makeSections(
             fileResults: searchState.fileResults,
             queryGeneration: generation
         )
@@ -125,41 +144,48 @@ enum WorkspaceSearchResultsPresenter {
             )
         }
     }
+}
 
+extension WorkspaceSearchResultsPresenter {
     static func makeSections(
         fileResults: [WorkspaceSearchFileResult],
         queryGeneration: UInt64
     ) -> [WorkspaceSearchResultFileSectionModel] {
-        fileResults.map { fileResult in
-            // One UTF-8 path buffer per section — shared by section ID and every match row.
-            let pathUTF8 = Data(fileResult.relativePath.utf8)
-            let canActivate = fileResult.fileAuthority != nil
-            let rows: [WorkspaceSearchResultRowModel] = fileResult.matches.enumerated().map { ordinal, match in
-                WorkspaceSearchResultRowModel(
-                    id: WorkspaceSearchResultRowID(
-                        pathUTF8: pathUTF8,
-                        queryGeneration: queryGeneration,
-                        match: match,
-                        ordinal: ordinal
-                    ),
-                    lineNumber: match.line,
-                    snippet: match.preview,
-                    previewMatchRange: match.previewMatchRange,
-                    canActivate: canActivate
-                )
-            }
-            return WorkspaceSearchResultFileSectionModel(
-                id: WorkspaceSearchResultFileSectionID(
+        fileResults.map { makeSection(for: $0, queryGeneration: queryGeneration) }
+    }
+
+    static func makeSection(
+        for fileResult: WorkspaceSearchFileResult,
+        queryGeneration: UInt64
+    ) -> WorkspaceSearchResultFileSectionModel {
+        // One UTF-8 path buffer per section — shared by section ID and every match row.
+        let pathUTF8 = Data(fileResult.relativePath.utf8)
+        let canActivate = fileResult.fileAuthority != nil
+        let rows: [WorkspaceSearchResultRowModel] = fileResult.matches.enumerated().map { ordinal, match in
+            WorkspaceSearchResultRowModel(
+                id: WorkspaceSearchResultRowID(
                     pathUTF8: pathUTF8,
-                    queryGeneration: queryGeneration
+                    queryGeneration: queryGeneration,
+                    match: match,
+                    ordinal: ordinal
                 ),
-                relativePath: fileResult.relativePath,
-                matchCount: fileResult.matches.count,
-                isTruncated: fileResult.isTruncated,
-                canActivate: canActivate,
-                rows: rows
+                lineNumber: match.line,
+                snippet: match.preview,
+                previewMatchRange: match.previewMatchRange,
+                canActivate: canActivate
             )
         }
+        return WorkspaceSearchResultFileSectionModel(
+            id: WorkspaceSearchResultFileSectionID(
+                pathUTF8: pathUTF8,
+                queryGeneration: queryGeneration
+            ),
+            relativePath: fileResult.relativePath,
+            matchCount: fileResult.matches.count,
+            isTruncated: fileResult.isTruncated,
+            canActivate: canActivate,
+            rows: rows
+        )
     }
 
     /// Resolves a row back to the live search payload for activation (no URL rebuild).

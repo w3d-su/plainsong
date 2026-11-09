@@ -4,10 +4,14 @@ import AppKit
 ///
 /// The backing NSTextStorage remains exact Markdown. Folded delimiters become equal-length
 /// U+200B runs, while active image spans become one U+FFFC attachment plus equal-length
-/// U+200B padding only inside the ephemeral paragraph copy.
+/// U+200B padding only inside the ephemeral paragraph copy. Presented table rows turn
+/// cell-starting pipes into `\t` and other structure into U+200B, and carry tab stops.
+/// A projected fold/image U+200B that ends a line becomes a near-zero-width hanging
+/// space (`WYSIWYGLineEndHangingSpace`).
 final class WYSIWYGZeroWidthTextContentStorageDelegate: NSObject, NSTextContentStorageDelegate {
     weak var previousDelegate: NSTextContentStorageDelegate?
     var imagePresentationGeneration: UInt64?
+    var tablePresentationGeneration: UInt64?
 
     init(previousDelegate: NSTextContentStorageDelegate? = nil) {
         self.previousDelegate = previousDelegate
@@ -45,7 +49,9 @@ final class WYSIWYGZeroWidthTextContentStorageDelegate: NSObject, NSTextContentS
             }
         }
 
-        guard !foldedRanges.isEmpty || !imageMarkers.isEmpty else {
+        let tableMarkers = tableRowMarkers(in: paragraph, paragraphLocation: range.location)
+
+        guard !foldedRanges.isEmpty || !imageMarkers.isEmpty || !tableMarkers.isEmpty else {
             return previousDelegate?.textContentStorage?(
                 textContentStorage,
                 textParagraphWith: range
@@ -81,10 +87,41 @@ final class WYSIWYGZeroWidthTextContentStorageDelegate: NSObject, NSTextContentS
             )
         }
 
+        for tableMarker in tableMarkers {
+            tableMarker.marker.project(into: paragraph, rowLocation: tableMarker.range.location)
+        }
+
+        WYSIWYGLineEndHangingSpace.apply(
+            to: paragraph,
+            projectedRanges: foldedRanges + imageMarkers.map(\.range)
+        )
+
         precondition(
             paragraph.length == range.length,
             "WYSIWYG projection must preserve every raw UTF-16 offset"
         )
         return NSTextParagraph(attributedString: paragraph)
+    }
+
+    /// Live table-row markers that cover a whole row line of this paragraph.
+    private func tableRowMarkers(
+        in paragraph: NSAttributedString,
+        paragraphLocation: Int
+    ) -> [(range: NSRange, marker: WYSIWYGTableRowPresentationMarker)] {
+        guard let generation = tablePresentationGeneration else { return [] }
+        var markers: [(range: NSRange, marker: WYSIWYGTableRowPresentationMarker)] = []
+        paragraph.enumerateAttribute(
+            WYSIWYGTableRowPresentationMarker.attribute,
+            in: NSRange(location: 0, length: paragraph.length)
+        ) { value, attributeRange, _ in
+            if let marker = value as? WYSIWYGTableRowPresentationMarker,
+               marker.generation == generation,
+               attributeRange.length == marker.rowRange.length,
+               paragraphLocation + attributeRange.location == marker.rowRange.location
+            {
+                markers.append((attributeRange, marker))
+            }
+        }
+        return markers
     }
 }
