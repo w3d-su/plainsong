@@ -103,6 +103,12 @@ preview-bundle:
 release:
 	Scripts/release.sh
 
+# Exercises Scripts/make-appcast.sh with a throwaway key. Needs the Sparkle tools a
+# release or test build resolved; SPARKLE_BIN overrides the `make release` location.
+.PHONY: test-appcast
+test-appcast:
+	Scripts/make-appcast.sh --self-test $(if $(SPARKLE_BIN),--sparkle-bin $(SPARKLE_BIN))
+
 format: swiftformat-version-check
 	swiftformat $(SWIFT_FORMAT_PATHS) $(SWIFTFORMAT_COMPAT_FLAGS)
 	swiftlint --fix --quiet
