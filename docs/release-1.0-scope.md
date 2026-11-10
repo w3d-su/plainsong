@@ -1,7 +1,8 @@
 # Release 1.0 Scope
 
 > **Status: V1, V2, V4, V5 and V6 decided by the owner on 2026-11-10
-> (`docs/decisions/2026-11-10-release-1.0-scope.md`). V3 is open.** Drafted
+> (`docs/decisions/2026-11-10-release-1.0-scope.md`), V3 on 2026-11-11
+> (`docs/decisions/2026-11-11-release-1.0-scope-v3-wysiwyg.md`).** Drafted
 > 2026-10-29; refreshed 2026-11-10 against `main` at `2a555d9` (#253). This file says
 > what "1.0" means for each platform and lists the remaining work against the gates that
 > already exist. It does not replace those gate documents; each row points at the source
@@ -28,7 +29,7 @@ Tiers used below:
 |---|---|---|---|
 | V1 | Do macOS and iOS ship 1.0 together? | **Decided 2026-11-10: no.** macOS 1.0 first; iOS follows as its own 1.0 | iOS still has every device gate open; tying them blocks macOS on hardware evidence |
 | V2 | Is multi-window (Windows PR C–G) in macOS 1.0? | **Decided 2026-11-10: yes, through D2**; native tabs (F), restoration (E) and residency (G) are Should | Without D2 a user cannot work in a second window: New Window is not offered, and a second scene refuses file and root opens and closes itself (agent.md §5). D2 is draft #246 |
-| V3 | WYSIWYG at 1.0? | **Ships Experimental, off by default** (no promotion) | Promotion needs the `docs/wysiwyg-release-checklist.md` §D.4 gate and a Decision Log entry. Draft #213 prepares it but waits on the owner's Zhuyin/Pinyin dogfood; the last real IME runs predate STTextView 2.4.1 (R9) |
+| V3 | WYSIWYG at 1.0? | **Decided 2026-11-11: promoted.** WYSIWYG leaves Experimental for 1.0 through #213: on by default and a stop in the layout cycle, not the first-launch layout, with the Settings switch kept as the kill switch | The owner chose promotion over shipping it Experimental and off by default (the draft default). The decision sets the target; it does not close the gate. #213 still merges only after the `docs/wysiwyg-release-checklist.md` §D.4 gate: the owner's Zhuyin/Pinyin and pointer dogfood, since the last real IME runs predate STTextView 2.4.1 (R9), and a Decision Log entry |
 | V4 | Distribution channel | **Decided 2026-11-10: unsigned direct DMG** (ad-hoc signature, README Gatekeeper bypass on first install). The Apple Developer Program membership is not planned in the short term; Developer ID signing, notarization and a Mac App Store build wait for it | agent.md §15 locks direct distribution first. The draft default was a signed, notarized DMG |
 | V5 | Updates | **Decided 2026-11-10: in-app updates are Must.** Sparkle 2 is integrated and off (U1, #232); turning it on needs U2 and U3 (`docs/auto-update-plan.md` §4). With V4 this means updating unsigned builds (U-D2) | An owner-run probe on 2026-11-10 updated an unsigned build with no second Gatekeeper prompt (`docs/auto-update-plan.md` §5). U-D4–U-D7 were adopted the same day (U-D6 reverses the 2026-07-02 no-secrets rule). README keeps "no auto-update" until U3 |
 | V6 | Version and channel naming | **Decided 2026-11-10: `1.0.0`**, with `0.9.x` betas before it; all unsigned, per V4 | `MARKETING_VERSION` is still `0.1.0` (release plan P0.5) |
@@ -45,6 +46,7 @@ Tiers used below:
 | Release §12 budgets | Re-run all budgets on the Release configuration at the 1.0 candidate commit; new `docs/perf/` entry | `agent.md` §12, release plan P5 |
 | In-app updates | The owner generates the EdDSA key pair; then U2 (appcast script, feed workflow, key and feed in the build, CI secret) and U3's end-to-end gates U-G4–U-G8 on unsigned builds | `docs/auto-update-plan.md` §4, §5 |
 | Clean-machine install | The unsigned release DMG on a second Mac, through the documented Gatekeeper bypass: workspace, edit/save, offline preview | release plan P5 |
+| WYSIWYG promotion (V3) | Owner dogfood and actual-IME sign-off on a build of #213 (its ten-item checklist; IME and pointer are blocking), then fill #213's decision entry and the §D.4 evidence line and merge it | `docs/wysiwyg-release-checklist.md` §D.4, draft #213 |
 | Docs | README: refresh Known limitations and replace "no auto-update"; keep the bypass instructions while builds are unsigned; Traditional Chinese README in sync | `README.md` |
 
 ### Should
@@ -58,8 +60,8 @@ Tiers used below:
 
 ### Deferred (stays a Known limitation)
 
-- WYSIWYG stable/default promotion (V3) and its raw/deferred constructs (tables, fences,
-  Mermaid/math, reference links, autolinks, SVG/remote/single-file images).
+- WYSIWYG's raw/deferred constructs (tables, fences, Mermaid/math, reference links,
+  autolinks, SVG/remote/single-file images). Promotion (V3) does not change them.
 - Real MDX component execution (agent.md §9 Phase 3+).
 - User CSS, per-slot fonts, and imported themes in the preview. Editor color theme
   import landed in #234; the preview keeps its built-in palettes
@@ -104,7 +106,8 @@ items need the owner with physical hardware.
 
 ## 4. Proposed order
 
-1. Owner decides V3 after the Zhuyin/Pinyin dogfood (#213).
+1. Owner runs the Zhuyin/Pinyin and pointer dogfood on #213 (V3 is decided: promote);
+   #213 merges when it passes.
 2. Owner smoke for D2 (#246), then merge it. C, D1-0 and D1a–D1c are already merged.
 3. Owner generates the EdDSA key (U-D4, U-D6 and U-D7 are decided) → U2 → first `0.9.0`
    beta with updates on → U3 against the real feed.
@@ -117,7 +120,9 @@ items need the owner with physical hardware.
 
 ## 5. Exit checklist (macOS 1.0)
 
-- [ ] V1–V6 recorded in `docs/decisions/` (V1, V2, V4, V5 and V6: 2026-11-10; V3 open).
+- [x] V1–V6 recorded in `docs/decisions/` (V1, V2, V4, V5 and V6: 2026-11-10; V3:
+  2026-11-11).
+- [ ] WYSIWYG promoted (V3): #213 merged with checklist §D.4 checked.
 - [ ] Unsigned DMG built by release CI (V4).
 - [ ] Windows PR C, D1a–D1c, and D2 merged with their named gates (all but D2, #246, are
   merged).
@@ -127,4 +132,4 @@ items need the owner with physical hardware.
   2026-10-29.)
 - [ ] §12 budgets re-measured on the Release configuration at the candidate commit.
 - [ ] Clean-machine install through the documented Gatekeeper bypass.
-- [ ] README (both languages) updated; WYSIWYG still labelled Experimental.
+- [ ] README (both languages) updated; WYSIWYG no longer labelled Experimental (#213).
