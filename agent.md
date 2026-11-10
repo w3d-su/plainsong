@@ -1016,8 +1016,11 @@ make format           # swiftformat . && swiftlint --fix
   which adds the new DMG to the published `appcast.xml` and signs it. The feed is
   attached to the draft release. The owner publishes the release and then runs the
   **Publish appcast** workflow, which copies the feed to `gh-pages` and holds no key.
-  No workflow with a `pull_request` trigger may read that secret. Without it the tag
-  job builds no feed, and fails if the build has updates on. `make test-appcast` runs
+  No workflow with a `pull_request` trigger may read that secret. Without it, or
+  without a `SUPublicEDKey` in the app, the tag job builds no feed, and fails if the
+  build has updates on. The script fails if the new download comes out unsigned (the
+  secret does not match the app's key). The publish check compares the newest build per
+  channel, so publish each release's feed before pushing the next tag. `make test-appcast` runs
   the script's self-test with a throwaway key.
 - `Scripts/release.sh` re-signs Sparkle innermost first: `Installer.xpc`,
   `Downloader.xpc` (`--preserve-metadata=entitlements`), `Autoupdate`, `Updater.app`,

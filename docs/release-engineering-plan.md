@@ -161,8 +161,8 @@ days and never attached to a Release; download it for any build that gets publis
 crash reports from that DMG can only be symbolicated with it. Public-repo macOS minutes
 are free. Since auto-update U2 the tag job reads one secret, `SPARKLE_ED_PRIVATE_KEY`, to
 sign the update feed it attaches to the draft release
-(`docs/decisions/2026-11-10-auto-update-u2-feed-pipeline.md`); without it the job builds
-no feed.
+(`docs/decisions/2026-11-10-auto-update-u2-feed-pipeline.md`); without it, or without
+a `SUPublicEDKey` in the app, the job builds no feed.
 
 - Secrets (Developer ID cert keychain import + notary API key) become repo secrets only
   when the signed path resumes with P1/P2.

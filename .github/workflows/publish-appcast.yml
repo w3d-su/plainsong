@@ -60,9 +60,12 @@ jobs:
             git checkout --quiet --orphan gh-pages
           fi
 
-      # The new feed must name this tag's download, and must not be older than
-      # the published one: publishing an earlier release's feed would hide the
-      # newer release from every user.
+      # The new feed must name this tag's download, and in every channel of the
+      # published feed its newest build must be at least the published one.
+      # A release's feed is built from the feed that was published when its tag
+      # ran, so a feed built before an earlier release was published lacks that
+      # release. Publishing it would hide that release from its channel's users:
+      # a beta-only feed over a stable item leaves stable users with no update.
       - name: Check the feed
         run: |
           python3 - new/appcast.xml pages/appcast.xml "$TAG" "$GITHUB_REPOSITORY" << 'PY'
@@ -77,27 +80,52 @@ jobs:
               found = []
               for item in ET.parse(path).getroot().iter("item"):
                   version = item.find(f"{namespace}version")
+                  channel = item.find(f"{namespace}channel")
                   enclosure = item.find("enclosure")
                   found.append((
                       int(version.text.strip()),
                       enclosure.get("url", "") if enclosure is not None else "",
+                      (channel.text or "").strip() if channel is not None else "",
                   ))
               return found
+
+          def newest_by_channel(found):
+              newest = {}
+              for version, _, channel in found:
+                  newest[channel] = max(version, newest.get(channel, version))
+              return newest
 
           new = items(new_path)
           if not new:
               sys.exit("error: the release's appcast.xml has no items")
           prefix = f"https://github.com/{repository}/releases/download/{tag}/"
-          if not any(url.startswith(prefix) for _, url in new):
+          if not any(url.startswith(prefix) for _, url, _ in new):
               sys.exit(f"error: no item downloads from {prefix}")
-          for _, url in new:
+          for _, url, _ in new:
               if not url.startswith(f"https://github.com/{repository}/releases/download/"):
                   sys.exit(f"error: an item downloads from outside this repository's releases: {url}")
-          if os.path.exists(current_path):
-              current = items(current_path)
-              if current and max(v for v, _ in new) < max(v for v, _ in current):
-                  sys.exit("error: the published feed already has a newer build than this release")
-          print(f"feed ok: builds {sorted(v for v, _ in new)}")
+          current = items(current_path) if os.path.exists(current_path) else []
+          if current:
+              newest_new = max(v for v, _, _ in new)
+              newest_published = max(v for v, _, _ in current)
+              if newest_new < newest_published:
+                  sys.exit(
+                      f"error: the published feed already has build {newest_published}, and this "
+                      f"release's feed stops at build {newest_new}. An older release cannot be "
+                      "added behind a newer one: tag a new release."
+                  )
+              new_newest = newest_by_channel(new)
+              for channel, published in sorted(newest_by_channel(current).items()):
+                  if new_newest.get(channel, -1) < published:
+                      name = channel or "default"
+                      have = f"stops at build {new_newest[channel]}" if channel in new_newest else "has no item"
+                      sys.exit(
+                          f"error: the published feed has build {published} in the {name} channel, "
+                          f"and this release's feed {have} in that channel. It was built before "
+                          f"that build's feed was published. Re-run the Release workflow for {tag} "
+                          "to rebuild its feed from the published one."
+                      )
+          print(f"feed ok: builds {sorted(v for v, _, _ in new)}")
           PY
 
       - name: Publish

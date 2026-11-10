@@ -99,7 +99,10 @@ quit, such as a save that cannot complete.
 2. `Scripts/make-appcast.sh` runs Sparkle's `generate_appcast` over a folder that holds
    the published `appcast.xml` (fetched from `gh-pages`) and the new DMG. It signs the
    DMG, and signs the feed when the app sets `SURequireSignedFeed`, with the EdDSA key
-   from the `SPARKLE_ED_PRIVATE_KEY` secret, passed on standard input. Earlier items stay
+   from the `SPARKLE_ED_PRIVATE_KEY` secret, passed on standard input. The script fails
+   unless the new item's download comes out signed: `generate_appcast` only warns, and
+   leaves the download unsigned, when the secret is not the private half of the app's
+   `SUPublicEDKey`. Earlier items stay
    in the feed without their DMGs. Release notes are GitHub's generated notes for the
    tag, embedded in the item as Markdown. Delta updates are not generated, because the
    job has only the new DMG.
@@ -108,14 +111,19 @@ quit, such as a save that cannot complete.
    (`publish-appcast`) that the owner runs after publishing the release. Users therefore
    never receive a build the owner has not released. It holds no key: it checks that
    the release is published, that the feed names that tag's download and only this
-   repository's releases, and that it is not older than the published feed, then commits
-   `appcast.xml` to `gh-pages`.
+   repository's releases, and that in each channel of the published feed its newest build
+   is at least the published one, then commits `appcast.xml` to `gh-pages`. A feed is
+   built from the feed that was published when its tag ran. Publish each release's feed
+   before pushing the next tag; a feed built earlier lacks that release, the check
+   refuses it, and re-running the tag's Release workflow rebuilds it.
 4. `generate_appcast` takes each item's `sparkle:minimumSystemVersion` from the app's
    `LSMinimumSystemVersion` (14.0, agent.md §1). A tag with a hyphen (`v0.9.0-beta.1`)
    carries `<sparkle:channel>beta</sparkle:channel>` (U-D5), so only users who turned on
    Receive beta updates are offered it.
-5. While `SPARKLE_ED_PRIVATE_KEY` is absent the tag job builds no feed, and it fails if
-   the build has updates on. `Scripts/make-appcast.sh --self-test` runs on every release
+5. While `SPARKLE_ED_PRIVATE_KEY` or the app's `SUPublicEDKey` is absent the tag job
+   builds no feed, and it fails if the build has updates on. It also fails when
+   `gh-pages` exists and cannot be read, so a feed is never built without the published
+   one. `Scripts/make-appcast.sh --self-test` runs on every release
    run with a throwaway key (`make test-appcast` locally).
 
 ### 3.5 Keys

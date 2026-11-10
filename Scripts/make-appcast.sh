@@ -6,6 +6,10 @@
 # signs the DMG, and signs the feed itself when the app in the DMG sets
 # SURequireSignedFeed. Earlier items stay in the feed without their DMGs.
 #
+# Refused: an app without a SUPublicEDKey, a build older than the feed's newest,
+# and a key that is not the private half of the app's SUPublicEDKey (the new
+# item's download must come out signed).
+#
 # The EdDSA private key is read from the SPARKLE_ED_PRIVATE_KEY environment
 # variable and passed on standard input. It is never written to disk, put on a
 # command line, or printed.
@@ -45,7 +49,8 @@ for item in ET.parse(sys.argv[1]).getroot().iter("item"):
 PY
 }
 
-# Prints "<version>\t<channel>\t<enclosure url>" for the item with that version.
+# Prints "<version>\t<channel>\t<enclosure url>\t<signed|unsigned>" for the item
+# with that version. "signed" means the enclosure carries an EdDSA signature.
 feed_item() {
     python3 - "$1" "$2" << 'PY'
 import sys
@@ -58,20 +63,56 @@ for item in ET.parse(sys.argv[1]).getroot().iter("item"):
         continue
     channel = item.find(f"{namespace}channel")
     enclosure = item.find("enclosure")
+    signature = enclosure.get(f"{namespace}edSignature", "") if enclosure is not None else ""
     print("\t".join([
         sys.argv[2],
         (channel.text or "").strip() if channel is not None else "",
         enclosure.get("url", "") if enclosure is not None else "",
+        "signed" if signature.strip() else "unsigned",
     ]))
 PY
 }
 
-# Reads CFBundleVersion and SURequireSignedFeed from the app inside a DMG.
+# Detaches a disk image by its device, which works whether or not its volume is
+# mounted. Falls back to the mount point when the device is unknown.
+detach_dmg() {
+    local device="$1" mount="$2" target
+    target="${device:-$mount}"
+    hdiutil detach -quiet "$target" 2> /dev/null \
+        || hdiutil detach -quiet -force "$target" 2> /dev/null \
+        || true
+    rmdir "$mount" 2> /dev/null || true
+}
+
+# Prints "<CFBundleVersion>\t<signed|unsigned>\t<key|nokey>" for the app inside a
+# DMG: its build, whether it sets SURequireSignedFeed, and whether it has a
+# SUPublicEDKey.
 dmg_app_info() {
-    local dmg="$1" mount
+    local dmg="$1" mount attached device="" attempt mounted=0 status=0
     mount="$(mktemp -d "${TMPDIR:-/tmp}/plainsong-appcast-mount.XXXXXX")"
-    hdiutil attach -quiet -nobrowse -readonly -mountpoint "$mount" "$dmg"
-    python3 - "$mount" << 'PY' || { hdiutil detach -quiet "$mount"; rmdir "$mount"; return 1; }
+    # hdiutil can return success with the image attached and its volume not
+    # mounted (seen on a loaded machine). A mount point is on another device
+    # than its parent directory, so check that, and attach again if it is not.
+    for attempt in 1 2 3; do
+        attached="$(hdiutil attach -nobrowse -readonly -mountpoint "$mount" "$dmg")" || attached=""
+        device="$(awk '/^\/dev\// { print $1; exit }' <<< "$attached")"
+        if [[ "$(stat -f %d "$mount")" != "$(stat -f %d "$mount/..")" ]]; then
+            mounted=1
+            break
+        fi
+        echo "note: $dmg did not mount (attempt $attempt)" >&2
+        if [[ -n "$device" ]]; then
+            hdiutil detach -quiet "$device" 2> /dev/null || hdiutil detach -quiet -force "$device" 2> /dev/null || true
+        fi
+        device=""
+        sleep 1
+    done
+    if [[ "$mounted" != 1 ]]; then
+        rmdir "$mount" 2> /dev/null || true
+        echo "error: could not mount $dmg" >&2
+        return 1
+    fi
+    python3 - "$mount" << 'PY' || status=$?
 import glob
 import plistlib
 import sys
@@ -84,10 +125,16 @@ with open(apps[0], "rb") as handle:
     info = plistlib.load(handle)
 signed = info.get("SURequireSignedFeed")
 signed = signed is True or (isinstance(signed, str) and signed.strip().lower() in {"yes", "true", "1"})
-print(f"{info.get('CFBundleVersion', '')}\t{'signed' if signed else 'unsigned'}")
+public_key = info.get("SUPublicEDKey")
+has_key = isinstance(public_key, str) and public_key.strip() != ""
+print("\t".join([
+    str(info.get("CFBundleVersion", "")),
+    "signed" if signed else "unsigned",
+    "key" if has_key else "nokey",
+]))
 PY
-    hdiutil detach -quiet "$mount"
-    rmdir "$mount"
+    detach_dmg "$device" "$mount"
+    return "$status"
 }
 
 make_appcast() {
@@ -111,11 +158,15 @@ make_appcast() {
     local generate_appcast="$sparkle_bin/generate_appcast" sign_update="$sparkle_bin/sign_update"
     [[ -x "$generate_appcast" && -x "$sign_update" ]] || fail "Sparkle tools not found in $sparkle_bin"
 
-    local info version feed_signing
+    local info version feed_signing app_key
     info="$(dmg_app_info "$dmg")"
-    version="${info%%$'\t'*}"
-    feed_signing="${info##*$'\t'}"
+    version="$(cut -f1 <<< "$info")"
+    feed_signing="$(cut -f2 <<< "$info")"
+    app_key="$(cut -f3 <<< "$info")"
     [[ "$version" =~ ^[0-9]+$ ]] || fail "the app's CFBundleVersion is not a number: '$version'"
+    # An app without a public key cannot verify any update, so a feed for it
+    # would offer a download that every copy of the app refuses.
+    [[ "$app_key" == "key" ]] || fail "the app in $dmg has no SUPublicEDKey: updates are not set up in this build"
 
     mkdir -p "$feed_dir"
     local feed="$feed_dir/$FEED_NAME" previous_versions=""
@@ -165,6 +216,13 @@ make_appcast() {
     [[ -n "$item" ]] || fail "the feed has no item for build $version"
     [[ "$(cut -f3 <<< "$item")" == "$expected_url" ]] || fail "the item's download URL is not $expected_url"
     [[ "$(cut -f2 <<< "$item")" == "$channel" ]] || fail "the item's channel is not '${channel}'"
+    # generate_appcast signs the download only when SPARKLE_ED_PRIVATE_KEY is the
+    # private half of the app's SUPublicEDKey. With another key it prints a
+    # warning, writes the item unsigned and exits 0, and the app then refuses the
+    # update. The feed's own signature cannot show this: it is made and checked
+    # with the same private key.
+    [[ "$(cut -f4 <<< "$item")" == "signed" ]] \
+        || fail "the download for build $version is not signed: SPARKLE_ED_PRIVATE_KEY does not match the app's SUPublicEDKey"
     local earlier
     for earlier in $previous_versions; do
         grep -qx "$earlier" <<< "$(feed_versions "$feed")" || echo "note: build $earlier left the feed (generate_appcast keeps the newest items)"
@@ -218,13 +276,17 @@ self_test() {
     fi
     [[ -x "$sparkle_bin/generate_appcast" ]] || fail "Sparkle tools not found in $sparkle_bin"
 
-    local root key public_key feed failed=0
+    local root key public_key other_public_key feed failed=0
     root="$(mktemp -d "${TMPDIR:-/tmp}/plainsong-appcast-test.XXXXXX")"
     # A throwaway key that exists only for this run. Sparkle's private key file
     # is the base64 of the 32-byte Ed25519 seed.
-    openssl genpkey -algorithm ed25519 -out "$root/key.pem" 2> /dev/null
+    # macOS's own /usr/bin/openssl (LibreSSL 3.3) has no Ed25519.
+    openssl genpkey -algorithm ed25519 -out "$root/key.pem" 2> /dev/null \
+        || fail "this openssl cannot make an Ed25519 key; put OpenSSL 3 first on PATH ($(command -v openssl): $(openssl version))"
+    openssl genpkey -algorithm ed25519 -out "$root/other.pem" 2> /dev/null
     key="$(openssl pkey -in "$root/key.pem" -outform DER | tail -c 32 | base64)"
     public_key="$(openssl pkey -in "$root/key.pem" -pubout -outform DER | tail -c 32 | base64)"
+    other_public_key="$(openssl pkey -in "$root/other.pem" -pubout -outform DER | tail -c 32 | base64)"
     feed="$root/feed/$FEED_NAME"
 
     expect() {
@@ -240,11 +302,22 @@ self_test() {
             failed=1
         fi
     }
+    # A refusal must be the one the case is about, not an earlier accident.
+    expect_reason() {
+        local name="$1" reason="$2"
+        if ! grep -qF "$reason" "$root/$name.log"; then
+            echo "self-test: $name was not refused for: $reason" >&2
+            sed 's/^/    /' "$root/$name.log" >&2
+            failed=1
+        fi
+    }
 
     self_test_dmg "$root" 300 "$public_key" signed "$root/Plainsong-0.0.0-300-unsigned.dmg"
     self_test_dmg "$root" 301 "$public_key" signed "$root/Plainsong-0.0.0-301-unsigned.dmg"
     self_test_dmg "$root" 299 "$public_key" signed "$root/Plainsong-0.0.0-299-unsigned.dmg"
     self_test_dmg "$root" 400 "$public_key" unsigned "$root/Plainsong-0.0.0-400-unsigned.dmg"
+    self_test_dmg "$root" 500 "$other_public_key" signed "$root/Plainsong-0.0.0-500-unsigned.dmg"
+    self_test_dmg "$root" 600 "" unsigned "$root/Plainsong-0.0.0-600-unsigned.dmg"
     printf '## Changes\n\n- A change.\n' > "$root/notes.md"
 
     expect first pass --dmg "$root/Plainsong-0.0.0-300-unsigned.dmg" --tag v0.0.0-beta.1 \
@@ -253,21 +326,29 @@ self_test() {
     expect older fail --dmg "$root/Plainsong-0.0.0-299-unsigned.dmg" --tag v0.0.0-old --feed-dir "$root/feed"
     expect bad-tag fail --dmg "$root/Plainsong-0.0.0-301-unsigned.dmg" --tag 'v1 2' --feed-dir "$root/other"
     expect unsigned-feed pass --dmg "$root/Plainsong-0.0.0-400-unsigned.dmg" --tag v0.0.2 --feed-dir "$root/plain"
+    # The key is not the private half of the app's SUPublicEDKey: generate_appcast
+    # leaves the download unsigned and still exits 0.
+    expect wrong-key fail --dmg "$root/Plainsong-0.0.0-500-unsigned.dmg" --tag v0.0.3 --feed-dir "$root/wrong"
+    expect_reason wrong-key "does not match the app's SUPublicEDKey"
+    expect no-key fail --dmg "$root/Plainsong-0.0.0-600-unsigned.dmg" --tag v0.0.4 --feed-dir "$root/nokey"
+    expect_reason no-key "has no SUPublicEDKey"
 
     if [[ "$failed" == 0 ]]; then
         # Both items are in the feed, the first kept its channel and URL without
         # its disk image, and only the feed file is left to publish.
         [[ "$(feed_versions "$feed" | sort -n | tr '\n' ' ')" == "300 301 " ]] \
             || { echo "self-test: feed versions are not 300 and 301" >&2; failed=1; }
-        [[ "$(feed_item "$feed" 300)" == $'300\tbeta\thttps://github.com/w3d-su/plainsong/releases/download/v0.0.0-beta.1/Plainsong-0.0.0-300-unsigned.dmg' ]] \
+        [[ "$(feed_item "$feed" 300)" == $'300\tbeta\thttps://github.com/w3d-su/plainsong/releases/download/v0.0.0-beta.1/Plainsong-0.0.0-300-unsigned.dmg\tsigned' ]] \
             || { echo "self-test: build 300's item changed" >&2; failed=1; }
-        [[ "$(feed_item "$feed" 301)" == $'301\t\thttps://github.com/w3d-su/plainsong/releases/download/v0.0.1/Plainsong-0.0.0-301-unsigned.dmg' ]] \
+        [[ "$(feed_item "$feed" 301)" == $'301\t\thttps://github.com/w3d-su/plainsong/releases/download/v0.0.1/Plainsong-0.0.0-301-unsigned.dmg\tsigned' ]] \
             || { echo "self-test: build 301's item is wrong" >&2; failed=1; }
         grep -q 'A change' "$feed" || { echo "self-test: release notes are not embedded" >&2; failed=1; }
         [[ "$(ls "$root/feed")" == "$FEED_NAME" ]] \
             || { echo "self-test: the feed directory holds more than the feed" >&2; failed=1; }
         grep -q 'sparkle-signatures' "$root/plain/$FEED_NAME" \
             && { echo "self-test: a feed for an app without SURequireSignedFeed was signed" >&2; failed=1; }
+        [[ "$(feed_item "$root/plain/$FEED_NAME" 400 | cut -f4)" == "signed" ]] \
+            || { echo "self-test: build 400's download is not signed" >&2; failed=1; }
         # A changed feed must stop verifying.
         sed -i '' 's/<sparkle:version>301</<sparkle:version>302</' "$feed"
         if printf '%s' "$key" | "$sparkle_bin/sign_update" --verify --ed-key-file - "$feed" > /dev/null 2>&1; then
@@ -279,6 +360,12 @@ self_test() {
             echo "self-test: the private key was printed" >&2
             failed=1
         fi
+    fi
+
+    # No case, passing or refused, may leave a disk image attached.
+    if hdiutil info | grep -F "image-path" | grep -qF "$(basename "$root")"; then
+        echo "self-test: a disk image is still attached" >&2
+        failed=1
     fi
 
     rm -rf "$root"
