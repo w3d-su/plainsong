@@ -1,25 +1,28 @@
-# Auto-update: GitHub Pages feed, the signing key as a CI secret, and a signed feed
+# Auto-update: GitHub Pages feed, a beta channel, the signing key as a CI secret, and a signed feed
 
-Date: 2026-11-10. Owner decisions U-D4, U-D6 and U-D7 in `docs/auto-update-plan.md` §2,
-adopted as proposed.
+Date: 2026-11-10. Owner decisions U-D4, U-D5, U-D6 and U-D7 in
+`docs/auto-update-plan.md` §2, adopted as proposed.
 
 ## Decision
 
 - **U-D4.** The appcast is `appcast.xml` on GitHub Pages (`gh-pages` branch), at
   `https://w3d-su.github.io/plainsong/appcast.xml`, written by the release workflow.
+- **U-D5.** One feed with a `beta` channel. A prerelease goes to `beta` only, so it
+  reaches the users who turned on Receive beta updates in Settings and nobody else.
 - **U-D6.** The EdDSA private key is stored as a GitHub Actions secret and used only by
   the tag job that signs the update and the feed. This reverses the 2026-07-02 rule that
   the release workflow uses no secrets.
 - **U-D7.** `SURequireSignedFeed` and its prerequisite `SUVerifyUpdateBeforeExtraction`
   are on from the first release that has updates.
 
-U-D5 (a `beta` channel) is not decided here.
-
 ## Why
 
 - U-D4: the repository is public and already on GitHub, so Pages adds no host, account or
   cost, and the feed URL is already the one `Scripts/check-shipped-update-configuration.sh`
   expects.
+- U-D5: a prerelease should not install itself on someone who did not ask for one. The
+  cost is accepted: with the default setting a user receives no update until the first
+  release that is not a prerelease.
 - U-D6: 1.0 needs in-app updates (V5), and an update must be signed where it is built.
   Signing on the owner's Mac instead would make every release depend on that machine and
   would put a hand step between the tagged build and what users receive. The 2026-07-02
