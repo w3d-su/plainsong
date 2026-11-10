@@ -116,13 +116,15 @@ final class UpdateSettingsModelTests: XCTestCase {
             delegate.responds(to: #selector(PlainsongUpdateChannelDelegate.feedURLString(for:)))
         )
         XCTAssertEqual(Bundle.main.bundleIdentifier, "app.plainsong.editor")
-        XCTAssertEqual(PlainsongUpdateChannelDelegate.feedURLString(in: .main), "")
+        // Since U2b every build's Info.plist names the feed; the defaults value
+        // set above must not replace it.
+        let feed = "https://w3d-su.github.io/plainsong/appcast.xml"
+        XCTAssertEqual(PlainsongUpdateChannelDelegate.feedURLString(in: .main), feed)
 
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("plainsong-feed-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
-        let feed = "https://w3d-su.github.io/plainsong/appcast.xml"
         let plist = ["SUFeedURL": feed] as NSDictionary
         try plist.write(to: root.appendingPathComponent("Info.plist"))
         let bundle = try XCTUnwrap(Bundle(url: root))
