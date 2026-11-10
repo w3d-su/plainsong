@@ -1,7 +1,8 @@
 export function workspaceRelativeAssetPath(source: string, baseDir: string | null): string {
   const normalizedSource = source.replaceAll("\\", "/");
-  const normalizedBaseDir = baseDir?.replace(/^\/+|\/+$/g, "") ?? "";
-  const combinedPath = normalizedBaseDir ? `${normalizedBaseDir}/${normalizedSource}` : normalizedSource;
+  // No slash trimming here: `normalizeRelativePath` drops the empty segments that leading,
+  // trailing, or repeated slashes in `baseDir` produce.
+  const combinedPath = baseDir ? `${baseDir}/${normalizedSource}` : normalizedSource;
 
   return normalizeRelativePath(combinedPath);
 }

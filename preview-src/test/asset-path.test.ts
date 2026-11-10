@@ -20,6 +20,25 @@ describe("workspace asset paths", () => {
     );
   });
 
+  it("ignores leading, trailing, and repeated slashes in the base directory", () => {
+    expect(workspaceRelativeAssetPath("images/pixel.png", "//content//posts//")).toBe(
+      "content/posts/images/pixel.png",
+    );
+    expect(workspaceRelativeAssetPath("images/pixel.png", "///")).toBe("images/pixel.png");
+    expect(workspaceRelativeAssetPath("images/pixel.png", "")).toBe("images/pixel.png");
+  });
+
+  it("handles a base directory with a long run of slashes in linear time", () => {
+    const baseDir = `content${"/".repeat(200_000)}posts`;
+    const start = performance.now();
+    const result = workspaceRelativeAssetPath("pixel.png", baseDir);
+    const elapsed = performance.now() - start;
+
+    expect(result).toBe("content/posts/pixel.png");
+    // The trimming regex this replaced took 56 s on this input (3.5 s at 50,000 slashes).
+    expect(elapsed).toBeLessThan(1000);
+  });
+
   it("preserves leading parent segments so native containment still rejects escapes", () => {
     expect(workspaceRelativeAssetPath("../secret.png", null)).toBe("../secret.png");
   });
