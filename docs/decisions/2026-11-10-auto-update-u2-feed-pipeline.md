@@ -1,6 +1,6 @@
 # Auto-update U2: the tag job signs the feed, a separate workflow publishes it
 
-Date: 2026-11-10. Implements U-D4, U-D6 and U-D7
+Date: 2026-11-10. Implements U-D4, U-D5, U-D6 and U-D7
 (`docs/decisions/2026-11-10-auto-update-feed-secret-and-signed-feed.md`, recorded with the
 1.0 scope) as the pipeline in `docs/auto-update-plan.md` §3.4.
 
@@ -20,8 +20,8 @@ Date: 2026-11-10. Implements U-D4, U-D6 and U-D7
   keys and the flag change in U2b, when the owner has generated the key pair.
 - **No delta updates yet**, and release notes are GitHub's generated notes for the tag,
   embedded as Markdown.
-- **A tag with a hyphen goes to the `beta` channel**, as §3.4 proposed. U-D5 is still the
-  owner's to decide and can change this one rule.
+- **A tag with a hyphen goes to the `beta` channel** (U-D5). With the default setting a
+  user is offered nothing until the first tag without a hyphen.
 
 ## Why
 

@@ -112,7 +112,8 @@ quit, such as a save that cannot complete.
    `appcast.xml` to `gh-pages`.
 4. `generate_appcast` takes each item's `sparkle:minimumSystemVersion` from the app's
    `LSMinimumSystemVersion` (14.0, agent.md §1). A tag with a hyphen (`v0.9.0-beta.1`)
-   carries `<sparkle:channel>beta</sparkle:channel>`; U-D5 can still change that rule.
+   carries `<sparkle:channel>beta</sparkle:channel>` (U-D5), so only users who turned on
+   Receive beta updates are offered it.
 5. While `SPARKLE_ED_PRIVATE_KEY` is absent the tag job builds no feed, and it fails if
    the build has updates on. `Scripts/make-appcast.sh --self-test` runs on every release
    run with a throwaway key (`make test-appcast` locally).
