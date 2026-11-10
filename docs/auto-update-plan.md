@@ -2,7 +2,9 @@
 
 > **Status: U1 adopted U-D1 and U-D3, 2026-10-29. V5 was decided on 2026-11-10: in-app
 > updates are Must for 1.0 (`docs/decisions/2026-11-10-release-1.0-scope.md`).**
-> U-D2 follows from V5 and V4 (unsigned DMG); U-D4–U-D7 stay owner 待決定. Adding Sparkle is a new Swift dependency, so the
+> U-D2 follows from V5 and V4 (unsigned DMG). The owner adopted U-D4, U-D6 and U-D7 as
+> proposed on 2026-11-10 (`docs/decisions/2026-11-10-auto-update-feed-secret-and-signed-feed.md`);
+> U-D5 stays owner 待決定. Adding Sparkle is a new Swift dependency, so the
 > implementing PR carries a `docs/decisions/` entry (agent.md §2, §17.7). Sparkle facts
 > below come from sparkle-project.org documentation (sandboxing, publishing, programmatic
 > setup, customization), fetched 2026-10-29 and re-checked against Sparkle 2.10.0.
@@ -34,10 +36,10 @@
 | U-D1 | Mechanism | **Sparkle 2** (alternatives in §7) | 已採用 |
 | U-D2 | Ship before or after Developer ID signing? | **Before, on unsigned builds.** V4 ships unsigned and V5 makes updates Must (`docs/release-1.0-scope.md` §1). The original proposal was after P1/P2; the 2026-11-10 probe in §5 removed its main reason | 已採用 (2026-11-10, from V4 and V5) |
 | U-D3 | Default behavior | Ask on second launch (Sparkle's default); "Automatically check" on, "Automatically download and install" off until 1.0 | 已採用 |
-| U-D4 | Feed host | `appcast.xml` on GitHub Pages (`gh-pages` branch), written by the release workflow | owner 待決定 |
+| U-D4 | Feed host | `appcast.xml` on GitHub Pages (`gh-pages` branch), written by the release workflow | 已採用 (2026-11-10) |
 | U-D5 | Channels | One stable feed plus a `beta` channel (`sparkle:channel`) that users opt into in Settings | owner 待決定 |
-| U-D6 | Signing secret in CI | Store the EdDSA private key as a GitHub Actions secret, used only by the tag job. This reverses the 2026-07-02 "no secrets" rule and needs its own decision entry | owner 待決定 |
-| U-D7 | Feed signing | Turn on `SURequireSignedFeed` (and its prerequisite `SUVerifyUpdateBeforeExtraction`) from the first release | owner 待決定 |
+| U-D6 | Signing secret in CI | Store the EdDSA private key as a GitHub Actions secret, used only by the tag job. This reverses the 2026-07-02 "no secrets" rule | 已採用 (2026-11-10) |
+| U-D7 | Feed signing | Turn on `SURequireSignedFeed` (and its prerequisite `SUVerifyUpdateBeforeExtraction`) from the first release | 已採用 (2026-11-10) |
 
 
 ## 3. Design
@@ -115,7 +117,8 @@ quit, such as a save that cannot complete.
   Actions secret (U-D6). The public key goes into `Info.plist`.
 - Sparkle documents that rotating EdDSA keys needs a Developer ID-signed disk image, and
   that changing the Apple certificate and EdDSA key in the same release is unsupported.
-  **Never change both at once.** Losing the private key strands every installed copy.
+  **Never change both at once.** Losing the private key strands every installed copy:
+  with V4's unsigned builds there is no Developer ID image to rotate through.
 
 ## 4. Work packages
 
@@ -125,7 +128,8 @@ quit, such as a save that cannot complete.
 | U2 | `make-appcast.sh`; `publish-appcast` workflow; `gh-pages` feed; README update | **Yes**: generate the keys and add the secret |
 | U3 | End-to-end update gate (§5 U-G4–U-G7) against a local test feed, then against the real feed with unsigned builds | **Yes**: the owner runs the clean-machine pass |
 
-U1 is merged. U2 and U3 wait for the keys and for U-D4, U-D6 and U-D7.
+U1 is merged. U-D4, U-D6 and U-D7 are decided, so U2 waits only for the owner to
+generate the key pair (§3.5). U3 follows U2.
 
 ## 5. Gates
 

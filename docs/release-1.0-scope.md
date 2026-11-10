@@ -30,7 +30,7 @@ Tiers used below:
 | V2 | Is multi-window (Windows PR C–G) in macOS 1.0? | **Decided 2026-11-10: yes, through D2**; native tabs (F), restoration (E) and residency (G) are Should | Without D2 a user cannot work in a second window: New Window is not offered, and a second scene refuses file and root opens and closes itself (agent.md §5). D2 is draft #246 |
 | V3 | WYSIWYG at 1.0? | **Ships Experimental, off by default** (no promotion) | Promotion needs the `docs/wysiwyg-release-checklist.md` §D.4 gate and a Decision Log entry. Draft #213 prepares it but waits on the owner's Zhuyin/Pinyin dogfood; the last real IME runs predate STTextView 2.4.1 (R9) |
 | V4 | Distribution channel | **Decided 2026-11-10: unsigned direct DMG** (ad-hoc signature, README Gatekeeper bypass on first install). The Apple Developer Program membership is not planned in the short term; Developer ID signing, notarization and a Mac App Store build wait for it | agent.md §15 locks direct distribution first. The draft default was a signed, notarized DMG |
-| V5 | Updates | **Decided 2026-11-10: in-app updates are Must.** Sparkle 2 is integrated and off (U1, #232); turning it on needs U2 and U3 (`docs/auto-update-plan.md` §4). With V4 this means updating unsigned builds (U-D2) | An owner-run probe on 2026-11-10 updated an unsigned build with no second Gatekeeper prompt (`docs/auto-update-plan.md` §5). U-D4–U-D7 are open; U-D6 reverses the 2026-07-02 no-secrets rule. README keeps "no auto-update" until U3 |
+| V5 | Updates | **Decided 2026-11-10: in-app updates are Must.** Sparkle 2 is integrated and off (U1, #232); turning it on needs U2 and U3 (`docs/auto-update-plan.md` §4). With V4 this means updating unsigned builds (U-D2) | An owner-run probe on 2026-11-10 updated an unsigned build with no second Gatekeeper prompt (`docs/auto-update-plan.md` §5). U-D4, U-D6 and U-D7 were adopted the same day (U-D6 reverses the 2026-07-02 no-secrets rule); U-D5 is open. README keeps "no auto-update" until U3 |
 | V6 | Version and channel naming | **Decided 2026-11-10: `1.0.0`**, with `0.9.x` betas before it; all unsigned, per V4 | `MARKETING_VERSION` is still `0.1.0` (release plan P0.5) |
 
 ## 2. macOS 1.0
@@ -43,7 +43,7 @@ Tiers used below:
 | Export acceptance | HTML/PDF/Print shipped (PR F #138, PR G #147). Open: E3 kitchen-sink output; E5 shared snapshot for PDF and Print; E6 fresh-panel URL and leaf-grant owner smoke; E7 PDF panel defaults, the real HTML panel, PDF failure/Print cancel feedback, and the keyboard/VoiceOver owner smoke; E9 keyboard-only HTML and PDF/Print accessibility, typing-path isolation while exporting, and the regression bullet | `docs/export-gates.md` §8 |
 | R17 sidebar stability | macOS 15 exact-head CI and owner macOS 27 F9/WS4A UI re-verification | `docs/risk-register.md` R17 |
 | Release §12 budgets | Re-run all budgets on the Release configuration at the 1.0 candidate commit; new `docs/perf/` entry | `agent.md` §12, release plan P5 |
-| In-app updates | U2 (appcast script, feed workflow, keys, CI secret) after U-D4, U-D6 and U-D7 are decided and the owner generates the EdDSA key; then U3's end-to-end gates U-G4–U-G8 on unsigned builds | `docs/auto-update-plan.md` §4, §5 |
+| In-app updates | The owner generates the EdDSA key pair; then U2 (appcast script, feed workflow, key and feed in the build, CI secret) and U3's end-to-end gates U-G4–U-G8 on unsigned builds. U-D5 (channels) is still open | `docs/auto-update-plan.md` §4, §5 |
 | Clean-machine install | The unsigned release DMG on a second Mac, through the documented Gatekeeper bypass: workspace, edit/save, offline preview | release plan P5 |
 | Docs | README: refresh Known limitations and replace "no auto-update"; keep the bypass instructions while builds are unsigned; Traditional Chinese README in sync | `README.md` |
 
@@ -106,7 +106,7 @@ items need the owner with physical hardware.
 
 1. Owner decides V3 after the Zhuyin/Pinyin dogfood (#213).
 2. Owner smoke for D2 (#246), then merge it. C, D1-0 and D1a–D1c are already merged.
-3. Owner decides U-D4, U-D6 and U-D7 and generates the EdDSA key → U2 → first `0.9.0`
+3. Owner generates the EdDSA key (U-D4, U-D6 and U-D7 are decided) → U2 → first `0.9.0`
    beta with updates on → U3 against the real feed.
 4. Close the export E-gates, R17 and the Release-configuration budget run in parallel;
    `0.9.x` betas as they land.
