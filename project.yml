@@ -84,8 +84,8 @@ targets:
         # targets are never stripped (a command-line STRIP_* override strips them
         # too and fails the build).
         PLAINSONG_STRIP_SHIPPED_BINARY: NO
-        # NO does not create or start the updater. YES constructs Sparkle, but U1's
-        # empty key makes startUpdater fail closed until U2 fills the feed and key.
+        # NO does not create or start the updater, so development and test builds make
+        # no update request. Scripts/release.sh builds with YES (auto-update U2b).
         PLAINSONG_UPDATES_ENABLED: NO
       configs:
         Release:
@@ -105,8 +105,13 @@ targets:
         # Kept on disabled builds. Inert while the updater is not created; the
         # matching mach-lookup exceptions are a Mac App Store review item.
         SUEnableInstallerLauncherService: true
-        SUFeedURL: ""
-        SUPublicEDKey: ""
+        # Inert while PLAINSONG_UPDATES_ENABLED is NO. The public half of the owner's
+        # EdDSA key (docs/auto-update-plan.md §3.5); the private half is never in the
+        # repository. Scripts/check-shipped-update-configuration.sh pins the feed URL.
+        SUFeedURL: "https://w3d-su.github.io/plainsong/appcast.xml"
+        SUPublicEDKey: "o17cpeoCIVbE1EiIUAdc2YgYUjui2UCPtclAHB/7oN4="
+        SURequireSignedFeed: true
+        SUVerifyUpdateBeforeExtraction: true
         CFBundleDocumentTypes:
           - CFBundleTypeName: Markdown Document
             CFBundleTypeRole: Editor
