@@ -88,6 +88,7 @@ xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Release
     -derivedDataPath "$DERIVED_DATA" \
     MARKETING_VERSION="$MARKETING_VERSION" \
     CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+    PLAINSONG_UPDATES_ENABLED=YES \
     "${SIGN_SETTINGS[@]}" \
     "${STRIP_SETTINGS[@]}" \
     clean build
