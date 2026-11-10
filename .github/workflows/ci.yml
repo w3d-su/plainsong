@@ -36,9 +36,10 @@ permissions:
 # check name the main ruleset requires and passes only when every job passed, or
 # when `changes` found a docs-only pull request and the test jobs were skipped.
 # Everything that does not need macOS runs on Ubuntu. A run holds at most four macOS
-# runners (`packages` plus three shards); CodeQL's Swift analysis takes the fifth of
-# GitHub's non-Enterprise cap. When two pull requests run at once, the second run's
-# jobs wait for a free runner.
+# runners (`packages` plus three shards) of GitHub's non-Enterprise cap of five.
+# CodeQL's Swift analysis no longer takes one per push; it runs weekly
+# (codeql-swift.yml). When two pull requests run at once, the second run's jobs wait
+# for a free runner.
 jobs:
   # Docs-only fast path. A pull request counts as docs-only when every path it
   # changes is under docs/ or is a top-level *.md or LICENSE file. Two docs paths
@@ -232,9 +233,10 @@ jobs:
   # run the same products. A shard that names a class also skips it in that bundle's
   # catch-all shard, so a renamed or new class always still runs; a new bundle fails
   # `Check every test bundle has a shard` until a shard names it. Three shards, not
-  # four: CodeQL's default setup holds a macOS runner for ~12 minutes per push, so a
-  # fourth shard waits for a free runner longer than it saves. Balanced from measured
-  # class times on macos-15 (runs 41338975839 and 41340274653).
+  # four: when this was measured, CodeQL's default setup held a macOS runner for ~12
+  # minutes per push, so a fourth shard waited for a free runner longer than it saved.
+  # Swift analysis is weekly now (codeql-swift.yml); re-measure before adding a fourth.
+  # Balanced from measured class times on macos-15 (runs 41338975839 and 41340274653).
   hosted-build:
     name: hosted (build)
     needs: changes
