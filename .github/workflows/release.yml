@@ -1,7 +1,12 @@
 # Unsigned alpha release pipeline (docs/release-engineering-plan.md P4).
 # Tag-only + manual dispatch, never per-push (2026-07-02 CI-cost Decision Log
-# entry). No secrets: the unsigned path needs none, and public-repo macOS
-# minutes are free. The signed path stays manual until P1/P2 resume.
+# entry). Public-repo macOS minutes are free. The signed path stays manual
+# until P1/P2 resume.
+#
+# One secret, SPARKLE_ED_PRIVATE_KEY, signs the update feed
+# (docs/decisions/2026-11-10-auto-update-feed-secret-and-signed-feed.md). Only
+# the "Build the update feed" step of a tag run receives it. This workflow has
+# no pull_request trigger, so code from a pull request never runs with it.
 name: Release
 
 on:
@@ -35,6 +40,47 @@ jobs:
       - name: Checksum summary
         run: cat build/release/*.sha256
 
+      # Exercises Scripts/make-appcast.sh with the Sparkle tools this build
+      # resolved and a throwaway key, on tag and dispatch runs alike.
+      - name: Appcast self-test
+        run: Scripts/make-appcast.sh --self-test
+
+      # Tag runs: add this build to the published feed and sign it. The result
+      # is attached to the draft release below; users see it only after the
+      # owner publishes the release and runs the "Publish appcast" workflow.
+      # A tag with a hyphen (v0.9.0-beta.1) goes to the beta channel.
+      # Skipped while the secret is absent, unless the build has updates on.
+      - name: Build the update feed (tags)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          updates="$(/usr/libexec/PlistBuddy -c 'Print :PLAINSONG_UPDATES_ENABLED' \
+            build/release/DerivedData/Build/Products/Release/Plainsong.app/Contents/Info.plist)"
+          if [[ -z "$SPARKLE_ED_PRIVATE_KEY" ]]; then
+            if [[ "$updates" != "NO" ]]; then
+              echo "::error::This build has updates on, but SPARKLE_ED_PRIVATE_KEY is not set."
+              exit 1
+            fi
+            echo "::notice::No SPARKLE_ED_PRIVATE_KEY and updates are off in this build: no feed."
+            exit 0
+          fi
+          mkdir -p build/appcast
+          if git fetch --depth 1 origin gh-pages 2>/dev/null; then
+            git show FETCH_HEAD:appcast.xml > build/appcast/appcast.xml 2>/dev/null \
+              || rm -f build/appcast/appcast.xml
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f tag_name="$GITHUB_REF_NAME" --jq .body > build/release-notes.md
+          channel=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            channel=(--channel beta)
+          fi
+          Scripts/make-appcast.sh --dmg build/release/Plainsong-*-unsigned.dmg \
+            --tag "$GITHUB_REF_NAME" --feed-dir build/appcast \
+            --release-notes build/release-notes.md "${channel[@]}"
+
       # Every run keeps the dSYM, so crash reports from this exact (stripped)
       # build can be symbolicated. It is deliberately never a Release asset.
       # Artifacts expire: download it for any build that gets published.
@@ -54,13 +100,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          assets=(build/release/Plainsong-*-unsigned.dmg build/release/Plainsong-*-unsigned.dmg.sha256)
+          if [[ -f build/appcast/appcast.xml ]]; then
+            assets+=(build/appcast/appcast.xml)
+          fi
           if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber \
-              build/release/Plainsong-*-unsigned.dmg build/release/Plainsong-*-unsigned.dmg.sha256
+            gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber "${assets[@]}"
           else
             gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
-              --draft --prerelease --generate-notes \
-              build/release/Plainsong-*-unsigned.dmg build/release/Plainsong-*-unsigned.dmg.sha256
+              --draft --prerelease --generate-notes "${assets[@]}"
           fi
 
       # Dispatch runs (pipeline verification without a tag): keep the DMG as a

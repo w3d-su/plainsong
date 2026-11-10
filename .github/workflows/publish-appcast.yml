@@ -1,0 +1,118 @@
+# Publishes one release's update feed to GitHub Pages
+# (docs/auto-update-plan.md §3.4 step 3).
+#
+# The Release workflow attaches a signed appcast.xml to each tag's draft
+# release. This workflow copies that file to the gh-pages branch, which serves
+# https://w3d-su.github.io/plainsong/appcast.xml. The owner runs it by hand
+# after publishing the release, so users are never offered a build the owner
+# has not released. It holds no signing key: it publishes the file as signed.
+name: Publish appcast
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag of the published release whose appcast.xml to publish (for example v0.9.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write # push appcast.xml to gh-pages
+
+concurrency:
+  group: publish-appcast
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - name: Check the release
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9A-Za-z.+-]+$ ]]; then
+            echo "::error::The tag must look like v1.2.3."
+            exit 1
+          fi
+          draft="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)"
+          if [[ "$draft" != "false" ]]; then
+            echo "::error::Release $TAG is still a draft. Publish it first."
+            exit 1
+          fi
+
+      - name: Download the release's appcast
+        run: |
+          mkdir new
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern appcast.xml --dir new
+          test -s new/appcast.xml
+
+      - name: Check out gh-pages
+        run: |
+          git init --quiet pages
+          cd pages
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git fetch --quiet --depth 1 origin gh-pages; then
+            git checkout --quiet -b gh-pages FETCH_HEAD
+          else
+            git checkout --quiet --orphan gh-pages
+          fi
+
+      # The new feed must name this tag's download, and must not be older than
+      # the published one: publishing an earlier release's feed would hide the
+      # newer release from every user.
+      - name: Check the feed
+        run: |
+          python3 - new/appcast.xml pages/appcast.xml "$TAG" "$GITHUB_REPOSITORY" << 'PY'
+          import os
+          import sys
+          import xml.etree.ElementTree as ET
+
+          new_path, current_path, tag, repository = sys.argv[1:5]
+          namespace = "{http://www.andymatuschak.org/xml-namespaces/sparkle}"
+
+          def items(path):
+              found = []
+              for item in ET.parse(path).getroot().iter("item"):
+                  version = item.find(f"{namespace}version")
+                  enclosure = item.find("enclosure")
+                  found.append((
+                      int(version.text.strip()),
+                      enclosure.get("url", "") if enclosure is not None else "",
+                  ))
+              return found
+
+          new = items(new_path)
+          if not new:
+              sys.exit("error: the release's appcast.xml has no items")
+          prefix = f"https://github.com/{repository}/releases/download/{tag}/"
+          if not any(url.startswith(prefix) for _, url in new):
+              sys.exit(f"error: no item downloads from {prefix}")
+          for _, url in new:
+              if not url.startswith(f"https://github.com/{repository}/releases/download/"):
+                  sys.exit(f"error: an item downloads from outside this repository's releases: {url}")
+          if os.path.exists(current_path):
+              current = items(current_path)
+              if current and max(v for v, _ in new) < max(v for v, _ in current):
+                  sys.exit("error: the published feed already has a newer build than this release")
+          print(f"feed ok: builds {sorted(v for v, _ in new)}")
+          PY
+
+      - name: Publish
+        run: |
+          cp new/appcast.xml pages/appcast.xml
+          cd pages
+          # Pages must serve the file as it is, without a Jekyll build.
+          touch .nojekyll
+          git add appcast.xml .nojekyll
+          if git diff --cached --quiet; then
+            echo "::notice::gh-pages already has this feed."
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit --quiet -m "Publish the appcast for $TAG"
+          git push --quiet origin gh-pages
+          echo "::notice::Published the appcast for $TAG."

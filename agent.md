@@ -1011,6 +1011,14 @@ make format           # swiftformat . && swiftlint --fix
   conflicts; edit `project.yml`.**
 - Code signing: "Sign to Run Locally" for dev; hardened runtime + notarization scripted
   later (Phase 3, direct distribution first, App Store optional).
+- Update feed (`docs/auto-update-plan.md` §3.4): on a tag run `release.yml` passes the
+  `SPARKLE_ED_PRIVATE_KEY` secret, on standard input only, to `Scripts/make-appcast.sh`,
+  which adds the new DMG to the published `appcast.xml` and signs it. The feed is
+  attached to the draft release. The owner publishes the release and then runs the
+  **Publish appcast** workflow, which copies the feed to `gh-pages` and holds no key.
+  No workflow with a `pull_request` trigger may read that secret. Without it the tag
+  job builds no feed, and fails if the build has updates on. `make test-appcast` runs
+  the script's self-test with a throwaway key.
 - `Scripts/release.sh` re-signs Sparkle innermost first: `Installer.xpc`,
   `Downloader.xpc` (`--preserve-metadata=entitlements`), `Autoupdate`, `Updater.app`,
   and `Sparkle.framework`, then the app. Signing never uses `--deep`. The Developer ID
