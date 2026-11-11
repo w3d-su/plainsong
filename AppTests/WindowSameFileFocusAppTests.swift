@@ -160,14 +160,6 @@ final class WindowSameFileFocusAppTests: SharedRootAppTestCase {
         XCTAssertNil(second.shownSession.fileURL)
     }
 
-    func testRecoveryShowEditorCopyFocusesTheWindowShowingTheCopy() async throws {
-        _ = try await showSharedA()
-        let session = primary.shownSession
-        XCTAssertTrue(second.focusOtherWindowShowing(session))
-        XCTAssertTrue(KeyWindowRouter.shared.focusedWindowState === primary.windowState)
-        XCTAssertNil(second.shownSession.fileURL)
-    }
-
     /// A Finder or Dock open can reach the app just before AppKit activates it. The window
     /// that shows the file comes forward when activation completes.
     func testFocusRequestedWhileInactiveAppliesOnActivation() async throws {

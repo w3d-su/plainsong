@@ -360,6 +360,9 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 - With no attached workspace window, New File, Open, and Open Recent wait for a scene
   that has claimed the owner. A three-second attach timeout lets the next command retry;
   a tracked façade alone does not establish that a scene exists.
+- An open that needs a new window (WD7) expires after three seconds and is reported in the
+  window that asked. If that scene's window attaches later it closes while still empty, so
+  no blank window is left; a late File › New Window stays.
 - Tabs: native window tabs (`NSWindow.tabbingMode`) deferred; Phase 1 uses sidebar
   selection to switch the single editor pane (like Typora). Files selections defer out of
   the native List update, read and verify the file off the main actor, and commit only the

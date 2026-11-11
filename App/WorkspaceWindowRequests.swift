@@ -7,7 +7,9 @@ import Foundation
 /// SwiftUI creates the scene. The next workspace scene to appear takes the oldest waiting
 /// request in `WindowFacadeHolder.init`, and the request's action runs on that scene's façade
 /// once its window attaches. A request that no scene takes, or a scene whose window never
-/// attaches, expires, so a lost open can never run in an unrelated window later.
+/// attaches, expires, so a lost open can never run in an unrelated window later. A scene whose
+/// window attaches only after its open expired closes that window while it is still empty: the
+/// requesting window already reported the open, and no blank window is left behind (W8).
 @MainActor
 final class WorkspaceWindowRequests {
     static let shared = WorkspaceWindowRequests()
@@ -29,6 +31,12 @@ final class WorkspaceWindowRequests {
 
     private var waiting: [Request] = []
     private var claims: [ObjectIdentifier: Claim] = [:]
+    /// Scenes whose open expired before their window attached.
+    private var expiredOpens: [ObjectIdentifier: ExpiredOpen] = [:]
+
+    private struct ExpiredOpen {
+        weak var facade: AppState?
+    }
 
     private init() {}
 
@@ -73,6 +81,10 @@ final class WorkspaceWindowRequests {
     /// `facade`'s window attached: run the request it took, once.
     func noteAttached(_ facade: AppState) {
         let identifier = ObjectIdentifier(facade)
+        if let expired = expiredOpens.removeValue(forKey: identifier), expired.facade === facade {
+            closeLateWindow(of: facade)
+            return
+        }
         guard let claim = claims[identifier], claim.facade === facade else { return }
         claims[identifier] = nil
         claim.request.action?(facade)
@@ -86,6 +98,7 @@ final class WorkspaceWindowRequests {
         func resetForTesting() {
             waiting.removeAll()
             claims.removeAll()
+            expiredOpens.removeAll()
         }
 
         /// Runs the three-second expiry now for every request still waiting or claimed.
@@ -107,10 +120,26 @@ final class WorkspaceWindowRequests {
     private func expireNow(_ id: UUID) {
         // A claim whose scene went away before its window attached never ran either, so it
         // stays until its own expiry reports it.
-        let request = waiting.first { $0.id == id } ?? claims.values.first { $0.request.id == id }?.request
+        let claim = claims.values.first { $0.request.id == id }
+        let request = waiting.first { $0.id == id } ?? claim?.request
         waiting.removeAll { $0.id == id }
         claims = claims.filter { $0.value.request.id != id }
+        expiredOpens = expiredOpens.filter { $0.value.facade != nil }
+        // File › New Window has no action: its late window is still the window that was asked
+        // for. A late window for an open would be blank, so it closes when it attaches.
+        if let facade = claim?.facade, request?.action != nil {
+            expiredOpens[ObjectIdentifier(facade)] = ExpiredOpen(facade: facade)
+        }
         // The open never ran: say so where it was asked for, instead of leaving it silent.
         request?.onExpire?()
+    }
+
+    /// Deferred: `noteAttached` runs while SwiftUI reports the hosting window. The window
+    /// stays if something opened in it meanwhile.
+    private func closeLateWindow(of facade: AppState) {
+        Task { @MainActor [weak facade] in
+            guard let facade, facade.isEmptyWorkspaceWindow else { return }
+            KeyWindowRouter.shared.closeAttachedWindow(of: facade, skippingCloseChecks: true)
+        }
     }
 }
