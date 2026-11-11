@@ -66,7 +66,7 @@ projects such as Astro/Next.js content directories).
 | Persistence of prefs | `UserDefaults` + built-in and imported editor color themes; user CSS deferred | |
 | Project generation | **XcodeGen** (`project.yml` committed; `.xcodeproj` is generated, never hand-edited) | pbxproj diffs are hostile to LLM collaboration. |
 | Lint/format | SwiftFormat + SwiftLint (configs committed) | |
-| Updates | [Sparkle](https://github.com/sparkle-project/Sparkle) 2.10.0, App target only | Pinned to revision `eef1a539a373c1f1a320624b1130fc5de7b2e100` (tag 2.10.0). `PLAINSONG_UPDATES_ENABLED` defaults to NO, so the app does not create or start `SPUUpdater` and makes no update request. Packages must not import Sparkle. |
+| Updates | [Sparkle](https://github.com/sparkle-project/Sparkle) 2.10.0, App target only | Pinned to revision `eef1a539a373c1f1a320624b1130fc5de7b2e100` (tag 2.10.0). `PLAINSONG_UPDATES_ENABLED` defaults to NO, so a development or test build does not create or start `SPUUpdater` and makes no update request. `Scripts/release.sh` builds with YES; the feed URL, public EdDSA key and signed-feed keys are in every build's Info.plist. Packages must not import Sparkle. |
 | JS tooling | Node 20+, npm, esbuild, vitest (preview pipeline unit tests) | |
 
 **Dependency policy:** keep the dependency list short. Adding any new Swift package or npm
@@ -1011,6 +1011,17 @@ make format           # swiftformat . && swiftlint --fix
   conflicts; edit `project.yml`.**
 - Code signing: "Sign to Run Locally" for dev; hardened runtime + notarization scripted
   later (Phase 3, direct distribution first, App Store optional).
+- Update feed (`docs/auto-update-plan.md` §3.4): on a tag run `release.yml` passes the
+  `SPARKLE_ED_PRIVATE_KEY` secret, on standard input only, to `Scripts/make-appcast.sh`,
+  which adds the new DMG to the published `appcast.xml` and signs it. The feed is
+  attached to the draft release. The owner publishes the release and then runs the
+  **Publish appcast** workflow, which copies the feed to `gh-pages` and holds no key.
+  No workflow with a `pull_request` trigger may read that secret. Without it, or
+  without a `SUPublicEDKey` in the app, the tag job builds no feed, and fails if the
+  build has updates on. The script fails if the new download comes out unsigned (the
+  secret does not match the app's key). The publish check compares the newest build per
+  channel, so publish each release's feed before pushing the next tag. `make test-appcast` runs
+  the script's self-test with a throwaway key.
 - `Scripts/release.sh` re-signs Sparkle innermost first: `Installer.xpc`,
   `Downloader.xpc` (`--preserve-metadata=entitlements`), `Autoupdate`, `Updater.app`,
   and `Sparkle.framework`, then the app. Signing never uses `--deep`. The Developer ID

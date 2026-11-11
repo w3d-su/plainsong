@@ -44,7 +44,7 @@ Tiers used below:
 | Export acceptance | HTML/PDF/Print shipped (PR F #138, PR G #147). Open: E3 kitchen-sink output; E5 shared snapshot for PDF and Print; E6 fresh-panel URL and leaf-grant owner smoke; E7 PDF panel defaults, the real HTML panel, PDF failure/Print cancel feedback, and the keyboard/VoiceOver owner smoke; E9 keyboard-only HTML and PDF/Print accessibility, typing-path isolation while exporting, and the regression bullet | `docs/export-gates.md` §8 |
 | R17 sidebar stability | macOS 15 exact-head CI and owner macOS 27 F9/WS4A UI re-verification | `docs/risk-register.md` R17 |
 | Release §12 budgets | Re-run all budgets on the Release configuration at the 1.0 candidate commit; new `docs/perf/` entry | `agent.md` §12, release plan P5 |
-| In-app updates | The owner generates the EdDSA key pair; then U2 (appcast script, feed workflow, key and feed in the build, CI secret) and U3's end-to-end gates U-G4–U-G8 on unsigned builds | `docs/auto-update-plan.md` §4, §5 |
+| In-app updates | U2 and U2b are merged (#257, #258): the tag job signs the feed, release builds have updates on, and the key pair and CI secret exist. Open: U3's end-to-end gates U-G4–U-G8 on unsigned builds, starting with the first tagged release | `docs/auto-update-plan.md` §4, §5 |
 | Clean-machine install | The unsigned release DMG on a second Mac, through the documented Gatekeeper bypass: workspace, edit/save, offline preview | release plan P5 |
 | WYSIWYG promotion (V3) | Owner dogfood and actual-IME sign-off on a build of #213 (its ten-item checklist; IME and pointer are blocking), then fill #213's decision entry and the §D.4 evidence line and merge it | `docs/wysiwyg-release-checklist.md` §D.4, draft #213 |
 | Docs | README: refresh Known limitations and replace "no auto-update"; keep the bypass instructions while builds are unsigned; Traditional Chinese README in sync | `README.md` |
@@ -109,8 +109,8 @@ items need the owner with physical hardware.
 1. Owner runs the Zhuyin/Pinyin and pointer dogfood on #213 (V3 is decided: promote);
    #213 merges when it passes.
 2. Owner smoke for D2 (#246), then merge it. C, D1-0 and D1a–D1c are already merged.
-3. Owner generates the EdDSA key (U-D4, U-D6 and U-D7 are decided) → U2 → first `0.9.0`
-   beta with updates on → U3 against the real feed.
+3. First `0.9.0` beta with updates on (U2 and U2b are merged; the key and secret exist)
+   → U3 against the real feed.
 4. Close the export E-gates, R17 and the Release-configuration budget run in parallel;
    `0.9.x` betas as they land.
 5. Should items (F, then E after WD5, G after WD6's residency half) as time allows; cut

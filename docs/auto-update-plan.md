@@ -2,8 +2,8 @@
 
 > **Status: U1 adopted U-D1 and U-D3, 2026-10-29. V5 was decided on 2026-11-10: in-app
 > updates are Must for 1.0 (`docs/decisions/2026-11-10-release-1.0-scope.md`).**
-> U-D2 follows from V5 and V4 (unsigned DMG). The owner adopted U-D4, U-D6 and U-D7 as
-> U-D5 as proposed on 2026-11-10
+> U-D2 follows from V5 and V4 (unsigned DMG). The owner adopted U-D4, U-D5, U-D6 and
+> U-D7 as proposed on 2026-11-10
 > (`docs/decisions/2026-11-10-auto-update-feed-secret-and-signed-feed.md`). Adding Sparkle is a new Swift dependency, so the
 > implementing PR carries a `docs/decisions/` entry (agent.md §2, §17.7). Sparkle facts
 > below come from sparkle-project.org documentation (sandboxing, publishing, programmatic
@@ -99,16 +99,35 @@ quit, such as a save that cannot complete.
 ### 3.4 Release pipeline
 
 1. `make release` builds and signs the DMG as today, with the Sparkle re-sign step.
-2. A new `Scripts/make-appcast.sh` runs Sparkle's `generate_appcast` over a folder that
-   holds the new DMG plus the previous DMGs it should build deltas from. It signs the
-   archive and the feed with the EdDSA key from the secret. Release notes come from the
-   GitHub release body, rendered to HTML.
-3. The tag job keeps creating the **draft** GitHub Release. Publishing the feed is a
-   second, manually dispatched job (`publish-appcast`) that the owner runs after
-   publishing the release. Users therefore never receive a build the owner has not
-   released. The job commits `appcast.xml` (and any delta files) to `gh-pages`.
-4. Each feed item sets `sparkle:minimumSystemVersion` to `14.0.0` (agent.md §1).
-   Prereleases carry `<sparkle:channel>beta</sparkle:channel>`.
+2. `Scripts/make-appcast.sh` runs Sparkle's `generate_appcast` over a folder that holds
+   the published `appcast.xml` (fetched from `gh-pages`) and the new DMG. It signs the
+   DMG, and signs the feed when the app sets `SURequireSignedFeed`, with the EdDSA key
+   from the `SPARKLE_ED_PRIVATE_KEY` secret, passed on standard input. The script fails
+   unless the new item's download comes out signed: `generate_appcast` only warns, and
+   leaves the download unsigned, when the secret is not the private half of the app's
+   `SUPublicEDKey`. Earlier items stay
+   in the feed without their DMGs. Release notes are GitHub's generated notes for the
+   tag, embedded in the item as Markdown. Delta updates are not generated, because the
+   job has only the new DMG.
+3. The tag job keeps creating the **draft** GitHub Release and attaches the signed
+   `appcast.xml` to it. Publishing the feed is a second, manually dispatched workflow
+   (`publish-appcast`) that the owner runs after publishing the release. Users therefore
+   never receive a build the owner has not released. It holds no key: it checks that
+   the release is published, that the feed names that tag's download and only this
+   repository's releases, and that in each channel of the published feed its newest build
+   is at least the published one, then commits `appcast.xml` to `gh-pages`. A feed is
+   built from the feed that was published when its tag ran. Publish each release's feed
+   before pushing the next tag; a feed built earlier lacks that release, the check
+   refuses it, and re-running the tag's Release workflow rebuilds it.
+4. `generate_appcast` takes each item's `sparkle:minimumSystemVersion` from the app's
+   `LSMinimumSystemVersion` (14.0, agent.md §1). A tag with a hyphen (`v0.9.0-beta.1`)
+   carries `<sparkle:channel>beta</sparkle:channel>` (U-D5), so only users who turned on
+   Receive beta updates are offered it.
+5. While `SPARKLE_ED_PRIVATE_KEY` or the app's `SUPublicEDKey` is absent the tag job
+   builds no feed, and it fails if the build has updates on. It also fails when
+   `gh-pages` exists and cannot be read, so a feed is never built without the published
+   one. `Scripts/make-appcast.sh --self-test` runs on every release
+   run with a throwaway key (`make test-appcast` locally).
 
 ### 3.5 Keys
 
@@ -125,11 +144,11 @@ quit, such as a save that cannot complete.
 | PR | Scope | Owner needed? |
 |---|---|---|
 | U1 | Decision entry; Sparkle package; updater controller; menu item; Settings toggles; Info.plist keys and entitlements; release-script re-signing; unit and hosted tests (§5) | No. `SUFeedURL` and `SUPublicEDKey` are empty strings until U2. YES is covered with a fake client, not a live Sparkle check |
-| U2 | `make-appcast.sh`; `publish-appcast` workflow; `gh-pages` feed; README update | **Yes**: generate the keys and add the secret |
+| U2 | `make-appcast.sh`, the feed step in `release.yml`, and the `publish-appcast` workflow (#257). U2b: `SUFeedURL`, `SUPublicEDKey`, `SURequireSignedFeed` and `SUVerifyUpdateBeforeExtraction` in every build, and `PLAINSONG_UPDATES_ENABLED=YES` in release builds (#258). README update with U3 | Done on 2026-11-10: the owner generated the key pair and added the `SPARKLE_ED_PRIVATE_KEY` secret |
 | U3 | End-to-end update gate (§5 U-G4–U-G7) against a local test feed, then against the real feed with unsigned builds | **Yes**: the owner runs the clean-machine pass |
 
-U1 is merged. U-D4, U-D6 and U-D7 are decided, so U2 waits only for the owner to
-generate the key pair (§3.5). U3 follows U2.
+U1, U2 and U2b are merged (#232, #257, #258). U3 is next: it needs the first tagged
+release, which is the first build with updates on.
 
 ## 5. Gates
 
