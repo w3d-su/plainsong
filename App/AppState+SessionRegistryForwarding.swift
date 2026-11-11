@@ -121,6 +121,11 @@ extension AppState {
         _modify { yield &registry.detachedSessionURLs }
     }
 
+    var cleanDetachedSessionRecords: [ObjectIdentifier: CleanDetachedSessionRecord] {
+        get { registry.cleanDetachedSessionRecords }
+        _modify { yield &registry.cleanDetachedSessionRecords }
+    }
+
     var anchoredSessionFileBindings: [ObjectIdentifier: AnchoredWorkspaceSessionFileBinding] {
         get { registry.anchoredSessionFileBindings }
         _modify { yield &registry.anchoredSessionFileBindings }

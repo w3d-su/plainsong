@@ -42,8 +42,9 @@ final class WindowFacadeLifecycleAppTests: XCTestCase {
         autoreleasepool {
             let extra = WindowFacadeHolder(owner: owner)
             XCTAssertFalse(extra.facade === owner, "a scene opened while the owner shows is a sibling")
-            XCTAssertFalse(WindowOpenAdmission.admits(extra.facade.windowState))
-            XCTAssertTrue(KeyWindowRouter.shared.home(for: owner.registry) === owner, "a refused scene is never home")
+            XCTAssertTrue(WindowOpenAdmission.admits(extra.facade.windowState), "PR D2 admits every scene")
+            XCTAssertTrue(extra.facade.isEmptyWorkspaceWindow)
+            XCTAssertTrue(KeyWindowRouter.shared.home(for: owner.registry) === owner, "the owner stays home")
         }
 
         let blocked = try write("blocked.md", "blocked\n")
@@ -64,10 +65,11 @@ final class WindowFacadeLifecycleAppTests: XCTestCase {
         XCTAssertEqual(owner.registry.pendingExternalTexts[blocked], "changed on disk\n")
         XCTAssertFalse(window.isVisible)
         XCTAssertFalse(KeyWindowRouter.shared.facades(in: owner.registry).contains { $0 === owner })
-        XCTAssertTrue(
-            owner.registry.connectedWindows.contains { $0 === owner.windowState },
-            "the owner keeps its document for the next scene"
-        )
+        // PR D2: a closed window keeps no document, the app-owned one included. The session
+        // stays warm on the registry with its pending external text.
+        XCTAssertFalse(owner.registry.connectedWindows.contains { $0 === owner.windowState })
+        XCTAssertTrue(owner.isEmptyWorkspaceWindow)
+        let blockedSession = try XCTUnwrap(owner.registry.warmSession(at: blocked))
 
         // With no window open, a registry input still advances the shared Replace generation.
         XCTAssertTrue(KeyWindowRouter.shared.facades(in: owner.registry).isEmpty)
@@ -78,11 +80,18 @@ final class WindowFacadeLifecycleAppTests: XCTestCase {
 
         let reopened = WindowFacadeHolder(owner: owner)
         XCTAssertTrue(reopened.facade === owner, "Dock reopen or a Finder open gets the owner back")
-        XCTAssertEqual(owner.externalChangePrompt?.fileURL, blocked)
+        XCTAssertTrue(owner.registry.connectedWindows.contains { $0 === owner.windowState })
+        XCTAssertTrue(owner.isEmptyWorkspaceWindow, "it reopens as an empty window")
+        XCTAssertNil(owner.externalChangePrompt)
         XCTAssertTrue(KeyWindowRouter.shared.isHome(owner))
         KeyWindowRouter.shared.testingUsesKeyWindowOverride = true
         KeyWindowRouter.shared.testingKeyWindow = nil
         XCTAssertTrue(KeyWindowRouter.shared.menuTarget(defaultFacade: nil) === owner)
+        // Showing the file again adopts the warm session, and its prompt comes back.
+        try owner.open(url: blocked, rememberAsLastOpened: false, preserveWorkspace: true)
+        XCTAssertTrue(owner.shownSession === blockedSession)
+        XCTAssertEqual(owner.externalChangePrompt?.fileURL, blocked)
+        owner.registry.pendingExternalTexts[blocked] = nil
         let file = try write("A.md", "# A\n")
         try owner.open(url: file, rememberAsLastOpened: false, preserveWorkspace: true)
         XCTAssertEqual(owner.shownSession.fileURL?.lastPathComponent, "A.md")

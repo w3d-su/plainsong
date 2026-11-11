@@ -7,8 +7,9 @@ import WorkspaceKit
 /// File › Open…, Save, launch restoration, and error presentation.
 extension AppState {
     func restoreLastOpenedFileIfNeeded() {
-        // A refused extra scene must not consume the one app-global restore attempt.
-        guard WindowOpenAdmission.admits(windowState) else { return }
+        // A refused extra scene must not consume the one app-global restore attempt, and a
+        // window opened after launch (New Window, a WD7 open) never restores (§6.1).
+        guard WindowOpenAdmission.admits(windowState), KeyWindowRouter.shared.isHome(self) else { return }
         guard !didAttemptRestore else { return }
         didAttemptRestore = true
 
@@ -59,20 +60,18 @@ extension AppState {
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
-        openExternalFile(url)
+        routeOpen(url)
     }
 
+    /// Finder Open With, a Dock drop, `open -a`, and `onOpenURL` (§5.2): the frontmost
+    /// workspace window by AppKit z-order receives the request, even before activation.
     func openExternalFile(_ url: URL) {
         let target = KeyWindowRouter.shared.facadeForExternalOpen(fallback: self)
         guard target === self else {
             target.openExternalFile(url)
             return
         }
-        do {
-            try open(url: url, rememberAsLastOpened: true, preserveWorkspace: false)
-        } catch {
-            present(error, title: "Could Not Open File")
-        }
+        routeOpen(url)
     }
 
     func save() {
@@ -88,6 +87,11 @@ extension AppState {
     }
 
     func present(_ error: Error, title: String) {
+        if let shown = error as? DocumentShownInAnotherWindow {
+            // WD1: an open that names a file another window shows focuses that window.
+            focusWindowShowingDocument(shown)
+            return
+        }
         presentedError = UserVisibleError(
             title: title,
             message: userVisibleDescription(for: error),

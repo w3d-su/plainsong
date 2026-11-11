@@ -13,6 +13,9 @@ extension AppState {
         let generation = advanceWorkspaceGeneration()
         let scanner = directoryScanner
         let pruning = workspaceScanPruning(root: selectedRoot)
+        // The watcher drops batches inside the subtrees this scan skips (M10), so it must
+        // learn each new pruning, including the chains kept for open documents.
+        workspaceWatcher?.setEventPathFilter(WorkspaceEventPathFilter(rootURL: selectedRoot, pruning: pruning))
         workspaceReloadTask?.cancel()
 
         let context = workspaceRootContext
@@ -144,6 +147,16 @@ extension AppState {
             }
         }
         return .ignoredDirectories(retaining: retained)
+    }
+
+    /// Gives the watcher the current pruning, so a document just opened inside an ignored
+    /// directory keeps receiving its external changes before the next rescan.
+    func refreshWorkspaceWatcherEventFilter() {
+        guard let workspaceRootURL, let workspaceWatcher else { return }
+        workspaceWatcher.setEventPathFilter(WorkspaceEventPathFilter(
+            rootURL: workspaceRootURL,
+            pruning: workspaceScanPruning(root: workspaceRootURL)
+        ))
     }
 
     /// `url`'s standardized and symlink-resolved paths.

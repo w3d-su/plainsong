@@ -62,9 +62,14 @@ from that descriptor before and after reading. Before returning bytes, the reade
 3. that same retained chain again; and
 4. byte count and metadata stability for that descriptor.
 
-`namespaceChanged` is fail-closed and is not retried. Content instability may be retried
-within the bounded coherent reader. Cancellation is returned as `cancelled`. No successful
-outcome may contain bytes from a descriptor detached from the captured namespace.
+`namespaceChanged` is fail-closed and the reader does not retry it. Content instability may be
+retried within the bounded coherent reader. Cancellation is returned as `cancelled`. No
+successful outcome may contain bytes from a descriptor detached from the captured namespace.
+App's watcher-driven inspection of an open document may start new reads of the same retained
+location after `namespaceChanged`, `unstable` or `unreadable` (0.2 s, 0.5 s and 1 s later) before
+it detaches the session. Each attempt is a separate fail-closed read, and autosave stays fenced
+while a retry is pending
+(`docs/decisions/2026-11-06-transient-reads-and-clean-detached-documents.md`).
 
 Production workspace search first canonicalizes an initially present, in-root alias under its
 existing physical-target policy through the request's one captured authority, then builds the
@@ -139,11 +144,23 @@ temporary file's create, truncate, write, `fsync` or `fchmod`, or of a commit re
 for `EROFS`, and `writeNotPermitted` for `EPERM` or `EACCES`. Other codes keep `unreadable`, or
 `durabilityFailed` for `fsync`.
 
-All writes first create a same-directory, exclusive `.plainsong-write-*.tmp` file as `0600`
-through an `O_RDWR` descriptor. Preparation explicitly truncates to zero, writes the requested
-byte count, `fsync`s, verifies descriptor size plus SHA-256 against the requested `Data`, applies
-the existing destination's `rwx` permission bits (`st_mode & 0777`; setuid, setgid, and sticky
-bits are never carried over) when replacing, `fsync`s again, and repeats exact verification.
+All writes first create a same-directory, exclusive `.plainsong-write-*.tmp` file through an
+`O_RDWR` descriptor: `0600` when it will replace an existing destination, and `0666` with the
+process umask applied when the destination is missing (Save As, Save Copy to a new name), so
+a new document gets the same mode any other app would give it. Preparation explicitly truncates
+to zero, writes the requested byte count, `fsync`s, verifies descriptor size plus SHA-256 against
+the requested `Data`, applies the existing destination's `rwx` permission bits (`st_mode & 0777`;
+setuid, setgid, and sticky bits are never carried over) when replacing, copies the replaced
+file's own metadata (below), `fsync`s again, and repeats exact verification.
+
+Publication replaces the destination's inode, so a replacing write carries the original's
+extended attributes (Finder tags and colors, `kMDItemWhereFroms`, quarantine), its extended ACL
+and its creation date onto the prepared file before the swap. The copy is best effort and never
+fails the write: the sandbox or the volume may refuse an attribute, and the system-owned
+`com.apple.macl`, `com.apple.provenance`, `com.apple.decmpfs` and `com.apple.system.*` attributes
+are never copied. Hard links cannot survive any rename-based publication: other names keep the
+displaced inode and its old bytes.
+
 The expected byte count and digest stay in `PreparedWrite`; descriptor content and the temporary
 name's identity are revalidated after preparation, immediately before rename, after rename,
 and at the final durable postflight. Empty writes therefore commit as exact zero-byte files, and

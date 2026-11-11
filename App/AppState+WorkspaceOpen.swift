@@ -75,6 +75,12 @@ extension AppState {
         // never adopted from this capture before external-change arbitration.
         let location = try WorkspaceFileSystemLocation(fileURL: requestedURL)
         let key = location.fileURL
+        try refuseIfShownInAnotherWindow(
+            location: location,
+            fileURL: key,
+            identity: nil,
+            session: registry.warmSession(at: key)
+        )
         // URL-keyed prompt/detachment state is only safe while it belongs to the same retained
         // authority. Do not let a replacement parent B install at A's lexical spelling and
         // inherit, clear, or overwrite a still-stateful retired/current A session.
@@ -173,6 +179,7 @@ extension AppState {
         transferEditorWriterForAdoption(of: session)
         shownSession = session
         releaseUnreferencedSessionOwnership(for: previousSession)
+        refreshWorkspaceWatcherEventFilter()
         clearPromptsNotMatchingCurrentDocument()
         restoreRecoveryPrompt(for: session)
         if indeterminateSessionWrites[ObjectIdentifier(session)] != nil {

@@ -6,18 +6,18 @@
 > documents stay outside the global LRU capacity of 8 and cannot be evicted.
 > D1b scopes last-root release to that root's eligible sessions (W3 bullet 7 and
 > W6 bullets 4–6). D1c shares one canonical root context (W6 bullets 1–3, 7, 8a,
-> and 9) and transfers writer ownership across windows (W4 bullets 3–4). W6 bullet
-> 8b stays with D2.
+> and 9) and transfers writer ownership across windows (W4 bullets 3–4).
+> D2 implements WD1 focus, File › New Window, the §5.2 Open rule (WD7, W6 bullet 8b), and
+> the §6.2 close lifecycle (WD8), and admits every scene. Its W0 owner smoke on the guarded
+> build is still to be recorded before it merges.
 > Each workspace window has its own `AppState` façade over a `WindowState` and a
 > `WorkspaceRootContext`. Those façades share one `AppDocumentRegistry`. `KeyWindowRouter`
-> resolves the key façade. Creation stays guarded until D2, and native tabbing stays off
-> until F. A scene gets the app-owned façade whenever no open scene shows it, so closing the
-> only window and reopening it keeps working. Checked: all W1 bullets, W2 bullet 5, W3
-> bullets 1–8, W4 bullets 3–4, W6 bullets 1–7, 8a, and 9, all W5 bullets, and W11
-> bullet 3. W2 bullets 1–3 have a production-path hosted test but stay open until D2 tests
-> two mounted `WorkspaceWindow`s.
-> W0's hosted probes are recorded; its owner-smoke boxes stay open for D2. D2 is
-> not done. WD5 and
+> resolves the key façade. Native tabbing stays off until F. A scene gets the app-owned
+> façade whenever no open scene shows it; every other scene gets its own admitted façade.
+> Checked: all W1 bullets, all W2 bullets but 4, all W3 bullets, all W4 bullets, all W5
+> bullets, all W6 bullets, W7 bullets 1, 2, 4, and 5, W8 bullet 2, and W11 bullet 3.
+> W0's hosted probes are recorded; its owner-smoke boxes, W7 bullet 3, and W8 bullet 1's
+> Finder and Dock smoke stay open for the owner. WD5 and
 > WD6's residency and budget half stay open. §12.2 assigns later `agent.md`
 > edits; §9 assigns owner-decision deadlines. Check gates only with named-test or
 > owner-recorded evidence in the implementation commit.
@@ -201,7 +201,7 @@ is added to `AppState` itself.
 | `autosaveTask`, `statisticsTask`, `sessionAutosaveTasks`, `sessionStatisticsTasks` | File | The foreground split assumes one current document (`App/AppState+Autosave.swift:23-62`). Merge into per-session tasks. |
 | `editorDocumentBindingIDs`, `editorDocumentBindingSessions`, `editorBindingInstallations`, `editorWriterInstallations`, `pendingEditorSourceInstallations`, `editorDocumentSourceSynchronizers`, `editorDocumentSourceFullComparisonCounts` | File | WS3B one-writer authority must see every installation in every window. |
 | `retiredEditorDocumentSessions`, `sessionLifecycleGenerations` | File | Retirement outlives windows. |
-| `deferredExternalChangeResolutions`, `externalResolutionIntentCaptures`, `externalReloadTasks`, `externalDiskInspectionTasks`, `pendingExternalReloadApplications`, `nextExternalReloadGeneration`, `externalDiskEventGenerations`, `lastKnownDiskHashes`, `lastKnownDiskModificationDates`, `pendingExternalTexts`, `pendingExternalFileVersions`, `detachedSessionURLs` | File | One disk truth per file. |
+| `deferredExternalChangeResolutions`, `externalResolutionIntentCaptures`, `externalReloadTasks`, `externalDiskInspectionTasks`, `pendingExternalReloadApplications`, `nextExternalReloadGeneration`, `externalDiskEventGenerations`, `lastKnownDiskHashes`, `lastKnownDiskModificationDates`, `pendingExternalTexts`, `pendingExternalFileVersions`, `detachedSessionURLs` (and, added after B1, `cleanDetachedSessionRecords`) | File | One disk truth per file. |
 | `anchoredSessionFileBindings`, `unanchoredManagedSessionOwnershipProofs`, `editorImageAssetDocumentAuthorities`, `indeterminateSessionWrites`, `indeterminateSessionWriteContexts` | File | Authority and quarantine belong to the file. |
 | `sessionCache`, `sessionPolicy` | App-global | One warm set and one LRU (WD6). |
 | `workspaceMutationWriteFences`, `workspaceMutationNamespaceDepth` | App-global | One namespace transaction app-wide in v1; the registry holds its affected-session fences and root identity. It fences relocation records, not every session under a root (`App/AppState+WorkspaceMutationPlanning.swift:190-206`). |
@@ -216,6 +216,7 @@ is added to `AppState` itself.
 | `workspaceSidebarHiddenWindows` | Window | Whether this window's split-view sidebar is hidden, so ⇧⌘F opens Search there (#216). B1 keeps the `NSWindow`-keyed table in the one `WindowState`; C reduces it to this window's flag. |
 | `registeredWindows` (B2) | App-global | Each connected `WindowState`, weakly. Every registry inventory includes each window's `shownSession` (§3.4 I2). `AppState.connect(_:)` adds a window after wiring its hooks. |
 | `menuEnablementDidChange` (C) | App-global | Save enablement only. Fences, quarantine, and the synchronous `isSaving` guard stay unpublished so they do not wake every window; this subject tells `MenuBarState` to re-read `canSave`. |
+| `saveAsPanelSessions` (Save As) | App-global | Sessions whose File › Save As panel is open. `canAutosave` refuses them in every window, so the focus-loss flush the panel triggers cannot write unsaved text over the original. Held only while the app-modal panel runs. |
 | `exportHTMLStatus`, `exportHTMLOperations` | Window | The Export as HTML…/Print banner and operation bookkeeping belong to the origin window, which fences publication when it closes. C decides whether `exportHTMLOperations.lastPrintInfo` (paper settings) stays per window. |
 
 Recovery-banner placement (`App/AppState+WorkspaceMutationRecoveryLoadFailure.swift:5-13`)
@@ -450,6 +451,12 @@ In order (closing a tab is closing a window):
    (`Packages/PreviewKit/Sources/PreviewKit/PreviewController.swift:249-271`).
 6. **Remove** its restoration record on user close only (E, after WD5; §6.4). D2
    implements steps 1–5; E adds this record-removal step.
+
+D2 refuses, rather than defers, every transient state in step 1, so no timer can close a
+window the user went back to. Steps 1, 2, and 4 run in `windowShouldClose` after the wrapped
+SwiftUI delegate agrees; steps 3 and 5 run in `willClose`. Every closed window keeps no
+document, the app-owned one included, so its next scene is empty
+(`docs/decisions/2026-11-06-windows-d2-close-lifecycle.md`).
 
 Failed or fenced eviction candidates remain protected for the pass; an over-limit cache
 is allowed (`App/AppState+WorkspaceSessions.swift:362-381`). New File creates a file first
@@ -714,6 +721,8 @@ C's fallback. W8 then verifies D2's routing to an existing or new window under W
   - Closing the only window and reopening it (Dock, Finder, `open -a`) gives the new scene the app-owned façade again, which keeps its document as the one `AppState` did before C: `WindowFacadeLifecycleAppTests/testClosingTheOwnersWindowLetsTheNextSceneReuseTheOwner`. A closed sibling leaves every registry inventory, the admission table, and the router: `testClosingASiblingWindowReleasesItEverywhere`.
   - Review follow-up: with no attached workspace window, File › New File, Open, and Open Recent call `openWindow(id:)` for the workspace group and run when the owner attaches (`testFileCommandWithNoWindowReopensTheOwnerAndRunsThere`). Only the latest file command runs; a Quit refusal stays beside it (`testQuitRefusalStaysQueuedBesideTheLatestFileCommand`). An open that never attaches is dropped, and the next command opens again (`testSilentSceneOpenExpiresSoTheNextCommandOpensAgain`, `testExpiredReopenDropsAStaleQuitRefusal`). A command that was waiting when launch produced no scene opens one (`testLaunchWithoutASceneOpensForACommandThatWasWaiting`). One workspace window still receives those commands when Settings is key, and comes forward (`testSingleWorkspaceWindowFileCommandComesForwardWhenSettingsIsKey`). A Quit refusal does the same (`testQuitRefusalWithNoWindowReopensTheOwnerBeforeShowingTheError`). `home` does not return a refused scene, and that scene closes with `close()` so a vetoing delegate cannot keep it (`testRefusedSceneClosesWithoutAskingAVetoingDelegate`). Dock, Finder, and `open -a` remain owner smoke. See `docs/decisions/2026-10-29-windows-no-window-file-commands.md`.
   - Owner smoke also checks New File, Open, and Open Recent after closing the only workspace window, and a refused Quit in that state. `testFileCommandBeforeTheFirstSceneWaitsForItsWindow`, `testFileCommandWithSeveralWindowsAndNoKeyWindowDoesNotGuess`, and `testQuitRefusalForAClosedSessionUsesAnAttachedHome` cover the launch queue, ambiguous routing, and an attached error target without claiming those native SwiftUI paths are smoke-tested.
+  - D2, hosted: `WindowMenuCommandsAppTests/testRecordMenuShortcuts` reads the test host's real menu bar and records every key equivalent; no shortcut is shared, and ⌘T is unused, which F needs. `testFileMenuHasNewFileAndNewWindowAndNoItemSharesNewWindowsShortcut` pins ⌘N New File, ⇧⌘N New Window with no other holder, and ⌘W Close. Replacing the save group had removed the system Close item; D2 restores it. These do not replace bullet 1's owner smoke on a shipped build, which still covers the tab-bar "+", Show Tab Bar, Merge All Windows, Finder Open With, a Dock drop, and `onOpenURL` scenes.
+  - D2: the owner smoke for bullets 1–4 runs on a guarded build (C's fallback still in place, so `main` or the D1c head) and is recorded in D2 before it merges. D2 removes the fallback in its own commit, so its PR stays a draft until that record lands.
   - Claimed-scene follow-up: `WindowFacadeReopenQueueAppTests/testLaunchWaitsForTheClaimedOwnersWindowToAttach` and `testFileCommandDuringDockReopenWaitsForTheClaimedOwner` hold attachment until after launch completion or a File command and verify that no extra scene is requested. `testClaimedOwnerCanRetryAfterItsAttachWaitExpires` covers the bounded wait, retry, and reset after attachment. `testExpiredClaimReopensOntoTheOwnerAndIgnoresTheOldScene` and `testLateRetiredSceneCannotReplaceTheAttachedOwner` release an unattached claim on expiry and reject the retired scene's window in either order. These are controlled lifecycle tests; native Dock/Finder owner smoke stays open. See `docs/decisions/2026-10-29-windows-claimed-scene-attach-wait.md`.
 
 ### W1 — Behavior-neutral partition (B1/B2)
@@ -747,13 +756,18 @@ C's fallback. W8 then verifies D2's routing to an existing or new window under W
 
 ### W2 — Two windows never mirror each other's document
 
-- [ ] Two production `WorkspaceWindow`s with separate `WindowState`s open `A.md` and `B.md`. Editor text, selection, editor/preview scroll, preview render, title, file header, Find visibility/query, search mode/results, banners, and layout are independent. Switching the document in window 1 leaves window 2 untouched. *Named hosted test (D2).*
-- [ ] The same holds for two different roots. *Named hosted test (D2).*
-- [ ] An external change to `A.md` shows its banner only in the window showing `A.md`. *Named hosted test (D2).*
+- [x] Two production `WorkspaceWindow`s with separate `WindowState`s open `A.md` and `B.md`. Editor text, selection, editor/preview scroll, preview render, title, file header, Find visibility/query, search mode/results, banners, and layout are independent. Switching the document in window 1 leaves window 2 untouched. *Named hosted test (D2).*
+- [x] The same holds for two different roots. *Named hosted test (D2).*
+- [x] An external change to `A.md` shows its banner only in the window showing `A.md`. *Named hosted test (D2).*
 - [ ] The first bullet passes out of process (PR G). *Named XCUITest.*
 - [x] I2 after C: `git grep -n -w currentDocument -- App Packages` has no hit outside `WindowState` (the bundled Mermaid build excepted). Every window-scoped read that B2 classified now goes through its operation's `WindowState`. *Source audit + PR classification.*
 - Evidence (C), partial: `WindowFacadeRoutingAppTests/testTwoWindowsKeepIndependentDocumentsRootsAndExternalBanners` opens two temporary roots with `openWorkspace` on two admitted façades and activates `A.md` and `B.md` with `openWorkspaceFile`. Each façade has its own `WorkspaceRootContext`, security scope, and root authority, and each session's retained location is anchored in its own root. A dirty `A.md` is rewritten on disk, window 1's own FSEvents watcher delivers it, and only window 1 shows the prompt and loses Save. Layout, Find bar and query, and search query stay separate. Bullets 1–3 stay open: `WorkspaceWindow` is not mounted (SceneStorage needs the SwiftUI app lifecycle), so selection, editor and preview scroll, preview render, title, and file header are not observed, and the same file in two windows is WD1.
   - Bullet 5: `git grep -n -w currentDocument -- 'App/*.swift' 'Packages/*.swift'` at this head hits only `App/WindowState.swift` (the stored property and its `shownSession` projection). No `AppState` forwarder or view still says `currentDocument`.
+- Evidence (D2), `AppTests/WindowMountedIndependenceHostedTests.swift` (`EditorFindHostedGateTests`), each mounting two production `WorkspaceWindow`s on two façades in real windows:
+  - Bullet 1: `testTwoMountedWindowsOnOneRootKeepIndependentDocumentsAndChrome` shares one root context. It checks editor text, a selection and editor scroll applied in window 1 only, each preview rendering its own document, a preview scroll in window 1 only, window titles and proxy URLs, the jump bar's file header read through accessibility scoped to each window, the Find bar and query, Search mode and results, banners, and layout. Opening C.md in window 1 leaves window 2's text, selection, visible range, proxy URL, and preview unchanged.
+  - Bullet 2: `testTwoMountedWindowsOnTwoRootsKeepIndependentDocumentsAndChrome` repeats the checks on two root contexts.
+  - Bullet 3: `testAnExternalChangeShowsItsBannerOnlyInTheWindowShowingTheFile` rewrites a dirty A.md through the real watcher; Reload appears only in window 1's accessibility tree, and window 2 keeps Save.
+  - `AccessibilityQuery.find(identifier:label:onlyIn:)` resolves the accessibility window at the window's frame, because both windows share every identifier.
 
 ### W3 — Ownership refusals are cross-window
 
@@ -775,7 +789,7 @@ C's fallback. W8 then verifies D2's routing to an existing or new window under W
     - Bullet 5: `WindowStateRegistryAppTests/testTerminationRefusesForASecondWindowsUnsavableSession` refuses termination, leaves the error on window 2's `WindowState`, and records that window as `KeyWindowRouter.focusedWindowState`. `WindowFacadeRoutingAppTests/testRecoveryBannerAndUnseenFailureStayOnTheHomeWindow` presents an unseen session's error on the home façade.
     - Bullet 6: the same test keeps `workspaceMutationRecoveryBannerPlacement` at `.global` on the home façade and `.hidden` on the sibling while the load-failure flag is set. `testClosingAFacadeRetargetsItsNotice` moves a write notice to the surviving façade after the owner façade closes. Unseen autosave failures use `present(_:title:for:)`, which is the path the recovery test calls.
     - Bullet 7: D1b evidence below. B2's `testClosingTheWorkspaceKeepsStateForASecondWindowsSession` kept proofs, pending external text, and the detached URL. The last-root preflight still refuses R1's own quarantined write, even when another window shows it. R2 quarantine does not block R1.
-  - D2 must decide one consequence. The Save Copy walk fails closed on a candidate with no ownership record, so an untitled, record-less document in another window refuses every Save Copy and export (`testAnUntitledRecordlessDocumentInASecondWindowFailsSaveCopyClosed`).
+  - D2 decided the untitled consequence: an empty window's untouched document (`isPristineEmptyDocument`: no file, no text, never edited, no App state) owns nothing, so `workspaceSaveCopyOwnershipCandidates()` skips it, and with it the Save Copy walk, the export writer, and the export gate. Any other file-less document still fails closed (`testAnUntitledRecordlessDocumentInASecondWindowFailsSaveCopyClosed`). `WindowEmptyDocumentOwnershipAppTests` covers an empty sibling, the owner's launch blank, a sibling that goes away without closing, and four fail-closed controls (text, an undone edit, an unavailable proof that names a file, a binding).
 - Evidence (D1b), `WindowRootReleaseAppTests`:
   - Bullet 7, one named test per item: `testClosingR1KeepsPendingExternalStateForASecondWindowsSession`, `testClosingR1KeepsAnchoredBindingForASecondWindowsSession`, `testClosingR1KeepsOwnershipProofForASecondWindowsSession`, `testClosingR1KeepsDetachedURLForASecondWindowsSession`, `testClosingR1RefusesCloseAndKeepsOwnRootQuarantineForASecondWindow`, `testClosingR1KeepsEditorBindingRegistrationForASecondWindowsSession`, `testClosingR1KeepsBackgroundTasksForASecondWindowsSession`, and `testClosingR1KeepsWarmCacheEntryForASecondWindowsSession`. `testClosingR1KeepsASessionAnotherWindowInstalls` keeps a session another window still installs after that window stops showing it. `WindowStateRegistryAppTests/testClosingTheWorkspaceKeepsStateForASecondWindowsSession` still keeps proofs, pending external text, and the detached URL.
 
@@ -787,11 +801,16 @@ C's fallback. W8 then verifies D2's routing to an existing or new window under W
 
 ### W4 — One writer per file across windows
 
-- [ ] Every §5.2 entry point that targets a file current in another window focuses that window and creates no second installation. *Named hosted tests, one per entry point.*
-- [ ] Hard links and case or NFC/NFD aliases count as the same file. *Named hosted test.*
+- [x] Every §5.2 entry point that targets a file current in another window focuses that window and creates no second installation. *Named hosted tests, one per entry point.*
+- [x] Hard links and case or NFC/NFD aliases count as the same file. *Named hosted test.*
 - [x] Every session has ≤ 1 writer always and ≤ 1 live installation after SwiftUI teardown settles. Adoption revokes the old writer synchronously; late teardown cannot revoke the new writer. *Debug assertions + named hosted test with delayed teardown (D1c).* Drive the delayed writer-release and revoked-installation events through the editor-binding installation-release path on admitted façade fixtures; a mounted `WorkspaceWindow` is not required.
 - [x] A warm session adopted by window 2 after window 1 switched away transfers the writer; window 1's stale installation cannot publish. *Named hosted test.*
 - Evidence (D1c): `assertSingleCrossWindowEditorInstallation` checks, at installation and writer activation, that non-superseded installations of one session do not span two windows. Same-window delayed teardown can still hold two installations until revoke. `WindowWriterAdoptionAppTests/testWarmAdoptionRevokesTheOldWriterBeforeTheNewInstallationExists` refuses stale publication and activation immediately at adoption. `testDelayedWriterReleaseAndInstallationRevocationCannotRevokeTheAdoptedWriter` drives late release and revoke through production binding lifecycle, verifies the new writer remains authorized, and leaves one live installation. `testLeavingTheAdoptingWindowRestoresTheWriterStillShown` drives the adopter's release followed by revoke, then publishes from the earlier window. `testStaleAdopterKeepsTheEarlierWindowSupersededUntilItsSynchronizedRetry` covers writer synchronization while both windows show the session. These are admitted facade fixtures; WD1 entry-point routing and mounted production windows remain D2. Typing evidence is recorded in `docs/perf/2026-10-30-windows-d1c-typing-ab.md`.
+- Evidence (D2), `WindowSameFileFocusAppTests` (window 1 shows the file; each test drives window 2's entry point and asserts window 1 is `focusedWindowState`, window 2 keeps its document, shows no error, and installs no editor for the file):
+  - Bullet 1: `testFilesSidebarClickFocusesTheWindowShowingTheFile` (through `FilesSelectionDeferral`, which drops the pick), `testJumpBarSelectionFocusesTheWindowShowingTheFile`, `testPreviewWorkspaceLinkFocusesTheWindowShowingTheFile`, `testWorkspaceSearchResultFocusesTheWindowShowingTheFile`, `testFinderOrDockOpenFocusesTheWindowShowingTheFile` (`openExternalFile`), `testOpenRecentFocusesTheWindowShowingTheFile`, `testDirectOpenRefusesBeforeClosingThisWindowsWorkspace` (launch restore and every `open(url:)` caller), and, in `WindowRecoveryCopyFocusAppTests` through `performWorkspaceMutationRecoverySecondaryAction`, `testRecoveryShowEditorCopyFocusesTheWindowShowingTheCopy`, `testRecoveryKeepEditorCopyFocusesTheWindowShowingTheCopy`, and `testTrashRecoveryShowEditorCopyFocusesTheWindowShowingTheCopy`. Paths that are not a user request keep the copy in its window and move no focus: `testRecoveryPromotionLeavesACopyShownInAnotherWindow`, `testTrashCompletionLeavesADetachedCopyShownInAnotherWindow`, and `testAReloadDoesNotSelectAFileShownInAnotherWindow`. `WindowOpenRoutingAppTests/testNewFileOverAFileAnotherWindowShowsFocusesItAndWritesNothing` covers New File's save panel. ⌘N in a root creates a new file, and New Window opens an empty window, so neither can name a shown file.
+  - Bullet 2: `testAHardLinkInTheSameRootFocusesTheWindowShowingTheOriginal` and `testStandaloneHardLinkCaseAndNormalizationAliasesFocusTheWindowShowingTheFile` (a hard link, the NFD spelling of an NFC name, and a case alias on a case-insensitive volume).
+  - Controls: `testAWarmSessionWindowOneLeftIsAdoptedInsteadOfFocused` keeps D1c adoption, `testAWindowThatCannotComeForwardMakesTheOpenRefuse` refuses when window 1 is closing, and `testFocusRequestedWhileInactiveAppliesOnActivation` brings window 1 forward when the app activates after the request.
+  - The mounted bullet-1 tests above show one live installation per window.
 
 ### PR C scheduling re-verification (R22)
 
@@ -827,9 +846,9 @@ scheduling root cause remains unknown. This is an additional gate, not closure b
 - [x] R2 fenced/quarantined/conflicted state does not block an otherwise-safe R1 release and is unchanged by it. Global transaction/store-load fences remain enforced. *Named hosted tests.*
 - [x] An R2 watcher event during R1 mutation stays queued and refreshes R2 after drain; every deferred root is serviced. *Named hosted test.*
 - [x] **8a.** Overlapping roots and a root containing an installed standalone file refuse before installation. *Named hosted tests (D1c).*
-- [ ] **8b.** A single file inside an open root routes per §4.3 (WD1, then WD7). *Named hosted tests (D2).*
+- [x] **8b.** A single file inside an open root routes per §4.3 (WD1, then WD7). *Named hosted tests (D2).*
 - [x] **9.** A second namespace transaction, from any window or root, is refused while one runs. *Named hosted test.*
-- Evidence (D1b), `WindowRootReleaseAppTests`. D1c evidence follows; bullet 8b stays open for D2.
+- Evidence (D1b), `WindowRootReleaseAppTests`. D1c and D2 evidence follow.
   - Bullet 4: `testLastR1ReleasePreservesOtherRootAndStandaloneSessionsAndLRURecency` drops only the closing root's warm session. The other root's warm session, a standalone session, its background task, its pending external text, the standalone detached URL, and LRU recency all survive. There is no global LRU reset.
   - Bullet 5: `testLastR1ReleaseKeepsAnotherWindowsEditorBindingRegistration`, `testLastR1ReleaseKeepsAnotherWindowsBackgroundTasks`, `testLastR1ReleaseKeepsAnotherWindowsWarmCacheEntry`, and `testLastR1ReleaseKeepsASessionShownFromAnotherRoot`.
   - Bullet 6: `testOtherRootFencedQuarantinedAndConflictedStateDoesNotBlockR1Release` leaves the other root's fence, quarantine, conflict text, and warm session in place. `testGlobalTransactionAndStoreLoadFencesStillBlockR1Release` still refuses the close.
@@ -843,23 +862,33 @@ scheduling root cause remains unknown. This is an additional gate, not closure b
   - Bullet 8a: `WindowSharedRootAdmissionAppTests` covers ancestor, descendant, filesystem `/`, shown standalone, delayed standalone, and `testDelayedStandaloneInstallationStillRefusesAfterItsWindowOpensAnotherRoot`. Refusal happens before scope or root installation and offers Show. `/tmp/plainsong-d1c-evidence/related-1.xcresult` then ran the window, workspace and session regression: 651 tests, 1 skipped, 0 failures. After rebasing onto `e7eaa94e`, `/tmp/plainsong-d1c-evidence/rebase-related-1.xcresult` at `cff0cafc` repeated those classes: 652 tests, 1 skipped, 0 failures.
   - Bullet 9: `WindowSharedRootMutationAppTests/testNamespaceTransactionIsGlobalWhileImagePlacementCountStaysPerRoot` pins the app-wide namespace fence and per-root image count.
   - `WindowSharedRootAppTests/testBodyEditsDoNotFanOutPublishesOrScansToTheOtherWindow` performs 200 body edits with zero peer facade publishes or scans. Debug typing A/B is recorded in `docs/perf/2026-10-30-windows-d1c-typing-ab.md`; four-window W12 and Release/residency acceptance remain G.
+  - Bullet 8b (D2), `WindowOpenRoutingAppTests`: `testAFileInsideAnOpenRootThatAWindowShowsFocusesThatWindow` (WD1 first), `testAFileInsideAnOpenRootReusesAnEmptyFrontmostWindow` and `testAFileInsideAnOpenRootOpensAsThatRootsDocumentInANewWindow` (WD7). The chosen window attaches to the shared root context and shows the file anchored in that root.
   - Limits: `make lint` reported 0 serious violations and `make test-preview` passed 229 tests. The full hosted run `/tmp/plainsong-d1c-evidence/full-hosted-1.xcresult` was interrupted after native UI timeouts while the screen was locked; it is not a complete suite result. The same AX filename failure reproduces on `main`, while fresh-host WKWebView and Save Panel cases passed on both trees (`main-ui-counterprobe-1.xcresult`, `d1c-ui-counterprobe-1.xcresult`).
 
 ### W7 — Window close lifecycle
 
-- [ ] A dirty, savable document is saved; it stays warm unless eligible for last-root retirement. *Named hosted tests.*
-- [ ] Every transient/quarantine state in §6.2 refuses/defers close without loss. Stable blocked sessions close only with registry retention proof; prompts, text, authority, and protection survive adoption into another window. Last-root release obeys the same rule. *Named hosted tests.*
+- [x] A dirty, savable document is saved; it stays warm unless eligible for last-root retirement. *Named hosted tests.*
+- [x] Every transient/quarantine state in §6.2 refuses/defers close without loss. Stable blocked sessions close only with registry retention proof; prompts, text, authority, and protection survive adoption into another window. Last-root release obeys the same rule. *Named hosted tests.*
 - [ ] Closing the last window leaves the app running. *Owner smoke.*
-- [ ] The installation is revoked, the writer released, and the LRU reconciled; a failed eviction candidate is still retained (§5). *Named hosted test.*
-- [ ] The preview controller is invalidated and released (its weak reference becomes `nil`). *Named hosted test.*
+- [x] The installation is revoked, the writer released, and the LRU reconciled; a failed eviction candidate is still retained (§5). *Named hosted test.*
+- [x] The preview controller is invalidated and released (its weak reference becomes `nil`). *Named hosted test.*
 - [ ] A user close removes the restoration record; a quit does not. *Named hosted test (E, after WD5).*
-- Evidence: _open_
+- Evidence (D2), `WindowCloseLifecycleAppTests`; each façade has a real window, and every close is `performClose`:
+  - Bullet 1: `testClosingAWindowSavesItsDirtyStandaloneDocumentAndKeepsItWarm`, `testClosingOneOfTwoWindowsOnARootKeepsTheRootAndItsSavedDocumentWarm`, and `testClosingTheLastWindowOnARootSavesAndReleasesTheRoot`.
+  - Bullet 2: `testTransientAndQuarantinedStatesRefuseTheCloseWithoutLoss` covers pending editor source (in the shown editor or in another of the window's editors, since the close revokes them all), a disk inspection, a namespace mutation, an image insertion, an indeterminate write, a mutation quarantine, and a write fence. `testAConflictedDocumentClosesAndItsPromptReturnsInTheNextWindowThatShowsIt` keeps the text, retained location, pending external text, and termination membership, then restores the prompt when window 1 shows the file. `testADirtyDocumentWithoutRetentionProofRefusesTheClose` refuses an untitled draft.
+  - Bullet 2, last-root release: `testTheLastRootCloseRetiresAnInstalledConflictedDocumentWithItsState` closes the last window on a root while it shows an installed, conflicted document. The release retires the document with its text, pending external text, and termination membership, and the closed window keeps no prompt. `testAKeptConflictBlocksTheLastRootCloseAndShowOpensIt` covers a conflict that WD8 kept warm when another window closed: it refuses the last window's close, and the refusal's Show opens that file there with its prompt.
+  - Bullet 4: `testClosingRevokesTheInstallationReleasesTheWriterAndTrimsTheLRU` revokes the installation and writer, removes the closed document's installed exemption, evicts the next countable session, and retains an unsavable oldest candidate.
+  - Bullet 5: `EditorFindHostedGateTests/testClosingAWindowInvalidatesAndReleasesItsPreview` mounts two windows, closes one, sees its controller invalidated and unregistered, then released with its views.
+  - The app-owned façade: `testClosingTheOwnersWindowLetsTheNextSceneReuseItEmpty` and `WindowFacadeLifecycleAppTests/testClosingTheOwnersWindowLetsTheNextSceneReuseTheOwner` reopen it empty and admitted; showing the file again adopts the warm session and restores its prompt.
+  - Bullet 3 stays open for the owner smoke.
 
 ### W8 — External-open and ⌘N routing
 
 - [ ] Every §5.2 row: focus the existing owner, reuse its specified empty target, or open a new window; external events before activation resolve frontmost workspace z-order. Exactly one window acts and none is left blank. *Named hosted tests + owner smoke for Finder and Dock.*
-- [ ] ⌘N creates a file in the key window's root. ⇧⌘N opens an empty window that does not restore. *Named hosted test.*
-- Evidence: _open_
+- [x] ⌘N creates a file in the key window's root. ⇧⌘N opens an empty window that does not restore. *Named hosted test.*
+- Evidence (D2), `WindowOpenRoutingAppTests` with simulated scenes (the opener builds `WindowFacadeHolder`s and attaches their windows):
+  - Bullet 1, hosted half: `testFinderOpenReusesAnEmptyFrontmostWindow`, `testFinderOpenWithANonEmptyFrontmostWindowOpensANewWindow`, `testOpenRecentFromANonEmptyKeyWindowOpensANewWindow`, `testOpeningAnOpenRootAgainOpensANewWindowOnTheSharedContext`, `testAnOverlappingRootIsRefusedBeforeAWindowAppears`, `testAFolderInsideThisWindowsOwnRootOpensHere`, `testAFailedOpenInTheNewWindowClosesItAndReportsInTheRequestingWindow`, `testANewWindowThatNeverOpensIsReportedInTheRequestingWindow`, `WindowLateSceneAppTests` (a window that attaches after its open expired closes while still empty; a late File › New Window stays), and `testARequestRunsOnlyInASceneOfItsRegistry`, plus the W4 and W6 bullet 8b tests. The Finder and Dock owner smoke stays open, so the box stays open.
+  - Bullet 2: `testNewFileInTheKeyWindowsRootCreatesTheFileThere` and `testNewWindowOpensAnEmptyAdmittedWindowThatDoesNotRestore`. `testOnlyTheAppOwnedWindowIsRestorable` keeps `isRestorable` false on every other window until E (WD5), so a relaunch cannot bring those windows back empty.
 
 ### W9 — Restoration
 

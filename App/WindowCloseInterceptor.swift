@@ -18,6 +18,9 @@ final class WindowCloseInterceptor: NSObject, NSWindowDelegate {
     var vetoesClose = false
     /// The next `windowShouldClose` returns false once. The caller closes later.
     var defersClose = false
+    /// The window's own close lifecycle (§6.2), asked after the wrapped delegate agrees.
+    /// It may save, release the root, or refuse; nil allows the close.
+    var closeDecision: (@MainActor () -> Bool)?
 
     static func install(on window: NSWindow) -> WindowCloseInterceptor {
         if let existing = window.delegate as? WindowCloseInterceptor {
@@ -36,10 +39,12 @@ final class WindowCloseInterceptor: NSObject, NSWindowDelegate {
             defersClose = false
             return false
         }
-        guard let forwarded, forwarded.responds(to: #selector(NSWindowDelegate.windowShouldClose(_:))) else {
-            return true
+        if let forwarded, forwarded.responds(to: #selector(NSWindowDelegate.windowShouldClose(_:))),
+           forwarded.windowShouldClose?(sender) == false
+        {
+            return false
         }
-        return forwarded.windowShouldClose?(sender) ?? true
+        return closeDecision?() ?? true
     }
 
     func windowWillClose(_ notification: Notification) {
