@@ -20,7 +20,13 @@
 #   PLAINSONG_SKIP_NOTARIZE=1    signed-but-unnotarized smoke run (NOT distributable)
 #
 # Optional (both modes):
-#   PLAINSONG_MARKETING_VERSION  default: 0.1.0 (matches project.yml)
+#   PLAINSONG_MARKETING_VERSION  explicit X.Y.Z; wins over a tag
+#   PLAINSONG_RELEASE_TAG        vX.Y.Z or vX.Y.Z-<prerelease>: the marketing version
+#                                is its X.Y.Z. A tag run of release.yml needs neither:
+#                                GITHUB_REF_NAME is read when GITHUB_REF_TYPE is "tag".
+#                                With no tag and no explicit version: 0.1.0 (project.yml).
+#                                Scripts/release-version.sh holds the rules and refuses
+#                                a malformed tag before anything is built.
 #   PLAINSONG_BUILD_NUMBER       default: git commit count on HEAD (monotonic, P0.5)
 set -euo pipefail
 
@@ -36,7 +42,8 @@ if [[ "$UNSIGNED" != "1" ]]; then
     : "${PLAINSONG_SIGNING_IDENTITY:?set PLAINSONG_SIGNING_IDENTITY to your Developer ID Application identity, or use PLAINSONG_UNSIGNED=1 for the unsigned alpha path (docs/release-engineering-plan.md P1)}"
 fi
 
-MARKETING_VERSION="${PLAINSONG_MARKETING_VERSION:-0.1.0}"
+# Fails here, before xcodegen and the build, on a tag that is not vX.Y.Z[-prerelease].
+MARKETING_VERSION="$(Scripts/release-version.sh)"
 BUILD_NUMBER="${PLAINSONG_BUILD_NUMBER:-$(git rev-list --count HEAD)}"
 OUT_DIR="build/release"
 DERIVED_DATA="$OUT_DIR/DerivedData"

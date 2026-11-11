@@ -21,8 +21,13 @@
   (`App/Plainsong.entitlements`). It is ad-hoc signed; Developer ID signing and
   notarization (release plan P1/P2) wait for Apple Developer Program membership.
 - `CFBundleVersion` is the commit count (`git rev-list --count HEAD`), so it increases
-  with every release. `MARKETING_VERSION` stays `0.1.0` until V6. Sparkle compares
-  `CFBundleVersion`, so the existing numbering works unchanged.
+  with every release. `MARKETING_VERSION` was `0.1.0` for alpha.1–alpha.5. Since V6 a
+  tagged build takes it from the tag: `v0.9.0-beta.1` is `0.9.0`, and the prerelease
+  suffix stays in the tag
+  (`docs/decisions/2026-11-12-release-marketing-version-from-tag.md`). Sparkle compares
+  `CFBundleVersion`, so the existing numbering works unchanged. Two betas of one version
+  share a display version, and Sparkle's update dialog then adds the build numbers:
+  "0.9.0 (312) is now available—you have 0.9.0 (305)".
 - Users on alpha.1–alpha.5 have no updater. They must install the first build that has
   one by hand; every build after that updates itself.
 
