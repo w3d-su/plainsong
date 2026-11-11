@@ -1,7 +1,10 @@
 # Auto-Update Plan (macOS)
 
-> **Status: U1 adopted U-D1 and U-D3, 2026-10-29.** Answers V5 in `docs/release-1.0-scope.md`.
-> U-D2 and U-D4–U-D7 stay owner 待決定. Adding Sparkle is a new Swift dependency, so the
+> **Status: U1 adopted U-D1 and U-D3, 2026-10-29. V5 was decided on 2026-11-10: in-app
+> updates are Must for 1.0 (`docs/decisions/2026-11-10-release-1.0-scope.md`).**
+> U-D2 follows from V5 and V4 (unsigned DMG). The owner adopted U-D4, U-D5, U-D6 and
+> U-D7 as proposed on 2026-11-10
+> (`docs/decisions/2026-11-10-auto-update-feed-secret-and-signed-feed.md`). Adding Sparkle is a new Swift dependency, so the
 > implementing PR carries a `docs/decisions/` entry (agent.md §2, §17.7). Sparkle facts
 > below come from sparkle-project.org documentation (sandboxing, publishing, programmatic
 > setup, customization), fetched 2026-10-29 and re-checked against Sparkle 2.10.0.
@@ -31,12 +34,12 @@
 | ID | Question | Proposed answer | U1 |
 |---|---|---|---|
 | U-D1 | Mechanism | **Sparkle 2** (alternatives in §7) | 已採用 |
-| U-D2 | Ship before or after Developer ID signing? | **After P1/P2.** Build and test it now on a branch; enable it in the first signed build. §6 explains the unsigned risks | owner 待決定 |
+| U-D2 | Ship before or after Developer ID signing? | **Before, on unsigned builds.** V4 ships unsigned and V5 makes updates Must (`docs/release-1.0-scope.md` §1). The original proposal was after P1/P2; the 2026-11-10 probe in §5 removed its main reason | 已採用 (2026-11-10, from V4 and V5) |
 | U-D3 | Default behavior | Ask on second launch (Sparkle's default); "Automatically check" on, "Automatically download and install" off until 1.0 | 已採用 |
-| U-D4 | Feed host | `appcast.xml` on GitHub Pages (`gh-pages` branch), written by the release workflow | owner 待決定 |
-| U-D5 | Channels | One stable feed plus a `beta` channel (`sparkle:channel`) that users opt into in Settings | owner 待決定 |
-| U-D6 | Signing secret in CI | Store the EdDSA private key as a GitHub Actions secret, used only by the tag job. This reverses the 2026-07-02 "no secrets" rule and needs its own decision entry | owner 待決定 |
-| U-D7 | Feed signing | Turn on `SURequireSignedFeed` (and its prerequisite `SUVerifyUpdateBeforeExtraction`) from the first release | owner 待決定 |
+| U-D4 | Feed host | `appcast.xml` on GitHub Pages (`gh-pages` branch), written by the release workflow | 已採用 (2026-11-10) |
+| U-D5 | Channels | One stable feed plus a `beta` channel (`sparkle:channel`) that users opt into in Settings. Prereleases go to `beta` only | 已採用 (2026-11-10) |
+| U-D6 | Signing secret in CI | Store the EdDSA private key as a GitHub Actions secret, used only by the tag job. This reverses the 2026-07-02 "no secrets" rule | 已採用 (2026-11-10) |
+| U-D7 | Feed signing | Turn on `SURequireSignedFeed` (and its prerequisite `SUVerifyUpdateBeforeExtraction`) from the first release | 已採用 (2026-11-10) |
 
 
 ## 3. Design
@@ -133,17 +136,19 @@ quit, such as a save that cannot complete.
   Actions secret (U-D6). The public key goes into `Info.plist`.
 - Sparkle documents that rotating EdDSA keys needs a Developer ID-signed disk image, and
   that changing the Apple certificate and EdDSA key in the same release is unsupported.
-  **Never change both at once.** Losing the private key strands every installed copy.
+  **Never change both at once.** Losing the private key strands every installed copy:
+  with V4's unsigned builds there is no Developer ID image to rotate through.
 
 ## 4. Work packages
 
 | PR | Scope | Owner needed? |
 |---|---|---|
 | U1 | Decision entry; Sparkle package; updater controller; menu item; Settings toggles; Info.plist keys and entitlements; release-script re-signing; unit and hosted tests (§5) | No. `SUFeedURL` and `SUPublicEDKey` are empty strings until U2. YES is covered with a fake client, not a live Sparkle check |
-| U2 | `make-appcast.sh`, the feed step in `release.yml`, and the `publish-appcast` workflow (landed with `PLAINSONG_UPDATES_ENABLED` still NO). U2b: `SUFeedURL`, `SUPublicEDKey`, `SURequireSignedFeed`, `SUVerifyUpdateBeforeExtraction` and the flag set to YES, once the owner has the key; README update with U3 | **Yes**: generate the keys and add the secret |
-| U3 | End-to-end update gate (§5 U-G4–U-G7) against a local test feed, then against the real feed with a signed build | **Yes**: signed builds need P1/P2; the owner runs the clean-machine pass |
+| U2 | `make-appcast.sh`, the feed step in `release.yml`, and the `publish-appcast` workflow (#257). U2b: `SUFeedURL`, `SUPublicEDKey`, `SURequireSignedFeed` and `SUVerifyUpdateBeforeExtraction` in every build, and `PLAINSONG_UPDATES_ENABLED=YES` in release builds (#258). README update with U3 | Done on 2026-11-10: the owner generated the key pair and added the `SPARKLE_ED_PRIVATE_KEY` secret |
+| U3 | End-to-end update gate (§5 U-G4–U-G7) against a local test feed, then against the real feed with unsigned builds | **Yes**: the owner runs the clean-machine pass |
 
-U1 can start now. U2 and U3 wait for the keys and, under U-D2, for Developer ID signing.
+U1, U2 and U2b are merged (#232, #257, #258). U3 is next: it needs the first tagged
+release, which is the first build with updates on.
 
 ## 5. Gates
 
@@ -153,6 +158,20 @@ Downloader.xpc, Autoupdate, Updater.app, Sparkle.framework, and the app, then
 `build/release` was deleted. The Developer ID path is the same signer plus
 `-o runtime --timestamp` and stays open until a signed release, because this machine has
 no Developer ID identity. U-G4–U-G9 stay open for U2 and U3.
+
+Unsigned Gatekeeper probe, 2026-11-10 (owner-run, macOS 27, Apple Silicon). Two Release
+builds of `main` at `2a555d9` (`CFBundleVersion` 9001 and 9002, arm64 only, ad-hoc
+signed and re-signed as `Scripts/release.sh` does, bundle identifier
+`app.plainsong.editor.updatetest`, `PLAINSONG_UPDATES_ENABLED=YES`). The 9001 disk image
+carried a `com.apple.quarantine` attribute, and the steps had the owner drag the app out
+with Finder and approve it once with Open Anyway; whether that first launch was blocked
+was not recorded. Check for Updates… offered 9002 from
+`http://localhost:8765` (the test build added `NSAllowsLocalNetworking`), with the
+archive signed by a throwaway EdDSA key. After Install and Relaunch the app ran as
+0.1.9002 with no Gatekeeper prompt, and a later launch from Finder had none either. This
+is one update on one Mac. It does not close U-G4: the feed was not HTTPS, and bookmarks,
+recents, preferences and the recovery store were not checked. The builds, key and feed
+were deleted afterward.
 
 - [x] **U-G1** Layering: `git grep -n -w Sparkle -- Packages` has no hit; only the App
   target links Sparkle. `Scripts/check-sparkle-layering.sh` runs from `make test-packages`.
@@ -186,7 +205,7 @@ no Developer ID identity. U-G4–U-G9 stay open for U2 and U3.
 
 | Risk | Mitigation |
 |---|---|
-| Unsigned (ad-hoc) builds: the sandboxed download is quarantined, and the updated app may hit Gatekeeper's "Open Anyway" again after every update | U-D2 ships only signed builds. If the owner wants it earlier, U-G4 on an unsigned build must prove the result first |
+| Unsigned (ad-hoc) builds: the sandboxed download is quarantined, and the updated app may hit Gatekeeper's "Open Anyway" again after every update | Did not happen in the 2026-11-10 probe (§5): one update, one Mac, macOS 27. Repeat it in U3 on the real feed, across two consecutive updates and on a second Mac, before the README drops "no auto-update" |
 | Ad-hoc → Developer ID transition | Keep the EdDSA key fixed through the transition (§3.5). Test it explicitly in U3 |
 | Private key loss or leak | Offline backup; the key is only in the tag-job secret; `SURequireSignedFeed` |
 | A broken release reaches every user | Draft-first publishing (§3.4 step 3). Beta channel first. A fix ships as N+2; Sparkle never downgrades |
