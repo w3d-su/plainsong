@@ -1055,6 +1055,10 @@ make format           # swiftformat . && swiftlint --fix
   `Fixtures/perf-500kb.md`.
 - UI tests: minimal smoke (launch, open fixture, type, preview updates). Don't invest in
   brittle full UI automation.
+- Hosted fixtures: `makeWorkspaceFixture(files:)` waits for FSEvents to record the
+  fixture's own writes (`WorkspaceFixtureEventSettle`) so the watcher started by opening
+  the workspace cannot receive them. A test that writes more files before it opens the
+  workspace calls `settleFixtureFileSystemEvents(at:)` after its last write.
 
 ---
 
