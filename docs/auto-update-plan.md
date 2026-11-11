@@ -14,7 +14,8 @@
 > U-D3 (second-launch prompt, automatic checks after permission, automatic download off)
 > applies only when the setting is YES. `SUFeedURL` and `SUPublicEDKey` stay empty until U2.
 > U1 tests of the YES path use a fake client. Real Sparkle rejects the empty key and
-> does not run a check until U2. The README "no auto-update" limitation stays until U3.
+> does not run a check until U2. The README describes in-app updates from the first
+> release that has them, with the unsigned-build Gatekeeper caveat; U3 verifies it.
 
 ## 1. Baseline
 
@@ -83,12 +84,14 @@ Sparkle supports sandboxed apps through its XPC services:
   `--deep`. It re-signs before the app bundle so the outer signature is valid, then
   checks each nested item with `codesign --verify --strict` and the finished app with
   `codesign --verify --deep --strict` (verification only). A shipped plist whose
-  `PLAINSONG_UPDATES_ENABLED` is not `NO` must have a 32-byte EdDSA key, the expected
+  `PLAINSONG_UPDATES_ENABLED` is not `NO` must have the pinned EdDSA public key, the expected
   HTTPS feed (`https://w3d-su.github.io/plainsong/appcast.xml`), `SURequireSignedFeed`,
   and `SUVerifyUpdateBeforeExtraction`. The key check matches Sparkle's decoder:
   Foundation's whitespace trim, no padding repair, and no interior whitespace.
   Non-zero trailing base64 bits are accepted. The feed check strips quotes only.
   CI runs the same guard on the Debug Info.plist after the ui-performance build.
+  `--self-test` (from `make test-packages`) also requires `project.yml` to carry the
+  pinned key and feed, so a mistaken edit fails before a tag.
   The installer-launcher key and the mach-lookup
   exceptions are present even when the flag is NO. They do not start the updater, and
   the temporary exceptions need a separate pass before a Mac App Store submission.
@@ -210,7 +213,7 @@ were deleted afterward.
 
 | Risk | Mitigation |
 |---|---|
-| Unsigned (ad-hoc) builds: the sandboxed download is quarantined, and the updated app may hit Gatekeeper's "Open Anyway" again after every update | Did not happen in the 2026-11-10 probe (§5): one update, one Mac, macOS 27. Repeat it in U3 on the real feed, across two consecutive updates and on a second Mac, before the README drops "no auto-update" |
+| Unsigned (ad-hoc) builds: the sandboxed download is quarantined, and the updated app may hit Gatekeeper's "Open Anyway" again after every update | Did not happen in the 2026-11-10 probe (§5): one update, one Mac, macOS 27. Repeat it in U3 on the real feed, across two consecutive updates and on a second Mac. Until then the README warns that macOS may ask again after an update |
 | Ad-hoc → Developer ID transition | Keep the EdDSA key fixed through the transition (§3.5). Test it explicitly in U3 |
 | Private key loss or leak | Offline backup; the key is only in the tag-job secret; `SURequireSignedFeed` |
 | A broken release reaches every user | Draft-first publishing (§3.4 step 3). Beta channel first. A fix ships as N+2; Sparkle never downgrades |
