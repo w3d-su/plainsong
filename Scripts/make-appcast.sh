@@ -16,7 +16,7 @@
 #
 # Usage:
 #   SPARKLE_ED_PRIVATE_KEY=... Scripts/make-appcast.sh \
-#       --dmg build/release/Plainsong-0.1.0-300-unsigned.dmg \
+#       --dmg build/release/Plainsong-0.9.0-300-unsigned.dmg \
 #       --tag v0.9.0 --feed-dir build/appcast [--channel beta] \
 #       [--release-notes notes.md] [--sparkle-bin <dir>]
 #

@@ -1022,6 +1022,12 @@ make format           # swiftformat . && swiftlint --fix
   secret does not match the app's key). The publish check compares the newest build per
   channel, so publish each release's feed before pushing the next tag. `make test-appcast` runs
   the script's self-test with a throwaway key.
+- Release versions: `Scripts/release-version.sh` gives `Scripts/release.sh` its marketing
+  version. An explicit `PLAINSONG_MARKETING_VERSION` wins; otherwise a tag (`PLAINSONG_RELEASE_TAG`,
+  or `GITHUB_REF_NAME` on a tag run) `vX.Y.Z` or `vX.Y.Z-<prerelease>` gives `X.Y.Z`;
+  otherwise `0.1.0`, the `project.yml` value. The prerelease suffix stays in the tag, and a
+  hyphen in the tag selects Sparkle's beta channel. A malformed tag fails before the build.
+  The build number is always `git rev-list --count HEAD`: Sparkle compares it.
 - `Scripts/release.sh` re-signs Sparkle innermost first: `Installer.xpc`,
   `Downloader.xpc` (`--preserve-metadata=entitlements`), `Autoupdate`, `Updater.app`,
   and `Sparkle.framework`, then the app. Signing never uses `--deep`. The Developer ID
