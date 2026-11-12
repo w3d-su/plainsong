@@ -111,7 +111,12 @@ cd preview-src && npm run typecheck
   每次停止輸入後，預覽只會重新渲染你修改過的區塊；含有連結參考定義或註腳的文件仍會整份重新渲染。
 - **側邊欄：** 在 macOS 14–26 上側邊欄為固定寬度。在 macOS 27+ 上可調整寬度
   （220–320 pt），並可用 ⌃⌘S 收合。
-- **無自動更新：** Alpha 版本需手動下載。
+- **更新：** `v0.1.0-alpha.5` 之後的 release 可透過 Sparkle 在 App 內更新。
+  alpha.1–alpha.5 沒有更新程式，請手動安裝下一版一次。第二次啟動時 Plainsong 會詢問
+  是否自動檢查更新；隨時可用 **Plainsong ▸ Check for Updates…** 手動檢查。
+  「自動下載並安裝」預設關閉（Settings ▸ General）。預發佈版本（如 `v0.9.0-beta.1`
+  這類 tag）只在開啟 **Receive beta updates** 時才會提供，使用 beta 版請記得開啟。
+  版本未經簽署：更新後 macOS 可能會再次要求你確認開啟 Plainsong。
 
 ## 授權
 
@@ -129,7 +134,8 @@ macOS 編輯器連結了 [STTextView](https://github.com/krzyzanowskim/STTextVie
 授權發佈，仍可依 MIT 授權使用。
 
 App target 另外連結 [Sparkle](https://github.com/sparkle-project/Sparkle) 2.10.0。
-除非 `PLAINSONG_UPDATES_ENABLED` 是 YES，否則不會檢查更新。Sparkle 為 MIT，並包含
+Release 版本會將 `PLAINSONG_UPDATES_ENABLED` 設為 YES；其他版本不會建立更新程式，
+也不會發出任何更新請求。所有更新來源與下載檔都會以 App 內的 EdDSA 公鑰驗證。Sparkle 為 MIT，並包含
 bsdiff、sais-lite 與 orlp/ed25519；聲明見
 [`docs/third-party/Sparkle-2.10.0-LICENSE.txt`](docs/third-party/Sparkle-2.10.0-LICENSE.txt)。
 

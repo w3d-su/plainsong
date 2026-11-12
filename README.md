@@ -119,7 +119,13 @@ supported. Live fixture coverage: `Fixtures/math.md`.
   with link reference definitions or footnotes still re-renders whole.
 - **Sidebar:** The sidebar is fixed-width on macOS 14–26. On macOS 27+ it is resizable
   (220–320 pt) and collapsible with ⌃⌘S.
-- **No auto-update:** alpha builds are manual downloads.
+- **Updates:** releases after `v0.1.0-alpha.5` can update in the app through Sparkle.
+  alpha.1–alpha.5 have no updater, so install the next release by hand once. On the
+  second launch Plainsong asks whether to check for updates automatically; **Plainsong ▸
+  Check for Updates…** checks at any time. Automatic download and install is off by
+  default (Settings ▸ General). A prerelease (a tag such as `v0.9.0-beta.1`) is offered
+  only while **Receive beta updates** is on, so turn it on if you run beta builds. Builds
+  are unsigned: macOS may ask you to confirm opening Plainsong again after an update.
 
 ## License
 
@@ -139,7 +145,9 @@ That is why Plainsong is GPL. Earlier versions, including every release through
 `v0.1.0-alpha.5`, were published under the MIT License and remain available under it.
 
 The App target also links [Sparkle](https://github.com/sparkle-project/Sparkle) 2.10.0.
-Updates stay off unless `PLAINSONG_UPDATES_ENABLED` is YES. Sparkle is MIT and bundles
+Release builds set `PLAINSONG_UPDATES_ENABLED` to YES; other builds never create the
+updater and make no update request. Every feed and download is verified against the EdDSA
+public key in the app. Sparkle is MIT and bundles
 bsdiff, sais-lite, and orlp/ed25519; those notices are in
 [`docs/third-party/Sparkle-2.10.0-LICENSE.txt`](docs/third-party/Sparkle-2.10.0-LICENSE.txt).
 

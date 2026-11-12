@@ -107,7 +107,8 @@ targets:
         SUEnableInstallerLauncherService: true
         # Inert while PLAINSONG_UPDATES_ENABLED is NO. The public half of the owner's
         # EdDSA key (docs/auto-update-plan.md §3.5); the private half is never in the
-        # repository. Scripts/check-shipped-update-configuration.sh pins the feed URL.
+        # repository. Scripts/check-shipped-update-configuration.sh pins both values;
+        # change them there too, and only for a planned key rotation (§3.5).
         SUFeedURL: "https://w3d-su.github.io/plainsong/appcast.xml"
         SUPublicEDKey: "o17cpeoCIVbE1EiIUAdc2YgYUjui2UCPtclAHB/7oN4="
         SURequireSignedFeed: true
