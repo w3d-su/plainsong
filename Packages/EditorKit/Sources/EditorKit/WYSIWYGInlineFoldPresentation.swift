@@ -1,11 +1,11 @@
 import AppKit
 import Foundation
 
-/// Presentation selector used by source mode and the Experimental WYSIWYG path.
+/// Presentation selector used by source mode and the WYSIWYG path.
 public enum MarkdownEditorDevelopmentPresentation: Equatable, Sendable {
     case source
     case inlineFoldReveal
-    /// Completed link-folding presentation used only by the Experimental WYSIWYG mode.
+    /// Completed link-folding presentation used only by the WYSIWYG layout mode.
     case inlineFoldRevealWithLinkFolding
 
     var enablesInlineFoldReveal: Bool {

@@ -14,7 +14,7 @@ struct WorkspaceToolbar: ToolbarContent {
                 Label("Source and Preview", systemImage: "rectangle.split.2x1")
                     .tag(EditorLayoutMode.sourcePreview)
                 if appState.isExperimentalWYSIWYGAvailable {
-                    Label("WYSIWYG (Experimental)", systemImage: "textformat")
+                    Label("WYSIWYG", systemImage: "textformat")
                         .tag(EditorLayoutMode.wysiwyg)
                 }
             }
