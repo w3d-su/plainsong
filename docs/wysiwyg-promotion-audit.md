@@ -3,14 +3,21 @@
 Re-verification of every gate in `docs/wysiwyg-release-checklist.md` (A, B1-B13, C, D),
 `docs/image-thumbnail-gates.md` (I0-I10) and `docs/link-folding-gates.md` (L1-L9) against
 `origin/main` `1428bf1`, before the D.4 promotion, and the pointer path again after merging
-`origin/main` `03db181` (with #214) on 2026-10-26. Most evidence dates from June-July;
-the editor changed a lot since. This audit asks, per gate: does the cited evidence still
-run, does it still pass, and could a later change have invalidated it?
+`origin/main` `03db181` (with #214) on 2026-10-26, and the EditorKit suite and perf gates
+again after merging `origin/main` `d9dc9221` on 2026-11-13. Most evidence dates from
+June-July; the editor changed a lot since. This audit asks, per gate: does the cited
+evidence still run, does it still pass, and could a later change have invalidated it?
 
-**Result:** every automated gate still passes. The click-layout fix landed in #214 and its
-pointer gates pass on the merged branch. One blocker remains: the owner's dogfood sign-off
+**Result:** every functional gate still passes, and B10, L8 and I8 pass alone and in the
+full suite. The click-layout fix landed in #214 and its pointer gates pass on the merged
+branch. One blocker remains: the owner's dogfood sign-off
 (`docs/wysiwyg-dogfood-checklist.md`), which includes the owner-run actual-IME harness. No WYSIWYG product bug was found. Four test
 gaps were closed with new tests and one perf record.
+
+**Open since 2026-11-13:** the production-viewport perf gate this audit added passes alone
+(27.7-29.6 ms) but fails in every local full-suite run, on the pre-merge build too: the
+first counted sample is 107-143 ms at load 3-7. The earlier "contention" reading was
+wrong and the cause is not identified (finding 7).
 
 ## What changed since the evidence
 
@@ -24,6 +31,8 @@ gaps were closed with new tests and one perf record.
 | Whole-source assignment resets (#154) | Image markers and folds after App text replacement | Hosted `testHostedSameLength*RestoresImageThumbnailAndFoldsWithoutAnEdit` (3) pass |
 | Replace/Find (#145/#151) | WYSIWYG Replace authority, presentation recovery | `EditorReplaceWYSIWYGTests` (17), batch WYSIWYG recovery (2) and 13 hosted Replace/Keep Mine WYSIWYG tests pass |
 | iOS integration (#188): fold model and parser moved to `SyntaxKit`; EditorKit keeps typealiases | Every fold/reveal gate | EditorKit gate tests now exercise the SyntaxKit code through those aliases; `WYSIWYGFoldModelTests` (14) pass |
+| Line-end fold hanging space (#251): the projection turns a projected U+200B that ends a line into a near-zero-width hanging space | Geometry (B13), pointer, every fold recompute (B10/L8/I8) | #251's `WYSIWYGLineEndFoldGeometryTests`, the full EditorKit suite and the 2026-11-13 perf rerun, which shows no cost in a paired before/after |
+| Table model (#250, table gate T1): the fold parser can return table regions | Fold parse cost and range | Off by default (`tableRegionsEnabled: false`) and reachable only through an internal test hook; tables stay raw in every mode (`docs/table-wysiwyg-gates.md`). Full EditorKit suite passes |
 
 ## How it was run
 
@@ -53,6 +62,18 @@ gaps were closed with new tests and one perf record.
   B10, L8 and I8 stayed normal in that run (25.957, 19.256, 17.682 ms). Run alone four times
   at load 43-48 it passed every time at 28.8-30.3 ms. It has now failed twice inside the full
   suite and never alone, so it is flaky in full-suite context, not a regression.
+  (Superseded by the next bullet: it fails every time in the full suite.)
+- **After merging `origin/main` `d9dc9221` (2026-11-13, 16 commits including #251 and
+  #250):** full EditorKit `swift test` on `78da1a41`, 560 tests, 9 opt-in skips, 1 failure,
+  run four times at load 3.2-6.8. The failure is the production-viewport perf gate each
+  time, first counted sample 108.8-127.4 ms, the next two 27.8-33.8 ms; B10, L8 and I8 are
+  normal in the same runs. The pre-merge head `0ea968cf` (552 tests) fails the same way in
+  3 of 3 runs (106.6-143.2 ms), so the merge is not the cause. `--filter WYSIWYG` alone
+  reproduces it; the non-WYSIWYG classes plus the gate do not, and no single WYSIWYG class
+  paired with the gate does. Alone the four perf gates pass 3 of 3. Record:
+  `docs/perf/2026-11-13-wysiwyg-promotion-gates-after-main-merge.md`. CI ran the hosted
+  shards, PreviewKit and preview-src on this merge and passed; the hosted WYSIWYG tests
+  were not rerun locally.
 - Not run locally: full `make test` (it includes PlainsongUITests, which kill a running
   Plainsong), PreviewKit and preview-src (no WYSIWYG code path), and the opt-in
   actual-IME harness (owner-run; it switches the system input source). CI runs the first
@@ -83,7 +104,7 @@ gaps were closed with new tests and one perf record.
 | B7 Raw copy | Both cited tests pass | — | Holds |
 | B8 Paste | Passes | — | Holds |
 | B9 AX value | Passes | — | Holds |
-| B10 Visible-range perf | 24.8-27.6 ms over 3 isolated runs (was 26.964 ms) | The gate times one line; production requests the whole padded viewport, which STTextView 2.4 made taller. New production-viewport gate: 27.2-30.0 ms over a 6,324-unit request | Holds |
+| B10 Visible-range perf | 24.8-27.6 ms over 3 isolated runs (was 26.964 ms); 27.4-33.3 ms on 2026-11-13, with the pre-merge build at 26.5-32.0 ms in the same session | The gate times one line; production requests the whole padded viewport, which STTextView 2.4 made taller. New production-viewport gate: 27.2-30.0 ms over a 6,324-unit request alone (27.7-29.6 ms on 2026-11-13), but 107-143 ms on its first sample in every full-suite run | B10 holds; the viewport gate is open (finding 7) |
 | B11 Undo/redo | Both cited tests pass | — | Holds |
 | B12 Source regression | See "How it was run" | `make test` now includes PlainsongUITests, which this audit must not run | Holds locally; full suite is CI's |
 | B13 Geometry | Passes | — | Holds |
@@ -126,7 +147,7 @@ single-file images, fenced code, tables, Mermaid/math and MDX stay raw (`testL1R
 | I5 IME | Opt-in; last owner run 2026-07-12 | **Owner rerun required** |
 | I6 Pointer | 4 cited tests pass | Holds; reran green after #214 |
 | I7 AX | 3 cited tests pass | Holds |
-| I8 Perf/memory | 16.2-17.3 ms over 3 runs (was 15.234 ms); in-flight typing, off-main decode, 32 MiB cache tests pass | Holds |
+| I8 Perf/memory | 16.2-17.3 ms over 3 runs (was 15.234 ms), 16.5-16.8 ms on 2026-11-13; in-flight typing, off-main decode, 32 MiB cache tests pass | Holds |
 | I9 Undo/redo | 3 cited tests pass | Holds |
 | I10 Security | 5 WorkspaceKit cited tests pass | Holds |
 
@@ -141,7 +162,7 @@ single-file images, fenced code, tables, Mermaid/math and MDX stay raw (`testL1R
 | L5 IME | Opt-in; last owner run 2026-07-06 | **Owner rerun required** |
 | L6 Pointer | 2 cited tests pass | Holds; reran green after #214 |
 | L7 AX | Passes | Holds |
-| L8 Perf | Failed once at 159.651 ms in the full suite at load 85-106 (the other samples were 24 and 30 ms); 15.6-16.0 ms over 3 isolated runs at load 12-14 (was 16.968 ms) | Holds (contention, R15) |
+| L8 Perf | Failed once at 159.651 ms in the full suite at load 85-106 (the other samples were 24 and 30 ms); 15.6-16.0 ms over 3 isolated runs at load 12-14 (was 16.968 ms); 16.1-16.3 ms alone and 16.9-17.0 ms in 7 full-suite runs on 2026-11-13 | Holds (contention, R15) |
 | L9 Undo/redo | Passes | Holds |
 
 ## Findings and what this PR did
@@ -172,3 +193,12 @@ single-file images, fenced code, tables, Mermaid/math and MDX stay raw (`testL1R
    test names) and the EditorKit API still says development
    (`MarkdownEditorDevelopmentPresentation`, `_developmentPresentation`,
    `_developmentImageThumbnails`). The UserDefaults key keeps its name on purpose (D.3).
+7. **Open: the production-viewport perf gate fails in the full EditorKit suite.** Found on
+   2026-11-13. `WYSIWYGViewportPerformanceGateTests` passes alone at about 28 ms and fails
+   7 of 7 full-suite runs at load 3-7 (4 on the merged head, 3 on the pre-merge head): its
+   first counted sample, taken after the test's own warm-up call, is 107-143 ms. It needs
+   the WYSIWYG test classes run in one process and no single class triggers it. That
+   points at state earlier tests leave behind, which is an inference. The cause, and
+   whether a long app session can reach the same slow recompute, are not known. CI cannot
+   show it, because perf budgets only print there (R15). Find the cause before reading the
+   B10 row as covering the production viewport.
