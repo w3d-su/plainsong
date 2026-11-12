@@ -6,6 +6,8 @@ import AppKit
 /// U+200B runs, while active image spans become one U+FFFC attachment plus equal-length
 /// U+200B padding only inside the ephemeral paragraph copy. Presented table rows turn
 /// cell-starting pipes into `\t` and other structure into U+200B, and carry tab stops.
+/// A projected fold/image U+200B that ends a line becomes a near-zero-width hanging
+/// space (`WYSIWYGLineEndHangingSpace`).
 final class WYSIWYGZeroWidthTextContentStorageDelegate: NSObject, NSTextContentStorageDelegate {
     weak var previousDelegate: NSTextContentStorageDelegate?
     var imagePresentationGeneration: UInt64?
@@ -88,6 +90,11 @@ final class WYSIWYGZeroWidthTextContentStorageDelegate: NSObject, NSTextContentS
         for tableMarker in tableMarkers {
             tableMarker.marker.project(into: paragraph, rowLocation: tableMarker.range.location)
         }
+
+        WYSIWYGLineEndHangingSpace.apply(
+            to: paragraph,
+            projectedRanges: foldedRanges + imageMarkers.map(\.range)
+        )
 
         precondition(
             paragraph.length == range.length,

@@ -6,13 +6,30 @@ A native macOS Markdown/MDX editor, built with Swift (SwiftUI shell + AppKit/Tex
 editor core) — in the spirit of Typora, tuned for blog authoring workflows
 (Astro/Next.js content folders, YAML frontmatter, CJK-friendly).
 
-**Status: in development.** M0-M5 have landed and M5 is accepted.
-M5 performance and security hardening have landed: PR #15 added the infrastructure,
-PR #20 measured visible-range highlighting, PR #21 measured the two-webview
-host-process RSS memory gate, and PR #24/#27 closed issue #17 with the MDX
-sanitizer/asset/SVG policy. PR #26 landed Settings/themes and closed #16. The
-2026-06-25 final sweeps fixed scroll sync, launch/Open Recent, MDX error liveness, and
-live MDX completion-popup checklist blockers; `docs/m5-checklist.md` now passes.
+**Status: public alpha.** Builds are unsigned and published on
+[GitHub Releases](https://github.com/w3d-su/plainsong/releases). Everything listed under
+Features is on `main`; a published build can lag behind it.
+
+## Features
+
+- **Source editor** with parser-based highlighting for Markdown, YAML frontmatter, fenced
+  code, and JSX in `.mdx`. List continuation, auto-pairing, a table formatter, and
+  checkbox toggling are built in.
+- **Live preview** beside the editor, with scroll sync in both directions. GFM, KaTeX
+  math, Mermaid diagrams, and code highlighting are bundled, so it works offline.
+- **Files:** open one file or a folder workspace with a file tree (create, rename, move,
+  move to Trash). Autosave, Save As, and a banner when the file changes on disk.
+- **Find and Replace** in the document, and **workspace search** (⇧⌘F) across the folder.
+- **Completion** for snippets, link and image paths, heading anchors, fence languages,
+  frontmatter keys, emoji shortcodes, and MDX component names.
+- **Images and links:** paste or drag an image to copy it into `assets/` and insert the
+  link; paste a URL over selected text to make a link.
+- **Frontmatter inspector** (⌃⌘I) with typed controls for dates, tags, and drafts.
+- **Export** as self-contained HTML or PDF, and **Print** (⌘P).
+- **Themes:** two built-in editor themes, imported JSON color themes, and system, light,
+  and dark preview palettes.
+- **Private by default:** sandboxed, no telemetry, and the preview loads nothing from the
+  network unless you turn on **Allow remote images** in Settings.
 
 Phase 2 WYSIWYG is a layout choice beside source-only and source+preview: pick it in the toolbar
 or cycle layouts from the **View** menu (`⌘⇧P`). Its release gates are in

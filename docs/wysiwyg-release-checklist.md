@@ -108,6 +108,8 @@ The 2026-06-26 mechanism PR removes this baseline/tiny-font path from production
   viewport. Add a layout-geometry assertion (folded-line height ≈ unfolded-line height
   within tolerance) over a multi-line fixture.
   Evidence: `WYSIWYGNativePointerGateTests.testFoldedLineGeometryMatchesUnfoldedLineAndKeepsSiblingLinesInViewport`.
+  A fold or image that ends a line keeps a non-empty content segment frame and a caret at
+  the visible content end (2026-11-06, `WYSIWYGLineEndFoldGeometryTests`).
 - [x] **Source-only mode unchanged.** With `_developmentPresentation: .source` (and in the
   shipping source-only mode), layout, selection, copy, and the line-number gutter are
   byte-for-byte unchanged from today.

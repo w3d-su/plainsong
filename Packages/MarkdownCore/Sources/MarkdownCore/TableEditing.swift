@@ -57,23 +57,27 @@ enum TableEditing {
         let cellCount = max(row.cells.count, block.columnCount)
         guard cellCount > 0 else { return nil }
 
+        let newline = MarkdownTextEditingSupport.insertedLineTerminator(on: row.line, in: text)
         let rowText = "|" + Array(repeating: "  ", count: cellCount).joined(separator: "|") + "|"
-        let replacement = "\n\(rowText)"
+        let replacement = "\(newline)\(rowText)"
         return MarkdownTextEditingSupport.replacement(
             range: selection,
             string: replacement,
-            selection: NSRange(location: selection.location + 3, length: 1)
+            // The first cell's second space, between its padding spaces.
+            selection: NSRange(
+                location: selection.location + MarkdownTextEditingSupport.utf16Length(newline) + 2,
+                length: 1
+            )
         )
     }
 }
 
 private struct TableBlock {
     let rows: [TableRow]
+    /// Each row's own source terminator; the last row's is excluded from `range`.
+    let terminators: [String]
     let range: NSRange
-
-    var text: String {
-        rows.map(\.line.text).joined(separator: "\n")
-    }
+    let text: String
 
     var columnCount: Int {
         rows.map(\.cells.count).max() ?? 0
@@ -84,10 +88,9 @@ private struct TableBlock {
         guard currentLine.text.contains("|") else { return nil }
 
         var firstLine = currentLine
-        while firstLine.range.location > 0 {
-            let previousProbe = max(0, firstLine.range.location - 1)
-            let previous = MarkdownTextEditingSupport.line(containing: previousProbe, in: text)
-            guard previous.text.contains("|") else { break }
+        while let previous = MarkdownTextEditingSupport.line(before: firstLine, in: text),
+              previous.text.contains("|")
+        {
             firstLine = previous
         }
 
@@ -101,26 +104,46 @@ private struct TableBlock {
             cursor = line.fullEndLocation
         }
 
-        guard collected.contains(where: \.isSeparator), collected.count >= 2 else { return nil }
+        // GFM starts a table at its header row, the line directly above the first
+        // delimiter row. Earlier lines that merely contain `|` are paragraph text: they
+        // are neither part of the block nor a place the table helpers act from.
+        guard let delimiterIndex = collected.firstIndex(where: \.isSeparator), delimiterIndex > 0 else {
+            return nil
+        }
+        let tableRows = Array(collected[(delimiterIndex - 1)...])
+        guard tableRows.count >= 2,
+              let header = tableRows.first,
+              let last = tableRows.last,
+              currentLine.range.location >= header.line.range.location
+        else {
+            return nil
+        }
 
-        rows = collected
-        let start = collected.first!.line.range.location
-        let end = collected.last!.line.endLocation
-        range = NSRange(location: start, length: end - start)
+        rows = tableRows
+        terminators = tableRows.map { MarkdownTextEditingSupport.lineTerminator(after: $0.line, in: text) }
+        let start = header.line.range.location
+        range = NSRange(location: start, length: last.line.endLocation - start)
+        self.text = MarkdownTextEditingSupport.substring(range, in: text)
     }
 
     func formattedText() -> String {
         let widths = columnWidths()
-        return rows.map { row in
-            let cells = (0 ..< widths.count).map { index -> String in
-                let cell = index < row.cells.count ? row.cells[index] : TableCell(raw: "")
+        var formatted = ""
+        for (index, row) in rows.enumerated() {
+            let cells = (0 ..< widths.count).map { column -> String in
+                let cell = column < row.cells.count ? row.cells[column] : TableCell(raw: "")
                 if row.isSeparator {
-                    return separatorText(for: cell.alignment, width: widths[index])
+                    return separatorText(for: cell.alignment, width: widths[column])
                 }
-                return pad(cell.raw, toDisplayWidth: widths[index])
+                return pad(cell.raw, toDisplayWidth: widths[column])
             }
-            return "| " + cells.joined(separator: " | ") + " |"
-        }.joined(separator: "\n")
+            formatted += "| " + cells.joined(separator: " | ") + " |"
+            if index < rows.count - 1 {
+                // Rows keep their own terminators, so CRLF tables stay CRLF.
+                formatted += terminators[index].isEmpty ? "\n" : terminators[index]
+            }
+        }
+        return formatted
     }
 
     func navigableCells() -> [TableCellRange] {

@@ -12,6 +12,8 @@ struct MenuBarSnapshot: Equatable {
     /// the action re-checks this and the key-window responder context itself.
     var canReplace: Bool
     var canSave: Bool
+    /// File ▸ Save As…: Save's eligibility, or a missing-file prompt for the shown document.
+    var canSaveAs: Bool
     var canExportHTML: Bool
     var canUseWorkspaceSearch: Bool
     var layoutModeCommandTitle: String
@@ -32,6 +34,7 @@ struct MenuBarSnapshot: Equatable {
             hasOpenDocument = false
             canReplace = false
             canSave = false
+            canSaveAs = false
             canExportHTML = false
             canUseWorkspaceSearch = false
             layoutModeCommandTitle = "Show Preview"
@@ -43,6 +46,7 @@ struct MenuBarSnapshot: Equatable {
             && appState.editorFindHost.ui.isReplaceRowActive
             && appState.editorFindHost.ui.replacementValidity == .valid
         canSave = appState.canSave
+        canSaveAs = appState.canSaveAs
         canExportHTML = appState.canExportCurrentDocumentAsHTML
         canUseWorkspaceSearch = appState.canUseWorkspaceSearch
         layoutModeCommandTitle = appState.layoutModeCommandTitle

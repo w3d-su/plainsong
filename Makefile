@@ -5,6 +5,8 @@ XCODE_RESULT_BUNDLE ?=
 XCODE_DERIVED_DATA ?=
 XCODE_ARTIFACT_DIR ?=
 XCODE_TEST_TARGETS ?=
+XCODE_SKIP_TESTS ?=
+SWIFTFORMAT_CACHE ?=
 
 PACKAGES := MarkdownCore EditorKit PreviewKit WorkspaceKit
 PORTABLE_PACKAGES := SyntaxKit WorkspaceCore
@@ -15,17 +17,22 @@ SWIFT_FORMAT_PATHS := App AppTests AppIOS AppIOSTests Packages PerformanceTests 
 # existing 0.61 layout until a deliberate repo-wide migration, without breaking
 # older SwiftFormat versions that do not recognize the rule names.
 SWIFTFORMAT_COMPAT_FLAGS := $(shell swiftformat --rules 2>/dev/null | grep -q wrapIfStatementBodies && echo --disable wrapIfStatementBodies,wrapIfExpressionBodies)
-# CI installs exactly this SwiftFormat release (.github/workflows/ci.yml). Local
-# Homebrew installs cannot pin, so `make lint`/`make format` only warn on drift;
-# treat CI as authoritative when local and CI lint results disagree.
+# CI installs exactly these releases (.github/workflows/ci.yml). Local Homebrew
+# installs cannot pin, so `make lint`/`make format` only warn on drift; treat CI as
+# authoritative when local and CI lint results disagree.
 SWIFTFORMAT_VERSION := 0.62.1
+SWIFTLINT_VERSION := 0.65.1
 
-.PHONY: bootstrap generate build run test test-packages test-hosted test-preview test-f2-tooling format lint preview-bundle release clean swiftformat-version-check
+.PHONY: bootstrap generate build run test test-packages test-hosted test-hosted-build test-hosted-shard test-preview test-f2-tooling format lint lint-style check-preview-layering preview-bundle release clean swiftformat-version-check
 
 swiftformat-version-check:
 	@actual="$$(swiftformat --version 2>/dev/null || echo missing)"; \
 	if [ "$$actual" != "$(SWIFTFORMAT_VERSION)" ]; then \
 		echo "warning: local swiftformat is $$actual; CI pins $(SWIFTFORMAT_VERSION), so lint results may differ from CI" >&2; \
+	fi
+	@actual="$$(swiftlint --version 2>/dev/null || echo missing)"; \
+	if [ "$$actual" != "$(SWIFTLINT_VERSION)" ]; then \
+		echo "warning: local swiftlint is $$actual; CI pins $(SWIFTLINT_VERSION), so lint results may differ from CI" >&2; \
 	fi
 
 bootstrap:
@@ -38,7 +45,7 @@ generate:
 build: generate
 	xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug $(if $(XCODE_DERIVED_DATA),-derivedDataPath "$(XCODE_DERIVED_DATA)") build
 
-# CI runs these three groups as parallel jobs (.github/workflows/ci.yml); locally
+# CI runs these groups as parallel jobs (.github/workflows/ci.yml); locally
 # `make test` still runs all of them in sequence.
 test: test-packages test-hosted test-preview
 
@@ -49,6 +56,7 @@ test-packages: generate
 	python3 Scripts/test-preview-webview-layering.py
 	Scripts/check-sparkle-layering.sh
 	Scripts/check-shipped-update-configuration.sh --self-test
+	Scripts/release-version.sh --self-test
 	@set -e; for pkg in $(PACKAGES); do \
 		echo "==> swift test: $$pkg"; \
 		(cd Packages/$$pkg && swift test); \
@@ -68,6 +76,18 @@ test-hosted: generate
 	    XCODE_TEST_TARGETS="$(XCODE_TEST_TARGETS)" \
 	    Scripts/run-hosted-tests.sh
 
+# CI's two halves of test-hosted: one job builds every bundle, and each shard runs
+# XCODE_TEST_TARGETS minus XCODE_SKIP_TESTS from those products, without the project.
+test-hosted-build: generate
+	XCODE_TEST_PHASE=build XCODE_DERIVED_DATA="$(XCODE_DERIVED_DATA)" XCODE_ARTIFACT_DIR="$(XCODE_ARTIFACT_DIR)" \
+	    Scripts/run-hosted-tests.sh
+
+test-hosted-shard:
+	XCODE_TEST_PHASE=test TEST_RUNNER_CI="$${CI:-}" XCODE_RESULT_BUNDLE="$(XCODE_RESULT_BUNDLE)" \
+	    XCODE_DERIVED_DATA="$(XCODE_DERIVED_DATA)" XCODE_ARTIFACT_DIR="$(XCODE_ARTIFACT_DIR)" \
+	    XCODE_TEST_TARGETS="$(XCODE_TEST_TARGETS)" XCODE_SKIP_TESTS="$(XCODE_SKIP_TESTS)" \
+	    Scripts/run-hosted-tests.sh
+
 test-preview:
 	cd preview-src && npm test
 
@@ -84,13 +104,25 @@ preview-bundle:
 release:
 	Scripts/release.sh
 
+# Exercises Scripts/make-appcast.sh with a throwaway key. Needs the Sparkle tools a
+# release or test build resolved; SPARKLE_BIN overrides the `make release` location.
+.PHONY: test-appcast
+test-appcast:
+	Scripts/make-appcast.sh --self-test $(if $(SPARKLE_BIN),--sparkle-bin $(SPARKLE_BIN))
+
 format: swiftformat-version-check
 	swiftformat $(SWIFT_FORMAT_PATHS) $(SWIFTFORMAT_COMPAT_FLAGS)
 	swiftlint --fix --quiet
 
-lint: swiftformat-version-check
+lint: check-preview-layering lint-style
+
+# The layering check resolves project.yml through xcodegen, so CI runs it on macOS;
+# lint-style needs no macOS and CI runs it on Ubuntu.
+check-preview-layering:
 	python3 Scripts/check-preview-webview-layering.py
-	swiftformat $(SWIFT_FORMAT_PATHS) --lint $(SWIFTFORMAT_COMPAT_FLAGS)
+
+lint-style: swiftformat-version-check
+	swiftformat $(SWIFT_FORMAT_PATHS) --lint $(SWIFTFORMAT_COMPAT_FLAGS) $(if $(SWIFTFORMAT_CACHE),--cache "$(SWIFTFORMAT_CACHE)")
 	swiftlint
 
 clean:

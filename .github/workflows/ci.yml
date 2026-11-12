@@ -1,30 +1,45 @@
 name: CI
 
-# No push trigger: main is protected and only receives squash merges of
-# PR-validated commits, so a push build duplicates the PR build at 10x
-# private-repo macOS pricing (this exhausted the June 2026 Actions quota).
-# Use workflow_dispatch to verify main on demand.
+# Every commit on main runs the full suite, without cancellation, and seeds the
+# caches every pull request restores (a pull request can read main's caches but
+# not another pull request's). Docs-only pushes are filtered here. Pull requests
+# have no path filter: a filtered run never reports the required `build-and-test`
+# check, which would block the merge, so the `changes` job classifies them instead.
+# The `paths` entries are last-match-wins, and the two re-included docs paths are
+# test inputs (see `changes`).
 on:
   pull_request:
+  push:
+    branches: [main]
+    paths:
+      - "**"
+      - "!docs/**"
+      - "docs/perf-log.md"
+      - "docs/evidence/**"
+      - "!*.md"
+      - "!LICENSE"
   workflow_dispatch:
 
-# Private-repo macOS minutes are expensive (10x multiplier): never run two
-# builds for the same ref at once.
+# A newer push to a pull request replaces its running build. Every other run gets
+# its own group: a shared group would keep only the newest waiting run, silently
+# dropping main commits, even with cancel-in-progress off.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.event_name == 'pull_request' && format('ci-pr-{0}', github.event.pull_request.number) || format('ci-run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Jobs only read the checkout; cache and artifact actions use the runtime
 # token, not GITHUB_TOKEN.
 permissions:
   contents: read
 
-# The suite runs as parallel jobs instead of one serial macOS job; the
-# `build-and-test` job at the bottom keeps the check name the main ruleset
-# requires and passes only when every job passed, or when `changes` found a
-# docs-only pull request and the test jobs were skipped. Three macOS jobs per
-# run fit GitHub's 5-concurrent macOS job cap (non-Enterprise plans); when two
-# PRs run at once, one of the second run's jobs waits for a free runner.
+# The suite runs as parallel jobs. The `build-and-test` job at the bottom keeps the
+# check name the main ruleset requires and passes only when every job passed, or
+# when `changes` found a docs-only pull request and the test jobs were skipped.
+# Everything that does not need macOS runs on Ubuntu. A run holds at most four macOS
+# runners (`packages` plus three shards) of GitHub's non-Enterprise cap of five.
+# CodeQL's Swift analysis no longer takes one per push; it runs weekly
+# (codeql-swift.yml). When two pull requests run at once, the second run's jobs wait
+# for a free runner.
 jobs:
   # Docs-only fast path. A pull request counts as docs-only when every path it
   # changes is under docs/ or is a top-level *.md or LICENSE file. Two docs paths
@@ -108,6 +123,79 @@ jobs:
       - name: Test preview
         run: make test-preview
 
+  # SwiftFormat and SwiftLint parse text and do not care which OS runs them. Both are
+  # pinned to exact release binaries instead of `brew install`: Homebrew tracks the
+  # latest release, and a runner-image bump from SwiftFormat 0.62.1 to 0.63.0
+  # (2026-09-18) changed the `indent` rule enough to fail `make lint` on untouched
+  # files, turning every PR red without any code change. These versions and SHA-256s
+  # are the single source of truth with the Makefile constants; bump them together
+  # in a PR that also reformats the tree if the new release changes rule behavior.
+  lint:
+    needs: changes
+    if: ${{ needs.changes.outputs.docs_only != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SWIFTFORMAT_VERSION: "0.62.1"
+      SWIFTFORMAT_LINUX_SHA256: "61ff55f3581e2144a4ad114831167102c38be853df75c1477d20b40a8e8120aa"
+      SWIFTLINT_VERSION: "0.65.1"
+      SWIFTLINT_LINUX_SHA256: "caeed6f4a679c35539ffaf124f6c4ab4a8416917f7d8796279dc52b74026059d"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned swiftformat and swiftlint
+        run: |
+          set -euo pipefail
+          install_dir="$RUNNER_TEMP/lint-tools"
+          mkdir -p "$install_dir"
+          curl -fsSL --retry 3 -o "$install_dir/swiftformat.zip" \
+            "https://github.com/nicklockwood/SwiftFormat/releases/download/$SWIFTFORMAT_VERSION/swiftformat_linux.zip"
+          curl -fsSL --retry 3 -o "$install_dir/swiftlint.zip" \
+            "https://github.com/realm/SwiftLint/releases/download/$SWIFTLINT_VERSION/swiftlint_linux_amd64.zip"
+          sha256sum -c - <<EOF
+          $SWIFTFORMAT_LINUX_SHA256  $install_dir/swiftformat.zip
+          $SWIFTLINT_LINUX_SHA256  $install_dir/swiftlint.zip
+          EOF
+          unzip -oq "$install_dir/swiftformat.zip" swiftformat_linux -d "$install_dir"
+          # The static build runs without Swift or libxml2 from the image. It has no
+          # SourceKit, so it skips statement_position, which only ever warns.
+          unzip -oq "$install_dir/swiftlint.zip" swiftlint-static -d "$install_dir"
+          mv "$install_dir/swiftlint-static" "$install_dir/swiftlint"
+          mv "$install_dir/swiftformat_linux" "$install_dir/swiftformat"
+          chmod +x "$install_dir/swiftformat" "$install_dir/swiftlint"
+          echo "$install_dir" >> "$GITHUB_PATH"
+          for tool in swiftformat swiftlint; do
+            actual="$("$install_dir/$tool" --version)"
+            expected="$SWIFTFORMAT_VERSION"
+            [ "$tool" = swiftformat ] || expected="$SWIFTLINT_VERSION"
+            if [ "$actual" != "$expected" ]; then
+              echo "pinned $tool $expected but binary reports $actual" >&2
+              exit 1
+            fi
+            echo "$tool: $actual (pinned)"
+          done
+
+      # SwiftFormat's cache is keyed by file content, tool version and options, so an
+      # unchanged file is not reformatted. The cache is a few hundred kilobytes.
+      - name: Cache SwiftFormat results
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/swiftformat-cache
+          key: swiftformat-${{ env.SWIFTFORMAT_VERSION }}-${{ hashFiles('.swiftformat', 'Makefile') }}-${{ github.run_id }}
+          restore-keys: swiftformat-${{ env.SWIFTFORMAT_VERSION }}-${{ hashFiles('.swiftformat', 'Makefile') }}-
+
+      # The static SwiftLint has no SourceKit, so it skips statement_position, which only
+      # warns. Fail if a SwiftLint upgrade or config change makes it skip any other rule.
+      - name: Lint
+        run: |
+          set -euo pipefail
+          make lint-style SWIFTFORMAT_CACHE="$RUNNER_TEMP/swiftformat-cache" 2>&1 | tee "$RUNNER_TEMP/lint.log"
+          skipped="$(grep -o "Skipping enabled rule '[a-z_]*'" "$RUNNER_TEMP/lint.log" | sort -u | grep -v "'statement_position'" || true)"
+          if [ -n "$skipped" ]; then
+            echo "SwiftLint skipped rules that need SourceKit: $skipped" >&2
+            exit 1
+          fi
+
   packages:
     needs: changes
     if: ${{ needs.changes.outputs.docs_only != 'true' }}
@@ -118,42 +206,8 @@ jobs:
 
       - name: Install tools
         run: |
-          brew install xcodegen swiftlint
+          brew install xcodegen
           echo "xcodegen: $(xcodegen --version)"
-          echo "swiftlint: $(swiftlint --version)"
-
-      # swiftformat is pinned to an exact release binary instead of `brew install`.
-      # Homebrew tracks the latest release, and a runner-image bump from 0.62.1 to
-      # 0.63.0 (2026-09-18) changed the `indent` rule enough to fail `make lint` on
-      # untouched files, turning every PR red without any code change. The pinned
-      # version and SHA-256 are the single source of truth; bump both together in a
-      # PR that also reformats the tree if the new release changes rule behavior.
-      - name: Install pinned swiftformat
-        env:
-          SWIFTFORMAT_VERSION: "0.62.1"
-          SWIFTFORMAT_SHA256: "7cb1cb1fae04932047c7015441c543848e8e60e1572d808d080e0a1f1661114a"
-        run: |
-          set -euo pipefail
-          install_dir="$RUNNER_TEMP/swiftformat-$SWIFTFORMAT_VERSION"
-          mkdir -p "$install_dir"
-          curl -fsSL --retry 3 \
-            -o "$install_dir/swiftformat.zip" \
-            "https://github.com/nicklockwood/SwiftFormat/releases/download/$SWIFTFORMAT_VERSION/swiftformat.zip"
-          echo "$SWIFTFORMAT_SHA256  $install_dir/swiftformat.zip" | shasum -a 256 -c -
-          unzip -oq "$install_dir/swiftformat.zip" -d "$install_dir"
-          chmod +x "$install_dir/swiftformat"
-          echo "$install_dir" >> "$GITHUB_PATH"
-          actual="$("$install_dir/swiftformat" --version)"
-          if [ "$actual" != "$SWIFTFORMAT_VERSION" ]; then
-            echo "pinned swiftformat $SWIFTFORMAT_VERSION but binary reports $actual" >&2
-            exit 1
-          fi
-          echo "swiftformat: $actual (pinned)"
-
-      - name: Verify swiftformat on PATH
-        run: |
-          echo "resolved: $(command -v swiftformat)"
-          echo "swiftformat: $(swiftformat --version)"
 
       - name: Cache Swift package builds
         uses: actions/cache@v4
@@ -164,47 +218,45 @@ jobs:
             Packages/EditorKit/.build
             Packages/PreviewKit/.build
             Packages/WorkspaceKit/.build
-          key: spm-${{ runner.os }}-${{ hashFiles('Packages/**/Package.swift', 'Packages/**/Package.resolved') }}
-          restore-keys: spm-${{ runner.os }}-
+            Packages/SyntaxKit/.build
+            Packages/WorkspaceCore/.build
+          key: spm-v3-${{ runner.os }}-${{ hashFiles('Packages/**/Package.swift', 'Packages/**/Package.resolved') }}
+          restore-keys: spm-v3-${{ runner.os }}-
 
-      - name: Lint
-        run: make lint
+      - name: Check preview layering
+        run: make check-preview-layering
 
       - name: Test packages
         run: make test-packages
 
-  # Hosted XCTest bundles, split across two runners by measured wall time on
-  # macos-15 (run 38697469851): PlainsongTests ~7.5 min alone; PlainsongUITests
-  # ~4.5 min plus PerformanceTests ~1 min. Each shard still builds every bundle
-  # (~3 min; -only-testing narrows execution, not the build).
-  hosted:
-    name: hosted (${{ matrix.shard }})
+  # Hosted XCTest bundles: one job builds every bundle once (~3 min) and the shards
+  # run the same products. A shard that names a class also skips it in that bundle's
+  # catch-all shard, so a renamed or new class always still runs; a new bundle fails
+  # `Check every test bundle has a shard` until a shard names it. Three shards, not
+  # four: when this was measured, CodeQL's default setup held a macOS runner for ~12
+  # minutes per push, so a fourth shard waited for a free runner longer than it saved.
+  # Swift analysis is weekly now (codeql-swift.yml); re-measure before adding a fourth.
+  # Balanced from measured class times on macos-15 (runs 41338975839 and 41340274653).
+  hosted-build:
+    name: hosted (build)
     needs: changes
     if: ${{ needs.changes.outputs.docs_only != 'true' }}
     runs-on: macos-15
-    timeout-minutes: 40
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - shard: app
-            targets: PlainsongTests
-          - shard: ui-performance
-            targets: PlainsongUITests PerformanceTests
-            build_app: true
+    timeout-minutes: 20
     env:
-      SHARD: ${{ matrix.shard }}
+      SHARD: build
     steps:
       - uses: actions/checkout@v4
 
-      - name: Prepare CI evidence paths
+      - &prepare-evidence
+        name: Prepare CI evidence paths
         run: |
           artifact_dir="$RUNNER_TEMP/plainsong-ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$SHARD"
           mkdir -p "$artifact_dir"
           {
             printf 'XCODE_ARTIFACT_DIR=%s\n' "$artifact_dir"
             printf 'XCODE_RESULT_BUNDLE=%s/Results.xcresult\n' "$artifact_dir"
-            printf 'XCODE_DERIVED_DATA=%s/plainsong-dd-%s-%s-%s\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$SHARD"
+            printf 'XCODE_DERIVED_DATA=%s/plainsong-dd\n' "$RUNNER_TEMP"
           } >> "$GITHUB_ENV"
 
       - name: Install tools
@@ -212,18 +264,50 @@ jobs:
           brew install xcodegen
           echo "xcodegen: $(xcodegen --version)"
 
-      - name: Test ${{ matrix.targets }}
-        run: make test-hosted XCODE_TEST_TARGETS="${{ matrix.targets }}"
+      - name: Cache Xcode package checkouts
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/plainsong-dd/SourcePackages
+          key: xcode-spm-${{ hashFiles('project.yml', 'Packages/**/Package.swift', 'Packages/**/Package.resolved') }}
+          restore-keys: xcode-spm-
 
-      - name: Build app
-        if: ${{ matrix.build_app }}
-        run: make build
+      - name: Build for testing
+        run: make test-hosted-build
+
+      # The shards select bundles by name; a new scheme test bundle would build but run in
+      # no shard while the gate stays green. Keep this list equal to the shards' targets.
+      - name: Check every test bundle has a shard
+        run: |
+          set -euo pipefail
+          xctestruns=("$XCODE_DERIVED_DATA"/Build/Products/*.xctestrun)
+          python3 Scripts/check-xctestrun-bundles.py "${xctestruns[0]}" PerformanceTests PlainsongTests PlainsongUITests
 
       - name: Check built update configuration
-        if: ${{ matrix.build_app }}
         run: Scripts/check-shipped-update-configuration.sh "$XCODE_DERIVED_DATA/Build/Products/Debug/Plainsong.app/Contents/Info.plist"
 
-      - name: Capture failure environment
+      # tar keeps the symlinks and signatures an artifact zip would lose. Objects and
+      # module files only serve the link step, which is finished.
+      - name: Package test products
+        run: |
+          set -euo pipefail
+          du -sh "$XCODE_DERIVED_DATA/Build/Products"
+          tar -C "$XCODE_DERIVED_DATA/Build" --exclude '*.o' --exclude '*.swiftmodule' --exclude '*.dSYM' -cf - Products \
+            | zstd -T0 -3 -o "$RUNNER_TEMP/hosted-products.tar.zst"
+          ls -lh "$RUNNER_TEMP/hosted-products.tar.zst"
+
+      # No attempt in the name: re-running a failed shard reuses this run's products.
+      - name: Upload test products
+        uses: actions/upload-artifact@v4
+        with:
+          name: hosted-products-${{ github.run_id }}
+          path: ${{ runner.temp }}/hosted-products.tar.zst
+          compression-level: 0
+          overwrite: true
+          retention-days: 1
+          if-no-files-found: error
+
+      - &capture-failure-environment
+        name: Capture failure environment
         if: ${{ failure() || cancelled() }}
         run: |
           artifact_dir="${XCODE_ARTIFACT_DIR:-$RUNNER_TEMP/plainsong-ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$SHARD}"
@@ -239,21 +323,78 @@ jobs:
 
       # Capture only the designated runner-temp evidence directory, never DerivedData,
       # caches, the workspace, environment dumps or home-directory contents.
-      - name: Keep failure evidence
+      - &keep-failure-evidence
+        name: Keep failure evidence
         if: ${{ failure() || cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: plainsong-ci-failure-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: plainsong-ci-failure-${{ env.SHARD }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ env.XCODE_ARTIFACT_DIR }}/
           retention-days: 14
           if-no-files-found: warn
+
+  hosted:
+    name: hosted (${{ matrix.shard }})
+    needs: [changes, hosted-build]
+    if: ${{ needs.changes.outputs.docs_only != 'true' }}
+    runs-on: macos-15
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: search
+            targets: >-
+              PlainsongUITests/WorkspaceSearchAcceptanceTests
+              PerformanceTests
+          - shard: find
+            targets: >-
+              PlainsongUITests
+              PlainsongTests/ExportPDFAcceptanceAppTests
+              PlainsongTests/WorkspaceSearchAppStateTests
+              PlainsongTests/ExportPDFMatrixAppTests
+              PlainsongTests/ExportPDFWideRunsAppTests
+            skip: PlainsongUITests/WorkspaceSearchAcceptanceTests
+          - shard: app
+            targets: PlainsongTests
+            skip: >-
+              PlainsongTests/ExportPDFAcceptanceAppTests
+              PlainsongTests/WorkspaceSearchAppStateTests
+              PlainsongTests/ExportPDFMatrixAppTests
+              PlainsongTests/ExportPDFWideRunsAppTests
+    env:
+      SHARD: ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - *prepare-evidence
+
+      - name: Download test products
+        uses: actions/download-artifact@v4
+        with:
+          name: hosted-products-${{ github.run_id }}
+          path: ${{ runner.temp }}
+
+      - name: Unpack test products
+        run: |
+          set -euo pipefail
+          mkdir -p "$XCODE_DERIVED_DATA/Build"
+          zstd -dc "$RUNNER_TEMP/hosted-products.tar.zst" | tar -C "$XCODE_DERIVED_DATA/Build" -xf -
+          rm "$RUNNER_TEMP/hosted-products.tar.zst"
+
+      - name: Test ${{ matrix.targets }}
+        run: make test-hosted-shard XCODE_TEST_TARGETS="${{ matrix.targets }}" XCODE_SKIP_TESTS="${{ matrix.skip }}"
+
+      - *capture-failure-environment
+
+      - *keep-failure-evidence
 
   # Required status check (main ruleset): keep this job id. Any failed or
   # cancelled job above fails it. A skipped job fails it too, unless `changes`
   # succeeded and reported a docs-only pull request.
   build-and-test:
     if: ${{ always() }}
-    needs: [changes, preview, packages, hosted]
+    needs: [changes, lint, preview, packages, hosted-build, hosted]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}

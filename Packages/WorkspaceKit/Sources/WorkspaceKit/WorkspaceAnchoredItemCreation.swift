@@ -243,13 +243,15 @@ private extension WorkspaceAnchoredItemCreator {
                     try chain.validateNamespace()
                     try WorkspaceAnchoredFileSystem.checkCancellation()
 
+                    // `0666` lets the kernel apply the umask, as for any other app's new
+                    // document; a hard-coded `0600` left every New File owner-only.
                     let descriptor = leaf.withCString {
                         Darwin.openat(
                             parentDescriptor,
                             $0,
                             O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC
                                 | O_NOFOLLOW_ANY,
-                            mode_t(S_IRUSR | S_IWUSR)
+                            mode_t(0o666)
                         )
                     }
                     guard descriptor >= 0 else {

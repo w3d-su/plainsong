@@ -13,6 +13,11 @@ concurrency:
   group: ios-${{ github.ref }}
   cancel-in-progress: true
 
+# The job only reads the checkout; artifact uploads use the runtime token, not
+# GITHUB_TOKEN.
+permissions:
+  contents: read
+
 jobs:
   ios-build-test-archive-ipa:
     # The image must carry an iOS >= 26 SDK and an installed iOS simulator

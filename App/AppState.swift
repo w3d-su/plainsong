@@ -27,7 +27,7 @@ final class AppState: ObservableObject {
     /// Window-scoped storage, forwarded by `AppState+WindowStateForwarding.swift`.
     let windowState: WindowState
     /// Root-scoped storage, forwarded by `AppState+WorkspaceRootForwarding.swift`.
-    let workspaceRootContext: WorkspaceRootContext
+    var workspaceRootContext: WorkspaceRootContext
     /// Per-file and app-global storage, forwarded by `AppState+RegistryForwarding.swift` and
     /// `AppState+SessionRegistryForwarding.swift`.
     let registry: AppDocumentRegistry
@@ -187,9 +187,7 @@ final class AppState: ObservableObject {
         if registerWindow {
             registry.register(windowState)
         }
-        workspaceRootContext.onExportHTMLContextChange = { [weak self] reason, _, _ in
-            self?.noteExportHTMLContextChange(reason)
-        }
+        connectWorkspaceRootContext()
         containerChangeCancellables = [
             windowState.objectWillChange.sink { [weak self] _ in
                 self?.objectWillChange.send()
