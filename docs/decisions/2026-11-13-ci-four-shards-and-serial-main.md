@@ -39,10 +39,10 @@ its test step took 344 s at the median (289–378). The other two took 294 s and
   runs the other UI tests and `PerformanceTests`; `gate` runs `EditorFindHostedGateTests`,
   `ExportPDFMatrixAppTests` and `ExportPDFWideRunsAppTests`; `app` runs the remaining
   `PlainsongTests` classes. Summing the class medians gives 196, 218, 219 and 216 s of
-  tests per shard, plus about 20 s of `xcodebuild` start-up each. That is an estimate from
-  the old layout's logs, not a measurement of this one. The rule that a named class is
-  skipped in its bundle's catch-all shard is unchanged, and so is the bundle check in
-  `hosted (build)`.
+  tests per shard, plus about 20 s of `xcodebuild` start-up each. That estimate comes from
+  the old layout's logs; the first two runs of this one are below. The rule that a named
+  class is skipped in its bundle's catch-all shard is unchanged, and so is the bundle
+  check in `hosted (build)`.
 - **A push to `main` runs its shards one at a time** (`max-parallel: 1`). Nobody waits for
   that run. It still runs every test from the same shard definitions as a pull request, and
   it holds at most two macOS runners (`packages` and `hosted (build)`, then `packages` and
@@ -50,6 +50,25 @@ its test step took 344 s at the median (289–378). The other two took 294 s and
 - **`workflow_dispatch` takes `serial_hosted`.** It defaults to off, so a dispatched run is
   as fast as a pull request. Setting it runs the shards as `main` does, which is also the
   only way to exercise that path before a change to it merges.
+
+## Measured on the pull request
+
+Two runs of this layout, against `main`'s run of the parent commit (43274184697, three
+shards). Test step times are from the job logs.
+
+| Run | Wall time | Shard test steps | macOS minutes |
+|---|---:|---|---:|
+| `main` at the parent commit, three shards | 13.0 min, with one job queued 115 s | 268, 269 and 323 s | 27.3 |
+| Pull request (43292425748), four at once | 8.7 min, nothing queued | 211, 228, 229 and 237 s | 26.4 |
+| `workflow_dispatch` with `serial_hosted` (43293560415) | 23.1 min | 202, 207, 229 and 256 s | 27.1 |
+
+All three executed the same 1,247 tests, each once, with the same 24 skipped. In the
+serial run each shard started two to four seconds after the one before it finished, and
+`packages` had finished before the first shard started, so the run held two macOS runners
+during the build and one after it.
+
+Two runs are a small sample, and runner speed varies between runs. Re-measure after
+`main` has run with this layout.
 
 ## Cost
 
