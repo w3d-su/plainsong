@@ -25,12 +25,30 @@ the canonical lock:
 | `make ios-test` | `46212ad8` (#264) | 703 run, 703 passed, 0 skipped |
 | `make ios-preview` | `46212ad8` (#264) | 214 run, 214 passed, 0 skipped |
 
-`make ios-preview` was not run on `1d8449f8` itself; #264 changes only `EditorKitIOS`
-and one `AppIOS` file. `make ios-acceptance`, `ios-archive`, `ios-ipa` and the hosted
-`ios.yml` workflow were not run. No iOS 26 simulator runtime is installed, so the
-minimum deployment target was compiled against and not executed. Evidence directories
-were under `/private/tmp/plainsong-ios-i0-out` and `/private/tmp/plainsong-ios-i0-fix-out`
-and are not retained in the repository.
+`make ios-preview` was not run locally on `1d8449f8` itself; #264 changes only
+`EditorKitIOS` and one `AppIOS` file. `ios-acceptance` was not run locally. No iOS 26
+simulator runtime is installed on this Mac. Local evidence directories were under
+`/private/tmp/plainsong-ios-i0-out` and `/private/tmp/plainsong-ios-i0-fix-out` and are
+not retained in the repository.
+
+Hosted `ios.yml`, dispatched on `main` `1d8449f8`
+([run 43629938430](https://github.com/w3d-su/plainsong/actions/runs/43629938430)),
+image `macos26`, Xcode 26.6, iOS SDK 26.5. The image carries iOS 26.2, 26.4.1 and 26.5
+simulator runtimes; which one the selected device used was not confirmed.
+
+| Attempt | Result |
+|---|---|
+| 1 | **Failed.** Tooling, build and `ios-test` passed. `ios-preview` failed one case, `PreviewIOSHostedTests/testBundledKitchenSinkAndMDXStayVisible`; acceptance, archive and IPA were skipped |
+| 2 (rerun of the failed job, same head) | Passed. `ios-test` 700/700, `ios-preview` 214/214, acceptance components 29/29, launch smoke 3/3, unsigned archive and IPA |
+
+In attempt 1 the test log shows the WebKit GPU process taking 8.16 s to launch, then the
+harness's 2 s JavaScript-reply deadline expiring while the kitchen-sink render was
+awaited. The reading here is a cold-start timing failure on the runner and not a
+product regression, because the same head passed on rerun and the same PreviewKit
+sources pass locally. That reading is an inference from one log, not a reproduced root
+cause, and a green rerun does not close it. The workflow also failed three of its six
+runs on 2026-10-29; those were not examined. The failed attempt's evidence artifact is
+`plainsong-ios-43629938430-1`.
 
 Unmerged iOS work found:
 
