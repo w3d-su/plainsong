@@ -41,14 +41,21 @@ simulator runtimes; which one the selected device used was not confirmed.
 | 1 | **Failed.** Tooling, build and `ios-test` passed. `ios-preview` failed one case, `PreviewIOSHostedTests/testBundledKitchenSinkAndMDXStayVisible`; acceptance, archive and IPA were skipped |
 | 2 (rerun of the failed job, same head) | Passed. `ios-test` 700/700, `ios-preview` 214/214, acceptance components 29/29, launch smoke 3/3, unsigned archive and IPA |
 
-In attempt 1 the test log shows the WebKit GPU process taking 8.16 s to launch, then the
-harness's 2 s JavaScript-reply deadline expiring while the kitchen-sink render was
-awaited. The reading here is a cold-start timing failure on the runner and not a
-product regression, because the same head passed on rerun and the same PreviewKit
-sources pass locally. That reading is an inference from one log, not a reproduced root
-cause, and a green rerun does not close it. The workflow also failed three of its six
-runs on 2026-10-29; those were not examined. The failed attempt's evidence artifact is
-`plainsong-ios-43629938430-1`.
+In attempt 1 the WebKit GPU process relaunched after an idle exit and took 8.16 s (its
+earlier launches in that session took 1.1–1.7 s), one JavaScript reply then missed the
+harness's 2 s deadline, and XCTest reported `InvalidTransition`. A local probe showed
+that this name is what XCTest reports when a test throws after its preview controller
+is torn down; the thrown error was the reply timeout. The slow relaunch itself is
+unexplained and is one occurrence, so the green rerun does not close it. Details and
+the limits of the probe are in
+[the decision entry](../decisions/2026-11-15-ios-preview-invalid-transition-is-a-masked-timeout.md).
+The failed attempt's evidence artifact is `plainsong-ios-43629938430-1`.
+
+The three failed `ios.yml` runs on 2026-10-29 had other causes, on in-progress commits
+of `codex/ios-editor-parity`: a required case missing from the inventory (`77f6b97e`),
+an acceptance-component failure (`5c1f2979`) and
+`IOSSourceEditorInputTests/testDeferredStatisticsRepublishTheEditorSnapshot`
+(`86e7d2cd`). None was this preview case.
 
 Unmerged iOS work found:
 
