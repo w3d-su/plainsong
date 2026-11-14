@@ -1,0 +1,62 @@
+<?xml version="1.0" standalone="yes"?><!-- sparkle-sign-warning:
+IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
+--><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>Plainsong</title>
+        <item>
+            <title>0.9.0</title>
+            <pubDate>Sat, 14 Nov 2026 18:44:34 +0000</pubDate>
+            <link>https://github.com/w3d-su/plainsong/releases/tag/v0.9.0-beta.1</link>
+            <sparkle:channel>beta</sparkle:channel>
+            <sparkle:version>226</sparkle:version>
+            <sparkle:shortVersionString>0.9.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[## What's Changed
+* Docs: record v0.1.0-alpha.5 at a210f85 (build 189) by @w3d-su in https://github.com/w3d-su/plainsong/pull/226
+* Phase 3 Windows: record owner decisions WD4 and WD9 by @w3d-su in https://github.com/w3d-su/plainsong/pull/225
+* Phase 3 Windows PR B2: take every session inventory from one registry enumerator over all connected windows by @w3d-su in https://github.com/w3d-su/plainsong/pull/224
+* Phase 3: apply iOS access, close and replacement review repairs by @w3d-su in https://github.com/w3d-su/plainsong/pull/221
+* Docs: add a Traditional Chinese README by @w3d-su in https://github.com/w3d-su/plainsong/pull/227
+* Phase 3 Windows PR C: independent window state and key-window routing by @w3d-su in https://github.com/w3d-su/plainsong/pull/230
+* Phase 3: show workspace SVG in the preview as an image by @w3d-su in https://github.com/w3d-su/plainsong/pull/229
+* Phase 3: record the R21 CI audit and lower R21 to Low by @w3d-su in https://github.com/w3d-su/plainsong/pull/231
+* Phase 3 Auto-update U1: integrate Sparkle 2, disabled by default by @w3d-su in https://github.com/w3d-su/plainsong/pull/232
+* Fix Sparkle U1 review notes before U2 by @w3d-su in https://github.com/w3d-su/plainsong/pull/235
+* Phase 3: import editor color themes by @w3d-su in https://github.com/w3d-su/plainsong/pull/234
+* feat(ios): add source chrome, folder search, and export by @w3d-su in https://github.com/w3d-su/plainsong/pull/228
+* Phase 3: block remote preview loads when Allow Remote Images is off by @w3d-su in https://github.com/w3d-su/plainsong/pull/233
+* Phase 3 Windows PR D1-0: record WD1-WD3 and WD6-WD8 and split D1 by @w3d-su in https://github.com/w3d-su/plainsong/pull/236
+* Phase 3 Windows PR D1a: keep installed sessions outside the warm LRU by @w3d-su in https://github.com/w3d-su/plainsong/pull/238
+* Phase 3: relicense Plainsong under GPL-3.0-or-later by @w3d-su in https://github.com/w3d-su/plainsong/pull/244
+* Phase 3 Windows PR D1b: release only the closing root's sessions by @w3d-su in https://github.com/w3d-su/plainsong/pull/239
+* Protect iOS document recovery and add an iCloud version picker by @w3d-su in https://github.com/w3d-su/plainsong/pull/243
+* Phase 3: refuse saves on volumes without atomic rename and type write failures by @w3d-su in https://github.com/w3d-su/plainsong/pull/245
+* Phase 2: specify the WYSIWYG table gate and prove its T0 projection by @w3d-su in https://github.com/w3d-su/plainsong/pull/249
+* Phase 3: review M-fixes (M1, M2, M4–M11) by @w3d-su in https://github.com/w3d-su/plainsong/pull/247
+* Phase 2: keep line-end WYSIWYG folds measurable by @w3d-su in https://github.com/w3d-su/plainsong/pull/251
+* Phase 3: add File › Save As… (⇧⌘S) by @w3d-su in https://github.com/w3d-su/plainsong/pull/248
+* Phase 2: model WYSIWYG tables from tree-sitter (table gate T1) by @w3d-su in https://github.com/w3d-su/plainsong/pull/250
+* Phase 3: integrate reviewed D1c shared-root lifecycle into main by @w3d-su in https://github.com/w3d-su/plainsong/pull/252
+* Docs: sync the READMEs and living docs with what main ships by @w3d-su in https://github.com/w3d-su/plainsong/pull/253
+* Phase 3: speed up CI with one hosted build and three test shards by @w3d-su in https://github.com/w3d-su/plainsong/pull/241
+* Phase 3: run CodeQL Swift analysis weekly from an advanced setup by @w3d-su in https://github.com/w3d-su/plainsong/pull/254
+* Phase 3: time the large-document completion miss as the fastest of five samples by @w3d-su in https://github.com/w3d-su/plainsong/pull/256
+* Phase 3: fix the two open code scanning alerts by @w3d-su in https://github.com/w3d-su/plainsong/pull/255
+* Phase 3 Auto-update U2: sign the update feed in the tag job and publish it by hand by @w3d-su in https://github.com/w3d-su/plainsong/pull/257
+* Phase 3 Auto-update U2b: set the feed and public key; release builds turn updates on by @w3d-su in https://github.com/w3d-su/plainsong/pull/258
+* Docs: record the release 1.0 scope decisions (V1–V6) by @w3d-su in https://github.com/w3d-su/plainsong/pull/237
+* Phase 3: wait for FSEvents to record a hosted fixture's writes before opening the workspace by @w3d-su in https://github.com/w3d-su/plainsong/pull/259
+* Phase 3: hold the scroll-owner clock in the hosted preview-owner Find test by @w3d-su in https://github.com/w3d-su/plainsong/pull/260
+* Phase 3: take a tagged release build's marketing version from the tag by @w3d-su in https://github.com/w3d-su/plainsong/pull/261
+* Phase 3 Auto-update: describe in-app updates in the README and pin the public key by @w3d-su in https://github.com/w3d-su/plainsong/pull/262
+
+
+**Full Changelog**: https://github.com/w3d-su/plainsong/compare/v0.1.0-alpha.5...v0.9.0-beta.1
+]]></description>
+            <enclosure url="https://github.com/w3d-su/plainsong/releases/download/v0.9.0-beta.1/Plainsong-0.9.0-226-unsigned.dmg" length="11276150" type="application/octet-stream" sparkle:edSignature="Gl12SbOb1gJUmRofI++Kb3goadIpapWAa6GnOzajyGFgECwRx7sOVQaSLIWNC1zB7Z5VJWMQEIS12tjH4YvdDw=="></enclosure>
+        </item>
+    </channel>
+</rss><!-- sparkle-signatures:
+edSignature: i9SXZZt3xAGA39r6CsgPygfPrQ1wCLLAcNknVsZ6VH0tgiTVBK1QmsuTz+rsihi2Mos7/EGhcdckdvPREk55BQ==
+length: 5992
+-->
