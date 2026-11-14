@@ -14,10 +14,12 @@ branch. One blocker remains: the owner's dogfood sign-off
 (`docs/wysiwyg-dogfood-checklist.md`), which includes the owner-run actual-IME harness. No WYSIWYG product bug was found. Four test
 gaps were closed with new tests and one perf record.
 
-**Open since 2026-11-13:** the production-viewport perf gate this audit added passes alone
-(27.7-29.6 ms) but fails in every local full-suite run, on the pre-merge build too: the
-first counted sample is 107-143 ms at load 3-7. The earlier "contention" reading was
-wrong and the cause is not identified (finding 7).
+**Found and fixed on 2026-11-13:** the production-viewport perf gate this audit added
+passed alone (27.7-29.6 ms) but failed in every local full-suite run, on the pre-merge
+build too, with a first counted sample of 107-143 ms. The earlier "contention" reading was
+wrong. Five WYSIWYG test fixtures left 75 windows on screen, and a Core Animation commit
+for them fell inside that sample. The fixtures now hide their windows after each test and
+the gate passes in the full suite. It was a test-suite artifact (finding 7).
 
 ## What changed since the evidence
 
@@ -74,6 +76,11 @@ wrong and the cause is not identified (finding 7).
   `docs/perf/2026-11-13-wysiwyg-promotion-gates-after-main-merge.md`. CI ran the hosted
   shards, PreviewKit and preview-src on this merge and passed; the hosted WYSIWYG tests
   were not rerun locally.
+- **After hiding the fixtures' leftover windows (2026-11-13, finding 7):** full EditorKit
+  `swift test`, 560 tests, 9 opt-in skips, 0 failures in 4 of 4 runs at load 5.1-8.2. The
+  production-viewport gate's samples are 27.6-32.7 ms, B10 23.8-25.7 ms, L8 16.7-17.0 ms
+  and I8 17.0-22.5 ms. Record:
+  `docs/perf/2026-11-13-wysiwyg-viewport-gate-leftover-windows.md`.
 - Not run locally: full `make test` (it includes PlainsongUITests, which kill a running
   Plainsong), PreviewKit and preview-src (no WYSIWYG code path), and the opt-in
   actual-IME harness (owner-run; it switches the system input source). CI runs the first
@@ -104,7 +111,7 @@ wrong and the cause is not identified (finding 7).
 | B7 Raw copy | Both cited tests pass | — | Holds |
 | B8 Paste | Passes | — | Holds |
 | B9 AX value | Passes | — | Holds |
-| B10 Visible-range perf | 24.8-27.6 ms over 3 isolated runs (was 26.964 ms); 27.4-33.3 ms on 2026-11-13, with the pre-merge build at 26.5-32.0 ms in the same session | The gate times one line; production requests the whole padded viewport, which STTextView 2.4 made taller. New production-viewport gate: 27.2-30.0 ms over a 6,324-unit request alone (27.7-29.6 ms on 2026-11-13), but 107-143 ms on its first sample in every full-suite run | B10 holds; the viewport gate is open (finding 7) |
+| B10 Visible-range perf | 24.8-27.6 ms over 3 isolated runs (was 26.964 ms); 27.4-33.3 ms on 2026-11-13, with the pre-merge build at 26.5-32.0 ms in the same session | The gate times one line; production requests the whole padded viewport, which STTextView 2.4 made taller. New production-viewport gate: 27.2-30.0 ms over a 6,324-unit request alone (27.7-29.6 ms on 2026-11-13). Its first sample was 107-143 ms in every full-suite run until the fixtures' leftover windows were hidden; 27.6-32.7 ms in 4 full-suite runs since | Holds (finding 7) |
 | B11 Undo/redo | Both cited tests pass | — | Holds |
 | B12 Source regression | See "How it was run" | `make test` now includes PlainsongUITests, which this audit must not run | Holds locally; full suite is CI's |
 | B13 Geometry | Passes | — | Holds |
@@ -193,12 +200,18 @@ single-file images, fenced code, tables, Mermaid/math and MDX stay raw (`testL1R
    test names) and the EditorKit API still says development
    (`MarkdownEditorDevelopmentPresentation`, `_developmentPresentation`,
    `_developmentImageThumbnails`). The UserDefaults key keeps its name on purpose (D.3).
-7. **Open: the production-viewport perf gate fails in the full EditorKit suite.** Found on
-   2026-11-13. `WYSIWYGViewportPerformanceGateTests` passes alone at about 28 ms and fails
-   7 of 7 full-suite runs at load 3-7 (4 on the merged head, 3 on the pre-merge head): its
-   first counted sample, taken after the test's own warm-up call, is 107-143 ms. It needs
-   the WYSIWYG test classes run in one process and no single class triggers it. That
-   points at state earlier tests leave behind, which is an inference. The cause, and
-   whether a long app session can reach the same slow recompute, are not known. CI cannot
-   show it, because perf budgets only print there (R15). Find the cause before reading the
-   B10 row as covering the production viewport.
+7. **Fixed: the production-viewport perf gate failed in the full EditorKit suite.** Found
+   on 2026-11-13. `WYSIWYGViewportPerformanceGateTests` passed alone at about 28 ms and
+   failed 7 of 7 full-suite runs at load 3-7 (4 on the merged head, 3 on the pre-merge
+   head): its first counted sample, taken after the test's own warm-up call, was
+   107-143 ms. Five WYSIWYG fixture factories showed a window per test and never hid it,
+   so 75 windows were on screen when the gate ran. A Core Animation run-loop timer commits
+   a transaction for the on-screen windows on the main thread (about 4 ms with 1 window,
+   about 77 ms with 76), and it fired inside the gate's first sample, during the probe's
+   `await`. `TestWindowTeardown` now hides each fixture window when its test finishes; the
+   gate then passes 4 of 4 full-suite runs at 27.6-32.7 ms. The cost depends on the number
+   of on-screen windows in the process, not on session length, so this was a test-suite
+   artifact and not an editor regression. Not established: what arms the timer, and one
+   151.584 ms I8 sample in 21 `--filter WYSIWYG` runs after the change (none in 5
+   full-suite runs). CI could not show the failure, because perf budgets only print there
+   (R15). Record: `docs/perf/2026-11-13-wysiwyg-viewport-gate-leftover-windows.md`.

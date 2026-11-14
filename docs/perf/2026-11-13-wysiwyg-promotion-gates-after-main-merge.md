@@ -102,3 +102,8 @@ All on the merged head, each a fresh process:
   known. The gate passing alone shows the steady-state cost of a viewport recompute is
   about 28 ms; it does not rule the other case out.
 - CI does not see this: `assertPerformanceBudget` only prints on CI hosts (R15).
+
+## Follow-up
+
+The cause was found the same day: windows left on screen by five WYSIWYG test fixtures.
+See `docs/perf/2026-11-13-wysiwyg-viewport-gate-leftover-windows.md`.

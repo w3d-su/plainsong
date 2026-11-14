@@ -52,6 +52,7 @@ enum WYSIWYGTableSpikeFixture {
             backing: .buffered,
             defer: false
         )
+        TestWindowTeardown.hideAfterCurrentTest(window)
         window.contentView = scrollView
         window.makeKeyAndOrderFront(nil)
         window.makeFirstResponder(textView)
