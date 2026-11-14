@@ -829,6 +829,12 @@ parsing cutoff. The memory budget is scoped to deterministic app host-process RS
 OS-managed WebKit helper processes should be recorded as diagnostic/informational
 data because helper reuse and process-pool ownership vary across runs and CI hosts.
 
+iOS device numbers come from the in-app Performance Probe (Settings, five taps on the
+Version row; `docs/ios/performance-probe.md`). It reports the app's side of a keystroke
+(insert, run loop commit, next display refresh), the visible highlight, and the preview
+render without its debounce, with raw samples as JSON. Its commit time alone does not
+close the keystroke-to-screen budget, and it does not exercise marked text.
+
 Record a new measurement as `docs/perf/YYYY-MM-DD-<slug>.md`, one file per entry.
 `docs/perf-log.md` is the archive and takes no new sections; its header has the file
 format. The 2026-10-18 profile above, and every earlier budget, stay in that archive.

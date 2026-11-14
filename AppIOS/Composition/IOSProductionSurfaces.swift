@@ -43,6 +43,7 @@ final class IOSProductionRuntime: ObservableObject {
     let recentPresentation = IOSRecentPresentationController()
     let exporter = IOSDocumentExportController()
     let typewriter = IOSTypewriterSync()
+    let performanceProbe = IOSPerformanceProbe()
     var previewThemeName = "system"
     var systemAppearanceIsDark = false
     var typewriterRequested = false
@@ -100,6 +101,7 @@ final class IOSProductionRuntime: ObservableObject {
         installSurfaces()
         installTypewriter()
         recentPresentation.bind(to: self)
+        performanceProbe.target = { [weak self] in self?.performanceProbeTarget() }
     }
 
     private func installTypewriter() {

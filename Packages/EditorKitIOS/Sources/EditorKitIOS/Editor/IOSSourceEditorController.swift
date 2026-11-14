@@ -21,6 +21,9 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
 
     /// Top visible source line after a real scroll. Typewriter sync listens; the editor does not.
     public var onViewportLine: ((Int) -> Void)?
+    /// Diagnostics only: the document version whose visible-range highlight was just
+    /// painted. Nil outside a measurement.
+    public var onHighlightApplied: ((Int) -> Void)?
 
     let scheduler: IOSHighlightScheduler
     let syntaxTokenizer: (any MarkdownSyntaxTokenizing)?

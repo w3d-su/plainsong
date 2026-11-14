@@ -11,6 +11,9 @@ struct IOSSettingsView: View {
     @State private var folderDraft = ""
     @State private var folderNote: String?
     @FocusState private var folderFieldFocused: Bool
+    /// Diagnostics stay out of sight until the version row is tapped five times.
+    @AppStorage(IOSDiagnosticsVisibility.key) private var showsDiagnostics = false
+    @Environment(\.plainsongPerformanceProbe) private var performanceProbe
 
     var body: some View {
         NavigationStack {
@@ -156,6 +159,18 @@ struct IOSSettingsView: View {
                     Text("Inserted images are copied into the image folder beside the document.")
                     Text("The folder is one name, not a path. A hidden or invalid name uses assets.")
                 }
+                Section {
+                    LabeledContent("Version", value: IOSDiagnosticsVisibility.versionText)
+                        .contentShape(Rectangle())
+                        .onTapGesture(count: 5) { showsDiagnostics.toggle() }
+                    if showsDiagnostics, let performanceProbe {
+                        Button("Performance Probe") {
+                            performanceProbe.isPanelPresented = true
+                            dismiss()
+                        }
+                        .accessibilityIdentifier("plainsong.ios.settings.performanceProbe")
+                    }
+                }
             }
             .onAppear { folderDraft = preferences.assetDirectoryName }
             .onDisappear(perform: commitFolderDraft)
@@ -176,6 +191,17 @@ extension IOSSettingsView {
         let result = IOSAssetFolderDraft.commit(folderDraft, to: preferences)
         folderDraft = result.name
         folderNote = result.note
+    }
+}
+
+enum IOSDiagnosticsVisibility {
+    static let key = "Plainsong.ios.settings.showsDiagnostics"
+
+    static var versionText: String {
+        let info = Bundle.main.infoDictionary ?? [:]
+        let version = info["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info["CFBundleVersion"] as? String ?? "?"
+        return "\(version) (\(build))"
     }
 }
 

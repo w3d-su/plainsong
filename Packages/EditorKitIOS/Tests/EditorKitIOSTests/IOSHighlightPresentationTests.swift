@@ -23,6 +23,25 @@ final class IOSHighlightPresentationTests: XCTestCase {
     }
 
     @MainActor
+    func testHighlightObserverReportsEachPaintedVersion() async {
+        let debounce = IOSDebounceGate()
+        let syntax = IOSGatedTokenizer()
+        let harness = makeHarness(debounce: debounce, syntax: syntax)
+        var painted: [Int] = []
+        harness.controller.onHighlightApplied = { painted.append($0) }
+        await paint(harness, syntax: syntax, debounce: debounce, kind: .strong)
+        XCTAssertEqual(painted, [0])
+
+        // A result for a theme that is no longer current is discarded, so nothing is reported.
+        harness.controller.theme = .dark
+        await releaseAndPark(debounce, syntax: syntax)
+        harness.controller.theme = .light
+        await syntax.gate.resumeFirst(kind: .inlineCode)
+        await Task.yield()
+        XCTAssertEqual(painted, [0])
+    }
+
+    @MainActor
     func testStaleThemeAndViewportResultsAreDiscarded() async {
         let debounce = IOSDebounceGate()
         let syntax = IOSGatedTokenizer()
