@@ -4,6 +4,49 @@ Created 2026-10-08. Contract: **IOS-C0-v1 declarations implemented**. Live main:
 
 The C0 tag preserves declarations and an unavailable scaffold. **The current branch contains the production composition candidate described below; full v1 acceptance remains OPEN. Older dated sections retain their original source and acceptance boundaries.**
 
+## I0 baseline re-check — 2026-11-15
+
+This section records the state of `main` three weeks after the section below. It closes
+no device gate, and **full v1 acceptance remains OPEN**.
+
+Merged since 2026-10-26 and not listed below: #221 (access, close and replacement review
+repairs), #228 (source chrome, folder search, Replace All, HTML/PDF export and print),
+#243 (recovery protection, background save assertion, in-place iCloud version
+resolution) and #255 (asset-path regex, iOS workflow token). Shared-package changes in
+that period include #233 (remote-load content rules in PreviewKit).
+
+Local runs on an iPhone 17 Pro / iOS 27.0 simulator with Xcode 27.0 (27A5194q), under
+the canonical lock:
+
+| Entry | Head | Result |
+|---|---|---|
+| `make test-ios-tooling` | `1d8449f8` | 44 run, 44 passed |
+| `make ios-test` | `1d8449f8` | 700 run, 700 passed, 0 skipped |
+| `make ios-test` | `46212ad8` (#264) | 703 run, 703 passed, 0 skipped |
+| `make ios-preview` | `46212ad8` (#264) | 214 run, 214 passed, 0 skipped |
+
+`make ios-preview` was not run on `1d8449f8` itself; #264 changes only `EditorKitIOS`
+and one `AppIOS` file. `make ios-acceptance`, `ios-archive`, `ios-ipa` and the hosted
+`ios.yml` workflow were not run. No iOS 26 simulator runtime is installed, so the
+minimum deployment target was compiled against and not executed. Evidence directories
+were under `/private/tmp/plainsong-ios-i0-out` and `/private/tmp/plainsong-ios-i0-fix-out`
+and are not retained in the repository.
+
+Unmerged iOS work found:
+
+- `f00d44ff` on `codex/ios-editor-parity` (forced light/dark editor appearance, line
+  number for the blank line after a trailing newline) was pushed after #228 merged and
+  never reached `main`. It is #264.
+- `wip/ios-local-rescue-20261029` holds one commit of local work rescued on 2026-10-29.
+  Its export-retention regression test and the files it shares with #228 and #243 are on
+  `main` in their merged form; the only content found missing was the perf record
+  `docs/perf/2026-10-29-leased-export-payload-retention.md`, added with this section.
+  The comparison was by file and by the named fix, not a line-by-line audit of all 86
+  files.
+
+Still OPEN, unchanged: every Must row in `docs/release-1.0-scope.md` §3, including
+export and print on a physical device, which the sections below do not list.
+
 ## Main completion candidate — 2026-10-26
 
 This section supersedes current-status claims below and preserves their historical receipts.
