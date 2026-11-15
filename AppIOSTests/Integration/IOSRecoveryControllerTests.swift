@@ -54,6 +54,31 @@ final class IOSRecoveryControllerTests: XCTestCase {
         XCTAssertTrue(fixture.store.opened.isEmpty)
     }
 
+    /// SwiftUI dismisses the folder sheet before UIKit's delegate reports the pick.
+    func testFolderPickedAfterTheSheetDismissesStillRestores() async throws {
+        let record = recoveryRecord()
+        let fixture = IOSSceneControllerFixture()
+        var restores = 0
+        let controller = IOSRecoveryController(list: { IOSRecoveryList(records: [record], corruptNames: []) },
+                                               load: { _ in record },
+                                               capture: fixture.controller.captureRecoveryRestore,
+                                               restore: { _, _, _ in restores += 1 })
+        controller.present()
+        await controller.select(record.recordID)
+        controller.requestRestore()
+        let request = try XCTUnwrap(controller.pickerRequest)
+        controller.pickerPresentationEnded()
+        XCTAssertNil(controller.pickerRequest)
+        let task = try XCTUnwrap(controller.completePicker(request, urls: [URL(fileURLWithPath: "/tmp/folder")]))
+        XCTAssertNil(
+            controller.completePicker(request, urls: [URL(fileURLWithPath: "/tmp/folder")]),
+            "a duplicate delegate result must not start a second restore"
+        )
+        await task.value
+        XCTAssertEqual(restores, 1)
+        XCTAssertNil(controller.completePicker(request, urls: [URL(fileURLWithPath: "/tmp/folder")]))
+    }
+
     func testCorruptReadShowsAnErrorWithoutLosingReadableSiblings() async {
         let record = recoveryRecord()
         let fixture = IOSSceneControllerFixture()

@@ -57,8 +57,8 @@ private struct IOSRecoveryView: View {
         }
         .task { await controller.refresh() }
         .sheet(item: Binding(get: { controller.pickerRequest }, set: { request in
-            if request == nil, !controller.isRestoring {
-                controller.cancelPicker()
+            if request == nil {
+                controller.pickerPresentationEnded()
             }
         })) { request in
             IOSProductionDocumentPicker(request: IOSProductionPickerRequest(scope: .directory)) { urls in
