@@ -111,3 +111,23 @@ extension IOSProductionRuntime {
         )
     }
 }
+
+extension IOSProductionRuntime {
+    /// The installed document as the performance probe sees it. Nil with no document.
+    func performanceProbeTarget() -> IOSPerformanceProbeTarget? {
+        guard let snapshot = editor.captureSnapshot() else { return nil }
+        let editor = editor
+        let preview = preview
+        return IOSPerformanceProbeTarget(
+            textView: editor.textView,
+            documentName: snapshot.document.fileURL?.lastPathComponent ?? "Untitled",
+            fileKind: String(describing: snapshot.document.fileKind),
+            canWrite: snapshot.canWrite,
+            setHighlightObserver: { observer in
+                editor.onHighlightApplied = observer.map { painted in { _ in painted() } }
+            },
+            setRenderObserver: { preview.renderTimingObserver = $0 },
+            previewIsVisible: { preview.webView.window != nil }
+        )
+    }
+}

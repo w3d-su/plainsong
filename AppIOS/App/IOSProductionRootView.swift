@@ -43,6 +43,7 @@ private struct IOSProductionSceneView: View {
     @ObservedObject var authoring: IOSAuthoringController
     @ObservedObject var recents: IOSRecentPresentationController
     @ObservedObject var exporter: IOSDocumentExportController
+    @ObservedObject var performanceProbe: IOSPerformanceProbe
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
     @State private var presentedRecentID: UUID?
@@ -53,10 +54,17 @@ private struct IOSProductionSceneView: View {
         _authoring = ObservedObject(wrappedValue: runtime.authoring)
         _recents = ObservedObject(wrappedValue: runtime.recentPresentation)
         _exporter = ObservedObject(wrappedValue: runtime.exporter)
+        _performanceProbe = ObservedObject(wrappedValue: runtime.performanceProbe)
     }
 
     var body: some View {
         IOSShellRootView(scene: runtime.scene, recovery: runtime.recovery)
+            .environment(\.plainsongPerformanceProbe, performanceProbe)
+            .overlay(alignment: .top) {
+                if performanceProbe.isPanelPresented {
+                    IOSPerformanceProbePanel(probe: performanceProbe)
+                }
+            }
             .background {
                 if let conflictCopy = runtime.conflictCopy {
                     IOSConflictCopyPresenter(coordinator: conflictCopy)
