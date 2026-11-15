@@ -107,13 +107,6 @@ final class IOSRootFilePresenter: NSObject, NSFilePresenter {
     }
 
     private func relativePath(for url: URL) -> String? {
-        let rootBytes = IOSWorkspacePathAuthority.pathBytes(root)
-        let fileBytes = IOSWorkspacePathAuthority.pathBytes(url)
-        guard fileBytes.count > rootBytes.count + 1 else { return nil }
-        guard Array(fileBytes.prefix(rootBytes.count)) == rootBytes else { return nil }
-        guard fileBytes[rootBytes.count] == UInt8(ascii: "/") else { return nil }
-        let remainder = String(decoding: fileBytes.dropFirst(rootBytes.count + 1), as: UTF8.self)
-        guard WorkspaceRelativePath(spelling: remainder) != nil else { return nil }
-        return remainder
+        IOSWorkspacePathAuthority.relativeSpelling(root: root, file: url)
     }
 }

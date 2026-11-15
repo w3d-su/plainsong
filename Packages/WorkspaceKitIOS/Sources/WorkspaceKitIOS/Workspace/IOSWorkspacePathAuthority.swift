@@ -44,6 +44,23 @@ enum IOSWorkspacePathAuthority {
         return rootPath
     }
 
+    /// `file`'s spelling below `root`, or nil when it is not below it. A folder
+    /// URL from the document picker spells its path with a trailing slash; a
+    /// root built from a path does not. Both name the same directory.
+    static func relativeSpelling(root: URL, file: URL) -> String? {
+        var rootBytes = pathBytes(root)
+        while rootBytes.count > 1, rootBytes.last == UInt8(ascii: "/") {
+            rootBytes.removeLast()
+        }
+        let fileBytes = pathBytes(file)
+        guard fileBytes.count > rootBytes.count + 1 else { return nil }
+        guard Array(fileBytes.prefix(rootBytes.count)) == rootBytes else { return nil }
+        guard fileBytes[rootBytes.count] == UInt8(ascii: "/") else { return nil }
+        let remainder = String(decoding: fileBytes.dropFirst(rootBytes.count + 1), as: UTF8.self)
+        guard WorkspaceRelativePath(spelling: remainder) != nil else { return nil }
+        return remainder
+    }
+
     static func directoryContains(root: URL, file: URL, relativePath: String) -> Bool {
         guard root.isFileURL, file.isFileURL else { return false }
         guard WorkspaceRelativePath(spelling: relativePath) != nil else { return false }

@@ -87,6 +87,39 @@ final class IOSWorkspaceAssetAndPreviewTests: XCTestCase {
         XCTAssertFalse(harness.service.isCurrent(access))
     }
 
+    /// The document picker's folder URL ends in a slash. Every relative image
+    /// in a picked folder was refused as outside the root.
+    func testPreviewReaderReadsBelowAPickedFolderURLWithATrailingSlash() async throws {
+        let harness = AccessHarness()
+        let grant = try await harness.openDirectory("/tmp/plainsong-lane06/Folder/")
+        XCTAssertTrue(grant.rootURL.path(percentEncoded: false).hasSuffix("/"))
+        let access = try XCTUnwrap(harness.service.previewContext(for: grant))
+        let url = IOSWorkspacePathAuthority.fileURL(path: "/tmp/plainsong-lane06/Folder/assets/plain.txt")
+        harness.files.parkReads = true
+        let task = Task {
+            try await harness.service.read(
+                PreviewAssetReadRequest(requestID: UUID(), resolvedURL: url, access: access, maximumByteCount: 32)
+            )
+        }
+        await waitUntil { harness.files.parkedReadCount == 1 }
+        harness.files.resumeRead(.success(Data("txt".utf8)))
+        let result = try await task.value
+        XCTAssertEqual(result.bytes, Data("txt".utf8))
+    }
+
+    func testRelativeSpellingTreatsATrailingSlashRootAsTheSameDirectory() {
+        let file = IOSWorkspacePathAuthority.fileURL(path: "/tmp/Folder/assets/a.png")
+        for root in ["/tmp/Folder", "/tmp/Folder/"] {
+            let rootURL = IOSWorkspacePathAuthority.fileURL(path: root)
+            XCTAssertEqual(IOSWorkspacePathAuthority.relativeSpelling(root: rootURL, file: file), "assets/a.png")
+            let sibling = IOSWorkspacePathAuthority.fileURL(path: "/tmp/Folder2/a.png")
+            XCTAssertNil(IOSWorkspacePathAuthority.relativeSpelling(root: rootURL, file: sibling))
+            XCTAssertNil(IOSWorkspacePathAuthority.relativeSpelling(root: rootURL, file: rootURL))
+            let escape = IOSWorkspacePathAuthority.fileURL(path: "/tmp/Folder/../secret.png")
+            XCTAssertNil(IOSWorkspacePathAuthority.relativeSpelling(root: rootURL, file: escape))
+        }
+    }
+
     func testSingleFilePreviewDoesNotReadASibling() async throws {
         let harness = AccessHarness()
         let grant = try await harness.openFile()
