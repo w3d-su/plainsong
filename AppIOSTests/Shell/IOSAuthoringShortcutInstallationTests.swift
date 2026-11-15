@@ -7,6 +7,8 @@ import XCTest
 /// not prove a hardware key reaches the scene router.
 @MainActor
 final class IOSAuthoringShortcutInstallationTests: XCTestCase {
+    /// The host mirrors the document column: navigation-bar items plus the
+    /// keyboard bar, which carries the primary commands' shortcuts.
     func testToolbarInstallsEveryDescriptorShortcut() {
         let provider = FakeAuthoringProvider(actions: IOSAuthoringCatalog.actions)
         let editor = FakeEditorBinding()
@@ -111,10 +113,13 @@ private struct ShortcutToolbarHost: View {
 
     var body: some View {
         NavigationStack {
-            TextField("Editor", text: .constant("hello"))
-                .toolbar {
-                    IOSAuthoringToolbarItems(scene: scene, router: router)
-                }
+            VStack {
+                TextField("Editor", text: .constant("hello"))
+                IOSAuthoringKeyboardBar(scene: scene, router: router)
+            }
+            .toolbar {
+                IOSAuthoringToolbarItems(scene: scene, router: router)
+            }
         }
     }
 }
