@@ -226,8 +226,13 @@ jobs:
       - name: Check preview layering
         run: make check-preview-layering
 
+      # The runner has three cores: three package builds at once, then the three test
+      # lanes side by side (Makefile, TEST_LANES; swift test --skip-build), then the
+      # sandbox probes serially after the lanes finish so their swiftc/swift-build work
+      # never runs beside timed package tests. The job has to end before `hosted (build)`
+      # does, about four minutes into a run, or it holds a macOS runner the shards need.
       - name: Test packages
-        run: make test-packages
+        run: make test-packages TEST_PACKAGES_JOBS=3
 
   # Hosted XCTest bundles: one job builds every bundle once (~3 min) and the shards
   # run the same products. A shard that names a class also skips it in that bundle's

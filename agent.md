@@ -987,6 +987,7 @@ make preview-bundle   # build preview-src → App/Resources/preview/ (commit the
 make build            # xcodebuild -scheme Plainsong build
 make test             # test-packages (swift test) + test-hosted (xcodebuild test) + test-preview (npm test)
 make test-hosted XCODE_TEST_TARGETS=PlainsongTests  # one hosted bundle subset
+make test-packages TEST_PACKAGES_JOBS=3  # package builds, then the test lanes, three at once (CI's setting)
 make release          # DMG pipeline (Scripts/release.sh); PLAINSONG_UNSIGNED=1 for the alpha path
 cd preview-src && npm run typecheck  # preview TypeScript check; CI runs this separately
 make format           # swiftformat . && swiftlint --fix
@@ -1007,6 +1008,23 @@ make format           # swiftformat . && swiftlint --fix
 - The preview CI job verifies every pinned acceptance resource against the committed
   bytes before installing preview dependencies. Regenerated resources must update
   `IOSAcceptanceTests/Resources/acceptance-resource-manifest.txt` in the same PR.
+- `make test-packages` builds every package's tests (`swift build --build-tests`), then
+  runs the test lanes the Makefile lists in `TEST_LANES`, through
+  `Scripts/run-test-lanes.py`, and finally runs `test-packages-sandbox` serially. Each
+  lane's `package-test-%` runs `swift test --skip-build` so `swift test` executes the
+  products built in the build phase without re-entering llbuild on the shared build plan
+  (avoiding a SwiftPM segfault). Running `test-packages-sandbox` after the lanes finish
+  keeps its `swift build`/`swift test`/`swiftc` invocations from compiling alongside timed
+  package tests in other lanes while reusing `WorkspaceKit`'s `.build`.
+  `TEST_PACKAGES_JOBS` is how many builds, then lanes, run at once. The default is 1: in
+  order, with live output, stopping at the first failure. CI's `packages` job passes 3,
+  one per runner core. Above 1 each lane's log is printed whole when the lane ends, a
+  failure lets the other lanes finish, the failed lanes' logs come last, and a stop
+  signal ends every lane's session and prints already-failed and running lanes' logs.
+  Wall-clock budgets that fail a test off CI are then measured while other lanes run, which
+  is why 1 is the default. A new package needs a `package-test-<name>` step in one lane
+  (and `test-packages-tooling` must appear in one lane), or the Makefile stops with an
+  error.
 - Xcode 16+. `.xcodeproj` is generated — **never hand-edit, never commit pbxproj
   conflicts; edit `project.yml`.**
 - Code signing: "Sign to Run Locally" for dev; hardened runtime + notarization scripted
