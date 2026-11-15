@@ -36,6 +36,9 @@ struct IOSRecentAccessList: View {
                     }
                 }
                 .padding(.vertical, 4)
+                // A List row with default-style buttons runs every button's
+                // action on one tap: open, Choose Again and Remove Record.
+                .buttonStyle(.borderless)
                 .accessibilityElement(children: .contain)
             }
         }
