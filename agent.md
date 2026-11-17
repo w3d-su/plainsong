@@ -364,7 +364,9 @@ gutter only draws: the laid-out viewport fragments it shows, numbered from the s
 `EditorScrollLineIndex` (only `\n` starts a line), on the painted baseline of each source
 line's first visual line (STTextView raises lines by half their line-height multiple's
 extra height). Its width follows the line count's digits with hysteresis and never
-changes while marked text is composed.
+changes while marked text is composed. It clips to its bounds and fills only the dirty
+rect inside them: since macOS 14 `draw(_:)` can get a wider rect, and the opaque fill
+then hid the whole text column (2026-11-17).
 
 **Abstraction rule:** App/ and MarkdownCore/ must never import STTextView types. Only
 EditorKit knows the concrete editor. This keeps the Phase-2 WYSIWYG swap and any library
