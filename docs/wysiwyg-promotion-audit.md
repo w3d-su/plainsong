@@ -180,8 +180,10 @@ single-file images, fenced code, tables, Mermaid/math and MDX stay raw (`testL1R
    and hidden link destination still zero width (a control proves an untrimmed paragraph
    is not rebuilt).
 2. **The perf gates time a paragraph, not a viewport.** Added
-   `WYSIWYGViewportPerformanceGateTests`, which times the range `MarkdownEditorView`
-   requests for a laid-out 1200 x 800 editor.
+   `WYSIWYGViewportPerformanceGateTests`, which times highlight and attribute apply over
+   the range `MarkdownEditorView` requests for a laid-out 1200 x 800 editor. The timed
+   editor is a separate scroll view outside the window, so the in-window fold layout of
+   that viewport is not in the number.
 3. **The pointer gates run with line numbers off.** Added
    `WYSIWYGLineNumberGutterPointerGateTests`; offsetting the click by the gutter width
    makes it fail.

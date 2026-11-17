@@ -39,7 +39,7 @@ impact to editor correctness, user trust, or ability to enter Phase 2 safely.
 1. Keep WYSIWYG Experimental/off by default until the promotion PR merges with the owner's dogfood and actual-IME sign-off (`docs/wysiwyg-dogfood-checklist.md`) and a dated Decision Log entry.
 2. Keep the opt-in actual IME (Zhuyin + Pinyin) harness, including the completed link- and image-boundary scenarios, and the pointer/selection/B13 gates runnable before any WYSIWYG promotion.
 3. Keep partial folded-span copy/paste policy, including partial hidden-URL selections, documented and covered by EditorKit tests.
-4. Keep inline-link folding and eligible folder-workspace image thumbnails confined to off-by-default Experimental WYSIWYG; keep reference links, autolinks, ineligible/single-file images, and other deferred constructs raw until their own native gates pass.
+4. Keep inline-link folding and eligible folder-workspace image thumbnails confined to the WYSIWYG layout, behind its mode switch; keep reference links, autolinks, ineligible/single-file images, and other deferred constructs raw until their own native gates pass.
 5. R17 is split by OS (window-chrome PR L): the split view only on macOS 27+, the fixed `HStack` shell before. Keep the launch loop and CI's macOS 15 run as the checks for any change to the split view or detail column.
 6. Keep release hardening separate from Phase 2 feature work.
 7. Keep R19's aggregate limits and repeated-reference tests on the HTML path. File-menu HTML export (#138), the one-shot writer (#132), and PDF/Print (#147) have landed; their owner smokes and E9 stay open. Do not widen the caps without owner-approved evidence.

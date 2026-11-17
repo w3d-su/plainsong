@@ -24,19 +24,36 @@ final class WYSIWYGElementCacheTrimGateTests: XCTestCase {
         let textView = fixture.textView
         let storage = try XCTUnwrap(MarkdownTextView.textStorage(of: textView))
         jumpToEndAndBack(fixture)
+        // A real edit in the viewport, so the trim has an Undo action to keep.
+        let edit = fixture.source.range(of: "Paragraph 751 ").location
+        textView.textSelection = NSRange(location: edit, length: 0)
+        textView.insertText("x", replacementRange: NSRange(location: edit, length: 0))
+        textView.layoutSubtreeIfNeeded()
+        let undoManager = try XCTUnwrap(textView.undoManager)
+        XCTAssertTrue(undoManager.canUndo, "Control: the edit registered an Undo action")
         let before = try XCTUnwrap(storage.copy() as? NSAttributedString)
         let selection = textView.selectedRange()
         let origin = fixture.scrollView.contentView.bounds.origin
-        let canUndo = textView.undoManager?.canUndo
 
         let trimmed = try trimAll(in: textView)
         textView.layoutSubtreeIfNeeded()
 
         XCTAssertGreaterThan(trimmed.length, 0)
+        XCTAssertGreaterThan(trimmed.location, edit, "The trim releases paragraphs below the edit")
         XCTAssertTrue(storage.isEqual(to: before), "A trim must not change text or fold attributes")
         XCTAssertEqual(textView.selectedRange(), selection)
         XCTAssertEqual(fixture.scrollView.contentView.bounds.origin, origin)
-        XCTAssertEqual(textView.undoManager?.canUndo, canUndo)
+        XCTAssertTrue(undoManager.canUndo, "A trim must keep the edit's Undo action")
+
+        undoManager.undo()
+
+        XCTAssertEqual(storage.string, fixture.source as String, "Undo after a trim restores the text")
+        // The trimmed paragraphs keep their fold attributes, one unit earlier than before.
+        let trimmedAfterUndo = NSRange(location: trimmed.location - 1, length: trimmed.length)
+        XCTAssertTrue(
+            storage.attributedSubstring(from: trimmedAfterUndo).isEqual(to: before.attributedSubstring(from: trimmed)),
+            "Undo after a trim keeps the trimmed paragraphs' fold attributes"
+        )
     }
 
     func testTrimmedParagraphsReturnThroughTheProjectionStillFolded() throws {
@@ -133,7 +150,7 @@ private extension WYSIWYGElementCacheTrimGateTests {
         window.orderFront(nil)
         windows.append(window)
         textView.text = source as String
-        textView.setWYSIWYGZeroWidthFoldingEnabled(true)
+        XCTAssertTrue(textView.setWYSIWYGZeroWidthFoldingEnabled(true))
 
         let highlighted = MarkdownSyntaxHighlighter().highlight(
             source as String,

@@ -71,6 +71,14 @@ private extension WYSIWYGLineNumberGutterPointerGateTests {
         let screenRect = editor.textView.firstRect(forCharacterRange: character, actualRange: nil)
         XCTAssertGreaterThan(screenRect.width, 0, "Expected a laid-out rect for \(character)")
         let windowPoint = editor.window.convertPoint(fromScreen: CGPoint(x: screenRect.midX, y: screenRect.midY))
+        // The event goes straight to the text view, so check that the window would route it
+        // there too: nothing (the gutter included) covers the clicked point.
+        let contentView = try XCTUnwrap(editor.window.contentView)
+        let hit = contentView.hitTest(contentView.superview?.convert(windowPoint, from: nil) ?? windowPoint)
+        XCTAssertTrue(
+            hit.map { $0 === editor.textView || $0.isDescendant(of: editor.textView) } ?? false,
+            "The window hit-tests \(String(describing: hit)) at \(character), not the text view"
+        )
         let event = try XCTUnwrap(NSEvent.mouseEvent(
             with: .leftMouseDown,
             location: windowPoint,

@@ -1,12 +1,13 @@
 # Image Thumbnails — Sub-Gate Specification
 
-> **Status: I0–I10 checked with evidence. PR #83 wires image thumbnails only into the
-> off-by-default Experimental WYSIWYG mode for folder workspaces.**
+> **Status: I0–I10 checked with evidence. PR #83 wired image thumbnails only into the
+> WYSIWYG mode for folder workspaces (then Experimental and off by default; on by default
+> since the D.4 promotion).**
 > `docs/wysiwyg-release-checklist.md` §E records that narrow inclusion. This document is the
 > dedicated sub-gate (the link-folding pattern, `docs/link-folding-gates.md`, applied to the
-> next construct). The App supplies the WorkspaceKit-backed loader only when the Experimental
-> flag, WYSIWYG layout, and mechanism-health gates already permit WYSIWYG; source modes,
-> kill-switch fallback, single-file mode, and stable/default promotion remain unchanged.
+> next construct). The App supplies the WorkspaceKit-backed loader only when the WYSIWYG
+> mode switch, WYSIWYG layout, and mechanism-health gates already permit WYSIWYG; source
+> modes, kill-switch fallback and single-file mode remain unchanged.
 > I0-I10 were re-verified against `origin/main` on 2026-10-24 for the D.4 promotion
 > (`docs/wysiwyg-promotion-audit.md`); I5 needs the owner's actual-IME rerun.
 
@@ -215,7 +216,7 @@ Experimental flag, WYSIWYG layout, and mechanism-health gates select
 `.inlineFoldRevealWithLinkFolding`, and only when a folder workspace provides contained
 directory scope. The existing FSEvents/external-reload path invalidates changed raster paths;
 single-file mode provably supplies no loader and stays raw. This enables image thumbnails
-**only inside the off-by-default Experimental WYSIWYG mode** and is recorded in the 2026-07-12
+**only inside the WYSIWYG mode** (then Experimental and off by default) and is recorded in the 2026-07-12
 Decision Log entry. Stable/default promotion remains governed by
 `docs/wysiwyg-release-checklist.md` §F/D.4 and is not claimed. Remote image fetching, SVG,
 reference images, animation playback, resize handles, and open-in-Preview behavior are out of

@@ -2,6 +2,7 @@
 
 > **Status: PROMOTION PREPARED, NOT SIGNED OFF. Every gate except the D.4 promotion box is
 > checked**, and every automated gate was re-verified against `origin/main` on 2026-10-24
+> and again after merging `origin/main` `d9dc9221` on 2026-11-13
 > (`docs/wysiwyg-promotion-audit.md`). The promotion makes WYSIWYG a normal layout choice, on
 > by default, with the Settings switch as its kill switch. The click-layout fix landed in #214;
 > it waits for the owner's dogfood and actual-IME rerun (`docs/wysiwyg-dogfood-checklist.md`; B1, B2,
@@ -312,9 +313,9 @@ turned this into a **three-state** cycle per `agent.md` §13.
 ### D.4 Experimental vs stable labeling
 
 - [x] Until **every** gate in this document is green, WYSIWYG ships (if at all) behind an
-  **Experimental** Settings toggle and is **off by default**. Evidence: on `main` until the
-  promotion merges, `AppStateTests.testSettingsPreferencesPersistThroughUserDefaults` asserts
-  the `false` default and its persistence. The promotion flips that assertion to `true`, so it
+  **Experimental** Settings toggle and is **off by default**. Evidence: before the
+  promotion, `AppStateTests.testSettingsPreferencesPersistThroughUserDefaults` asserted the
+  `false` default and its persistence. The promotion flipped that assertion to `true`, so it
   merges only together with the checked promotion box below.
 - [x] The Experimental label is manually verified in Settings UI and user-facing docs/README.
   Evidence (before the promotion): 2026-06-27 Settings UI sign-off verified
@@ -324,12 +325,18 @@ turned this into a **three-state** cycle per `agent.md` §13.
   this checklist fully green and a Decision Log entry recording the promotion.
   Check this box only once every placeholder in its evidence is filled.
   Evidence: every gate re-verified against `origin/main` `1428bf1` on 2026-10-24
-  (`docs/wysiwyg-promotion-audit.md`, `docs/perf/2026-10-24-wysiwyg-promotion-gates.md`); the
+  (`docs/wysiwyg-promotion-audit.md`, `docs/perf/2026-10-24-wysiwyg-promotion-gates.md`) and
+  after merging `origin/main` `d9dc9221` on 2026-11-13
+  (`docs/perf/2026-11-13-wysiwyg-promotion-gates-after-main-merge.md`,
+  `docs/perf/2026-11-13-wysiwyg-viewport-gate-leftover-windows.md`; merge `78da1a41`, then
+  `1c777b12` with the test-window fix); the
   click-layout fix #214 (pointer gates reran green on the merged branch, 2026-10-26); owner dogfood and actual-IME sign-off
   (`docs/wysiwyg-dogfood-checklist.md`) **<maintainer: date and record link>**; Decision Log
   `docs/decisions/YYYY-MM-DD-wysiwyg-leaves-experimental.md`. The switch defaults on, the
-  first-launch layout is unchanged, and Settings, the View menu, the toolbar and README drop
-  the Experimental label (`WYSIWYGPromotionAppStateTests`).
+  first-launch layout is unchanged (`WYSIWYGPromotionAppStateTests` covers the default layout
+  choice and the kept opt-out), and Settings, the View menu, the toolbar, the fallback banner
+  and both READMEs drop the Experimental label (read from `App/` and the READMEs; no test
+  checks the strings).
 
 ---
 

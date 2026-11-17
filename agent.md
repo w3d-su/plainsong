@@ -454,7 +454,7 @@ replacement local to EditorKit.
 | Paragraph | ⌘0 | strip heading prefix |
 | Quote | ⌘⇧Q | toggle `> ` |
 | Code fence | ⌘⇧K | wrap selection in fences |
-| Toggle preview pane | ⌘⇧P | show/hide right pane |
+| Cycle layout | ⌘⇧P | source + preview → source only → WYSIWYG (while the WYSIWYG switch is on) → source + preview |
 | Toggle sidebar | ⌃⌘S | native View › Show/Hide Sidebar (`SidebarCommands`; macOS 27+ split view only) |
 | Toggle inspector | ⌃⌘I | View › Show/Hide Inspector (`InspectorToggleCommands`, key window) |
 | Format table | ⌥⌘F | |
@@ -873,7 +873,7 @@ editor *folds* markdown tokens via rendering, not text mutation:
   reset presentation caches and request one fresh derivation; real-IME and full
   performance acceptance remain open.
 - The two-pane mode remains available behind a toggle forever (⌘⇧P cycles: source+preview
-  / source only / WYSIWYG once it ships; the toolbar layout picker selects a mode directly).
+  / source only / WYSIWYG; the toolbar layout picker selects a mode directly).
 
 ---
 

@@ -5,9 +5,11 @@ import XCTest
 
 /// B10, L8 and I8 time the fold recompute over one paragraph. Production requests the
 /// native viewport, which STTextView 2.4 (#180) extends up to half a screen above the
-/// visible area, padded by `EditorHighlightViewport.padded`. This gate times the shipped
-/// link-folding presentation over that real request range for a laid-out 1200 x 800
-/// editor on the 1 MB fixture, against the same agent.md §12 50 ms highlight budget.
+/// visible area, padded by `EditorHighlightViewport.padded`. This gate takes that request
+/// range from a laid-out 1200 x 800 editor on the 1 MB fixture, then times the shipped
+/// link-folding highlight and attribute apply over it, against the same agent.md §12 50 ms
+/// highlight budget. The timed editor is a separate scroll view outside the window with its
+/// viewport at the top, so in-window layout of the folded viewport is not timed.
 @MainActor
 final class WYSIWYGViewportPerformanceGateTests: XCTestCase {
     private var windows: [NSWindow] = []
