@@ -6,8 +6,11 @@
 > `docs/wysiwyg-release-checklist.md` §E requires before a deferred construct becomes
 > user-facing, following the link-folding (`docs/link-folding-gates.md`) and image-thumbnail
 > (`docs/image-thumbnail-gates.md`) pattern. When every gate is checked, tables render only in
-> the off-by-default Experimental WYSIWYG mode (`.inlineFoldRevealWithLinkFolding`); source
-> modes, kill-switch fallback, and stable/default promotion stay unchanged.
+> the WYSIWYG layout (`.inlineFoldRevealWithLinkFolding`), behind the WYSIWYG mode switch;
+> source modes and kill-switch fallback stay unchanged. This spec was written while that
+> mode was Experimental and off by default. Since the D.4 promotion it is on by default, so
+> T11 ships tables to everyone who uses WYSIWYG; the owner re-confirms this premise before
+> T11 is checked.
 
 Created 2026-11-06 after an owner report: in Experimental WYSIWYG a table such as
 `| 123|234|345|` / `| ----- | ----- | ---- |` shows as styled raw pipe text. See `agent.md`
@@ -257,7 +260,7 @@ reveals a construct's raw syntax when the caret touches it. For tables v1 combin
 
 ### T11 — Mode integration and regression
 - [ ] Table presentation runs only under `.inlineFoldRevealWithLinkFolding` behind the
-  existing Experimental flag, WYSIWYG layout and mechanism-health gates; the kill switch and
+  WYSIWYG mode switch, WYSIWYG layout and mechanism-health gates; the kill switch and
   disable-from-WYSIWYG fallback drop it with the rest of the presentation. Source-only and
   source+preview are byte-for-byte unchanged (the §A.3 invariants), the preview pipeline is
   untouched, App and MarkdownCore import no STTextView, and full `make test` passes.
@@ -266,6 +269,5 @@ reveals a construct's raw syntax when the caret touches it. For tables v1 combin
 
 T0–T11 checked with named automated and owner-run evidence. Then the
 `docs/wysiwyg-release-checklist.md` §E "Tables — stay raw" line becomes "included only in
-Experimental WYSIWYG after T0–T11", `agent.md` §13 replaces "tables may initially stay raw"
-with the shipped policy, and a Decision Log entry records the inclusion. Stable/default
-promotion stays governed by checklist §F/D.4 and is not claimed.
+the WYSIWYG layout after T0–T11", `agent.md` §13 replaces "tables may initially stay raw"
+with the shipped policy, and a Decision Log entry records the inclusion.

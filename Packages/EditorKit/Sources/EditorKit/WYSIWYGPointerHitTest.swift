@@ -1,7 +1,7 @@
 import AppKit
 import STTextView
 
-/// Maps a pointer location to a raw UTF-16 caret offset in Experimental WYSIWYG, where folded
+/// Maps a pointer location to a raw UTF-16 caret offset in WYSIWYG, where folded
 /// Markdown delimiters lay out with zero width.
 ///
 /// Only the laid-out TextKit viewport is visited. STTextView keeps it at the visible area

@@ -3,7 +3,7 @@ import AppKit
 import STTextView
 import XCTest
 
-/// Windowed Experimental WYSIWYG editors for pointer-click cost tests: the visible range is
+/// Windowed WYSIWYG editors for pointer-click cost tests: the visible range is
 /// folded as the app's visible-range highlight folds it, and clicks are real `NSEvent`s.
 @MainActor
 enum WYSIWYGPointerClickTestSupport {

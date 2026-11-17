@@ -3,8 +3,8 @@ import AppKit
 import STTextView
 import XCTest
 
-/// Opt-in (PLAINSONG_RUN_WYSIWYG_CLICK_PROBE=1) cost of a pointer click in Experimental
-/// WYSIWYG on `Fixtures/large-1mb.md`, near the top, middle and end, with the visible range
+/// Opt-in (PLAINSONG_RUN_WYSIWYG_CLICK_PROBE=1) cost of a pointer click in WYSIWYG on
+/// `Fixtures/large-1mb.md`, near the top, middle and end, with the visible range
 /// folded and image thumbnails placed, plus one click after a scroll with no layout pass.
 /// Run release-optimized:
 /// `PLAINSONG_RUN_WYSIWYG_CLICK_PROBE=1 swift test -c release -Xswiftc -enable-testing

@@ -26,7 +26,7 @@ extension AppState {
         case .sourcePreview:
             "Show Source Only"
         case .sourceOnly:
-            isExperimentalWYSIWYGAvailable ? "Show WYSIWYG (Experimental)" : "Show Preview"
+            isExperimentalWYSIWYGAvailable ? "Show WYSIWYG" : "Show Preview"
         case .wysiwyg:
             "Show Source + Preview"
         }
@@ -56,7 +56,7 @@ extension AppState {
 
     var layoutModeToolbarHelp: String {
         isExperimentalWYSIWYGAvailable
-            ? "Cycle layout: source + preview, source only, WYSIWYG (Experimental)"
+            ? "Cycle layout: source + preview, source only, WYSIWYG"
             : "Toggle layout between source + preview and source only"
     }
 
@@ -118,7 +118,7 @@ extension AppState {
 
         let reason = preferences.experimentalWYSIWYGEnabled
             ? "WYSIWYG editor mechanism is unhealthy"
-            : "Experimental WYSIWYG is disabled"
+            : "WYSIWYG is turned off in Settings"
         recoverFromUnavailableWYSIWYG(reason: reason)
     }
 
@@ -129,7 +129,7 @@ extension AppState {
 
         let reason = preferences.experimentalWYSIWYGEnabled
             ? "WYSIWYG editor mechanism is unhealthy"
-            : "Experimental WYSIWYG is disabled"
+            : "WYSIWYG is turned off in Settings"
         recordWYSIWYGFallback(reason: reason)
         return .sourceOnly
     }

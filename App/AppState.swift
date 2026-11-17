@@ -279,7 +279,7 @@ extension AppState {
            let persistedMode = EditorLayoutMode(rawValue: rawMode)
         {
             guard persistedMode != .wysiwyg || isExperimentalWYSIWYGEnabled else {
-                let message = "Experimental WYSIWYG is disabled; " +
+                let message = "WYSIWYG is turned off in Settings; " +
                     "falling back to source-only layout without changing source text."
                 userDefaults.set(EditorLayoutMode.sourceOnly.rawValue, forKey: layoutModeDefaultsKey)
                 NSLog("[Plainsong] %@", message)

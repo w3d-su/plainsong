@@ -52,7 +52,7 @@ public enum EditorReplaceRefusal: Equatable, Sendable, Error {
     case noCurrentMatch
     case markedText
     case unauthorized
-    /// Experimental WYSIWYG: the selected raw match lacks a current applied proof that
+    /// WYSIWYG: the selected raw match lacks a current applied proof that
     /// the match, each overlapping owner's own fold chrome, and each overlapping image
     /// source are revealed. Zero effect; it never reveals and writes in one action.
     case wysiwygRangeNotRevealed

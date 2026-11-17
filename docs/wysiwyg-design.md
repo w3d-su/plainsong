@@ -10,9 +10,13 @@
 >
 > Current note (2026-07-12): §§3-19 are historical core/gate records. Native input,
 > selection, and pointer gates are complete; §20 records the separately gated inline-link and
-> folder-workspace image-thumbnail extensions. WYSIWYG remains available only as an
-> off-by-default Experimental mode, and stable/default promotion remains blocked by
-> `docs/wysiwyg-release-checklist.md` D.4.
+> folder-workspace image-thumbnail extensions. At that date WYSIWYG was available only as an
+> off-by-default Experimental mode, with stable/default promotion blocked by
+> `docs/wysiwyg-release-checklist.md` D.4. Promotion note (2026-10-24): the gates were
+> re-verified (`docs/wysiwyg-promotion-audit.md`); the click-layout fix landed in #214, and D.4
+> now waits only for the owner's dogfood sign-off (`docs/wysiwyg-dogfood-checklist.md`).
+> After the promotion WYSIWYG is a normal layout choice, on by default behind its Settings
+> kill switch.
 
 ## 1. Goal & non-goals
 

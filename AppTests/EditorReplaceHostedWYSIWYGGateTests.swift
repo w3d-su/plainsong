@@ -219,7 +219,7 @@ extension EditorFindHostedGateTests {
     }
 
     private func waitForHostedReplaceWYSIWYG(_ hosted: HostedReplaceWorkspace) async throws {
-        try await waitUntil("production Experimental WYSIWYG is installed") {
+        try await waitUntil("production WYSIWYG is installed") {
             self.editorTextView(in: hosted.window)?.wysiwygZeroWidthContentStorageDelegate != nil
                 && self.editorTextView(in: hosted.window)?.replacePresentationSnapshot?.styledText.foldPlan != nil
         }
