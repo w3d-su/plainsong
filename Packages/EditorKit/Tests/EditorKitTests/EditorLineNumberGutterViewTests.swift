@@ -149,7 +149,8 @@ final class EditorLineNumberGutterViewTests: XCTestCase {
         var opaque = Support.style
         opaque.backgroundColor = NSColor(srgbRed: 1, green: 0, blue: 0, alpha: 1)
         editor.gutter.update(style: opaque)
-        let gutterWidth = Int(editor.gutter.bounds.width)
+        // The first pixel column wholly outside the gutter, even if its width is fractional.
+        let gutterWidth = Int(editor.gutter.bounds.width.rounded(.up))
         let width = gutterWidth + 40
         let height = Int(editor.gutter.bounds.height)
         let bitmap = try XCTUnwrap(NSBitmapImageRep(
@@ -171,7 +172,7 @@ final class EditorLineNumberGutterViewTests: XCTestCase {
         NSGraphicsContext.restoreGraphicsState()
 
         XCTAssertGreaterThan(try XCTUnwrap(bitmap.colorAt(x: 1, y: height / 2)).alphaComponent, 0.9)
-        for column in (gutterWidth + 1) ..< width {
+        for column in gutterWidth ..< width {
             XCTAssertEqual(
                 try XCTUnwrap(bitmap.colorAt(x: column, y: height / 2)).alphaComponent,
                 0,
