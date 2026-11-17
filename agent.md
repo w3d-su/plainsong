@@ -217,6 +217,13 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 
 ## 5. File & Workspace Handling
 
+Opening a Markdown or MDX file of 64 KiB or more (decoded UTF-8 size) installs its editable
+source immediately. The status bar shows “Counting…” until the first counts arrive. Smaller
+files open with counts available. In the macOS editor the document session owns its pending
+count, including the 300 ms pause after editing. Switching windows or files, renaming, and
+Save As keep that count with the source. On iOS a statistics-only snapshot preserves a
+pending preview render for the same document revision.
+
 - **App Sandbox: ON.** All file access via user-selected URLs; persist
   security-scoped bookmarks for recents/workspaces; always wrap access in
   `startAccessingSecurityScopedResource()` pairs (helper in WorkspaceKit). Each recent item
@@ -800,6 +807,10 @@ attempt without a Decision Log entry.
 | Preview update (debounced) | render < 100 ms for 100 KB doc; debounce 150 ms |
 | File open (500 KB md) | < 300 ms to first paint, highlight may stream in |
 | Memory (app host RSS) | < 400 MB in the Plainsong host process with 8 warm sessions + 2 settled live WKWebViews |
+
+The 500 KB first-paint budget includes opening the editable document with counts pending.
+The opening probe also checks that typing immediately and switching documents preserve the
+edited source and eventually publish its counts.
 
 Techniques: tree-sitter incremental edits (`InputEdit`), visible-range-first
 highlighting, a line-number gutter that draws only the visible viewport fragments from an

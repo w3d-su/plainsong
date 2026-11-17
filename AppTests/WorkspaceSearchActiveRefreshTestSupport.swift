@@ -1,5 +1,5 @@
 import Foundation
-import MarkdownCore
+@testable import MarkdownCore
 @testable import Plainsong
 import WorkspaceKit
 import XCTest
@@ -196,7 +196,7 @@ func retainActiveSearchRefreshSession(
 @MainActor
 func cleanUpActiveSearchRefreshFixture(_ fixture: ActiveSearchRefreshFixture) {
     fixture.appState.autosaveTask?.cancel()
-    fixture.appState.statisticsTask?.cancel()
+    fixture.appState.shownSession.statisticsTask?.cancel()
     fixture.appState.completionWorkspaceTask?.cancel()
     fixture.appState.teardownWorkspaceSearch()
     fixture.appState.workspaceWatcher?.stop()

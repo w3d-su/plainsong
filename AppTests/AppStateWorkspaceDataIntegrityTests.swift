@@ -1,7 +1,7 @@
 // swiftlint:disable file_length type_body_length
 import EditorKit
 import Foundation
-import MarkdownCore
+@testable import MarkdownCore
 @testable import Plainsong
 import WorkspaceKit
 import XCTest
@@ -6968,13 +6968,10 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
 
     private func cleanUp(_ fixture: Fixture) {
         fixture.appState.autosaveTask?.cancel()
-        fixture.appState.statisticsTask?.cancel()
+        fixture.appState.shownSession.statisticsTask?.cancel()
         fixture.appState.workspaceReloadTask?.cancel()
         fixture.appState.completionWorkspaceTask?.cancel()
         for task in fixture.appState.sessionAutosaveTasks.values {
-            task.task.cancel()
-        }
-        for task in fixture.appState.sessionStatisticsTasks.values {
             task.task.cancel()
         }
         for task in fixture.appState.externalDiskInspectionTasks.values {

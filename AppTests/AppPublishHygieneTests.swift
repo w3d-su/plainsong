@@ -1,5 +1,5 @@
 import Combine
-import MarkdownCore
+@testable import MarkdownCore
 @testable import Plainsong
 import WorkspaceKit
 import XCTest
@@ -245,7 +245,7 @@ final class AppPublishHygieneTests: XCTestCase {
         addTeardownBlock { @MainActor in
             appState.completionWorkspaceTask?.cancel()
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             try? FileManager.default.removeItem(at: root)
         }
         return CompletionFixture(root: root, appState: appState)

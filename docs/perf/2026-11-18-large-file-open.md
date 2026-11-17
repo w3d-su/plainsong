@@ -1,8 +1,30 @@
 # Opening large Markdown files in a macOS workspace window
 
-On November 18, 2026, a Release build of commit `2af666cb` and the same checkout with
-deferred opening statistics ran on an arm64 MacBook Pro with macOS 27.0 (26A428)
-and Xcode 27.0 (27A5194q). For the 1 MiB files, both builds ran the same timing probe three times,
+- Date: 2026-11-18
+- Commit: `53b6cefe` for the verification below. The original opening comparison used
+  `2af666cb` as its baseline and the implementation in `5204ca21` for deferred counting.
+- Environment: arm64 MacBook Pro, macOS 27.0 (26A428), Xcode 27.0 (27A5194q), Release.
+- Fixture: `Fixtures/perf-500kb.md` for the §12 load-and-paint budget of < 300 ms.
+  The hosted probes use `Fixtures/large-1mb.md`, a Traditional Chinese paragraph
+  repeated to 1 MiB, and ten copies of the English fixture for 10 MiB.
+- Procedure: run the Release tests below three times with a warm local filesystem cache.
+- Result: **PASS**. The 500 KB load-and-paint samples were 35.678, 29.044 and
+  29.259 ms (median 29.259 ms). All three were below 300 ms.
+
+## Verification after moving the count into the document session
+
+At `53b6cefe`, the 10 MiB hosted probe took 60.71, 55.80 and 50.22 ms from Open
+to AppKit display (median 55.80 ms). The same runs took 112.30, 103.22 and 97.04 ms
+through the first native insertion and display (median 103.22 ms). The §12 budget
+applies to the 500 KB fixture. The 10 MiB probe has no timing threshold.
+
+The cached sidebar switch, simultaneous edits in separate windows, and Save As
+each passed three hosted Release runs. Each test waits for the edited session's
+counts. The Save As test also reads both files to verify their contents.
+
+## Original opening comparison
+
+For the 1 MiB files, both builds ran the same timing probe three times,
 with baseline runs first. Each sample used a fresh source-only window, session and
 temporary local file. The file was written just before opening, so these are warm
 filesystem-cache measurements.
@@ -37,21 +59,17 @@ The sidebar has more scheduling variance. Its three Traditional Chinese display 
 were 266.64, 225.98 and 222.25 ms before and 42.41, 87.42 and 43.58 ms after.
 The structural regression assertion checks that the new session reaches the real
 window with initial counts pending. The existing 500 KB load-and-paint gate measured
-38.469 ms against its 300 ms budget in the final Release verification. The existing
+38.469 ms against its 300 ms budget in the original Release verification. The existing
 native typing hot-path probe measured at most 0.225 ms across its five scenarios.
 
-In the full macOS test action the app and performance bundles passed. The UI runner
-timed out enabling automation and one isolated retry lost the test daemon. The full
-UI bundle subsequently passed all 31 tests on its own, including repeated filename
-clicks and verification of the editable source. The iPhone 17 Pro simulator on iOS
-27.0 passed all 714 tests in the configured scheme. The simulator checks cover count
-publication and document identity. The timing table above was measured on macOS.
+## Reproduction
 
-Run from a generated project with `make generate` followed by
+Run `make generate` and then run the probes from the project root.
 
 ```sh
 xcodebuild -project Plainsong.xcodeproj -scheme PerformanceTests -configuration Release \
   -destination 'platform=macOS,arch=arm64' -parallel-testing-enabled NO \
+  -only-testing:PerformanceTests/PerformanceBudgetTests/testOpening500KBMarkdownToEditorFirstPaintStaysUnderBudget \
   -only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testLargeFileOpenToHostedDisplayAndFirstEdit \
   -only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testTenMiBFileOpenToHostedDisplayAndFirstEdit \
   -test-iterations 3 ENABLE_TESTABILITY=YES test

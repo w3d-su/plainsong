@@ -4,6 +4,7 @@ import Combine
 import MarkdownCore
 @testable import Plainsong
 import SwiftUI
+import WorkspaceKit
 import XCTest
 
 @MainActor
@@ -92,7 +93,12 @@ extension AppBackedEditorPerformanceTests {
         XCTAssertTrue(installedWithPendingCounts, "A large file must reach the window before counting completes")
         XCTAssertEqual(appState.shownSession.fileURL?.lastPathComponent, file.lastPathComponent)
         XCTAssertEqual(MarkdownTextView.textStorage(of: editor)?.length, length + 1)
-        XCTAssertEqual(appState.shownSession.text, "Z" + source)
+        let expected = "Z" + source
+        XCTAssertEqual(appState.shownSession.text, expected)
+        // SwiftUI can release the editor after the temporary directory is removed.
+        // Persist the native edit while the file still exists, outside the timed interval.
+        try appState.saveCurrentDocument()
+        XCTAssertEqual(try Data(contentsOf: file), Data(expected.utf8))
         print(String(format: "OPEN PERF %@ %@ display %.2f ms first edit %.2f ms", file.lastPathComponent,
                      sidebar ? "sidebar" : "open", Double(display - start) / 1e6, Double(edit - start) / 1e6))
     }
@@ -121,6 +127,73 @@ extension AppBackedEditorPerformanceTests {
         XCTAssertTrue(app.appState.shownSession === second)
         XCTAssertEqual(second.availableStatistics, TextStatistics(text: "small"))
         XCTAssertEqual(first.text, edited)
+    }
+
+    func testEditedLargeFileFinishesCountingAfterAnchoredCacheHit() async throws {
+        try await withOpenFiles { app, small, large, source in
+            let cached = try WorkspaceFileSystemLocation(fileURL: small)
+            let active = try WorkspaceFileSystemLocation(fileURL: large)
+            try app.activateAnchoredFileSession(at: cached)
+            let other = app.shownSession
+            try app.activateAnchoredFileSession(at: active)
+            let edited = app.shownSession
+            XCTAssertNil(edited.availableStatistics)
+            app.applyAuthorizedEditorText(source + "a", to: edited)
+            try app.activateAnchoredFileSession(at: cached)
+            XCTAssertTrue(app.shownSession === other)
+            try app.activateAnchoredFileSession(at: active)
+            XCTAssertTrue(app.shownSession === edited)
+            let expected = TextStatistics(text: source + "a")
+            try await self.waitForOpenCondition { edited.availableStatistics == expected }
+        }
+    }
+
+    func testEditsInTwoWindowsFinishCountingTheirOwnSources() async throws {
+        try await withOpenFiles { app, small, large, source in
+            let sibling = app.makeSiblingFacade(admitsFileOperations: true)
+            try sibling.activateFileSession(url: small)
+            try app.activateFileSession(url: large)
+            let edited = app.shownSession
+            XCTAssertNil(edited.availableStatistics)
+            app.applyAuthorizedEditorText(source + "a", to: edited)
+            sibling.applyAuthorizedEditorText("another document", to: sibling.shownSession)
+            let expected = TextStatistics(text: source + "a")
+            let other = TextStatistics(text: "another document")
+            try await self.waitForOpenCondition {
+                edited.availableStatistics == expected && sibling.shownSession.availableStatistics == other
+            }
+        }
+    }
+
+    func testSaveAsKeepsCountingTheEditedSource() async throws {
+        try await withOpenFiles { app, _, large, source in
+            try app.activateFileSession(url: large)
+            let edited = app.shownSession
+            XCTAssertNil(edited.availableStatistics)
+            let text = source + "new word"
+            app.applyAuthorizedEditorText(text, to: edited)
+            let copy = large.deletingLastPathComponent().appendingPathComponent("copy.mdx")
+            try app.saveCurrentDocumentAs(to: copy)
+            XCTAssertTrue(app.shownSession === edited)
+            XCTAssertEqual(try String(contentsOf: copy, encoding: .utf8), text)
+            XCTAssertEqual(try String(contentsOf: large, encoding: .utf8), source)
+            let expected = TextStatistics(text: text)
+            try await self.waitForOpenCondition { edited.availableStatistics == expected }
+        }
+    }
+
+    private func withOpenFiles(_ run: (AppState, URL, URL, String) async throws -> Void) async throws {
+        let app = try EditorFindPerformanceSupport.makeAppHarness(fixtureText: "", opensFind: false)
+        defer { app.cleanUp() }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let small = directory.appendingPathComponent("small.md")
+        let large = directory.appendingPathComponent("large.md")
+        let source = String(repeating: "一份繁體中文文件\n", count: 4000)
+        try "small".write(to: small, atomically: true, encoding: .utf8)
+        try source.write(to: large, atomically: true, encoding: .utf8)
+        try await run(app.appState, small, large, source)
     }
 
     private func waitForOpenCondition(_ condition: () -> Bool) async throws {

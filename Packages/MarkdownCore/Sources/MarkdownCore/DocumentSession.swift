@@ -53,7 +53,7 @@ public final class DocumentSession: ObservableObject {
         availableStatistics ?? TextStatistics(text: text)
     }
 
-    private var initialStatisticsTask: Task<Void, Never>?
+    private(set) var statisticsTask: Task<Void, Never>?
 
     private var savedText: String?
     private var textChangeContinuations: [UUID: AsyncStream<DocumentTextChange>.Continuation] = [:]
@@ -100,19 +100,37 @@ public final class DocumentSession: ObservableObject {
             return
         }
         self.init(text: text, url: url, fileKind: fileKind, isDirty: false, statistics: nil)
-        initialStatisticsTask = Task.detached(priority: .utility) { [weak self] in
-            guard let counts = TextStatistics.countUnlessCancelled(text) else { return }
+        scheduleStatisticsCount(debounced: false, onReady: onStatisticsReady)
+    }
+
+    /// Count the most recent edit after a typing pause. The work follows this session
+    /// through window switches and URL changes. Only a source change invalidates it.
+    public func scheduleStatisticsRefreshAfterEdit() {
+        scheduleStatisticsCount(debounced: true)
+    }
+
+    private func scheduleStatisticsCount(
+        debounced: Bool,
+        onReady: (@MainActor (DocumentSession) -> Void)? = nil
+    ) {
+        cancelStatisticsTask()
+        let source = text
+        statisticsTask = Task.detached(priority: .utility) { [weak self] in
+            if debounced {
+                do { try await Task.sleep(for: .milliseconds(300)) } catch { return }
+            }
+            guard let counts = TextStatistics.countUnlessCancelled(source) else { return }
             await MainActor.run { [weak self] in
                 guard !Task.isCancelled, let self else { return }
-                initialStatisticsTask = nil
+                statisticsTask = nil
                 applyStatistics(counts)
-                onStatisticsReady?(self)
+                onReady?(self)
             }
         }
     }
 
     deinit {
-        initialStatisticsTask?.cancel()
+        statisticsTask?.cancel()
     }
 
     private init(text: String, url: URL?, fileKind: FileKind?, isDirty: Bool, statistics: TextStatistics?) {
@@ -152,7 +170,7 @@ public final class DocumentSession: ObservableObject {
             return
         }
 
-        cancelInitialStatistics()
+        cancelStatisticsTask()
         text = newText
         if refreshStatistics {
             self.refreshStatistics()
@@ -186,7 +204,7 @@ public final class DocumentSession: ObservableObject {
     /// Applies statistics computed elsewhere (e.g. on a background task — counting a
     /// large document is O(n) and must stay off the typing hot path).
     public func applyStatistics(_ newStatistics: TextStatistics) {
-        cancelInitialStatistics()
+        cancelStatisticsTask()
         needsStatisticsRefresh = false
         if availableStatistics != newStatistics {
             availableStatistics = newStatistics
@@ -287,8 +305,14 @@ public final class DocumentSession: ObservableObject {
         }
 
         if textChanged {
+            let counts = precomputedStatistics ?? TextStatistics(text: newText)
+            // A full reload must still invalidate observers when its text changes but
+            // all published metadata (including counts) would otherwise stay equal.
+            if availableStatistics == counts, fileURL == newURL, fileKind == newFileKind, isDirty == newIsDirty {
+                objectWillChange.send()
+            }
             text = newText
-            applyStatistics(precomputedStatistics ?? TextStatistics(text: newText))
+            applyStatistics(counts)
         }
 
         if fileURL != newURL {
@@ -308,9 +332,9 @@ public final class DocumentSession: ObservableObject {
         }
     }
 
-    private func cancelInitialStatistics() {
-        initialStatisticsTask?.cancel()
-        initialStatisticsTask = nil
+    private func cancelStatisticsTask() {
+        statisticsTask?.cancel()
+        statisticsTask = nil
     }
 
     private func emitTextChange() {
