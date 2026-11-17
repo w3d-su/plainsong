@@ -61,6 +61,31 @@ enum IOSWorkspacePathAuthority {
         return remainder
     }
 
+    /// `url` with its symlinks resolved, as PreviewKit's `AssetURLResolver` resolves its
+    /// root. On a device this drops the leading `/private` that a picker URL keeps.
+    static func resolvedDirectory(_ url: URL) -> URL {
+        url.standardizedFileURL.resolvingSymlinksInPath()
+    }
+
+    /// `relativeSpelling(root:file:)` for a `file` whose prefix may be spelled through a
+    /// symlink: `/var/mobile/…` against a picker root under `/private/var/mobile/…`, or
+    /// the reverse. `resolvedRoot` is `resolvedDirectory(root)`. Only the file's parent
+    /// is resolved, so a leaf that was just deleted or moved away still maps. This
+    /// touches the file system; keep it off the main actor.
+    static func relativeSpelling(root: URL, resolvedRoot: URL, file: URL) -> String? {
+        if let relative = relativeSpelling(root: root, file: file)
+            ?? relativeSpelling(root: resolvedRoot, file: file)
+        {
+            return relative
+        }
+        let path = file.path(percentEncoded: false)
+        guard let slash = path.lastIndex(of: "/"), slash != path.startIndex else { return nil }
+        let leaf = String(path[path.index(after: slash)...])
+        guard !leaf.isEmpty else { return nil }
+        let parent = resolvedDirectory(fileURL(path: String(path[..<slash])))
+        return relativeSpelling(root: resolvedRoot, file: fileURL(path: joined(root: parent, relativePath: leaf)))
+    }
+
     static func directoryContains(root: URL, file: URL, relativePath: String) -> Bool {
         guard root.isFileURL, file.isFileURL else { return false }
         guard WorkspaceRelativePath(spelling: relativePath) != nil else { return false }

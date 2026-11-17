@@ -34,11 +34,15 @@ final class IOSSystemWorkspaceWatcher: IOSWorkspaceChangeWatching, @unchecked Se
 
 final class IOSRootFilePresenter: NSObject, NSFilePresenter {
     let root: URL
+    /// `root` with its symlinks resolved, once. Callbacks may spell child URLs through
+    /// either form of a symlinked prefix, such as `/private/var/mobile/…` on a device.
+    let resolvedRoot: URL
     let sink: @Sendable (IOSExternalWorkspaceNotice) -> Void
     let operationQueue: OperationQueue
 
     init(root: URL, sink: @escaping @Sendable (IOSExternalWorkspaceNotice) -> Void) {
         self.root = root
+        resolvedRoot = IOSWorkspacePathAuthority.resolvedDirectory(root)
         self.sink = sink
         let queue = OperationQueue()
         queue.name = "Plainsong.IOSWorkspaceChange"
@@ -106,7 +110,8 @@ final class IOSRootFilePresenter: NSObject, NSFilePresenter {
         sink(notice)
     }
 
+    /// Runs on `operationQueue`, so the fallback's file-system walk is off the main actor.
     private func relativePath(for url: URL) -> String? {
-        IOSWorkspacePathAuthority.relativeSpelling(root: root, file: url)
+        IOSWorkspacePathAuthority.relativeSpelling(root: root, resolvedRoot: resolvedRoot, file: url)
     }
 }

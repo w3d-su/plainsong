@@ -89,4 +89,75 @@ final class IOSRootPresenterReviewTests: XCTestCase {
         XCTAssertEqual(locations.first?.fileURL, grant.rootURL)
         XCTAssertEqual(locations.first?.relativePath, "Note.md")
     }
+
+    /// A device picker root keeps `/private/var/mobile/…`, and a callback may spell the
+    /// same child through the other side of that symlink. A symlinked folder stands in
+    /// for `/private`, in both directions, including leaves that no longer exist.
+    func testSubitemCallbacksMapAcrossASymlinkedRootSpelling() throws {
+        let base = FileManager.default.temporaryDirectory
+            .appendingPathComponent("plainsong-root-presenter-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: base) }
+        let real = base.appendingPathComponent("real", isDirectory: true)
+        let notes = real.appendingPathComponent("Folder/notes", isDirectory: true)
+        try FileManager.default.createDirectory(at: notes, withIntermediateDirectories: true)
+        try Data("a".utf8).write(to: notes.appendingPathComponent("a.md"))
+        let alias = base.appendingPathComponent("alias", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: real)
+        let aliasFolder = alias.appendingPathComponent("Folder", isDirectory: true)
+        let resolvedFolder = IOSWorkspacePathAuthority.resolvedDirectory(aliasFolder)
+        XCTAssertNil(IOSWorkspacePathAuthority.relativeSpelling(
+            root: aliasFolder,
+            file: resolvedFolder.appendingPathComponent("notes/a.md")
+        ))
+
+        let log = NoticeLog()
+        let aliasRooted = IOSRootFilePresenter(root: aliasFolder) { log.append($0) }
+        aliasRooted.presentedSubitemDidChange(at: resolvedFolder.appendingPathComponent("notes/a.md"))
+        aliasRooted.presentedSubitemDidChange(at: real.appendingPathComponent("Other.md"))
+        aliasRooted.presentedSubitemDidChange(at: real.appendingPathComponent("Folder2/x.md"))
+
+        let resolvedRooted = IOSRootFilePresenter(root: resolvedFolder) { log.append($0) }
+        resolvedRooted.presentedSubitemDidChange(at: aliasFolder.appendingPathComponent("notes/a.md"))
+        resolvedRooted.presentedSubitem(
+            at: aliasFolder.appendingPathComponent("notes/gone.md"),
+            didMoveTo: aliasFolder.appendingPathComponent("notes/b.md")
+        )
+        resolvedRooted.accommodatePresentedSubitemDeletion(at: aliasFolder.appendingPathComponent("notes/a.md")) {
+            XCTAssertNil($0)
+        }
+
+        XCTAssertEqual(log.entries, [
+            "changed notes/a.md",
+            "changed notes/a.md",
+            "moved notes/gone.md notes/b.md",
+            "deleted notes/a.md",
+        ])
+    }
+}
+
+private final class NoticeLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: [String] = []
+
+    var entries: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return stored
+    }
+
+    func append(_ notice: IOSExternalWorkspaceNotice) {
+        let line = switch notice {
+        case let .changed(relativePath):
+            "changed \(relativePath)"
+        case let .deleted(relativePath):
+            "deleted \(relativePath)"
+        case let .moved(from, to):
+            "moved \(from) \(to)"
+        default:
+            "other"
+        }
+        lock.lock()
+        stored.append(line)
+        lock.unlock()
+    }
 }

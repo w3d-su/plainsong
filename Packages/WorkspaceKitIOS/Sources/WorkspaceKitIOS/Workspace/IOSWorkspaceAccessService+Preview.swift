@@ -56,14 +56,17 @@ extension IOSWorkspaceAccessService: PreviewAssetReading {
         guard let record = matchingRecord(request.access) else {
             throw PreviewAssetReadFailure.accessChanged
         }
-        // PreviewKit's AssetURLResolver runs `standardizedFileURL.resolvingSymlinksInPath()`,
-        // which strips a leading `/private` on physical devices while the picker's `record.rootURL`
-        // keeps `/private/var/mobile/...`. Fall back to comparing normalized paths on both sides,
-        // then rebuild `location.fileURL` under `record.rootURL` so `authorize` still matches.
-        let resolvedRoot = record.rootURL.standardizedFileURL.resolvingSymlinksInPath()
-        let resolvedCandidate = request.resolvedURL.standardizedFileURL.resolvingSymlinksInPath()
+        // PreviewKit's AssetURLResolver resolves symlinks in its root and in the candidate, so on
+        // a device `request.resolvedURL` starts `/var/mobile/...` while the picker's
+        // `record.rootURL` keeps `/private/var/mobile/...`. Only when the plain spelling fails,
+        // compare against the root resolved the same way; the candidate is already resolved.
+        // This runs on the main actor, so the file-system walk stays off the common path.
+        // `location.fileURL` is rebuilt under `record.rootURL` so `authorize` still matches.
         let relative = IOSWorkspacePathAuthority.relativeSpelling(root: record.rootURL, file: request.resolvedURL)
-            ?? IOSWorkspacePathAuthority.relativeSpelling(root: resolvedRoot, file: resolvedCandidate)
+            ?? IOSWorkspacePathAuthority.relativeSpelling(
+                root: IOSWorkspacePathAuthority.resolvedDirectory(record.rootURL),
+                file: request.resolvedURL
+            )
         guard let relative else { throw PreviewAssetReadFailure.outsideRoot }
         let fileURL = IOSWorkspacePathAuthority.fileURL(
             path: IOSWorkspacePathAuthority.joined(root: record.rootURL, relativePath: relative)

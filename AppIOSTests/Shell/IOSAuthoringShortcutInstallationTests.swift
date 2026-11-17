@@ -89,6 +89,8 @@ final class IOSAuthoringShortcutInstallationTests: XCTestCase {
         return result
     }
 
+    /// Every key command the mounted controls install. The editor stand-in's own commands
+    /// are left out, so a match cannot come from `UITextView` (⌘Z in particular).
     private static func keyCommands(in host: UIViewController) -> [UIKeyCommand] {
         var commands: [UIKeyCommand] = []
         var responders: [UIResponder] = [host, host.view]
@@ -98,6 +100,7 @@ final class IOSAuthoringShortcutInstallationTests: XCTestCase {
             let responder = responders[index]
             index += 1
             guard seen.insert(ObjectIdentifier(responder)).inserted else { continue }
+            guard !(responder is UITextView) else { continue }
             commands.append(contentsOf: responder.keyCommands ?? [])
             if let next = responder.next {
                 responders.append(next)
