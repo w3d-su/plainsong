@@ -10,6 +10,76 @@ final class IOSAuthoringShortcutInstallationTests: XCTestCase {
     /// The host mirrors the document column: navigation-bar items plus the
     /// keyboard bar, which carries the primary commands' shortcuts.
     func testToolbarInstallsEveryDescriptorShortcut() {
+        let mounted = Self.mountDocumentScreen()
+        defer { mounted.window.isHidden = true }
+        Self.focusTextInput(in: mounted.host.view)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+
+        let installed = Self.keyCommands(in: mounted.host)
+        var expected = IOSAuthoringCatalog.actions.compactMap { action -> ExpectedShortcut? in
+            guard let input = action.keyboardInput, input.count == 1, let character = input.first else { return nil }
+            return ExpectedShortcut(
+                input: String(character),
+                flags: Self.flags(action.keyboardModifiers),
+                name: "\(action.id)"
+            )
+        }
+        expected.append(ExpectedShortcut(input: "z", flags: .command, name: "undo"))
+        expected.append(ExpectedShortcut(input: "z", flags: [.command, .shift], name: "redo"))
+        XCTAssertFalse(expected.isEmpty)
+        let summary = installed.map { "\($0.input ?? "")/\($0.modifierFlags.rawValue)" }
+        for item in expected {
+            let matches = installed.filter { $0.input == item.input && $0.modifierFlags == item.flags }
+            XCTAssertGreaterThanOrEqual(
+                matches.count,
+                1,
+                "missing shortcut \(item.name) \(item.input) flags=\(item.flags.rawValue); saw \(summary)"
+            )
+        }
+    }
+
+    /// The keyboard bar is not mounted while a single pane shows the preview, but
+    /// the Find button stays in the navigation bar there. Find, Find Next, Find
+    /// Previous and Use Selection stay installed with it; the bar's own commands
+    /// do not.
+    func testPreviewLayoutKeepsTheFindShortcuts() {
+        let mounted = Self.mountDocumentScreen()
+        defer { mounted.window.isHidden = true }
+        guard case .single = mounted.scene.layout else {
+            return XCTFail("a 390 pt column shows one pane; got \(mounted.scene.layout)")
+        }
+        mounted.scene.showPane(.preview)
+        mounted.host.view.setNeedsLayout()
+        mounted.host.view.layoutIfNeeded()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        XCTAssertEqual(mounted.scene.layout, .single(.preview))
+
+        let installed = Self.keyCommands(in: mounted.host)
+        let summary = installed.map { "\($0.input ?? "")/\($0.modifierFlags.rawValue)" }
+        let findActions = IOSAuthoringCatalog.actions.filter { $0.placement == .find && $0.keyEquivalent != nil }
+        XCTAssertEqual(findActions.map(\.id), [.find, .nextMatch, .previousMatch, .useSelectionForFind])
+        for action in findActions {
+            let input = action.keyboardInput ?? ""
+            let flags = Self.flags(action.keyboardModifiers)
+            XCTAssertTrue(
+                installed.contains { $0.input == input && $0.modifierFlags == flags },
+                "missing shortcut \(action.id) \(input) flags=\(flags.rawValue) in the preview; saw \(summary)"
+            )
+        }
+        XCTAssertFalse(
+            installed.contains { $0.input == "b" && $0.modifierFlags == .command },
+            "the keyboard bar (⌘B) is still mounted, so this does not test the preview layout; saw \(summary)"
+        )
+    }
+
+    private struct MountedDocumentScreen {
+        let scene: IOSShellSceneState
+        let window: UIWindow
+        let host: UIViewController
+    }
+
+    /// The document column at iPhone width, with the editor stand-in mounted.
+    private static func mountDocumentScreen() -> MountedDocumentScreen {
         let provider = FakeAuthoringProvider(actions: IOSAuthoringCatalog.actions)
         let editor = FakeEditorBinding()
         let scene = IOSShellSceneState(
@@ -32,30 +102,7 @@ final class IOSAuthoringShortcutInstallationTests: XCTestCase {
         window.makeKeyAndVisible()
         host.view.frame = window.bounds
         host.view.layoutIfNeeded()
-        Self.focusTextInput(in: host.view)
-        RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-
-        let installed = Self.keyCommands(in: host)
-        var expected = IOSAuthoringCatalog.actions.compactMap { action -> ExpectedShortcut? in
-            guard let input = action.keyboardInput, input.count == 1, let character = input.first else { return nil }
-            return ExpectedShortcut(
-                input: String(character),
-                flags: Self.flags(action.keyboardModifiers),
-                name: "\(action.id)"
-            )
-        }
-        expected.append(ExpectedShortcut(input: "z", flags: .command, name: "undo"))
-        expected.append(ExpectedShortcut(input: "z", flags: [.command, .shift], name: "redo"))
-        XCTAssertFalse(expected.isEmpty)
-        let summary = installed.map { "\($0.input ?? "")/\($0.modifierFlags.rawValue)" }
-        for item in expected {
-            let matches = installed.filter { $0.input == item.input && $0.modifierFlags == item.flags }
-            XCTAssertGreaterThanOrEqual(
-                matches.count,
-                1,
-                "missing shortcut \(item.name) \(item.input) flags=\(item.flags.rawValue); saw \(summary)"
-            )
-        }
+        return MountedDocumentScreen(scene: scene, window: window, host: host)
     }
 
     private static func focusTextInput(in view: UIView) {

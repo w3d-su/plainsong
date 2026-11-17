@@ -94,7 +94,7 @@ final class IOSRootFilePresenter: NSObject, NSFilePresenter {
     func presentedSubitem(at oldURL: URL, didMoveTo newURL: URL) {
         guard let from = relativePath(for: oldURL) else { return }
         let destination = relativePath(for: newURL) ?? IOSWorkspacePathAuthority.lastComponent(
-            newURL.path(percentEncoded: false)
+            IOSWorkspacePathAuthority.pathWithoutTrailingSlash(newURL)
         )
         emit(.moved(from: from, to: destination))
     }

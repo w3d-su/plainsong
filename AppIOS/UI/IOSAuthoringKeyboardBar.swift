@@ -40,16 +40,7 @@ struct IOSAuthoringKeyboardBar: View {
         .background(.bar)
         .overlay(alignment: .top) { Divider() }
         .background {
-            // In the navigation bar these hosts were drawn: an iPad showed their
-            // titles on top of each other, an iPhone listed them under More.
-            ZStack {
-                ForEach(unplacedShortcutActions, id: \.id) { action in
-                    shortcutHost(action)
-                }
-            }
-            .buttonStyle(.plain)
-            .opacity(0)
-            .allowsHitTesting(false)
+            IOSAuthoringShortcutHosts(scene: scene, router: router, group: .formatting)
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             keyboardIsUp = true
@@ -173,40 +164,6 @@ struct IOSAuthoringKeyboardBar: View {
         case .link: "link"
         default: "textformat"
         }
-    }
-
-    /// Menus are not a reliable key-command source, and Find Next / Find
-    /// Previous / Use Selection have no always-visible control. Mount the same
-    /// installer so those shortcuts exist while the toolbar is on screen.
-    /// Cmd-F stays on the visible Find button. Primary buttons install their
-    /// own shortcuts and are not repeated here.
-    private var unplacedShortcutActions: [IOSAuthoringAction] {
-        router.actions.filter { action in
-            guard action.keyEquivalent != nil else { return false }
-            switch action.placement {
-            case .formatMenu, .toolbarGroup:
-                return true
-            case .find:
-                return action.id != .find
-            case .toolbar:
-                return false
-            }
-        }
-    }
-
-    /// Menu rows are not a reliable key-command source, so format and find
-    /// commands are also mounted here with the same installer. The host is
-    /// hidden; the menu row remains the visible control. Primary shortcuts
-    /// stay on their buttons and are not repeated here.
-    private func shortcutHost(_ action: IOSAuthoringAction) -> some View {
-        Button(action.title) {
-            _ = router.perform(action.id)
-        }
-        .disabled(!router.isEnabled(action.id))
-        .accessibilityLabel(action.accessibilityLabel)
-        .modifier(AuthoringShortcutModifier(action: action))
-        .accessibilityHidden(true)
-        .frame(width: 1, height: 1)
     }
 
     private func overflowButton(_ action: IOSAuthoringAction) -> some View {

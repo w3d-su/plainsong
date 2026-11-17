@@ -44,14 +44,20 @@ enum IOSWorkspacePathAuthority {
         return rootPath
     }
 
-    /// `file`'s spelling below `root`, or nil when it is not below it. A folder
-    /// URL from the document picker spells its path with a trailing slash; a
-    /// root built from a path does not. Both name the same directory.
-    static func relativeSpelling(root: URL, file: URL) -> String? {
-        var rootBytes = pathBytes(root)
-        while rootBytes.count > 1, rootBytes.last == UInt8(ascii: "/") {
-            rootBytes.removeLast()
+    /// `url`'s path without trailing slashes. A folder URL from the document picker or a
+    /// file presenter spells its path with one; the same folder built from a path does not.
+    static func pathWithoutTrailingSlash(_ url: URL) -> String {
+        var path = url.path(percentEncoded: false)
+        while path.utf8.count > 1, path.hasSuffix("/") {
+            path.removeLast()
         }
+        return path
+    }
+
+    /// `file`'s spelling below `root`, or nil when it is not below it. The root may
+    /// end in a slash. The file may not: a preview read names a file, never a folder.
+    static func relativeSpelling(root: URL, file: URL) -> String? {
+        let rootBytes = Array(pathWithoutTrailingSlash(root).utf8)
         let fileBytes = pathBytes(file)
         guard fileBytes.count > rootBytes.count + 1 else { return nil }
         guard Array(fileBytes.prefix(rootBytes.count)) == rootBytes else { return nil }
@@ -70,15 +76,17 @@ enum IOSWorkspacePathAuthority {
     /// `relativeSpelling(root:file:)` for a `file` whose prefix may be spelled through a
     /// symlink: `/var/mobile/…` against a picker root under `/private/var/mobile/…`, or
     /// the reverse. `resolvedRoot` is `resolvedDirectory(root)`. Only the file's parent
-    /// is resolved, so a leaf that was just deleted or moved away still maps. This
-    /// touches the file system; keep it off the main actor.
+    /// is resolved, so a leaf that was just deleted or moved away still maps. A folder
+    /// callback (`…/notes/`) maps without its trailing slash. This touches the file
+    /// system; keep it off the main actor.
     static func relativeSpelling(root: URL, resolvedRoot: URL, file: URL) -> String? {
+        let path = pathWithoutTrailingSlash(file)
+        let file = fileURL(path: path)
         if let relative = relativeSpelling(root: root, file: file)
             ?? relativeSpelling(root: resolvedRoot, file: file)
         {
             return relative
         }
-        let path = file.path(percentEncoded: false)
         guard let slash = path.lastIndex(of: "/"), slash != path.startIndex else { return nil }
         let leaf = String(path[path.index(after: slash)...])
         guard !leaf.isEmpty else { return nil }

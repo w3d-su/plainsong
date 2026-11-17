@@ -34,6 +34,11 @@ struct IOSDocumentScreen: View {
                 // toggle, leaving no way to reach the preview.
                 IOSPaneToggle(scene: scene)
                 contentArea
+                    .background {
+                        // Every layout: the Find button stays in the navigation
+                        // bar while the preview shows, so ⌘G, ⇧⌘G and ⌘E must too.
+                        IOSAuthoringShortcutHosts(scene: scene, router: router, group: .find)
+                    }
                 if scene.layout != .single(.preview) {
                     IOSAuthoringKeyboardBar(scene: scene, router: router)
                 }

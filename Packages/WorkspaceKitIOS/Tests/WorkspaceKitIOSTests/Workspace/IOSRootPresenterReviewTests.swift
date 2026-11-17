@@ -133,6 +133,53 @@ final class IOSRootPresenterReviewTests: XCTestCase {
             "deleted notes/a.md",
         ])
     }
+
+    /// A file presenter spells a folder child with a trailing slash (`…/notes/`). Those
+    /// callbacks map like file callbacks, through either spelling of a symlinked root,
+    /// and a folder moved out of the workspace reports its own name, not an empty one.
+    func testFolderCallbacksWithATrailingSlashMap() throws {
+        let base = FileManager.default.temporaryDirectory
+            .appendingPathComponent("plainsong-root-presenter-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: base) }
+        let real = base.appendingPathComponent("real", isDirectory: true)
+        let folder = real.appendingPathComponent("Folder", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: folder.appendingPathComponent("notes/drafts", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        let alias = base.appendingPathComponent("alias", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: real)
+        let aliasFolder = alias.appendingPathComponent("Folder", isDirectory: true)
+        let resolvedFolder = IOSWorkspacePathAuthority.resolvedDirectory(aliasFolder)
+        let notes = resolvedFolder.appendingPathComponent("notes", isDirectory: true)
+        XCTAssertTrue(notes.path(percentEncoded: false).hasSuffix("/notes/"))
+
+        let log = NoticeLog()
+        let presenter = IOSRootFilePresenter(root: resolvedFolder) { log.append($0) }
+        presenter.presentedSubitemDidAppear(at: notes)
+        presenter.presentedSubitemDidChange(at: aliasFolder.appendingPathComponent("notes/drafts", isDirectory: true))
+        presenter.presentedSubitem(
+            at: notes.appendingPathComponent("old", isDirectory: true),
+            didMoveTo: notes.appendingPathComponent("new", isDirectory: true)
+        )
+        presenter.presentedSubitem(
+            at: notes.appendingPathComponent("drafts", isDirectory: true),
+            didMoveTo: base.appendingPathComponent("Elsewhere/drafts", isDirectory: true)
+        )
+        presenter.accommodatePresentedSubitemDeletion(at: notes) {
+            XCTAssertNil($0)
+        }
+        presenter.presentedSubitemDidChange(at: resolvedFolder)
+        presenter.presentedSubitemDidChange(at: real.appendingPathComponent("Folder2/", isDirectory: true))
+
+        XCTAssertEqual(log.entries, [
+            "changed notes",
+            "changed notes/drafts",
+            "moved notes/old notes/new",
+            "moved notes/drafts drafts",
+            "deleted notes",
+        ])
+    }
 }
 
 private final class NoticeLog: @unchecked Sendable {
