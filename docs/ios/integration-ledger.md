@@ -39,10 +39,13 @@ On #269's current head `2175bfe3` (adding the `/private` preview-root symlink re
 fallback, the Files image-picker dismissal/delegate split, Recent row hit-target framing,
 scene-local resign on preview switch, and `IOSDocumentScreen` shortcut test hosting),
 local, Xcode 27.0, iOS 27.0 simulator (`59CB04BD-26CC-4841-8D06-E75A2EDEBC66`):
-`make ios-test` 723 run, 723 passed, 0 skipped; `make test-ios-tooling` 44/44;
-SwiftFormat (local 0.64.0 with 0.64-only `repeatedGuard` and `wrapIf*` rules disabled)
-and `swiftlint --strict` passed on the 9 changed Swift files. Hosted `ios.yml` was not
-dispatched for this head, and Mac CI for `2175bfe3` runs on the updated PR.
+`make ios-test` 723 run, 723 passed, 0 skipped; `make test-ios-tooling` 44/44. The
+exact-head Mac CI passed for `2175bfe3`, including `lint` with the pinned SwiftFormat
+0.62.1. No `make ios-preview` run is recorded for this head; the commit touches neither
+PreviewKit nor `index.html`. No simulator walk is recorded for these changes, so the
+device pass is their first UI check: G10 for Insert Image → Files, D7 for the pane
+switch during Zhuyin composition, and H6 for the `/private` spelling of a picked
+folder. Hosted `ios.yml` was not dispatched for this head.
 
 The device-pass kit is rebuilt from `2175bfe3`: `PlainsongIOS-2175bfe33959.ipa`,
 SHA-256 `892e35dd448be58666c5d77f66122af6d354bb2249e5d52fcec3f399a2a87211`.
