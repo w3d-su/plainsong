@@ -107,6 +107,66 @@ final class IOSWorkspaceAssetAndPreviewTests: XCTestCase {
         XCTAssertEqual(result.bytes, Data("txt".utf8))
     }
 
+    /// PreviewKit's `AssetURLResolver` strips symlinked prefixes such as `/private`
+    /// when resolving `record.rootURL`. The preview reader must still accept the
+    /// resolved asset URL and map it back under `record.rootURL` for `authorize`.
+    func testPreviewReaderReadsWhenResolverChangesRootPrefixViaSymlinkResolution() async throws {
+        let (base, alias) = try makeSymlinkedPreviewFolder()
+        defer { try? FileManager.default.removeItem(at: base) }
+        let pickedFolderPath = alias.appendingPathComponent("Folder", isDirectory: true).path(percentEncoded: false)
+        let harness = AccessHarness()
+        let grant = try await harness.openDirectory(pickedFolderPath)
+        let access = try XCTUnwrap(harness.service.previewContext(for: grant))
+
+        // Mirror `AssetURLResolver`: resolve symlinks on both the root and the asset candidate.
+        let resolvedURL = grant.rootURL.standardizedFileURL.resolvingSymlinksInPath()
+            .appendingPathComponent("assets/sample.png", isDirectory: false)
+            .standardizedFileURL.resolvingSymlinksInPath()
+        XCTAssertNil(IOSWorkspacePathAuthority.relativeSpelling(root: grant.rootURL, file: resolvedURL))
+
+        harness.files.parkReads = true
+        let task = Task {
+            let request = PreviewAssetReadRequest(
+                requestID: UUID(),
+                resolvedURL: resolvedURL,
+                access: access,
+                maximumByteCount: 32
+            )
+            return try await harness.service.read(request)
+        }
+        await waitUntil { harness.files.parkedReadCount == 1 }
+        harness.files.resumeRead(.success(Data("png".utf8)))
+        let result = try await task.value
+        XCTAssertEqual(result.bytes, Data("png".utf8))
+        XCTAssertEqual(
+            result.coordinatedURL.path(percentEncoded: false),
+            IOSWorkspacePathAuthority.joined(root: grant.rootURL, relativePath: "assets/sample.png")
+        )
+
+        let escaped = base.appendingPathComponent("secret.png").standardizedFileURL.resolvingSymlinksInPath()
+        do {
+            _ = try await harness.service.read(
+                PreviewAssetReadRequest(requestID: UUID(), resolvedURL: escaped, access: access, maximumByteCount: 32)
+            )
+            XCTFail("outside-root resolved URL succeeded")
+        } catch let failure as PreviewAssetReadFailure {
+            XCTAssertEqual(failure, .outsideRoot)
+        }
+    }
+
+    private func makeSymlinkedPreviewFolder() throws -> (base: URL, alias: URL) {
+        let base = FileManager.default.temporaryDirectory
+            .appendingPathComponent("plainsong-lane06-preview-\(UUID().uuidString)", isDirectory: true)
+        let real = base.appendingPathComponent("real", isDirectory: true)
+        let assets = real.appendingPathComponent("Folder/assets", isDirectory: true)
+        let alias = base.appendingPathComponent("private-alias", isDirectory: true)
+        try FileManager.default.createDirectory(at: assets, withIntermediateDirectories: true)
+        try Data("png".utf8).write(to: assets.appendingPathComponent("sample.png"))
+        try Data("secret".utf8).write(to: base.appendingPathComponent("secret.png"))
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: real)
+        return (base, alias)
+    }
+
     func testRelativeSpellingTreatsATrailingSlashRootAsTheSameDirectory() {
         let file = IOSWorkspacePathAuthority.fileURL(path: "/tmp/Folder/assets/a.png")
         for root in ["/tmp/Folder", "/tmp/Folder/"] {

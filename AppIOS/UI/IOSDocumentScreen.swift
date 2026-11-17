@@ -64,11 +64,10 @@ struct IOSDocumentScreen: View {
         }
         .onChange(of: scene.layout) { _, layout in
             // The hidden editor would keep the keyboard, and the bar with Hide
-            // Keyboard is gone while the preview shows.
+            // Keyboard is gone while the preview shows. Resign only this scene's
+            // editor view so background scenes on iPad cannot dismiss the key scene.
             if layout == .single(.preview) {
-                UIApplication.shared.sendAction(
-                    #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil
-                )
+                scene.editorHostView?.endEditing(true)
             }
         }
         .onAppear {

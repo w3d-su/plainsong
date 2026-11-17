@@ -19,7 +19,10 @@ final class IOSAuthoringShortcutInstallationTests: XCTestCase {
                     editor: editor, documents: nil, workspace: nil, preview: nil, assets: nil
                 )
             ),
-            surfaces: IOSShellFeatureSurfaces(authoring: provider)
+            surfaces: IOSShellFeatureSurfaces(
+                authoring: provider,
+                makeEditorView: { _ in UITextView() }
+            )
         )
         scene.startObserving()
         let router = IOSShellActionRouter(scene: scene)
@@ -33,21 +36,24 @@ final class IOSAuthoringShortcutInstallationTests: XCTestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(0.1))
 
         let installed = Self.keyCommands(in: host)
-        let expected = IOSAuthoringCatalog.actions.compactMap { action -> (
-            String,
-            UIKeyModifierFlags,
-            IOSAuthoringActionID
-        )? in
+        var expected = IOSAuthoringCatalog.actions.compactMap { action -> ExpectedShortcut? in
             guard let input = action.keyboardInput, input.count == 1, let character = input.first else { return nil }
-            return (String(character), Self.flags(action.keyboardModifiers), action.id)
+            return ExpectedShortcut(
+                input: String(character),
+                flags: Self.flags(action.keyboardModifiers),
+                name: "\(action.id)"
+            )
         }
+        expected.append(ExpectedShortcut(input: "z", flags: .command, name: "undo"))
+        expected.append(ExpectedShortcut(input: "z", flags: [.command, .shift], name: "redo"))
         XCTAssertFalse(expected.isEmpty)
-        for (input, flags, id) in expected {
-            let matches = installed.filter { $0.input == input && $0.modifierFlags == flags }
+        let summary = installed.map { "\($0.input ?? "")/\($0.modifierFlags.rawValue)" }
+        for item in expected {
+            let matches = installed.filter { $0.input == item.input && $0.modifierFlags == item.flags }
             XCTAssertGreaterThanOrEqual(
                 matches.count,
                 1,
-                "missing installed shortcut \(id) \(input) flags=\(flags.rawValue); saw \(installed.map { "\($0.input ?? "")/\($0.modifierFlags.rawValue)" })"
+                "missing shortcut \(item.name) \(item.input) flags=\(item.flags.rawValue); saw \(summary)"
             )
         }
     }
@@ -107,19 +113,19 @@ final class IOSAuthoringShortcutInstallationTests: XCTestCase {
     }
 }
 
+private struct ExpectedShortcut {
+    let input: String
+    let flags: UIKeyModifierFlags
+    let name: String
+}
+
 private struct ShortcutToolbarHost: View {
     @ObservedObject var scene: IOSShellSceneState
     @ObservedObject var router: IOSShellActionRouter
 
     var body: some View {
         NavigationStack {
-            VStack {
-                TextField("Editor", text: .constant("hello"))
-                IOSAuthoringKeyboardBar(scene: scene, router: router)
-            }
-            .toolbar {
-                IOSAuthoringToolbarItems(scene: scene, router: router)
-            }
+            IOSDocumentScreen(scene: scene, router: router)
         }
     }
 }

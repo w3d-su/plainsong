@@ -56,13 +56,23 @@ extension IOSWorkspaceAccessService: PreviewAssetReading {
         guard let record = matchingRecord(request.access) else {
             throw PreviewAssetReadFailure.accessChanged
         }
+        // PreviewKit's AssetURLResolver runs `standardizedFileURL.resolvingSymlinksInPath()`,
+        // which strips a leading `/private` on physical devices while the picker's `record.rootURL`
+        // keeps `/private/var/mobile/...`. Fall back to comparing normalized paths on both sides,
+        // then rebuild `location.fileURL` under `record.rootURL` so `authorize` still matches.
+        let resolvedRoot = record.rootURL.standardizedFileURL.resolvingSymlinksInPath()
+        let resolvedCandidate = request.resolvedURL.standardizedFileURL.resolvingSymlinksInPath()
         let relative = IOSWorkspacePathAuthority.relativeSpelling(root: record.rootURL, file: request.resolvedURL)
+            ?? IOSWorkspacePathAuthority.relativeSpelling(root: resolvedRoot, file: resolvedCandidate)
         guard let relative else { throw PreviewAssetReadFailure.outsideRoot }
+        let fileURL = IOSWorkspacePathAuthority.fileURL(
+            path: IOSWorkspacePathAuthority.joined(root: record.rootURL, relativePath: relative)
+        )
         let location = IOSFileLocation(
             workspaceID: record.workspaceID,
             accessGeneration: record.generation,
             relativePath: relative,
-            fileURL: request.resolvedURL,
+            fileURL: fileURL,
             resourceID: nil
         )
         try authorize(location, record: record)

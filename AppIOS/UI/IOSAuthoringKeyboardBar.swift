@@ -21,9 +21,13 @@ struct IOSAuthoringKeyboardBar: View {
             if keyboardIsUp {
                 Divider().frame(height: 24)
                 Button {
-                    UIApplication.shared.sendAction(
-                        #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil
-                    )
+                    if let editorView = scene.editorHostView {
+                        editorView.endEditing(true)
+                    } else {
+                        UIApplication.shared.sendAction(
+                            #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil
+                        )
+                    }
                 } label: {
                     Label("Hide Keyboard", systemImage: "keyboard.chevron.compact.down")
                 }
