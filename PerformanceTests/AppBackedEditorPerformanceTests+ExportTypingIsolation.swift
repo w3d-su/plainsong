@@ -11,12 +11,12 @@ import XCTest
 /// `docs/perf/2026-11-18-export-e9-typing-isolation.md`.
 ///
 /// For HTML and then PDF, on the same 1 MiB document: warm exports and idle windows of the
-/// same length record every main run loop slice with no typing, which is all the main-thread
-/// work an export does; then interleaved rounds pair a typing burst with no export against
-/// a burst while the export runs. Both bursts use the same jittered schedule and are compared
-/// at matching burst positions. A keystroke counts as during the export when it was due
-/// before the export finished, so one held up by the export's last synchronous step (fence,
-/// write, teardown) counts.
+/// same length record every main run loop slice with no typing, which is the export's
+/// main-thread work; then interleaved rounds pair a typing burst with no export against a
+/// burst while the export runs. Both bursts use the same jittered schedule after the same
+/// idle time and are compared within burst-position strata. A keystroke counts as during
+/// the export when it was due before the export finished, so one held up by the export's
+/// last synchronous step (fence, write, teardown) counts.
 @MainActor
 extension AppBackedEditorPerformanceTests {
     static let exportTypingCadenceMilliseconds = 80.0

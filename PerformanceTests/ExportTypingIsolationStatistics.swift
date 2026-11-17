@@ -112,7 +112,7 @@ enum ExportTypingStratum: String, Codable, CaseIterable {
     }
 }
 
-/// Handler time with and without an active export at matching burst positions.
+/// Handler time with and without an active export, pooled within one burst-position stratum.
 struct ExportTypingComparison: Codable {
     let stratum: ExportTypingStratum
     let withoutExport: ExportTypingDistribution
@@ -189,7 +189,7 @@ enum ExportTypingStatistics {
     /// G1: a regression larger than this that cannot be excluded fails the gate.
     static let isolationMarginMilliseconds = 1.0
     /// G2: the export arm may exceed the budget at most this much more often than the
-    /// no-export arm at the same burst positions.
+    /// no-export arm in the same stratum.
     static let overBudgetShareMargin = 0.01
     /// G0/G1 coverage: fewer rounds than this cannot support an interval over rounds.
     static let minimumCoveredRounds = 4
