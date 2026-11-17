@@ -36,7 +36,9 @@
 > longer shrinks every page, and a shrunk page warns instead of failing; Print's
 > paper aspect becomes a soft page budget, so a tall image or diagram extends one
 > page (scaled to fit at print) instead of erroring. Real panel/Powerbox,
-> keyboard/VoiceOver, and idle PDF timing stay open.** Precedent:
+> keyboard/VoiceOver, and idle PDF timing stay open. On 2026-11-17 hosted tests on
+> the written output check E3's kitchen-sink bullet and E5's shared-snapshot bullet.**
+> Precedent:
 > PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
 > or an owner-recorded result in the same commit.
 
@@ -1008,7 +1010,7 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   no bridge/runtime script, event handler, or checkbox writeback.
 - [x] Output carries D3's exact CSP; every HTML/SVG URL-bearing attribute and CSS
   `url(...)` is accepted only by the documented scheme/fragment/data allowlist.
-- [ ] Markdown kitchen-sink output preserves GFM, math, highlighted code, task-checkbox
+- [x] Markdown kitchen-sink output preserves GFM, math, highlighted code, task-checkbox
   appearance, and Mermaid output.
 - [x] Frontmatter is absent from the body; `<title>` follows D3's frontmatter / first
   document heading / `Untitled` rule.
@@ -1045,8 +1047,18 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   `ExportHTMLHostedTests` covers the static
   document, disabled checkboxes, MDX placeholders, and MDX failure;
   `export-html.test.ts` freezes dark styling; `ExportHTMLOfflineTests` resolves `system`
-  to light or dark. The full `Fixtures/kitchen-sink.md` matrix stays open for E8, so
-  E3 stays open on that bullet only.
+  to light or dark.
+  Kitchen-sink evidence (2026-11-17):
+  `ExportHTMLKitchenSinkAppTests.testKitchenSinkMarkdownExportKeepsGFMMathCodeTasksAndMermaid`
+  exports the real `Fixtures/kitchen-sink.md` through the product command under light and
+  dark, then reopens the written file in a fresh non-persistent WebKit view. The reopened
+  document renders the table with its right-aligned column, strikethrough, and the bare
+  URL and email autolinks. Its five task checkboxes are laid out, two checked, none
+  writable. KaTeX typesets the inline formula and both display blocks. All nine
+  non-Mermaid fences keep their language class and token spans, and the computed keyword
+  color is each theme's `--hl-keyword`. Both Mermaid diagrams are SVG with their own
+  labels, and no Mermaid fence stays raw. The title is the frontmatter title, no
+  frontmatter value is in the body, and the one missing image is the only omission.
 
 ### E4 — Assets, fonts, and offline fidelity
 
@@ -1118,7 +1130,7 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   (`TEST_RUNNER_PLAINSONG_REAL_PRINT=1`, skipped by default) real `runModal` runs
   confirm a suppressed-panel job produces a readable PDF and that real-sheet
   cancel/supersede unwind the operation.
-- [ ] Both use the same completed offscreen snapshot and include finalized images,
+- [x] Both use the same completed offscreen snapshot and include finalized images,
   KaTeX, highlighting, Mermaid, MDX placeholders, and the right theme for the
   product (PDF: resolved invocation theme; Print: light by B1).
 - [x] Print uses panel-controlled paper pagination; PDF/Print prove equivalent
@@ -1152,8 +1164,17 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   With content asserted on the captured print PDF, only the final PDFKit-to-device
   print hop remains owner smoke, in `docs/export-pdf-print-checklist.md`.
   KaTeX, code, Mermaid, MDX placeholders, a wide table, and the light print theme are in
-  the hosted capture/print job; finalized raster images and highlighted-code styling in
-  the PDF are still not asserted, so that bullet stays open.
+  the hosted capture/print job.
+  Image and highlight evidence (2026-11-17):
+  `ExportPDFContentAppTests.testPDFAndPrintPaintTheFinalizedImageAndHighlightedCodeFromOneSnapshot`
+  runs Export as PDF… under light and dark and Print… under a dark preference. After
+  each capture, the captured offscreen DOM holds the image as a loaded 96×48 `data:`
+  image and the Swift fence's keyword spans. The light PDF, the dark PDF and Print
+  captured the same text, and Print rendered light. In every resulting PDF the pages,
+  rendered at 2×, paint the image's teal. The keyword `struct` has colored pixels;
+  a prose control word has none. `testMissingImagePaintsNoSwatch` removes the image and
+  finds no teal pixels, so the count comes from the image and not from theme or code
+  colors.
 
 ### E6 — One-shot sandbox write and refusal matrix
 
