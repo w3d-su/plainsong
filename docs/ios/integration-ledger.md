@@ -28,16 +28,24 @@ not verified are in that PR's decision entry,
 6. preview laid out 980 px wide on iPhone;
 7. every relative image in a picked folder refused as outside the root.
 
-On #269's head `0c0e8f28`, local, Xcode 27.0, iOS 27.0 simulator: `make ios-test`
+On #269's earlier head `0c0e8f28`, local, Xcode 27.0, iOS 27.0 simulator: `make ios-test`
 719 run, 719 passed, 0 skipped; `make test-ios-tooling` 44/44; `make lint` with
 SwiftFormat 0.62.1 passed. `make ios-preview` 217/217 was run three source changes
-earlier, none of them in PreviewKit or `index.html`. The exact-head Mac CI passed. The
-walk was repeated after the fixes on the iPhone simulator and, for the layout and the
-bars, on an iPad Pro 11-inch simulator. Hosted `ios.yml` was not dispatched for this
-head.
+earlier, none of them in PreviewKit or `index.html`. The exact-head Mac CI passed for
+`0c0e8f28`. The walk was repeated after the fixes on the iPhone simulator and, for the
+layout and the bars, on an iPad Pro 11-inch simulator.
 
-The device-pass kit is rebuilt from `0c0e8f28`: `PlainsongIOS-0c0e8f28852c.ipa`,
-SHA-256 `7952dfe777bc16996f142641128d4f8ee9825878d95d8ff16634d39b45541363`.
+On #269's current head `2175bfe3` (adding the `/private` preview-root symlink resolution
+fallback, the Files image-picker dismissal/delegate split, Recent row hit-target framing,
+scene-local resign on preview switch, and `IOSDocumentScreen` shortcut test hosting),
+local, Xcode 27.0, iOS 27.0 simulator (`59CB04BD-26CC-4841-8D06-E75A2EDEBC66`):
+`make ios-test` 723 run, 723 passed, 0 skipped; `make test-ios-tooling` 44/44;
+SwiftFormat (local 0.64.0 with 0.64-only `repeatedGuard` and `wrapIf*` rules disabled)
+and `swiftlint --strict` passed on the 9 changed Swift files. Hosted `ios.yml` was not
+dispatched for this head, and Mac CI for `2175bfe3` runs on the updated PR.
+
+The device-pass kit is rebuilt from `2175bfe3`: `PlainsongIOS-2175bfe33959.ipa`,
+SHA-256 `892e35dd448be58666c5d77f66122af6d354bb2249e5d52fcec3f399a2a87211`.
 `docs/ios/device-pass.md` names it and now says where each control is. The kit is
 local and not committed.
 

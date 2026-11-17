@@ -13,9 +13,9 @@ M0 原型的結果都不能代替這裡的任何一項。
 
 | 欄位 | 值 |
 |---|---|
-| 來源 commit | `0c0e8f28852c896cbfbfb5932ed777170c0c12d8`（`main` `f664c5af` 加上 #269） |
-| 未簽名 IPA | `PlainsongIOS-0c0e8f28852c.ipa` |
-| IPA SHA-256 | `7952dfe777bc16996f142641128d4f8ee9825878d95d8ff16634d39b45541363` |
+| 來源 commit | `2175bfe339596ea0873a120c617eab954bd018a1`（`main` `f664c5af` 加上 #269） |
+| 未簽名 IPA | `PlainsongIOS-2175bfe33959.ipa` |
+| IPA SHA-256 | `892e35dd448be58666c5d77f66122af6d354bb2249e5d52fcec3f399a2a87211` |
 | 建置 | Release、arm64、Xcode 27.0、iOS SDK 27.0、最低版本 iOS 26.0 |
 
 換了 IPA 就要重新記錄這張表。#269 以 squash 合併後 `main` 上的 commit 會不同；
@@ -174,7 +174,7 @@ images；Files 區有 New file 與圖片資料夾名稱；最下面是 Version�
 | G7 | Replace 一次 | 只換目前那一處；一步 Undo 可還原 |
 | G8 | Replace All | 全部換掉；一步 Undo 全部還原 |
 | G9 | Insert Image → Photos，選一張照片 | 圖檔存進文件旁的資料夾，插入 `![](…)`，預覽看得到 |
-| G10 | Insert Image → Files，選一張圖 | 同 G9 |
+| G10 | Insert Image → Files，選一張圖 | 同 G9（圖片實際插入，不會在選完檔案後無聲消失） |
 | G11 | 開始插入圖片後按 Cancel | 文件沒有變，沒有留下孤兒圖檔 |
 | G12 | 只開單一檔案（不是資料夾）時插入圖片 | 要求先選資料夾，不會自己寫到別處 |
 
