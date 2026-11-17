@@ -1611,7 +1611,7 @@ for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
   any export-specific wall-clock or memory budget.
 - [ ] Export work never enters the editor keystroke path; the existing < 16 ms typing
   budget remains green while export is active.
-- [ ] Existing preview protocol, asset containment, MDX sanitizer, theme, render,
+- [x] Existing preview protocol, asset containment, MDX sanitizer, theme, render,
   scroll-sync, Save/Save Copy, and workspace mutation/recovery suites remain green.
 - [x] Dependency manifests are unchanged.
 - PR E evidence: `git diff origin/main -- '*Package.swift' '*Package.resolved'
@@ -1625,6 +1625,31 @@ for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
   `AppStateWorkspaceDataIntegrityTests`, `AppStateSessionStateCleanupTests`, and
   `WorkspaceMutation{Operation,Text}RecoveryStoreTests` stay green with the leaf-path writer,
   the restored pre-PR-E write primitive, and the extracted Save Copy owner walk.
+- Regression evidence (2026-11-17): CI run 43696370006 on the `main` push of `f664c5af`
+  (2026-11-15) contains every export PR and passed every job. Its logs record 2,869
+  passed XCTest cases, 0 failed and 36 skipped (opt-in probes), plus 231 of 231 vitest
+  cases in 25 preview-src files. Every macOS XCTest class at that commit passed in it,
+  apart from the `SharedRootAppTestCase` base class, which runs through its subclasses.
+  The named suites, all passed in that run:
+  - preview protocol: `protocol.test.ts`, `PreviewBridgeTransportTests`,
+    `ExportHTMLProtocolTests`, `ExportHTMLBridgeDecodingTests`;
+  - asset containment: `PreviewKitTests` (the `asset://` `../` and symlink cases),
+    `SVGAssetContainmentTests`, `PreviewAssetFenceTests`, `ExportResourceResolverTests`,
+    `asset-path.test.ts`;
+  - MDX sanitizer: `pipeline.test.ts`, `preview-regressions.test.ts`;
+  - theme: `export-html.test.ts`, `CustomThemeValidationTests`,
+    `MarkdownSyntaxThemeCustomTests`;
+  - render: `PreviewRenderDispatchTests`, `PreviewRenderDispatchHostedTests`,
+    `PreviewRenderingRegressionTests`, `segmented-render.test.ts`,
+    `segmented-render-fallbacks.test.ts`;
+  - scroll sync: `scroll-sync.test.ts`, `scroll-index.test.ts`,
+    `PreviewScrollDeliveryTests`, `EditorPreviewScrollCoordinatorTests`;
+  - Save/Save Copy: `WorkspaceKitTests`, `AppStateTests`,
+    `AppStateWorkspaceDataIntegrityTests`, `AppStateSessionStateCleanupTests`,
+    `ExportDestinationOwnershipAppTests`, `AppStateSaveAsTests` (50 `…SaveCopy…` cases
+    across them);
+  - workspace mutation/recovery: `WorkspaceMutationOperationRecoveryStoreTests`,
+    `WorkspaceMutationTextRecoveryStoreTests`, `WorkspaceAnchoredItemMutationTests`.
 
 ### PR F Phase B verification — 2026-10-01
 
