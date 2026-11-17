@@ -4,6 +4,48 @@ Created 2026-10-08. Contract: **IOS-C0-v1 declarations implemented**. Live main:
 
 The C0 tag preserves declarations and an unavailable scaffold. **The current branch contains the production composition candidate described below; full v1 acceptance remains OPEN. Older dated sections retain their original source and acceptance boundaries.**
 
+## I2 simulator walk — 2026-11-15
+
+This section records the first run of the production app through its real UI. It closes
+no device gate, and **full v1 acceptance remains OPEN**.
+
+`main` `f664c5af` (after #264–#267) was built and driven by a temporary XCUITest, not
+committed, on an iPhone 17 Pro / iOS 27.0 simulator: the system document picker, the
+Recent list, the editor, the preview, Settings and the Performance Probe entry. The
+unsigned Release IPA from that commit (`f2a5e60a…82e1`) is **not usable**: opening a
+file or a folder through the picker did nothing.
+
+Seven defects were found and are fixed in
+[#269](https://github.com/w3d-su/plainsong/pull/269); the causes, the fixes and what was
+not verified are in that PR's decision entry,
+`docs/decisions/2026-11-15-ios-first-real-ui-walk-fixes.md`:
+
+1. picker results dropped (file, folder, recovery restore, conflict copy);
+2. one tap on a Recent row ran Open, Choose Again and Remove Record;
+3. no Source/Preview control on iPhone;
+4. no Undo/Redo or formatting controls, and their shortcuts not installed;
+5. shortcut-host titles drawn over the iPad navigation bar;
+6. preview laid out 980 px wide on iPhone;
+7. every relative image in a picked folder refused as outside the root.
+
+On #269's head `0c0e8f28`, local, Xcode 27.0, iOS 27.0 simulator: `make ios-test`
+719 run, 719 passed, 0 skipped; `make test-ios-tooling` 44/44; `make lint` with
+SwiftFormat 0.62.1 passed. `make ios-preview` 217/217 was run three source changes
+earlier, none of them in PreviewKit or `index.html`. The exact-head Mac CI passed. The
+walk was repeated after the fixes on the iPhone simulator and, for the layout and the
+bars, on an iPad Pro 11-inch simulator. Hosted `ios.yml` was not dispatched for this
+head.
+
+The device-pass kit is rebuilt from `0c0e8f28`: `PlainsongIOS-0c0e8f28852c.ipa`,
+SHA-256 `7952dfe777bc16996f142641128d4f8ee9825878d95d8ff16634d39b45541363`.
+`docs/ios/device-pass.md` names it and now says where each control is. The kit is
+local and not committed.
+
+Not walked in the simulator: iCloud Drive, Chinese input, backgrounding and termination,
+external change and conflict, image insertion, the frontmatter panel, export and print,
+workspace search results, and accessibility. Those device-pass steps are still written
+from the source, and more defects of the same kind may be behind them.
+
 ## I0 baseline re-check — 2026-11-15
 
 This section records the state of `main` three weeks after the section below. It closes
