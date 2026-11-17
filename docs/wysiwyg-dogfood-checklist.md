@@ -26,11 +26,12 @@ WYSIWYG mode is on (the new default). Select WYSIWYG from the toolbar layout pic
   Pass: committed text is exactly what you chose, no stray spaces or newlines, the caret
   stays where you typed, the candidate window sits at the caret, and folds come back after
   the commit.
-- [ ] **Pinyin – Traditional:** the same positions and pass criteria.
 - [ ] **Harness rerun (owner-run, R9):**
-  `cd Packages/EditorKit && PLAINSONG_RUN_ACTUAL_IME=1 swift test --filter WYSIWYGActualIMEEventGateTests`
-  with both input methods enabled. Pass: 10 tests, 0 failures, neither input method
-  skipped. The last run was 2026-07-12, before STTextView 2.4.1.
+  `cd Packages/EditorKit && PLAINSONG_RUN_ACTUAL_IME=1 swift test --filter WYSIWYGActualIMEEventGateTests --skip Pinyin`
+  with Zhuyin enabled. Pass: 7 tests, 0 failures, none skipped. Pinyin is not tested
+  (`docs/decisions/2026-11-17-zhuyin-only-ime-testing.md`); `--skip Pinyin` leaves out
+  the Pinyin tests this branch still has until that change is merged from `main`, and
+  matches nothing after. The last run was 2026-07-12, before STTextView 2.4.1.
 
 ## 2. Pointer (blocking)
 

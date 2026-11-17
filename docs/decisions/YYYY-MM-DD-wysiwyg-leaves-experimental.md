@@ -13,7 +13,7 @@ typing-path and cache-trimming work, the EditorKit gutter, whole-source resets,
 Replace/Find and the iOS move of the fold model into SyntaxKit. That audit added gates for
 cache trimming, the production viewport and pointer hits beside the gutter. The
 click-layout fix (#214) removed the last known limit: a WYSIWYG click no longer lays
-out the whole document. The owner reran the actual Zhuyin/Pinyin harness on <date>
+out the whole document. The owner reran the actual Zhuyin harness on <date>
 (<result>) and dogfooded WYSIWYG for real writing.
 
 What changes: `Plainsong.settings.experimentalWYSIWYGEnabled` now defaults to `true`, so

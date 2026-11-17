@@ -103,7 +103,7 @@ the gate passes in the full suite. It was a test-suite artifact (finding 7).
 | # | Evidence rerun | Invalidated by a later change? | Status |
 |---|---|---|---|
 | B1 Zhuyin | Opt-in, skipped by default. Deterministic marked-text coverage passes: `WYSIWYGIMESpikeTests` (4), `testTrimIsRefusedDuringMarkedTextComposition`, the gutter keeps its width during marked text | STTextView 2.4.1 did not change `NSTextInputClient`, but the last real-IME run (2026-07-12) predates it, #180's typing changes and #189 | **Owner rerun required** (R9) |
-| B2 Pinyin | Same | Same | **Owner rerun required** |
+| B2 Pinyin | Same | Same | Dropped: Pinyin is not tested since 2026-11-17 (`docs/decisions/2026-11-17-zhuyin-only-ime-testing.md`) |
 | B3 Arrow near folds | Both cited tests pass | — | Holds |
 | B4 Reverse shift-selection | Both cited tests pass | — | Holds |
 | B5 Pointer click | Three cited tests pass; new gutter-visible test passes | Every pointer click laid out the whole document; #214 hit-tests the viewport | Holds; reran green after #214 |
