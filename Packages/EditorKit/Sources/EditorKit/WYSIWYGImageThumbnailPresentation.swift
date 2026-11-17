@@ -192,7 +192,8 @@ enum WYSIWYGImagePresentationMetrics {
     /// the app). Highlighting replaces every attribute, so TextKit lays these paragraphs out
     /// without a multiple while the painter still raises them: 2 pt for a text line, 30 pt
     /// for a 240 pt canvas line, which then covers the lines above it. A projected paragraph
-    /// that holds an image gets multiple 1, so its lines paint where TextKit placed them.
+    /// that holds an image gets `lineHeightMultiple = 0` (no multiple, which STTextView reads
+    /// as 1), so its lines paint where TextKit placed them.
     static func paintLinesWhereLaidOut(in paragraph: NSMutableAttributedString) {
         guard paragraph.length > 0 else { return }
         let fullRange = NSRange(location: 0, length: paragraph.length)

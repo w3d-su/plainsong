@@ -107,7 +107,10 @@ never touched:
     their own reserved line, with and without the app's 1.25 line-height multiple. Before
     this, the canvas hung from the reserving font's baseline and STTextView raised the tall
     line, so a 240 pt placeholder covered the lines above it by up to 69 pt while every
-    layout frame stayed correct.
+    layout frame stayed correct. Known limit: text beside an inline image now sits on the
+    line's baseline, the reserving font's descent (about 18% of the canvas) above the
+    image's bottom edge; Typora and CSS put the image's bottom on the baseline. Standalone
+    images are unaffected.
   - `testMultipleImagesShareOneLineWithFoldedLinkAndCoalesceDuplicateLoad` covers multiple
     image regions in one paragraph alongside the existing folded-link projection.
   - `testRefreshProxyReloadsOnlyAffectedPathAndPreservesSelectionAndScroll` proves the
