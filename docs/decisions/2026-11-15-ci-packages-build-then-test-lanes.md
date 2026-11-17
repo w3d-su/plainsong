@@ -22,26 +22,35 @@ mostly waiting for WebKit, and one MarkdownCore test uses one core for 27 s.
 
 ## Decisions
 
-- **Build first, then test, then sandbox probes.** `make test-packages` runs
-  `swift build --build-tests` for the six packages and starts the test lanes only when
-  every build has ended. `package-test-%` runs `swift test --skip-build` so SwiftPM
-  executes the built test products instead of reusing `swift build`'s llbuild plan (which
-  caused `swift-package` to segfault with `EXC_BAD_ACCESS` on two of five CI runs when
-  `swift test` replanned after `swift build --build-tests`). Once all three lanes finish,
-  `make test-packages-sandbox` runs serially. Because the sandbox probes compile with
-  `swift build`, `swift test`, and `swiftc`, running them after the lanes means no timed
-  package test is ever timed beside a compiler: PreviewKit's hosted tests allow 8 s for
-  the page and 2 s for a JavaScript reply, 70 of the 76 waits in EditorKit's tests are
-  2 s, and the tooling tests give subprocesses 2 s.
+- **Build one at a time, then test in lanes, then sandbox probes.** `make test-packages`
+  runs `swift build --build-tests` for the six packages one package at a time (`--jobs 1`,
+  since each `swift build` already uses all three cores) and starts the three test lanes
+  only when every build has ended. Without `--skip-build`, `swift test` after
+  `swift build --build-tests` segfaulted on two of five CI runs (runs 43697280282 and
+  43703681414); running three `swift build --build-tests` at once (`--jobs 3`)
+  segfaulted the same way in `package-build-WorkspaceKit` on attempt 3 of run
+  44056852361. In all three crashes, the failing SwiftPM invocation printed
+  `Building for debugging...` with no `[0/1] Planning build` before it and crashed with
+  `EXC_BAD_ACCESS` on `org.swift.swiftpm.build-delegate` inside `llbuild` (every
+  `swift build` and `swift test` that printed `[0/1] Planning build` first survived).
+  `package-test-%` runs `swift test --skip-build`, which still prints
+  `[0/1] Planning build` but skips the `Building for debugging...` phase where the
+  crashes occurred, and building one package at a time (`--jobs 1`) avoids running
+  multiple `llbuild` processes concurrently on the three-core runner. Once all three
+  lanes finish, `make test-packages-sandbox` runs serially. Because the sandbox probes
+  compile with `swift build`, `swift test`, and `swiftc`, running them after the lanes
+  means no timed package test is ever timed beside a compiler: PreviewKit's hosted tests
+  allow 8 s for the page and 2 s for a JavaScript reply, 70 of the 76 waits in
+  EditorKit's tests are 2 s, and the tooling tests give subprocesses 2 s.
 - **Three test lanes.** `preview` is PreviewKit. `editor` is EditorKit, then the Python
   tooling tests and the script self-tests. `core` is MarkdownCore, WorkspaceKit, SyntaxKit
   and WorkspaceCore. By the test times above that is about 85, 80 and 60 s (plus ~14 s for
   the serial sandbox probes afterward). The Makefile stops with an error when a package in
   `PACKAGES` or `PORTABLE_PACKAGES` is in no lane or in two, or when `test-packages-tooling`
   is missing or duplicated.
-- **`TEST_PACKAGES_JOBS` sets how many builds, then lanes, run at once. CI passes 3; the
-  default is 1.** With 1 everything runs in order with live output and stops at the
-  first failure, as before. The default stays 1 because the packages' wall-clock budgets
+- **`TEST_PACKAGES_JOBS` sets how many test lanes run at once. CI passes 3; the default
+  is 1.** With 1 everything runs in order with live output and stops at the first failure,
+  as before. The default stays 1 because the packages' wall-clock budgets
   (`assertPerformanceBudget`, `assertTextSearchDurationUnderLocally`) only print on CI
   but fail a test anywhere else, and `make test` should not start failing because lanes
   compete for cores. `make test-packages TEST_PACKAGES_JOBS=3` works locally.
@@ -103,8 +112,9 @@ CI: see the table below, filled in from the pull request's runs.
 - A handful of green runs cannot show a failure that happens once in fifty runs. If a
   package test starts failing only on CI, set `TEST_PACKAGES_JOBS=1` in `ci.yml` first:
   that is the previous behavior and a one-line change.
-- A cache miss (a changed `Package.swift` or `Package.resolved` with no fallback cache)
-  builds three packages from nothing at once on a 7 GB runner. That was not measured.
+- A cache miss (a changed `Package.swift` or `Package.resolved` with no fallback cache,
+  or a runner-image bump that invalidates incremental artifacts) builds one package at a
+  time (`--jobs 1`) across the three cores rather than three at once on a 7 GB runner.
 
 ## Alternatives considered
 

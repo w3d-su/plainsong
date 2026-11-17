@@ -11,9 +11,9 @@ SWIFTFORMAT_CACHE ?=
 PACKAGES := MarkdownCore EditorKit PreviewKit WorkspaceKit
 PORTABLE_PACKAGES := SyntaxKit WorkspaceCore
 TEST_PACKAGES := $(PACKAGES) $(PORTABLE_PACKAGES)
-# How many package builds, and then how many test lanes, `make test-packages` runs at
-# once. 1 runs everything in order with live output. CI passes 3, one per runner core
-# (.github/workflows/ci.yml). Above 1, the wall-clock budgets that fail a test off CI
+# How many test lanes `make test-packages` runs at once. 1 runs everything in order
+# with live output. CI passes 3, one per runner core (.github/workflows/ci.yml).
+# Above 1, the wall-clock budgets that fail a test off CI
 # (PerformanceBudgetAssertion) are measured while the other lanes run.
 TEST_PACKAGES_JOBS ?= 1
 # The test lanes of `make test-packages`. A lane runs its steps in the order written,
@@ -64,21 +64,25 @@ build: generate
 # `make test` still runs all of them in sequence.
 test: test-packages test-hosted test-preview
 
-# Every package's tests are built before any test runs, then the lanes above run
-# (Scripts/run-test-lanes.py; TEST_PACKAGES_JOBS), and then the sandbox probes run
-# serially so no test is timed beside a compiler (`swift build`/`swiftc`).
+# Every package's tests are built one package at a time before any test runs (each
+# `swift build` already uses all cores, and running three `swift build`s at once hit
+# the same SwiftPM `build-delegate` segfault as `swift test` without `--skip-build`),
+# then the lanes above run side by side (Scripts/run-test-lanes.py; TEST_PACKAGES_JOBS),
+# and then the sandbox probes run serially so no test is timed beside a compiler
+# (`swift build`/`swiftc`).
 # generate: the sandbox probes sign with the XcodeGen-generated
 # App/Plainsong.entitlements.
 test-packages: generate
-	python3 Scripts/run-test-lanes.py --jobs $(TEST_PACKAGES_JOBS) $(addprefix package-build-,$(TEST_PACKAGES))
+	python3 Scripts/run-test-lanes.py --jobs 1 $(addprefix package-build-,$(TEST_PACKAGES))
 	python3 Scripts/run-test-lanes.py --jobs $(TEST_PACKAGES_JOBS) $(addprefix test-packages-lane-,$(TEST_LANES))
 	$(MAKE) test-packages-sandbox
 
 package-build-%:
 	cd Packages/$* && swift build --build-tests
 
-# `--skip-build` runs the products `package-build-%` already built without
-# re-entering llbuild on the shared build plan, avoiding a SwiftPM segfault.
+# `--skip-build` runs the test products `package-build-%` already built and skips
+# `swift test`'s `Building for debugging...` phase, where `swift-package` segfaulted on CI.
+# Run `make package-build-<name>` first when invoking `package-test-<name>` on its own.
 package-test-%:
 	@echo "==> swift test: $*"
 	cd Packages/$* && swift test --skip-build

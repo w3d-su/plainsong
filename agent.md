@@ -987,7 +987,7 @@ make preview-bundle   # build preview-src → App/Resources/preview/ (commit the
 make build            # xcodebuild -scheme Plainsong build
 make test             # test-packages (swift test) + test-hosted (xcodebuild test) + test-preview (npm test)
 make test-hosted XCODE_TEST_TARGETS=PlainsongTests  # one hosted bundle subset
-make test-packages TEST_PACKAGES_JOBS=3  # package builds, then the test lanes, three at once (CI's setting)
+make test-packages TEST_PACKAGES_JOBS=3  # build packages one by one, then run the three test lanes at once (CI's setting)
 make release          # DMG pipeline (Scripts/release.sh); PLAINSONG_UNSIGNED=1 for the alpha path
 cd preview-src && npm run typecheck  # preview TypeScript check; CI runs this separately
 make format           # swiftformat . && swiftlint --fix
@@ -1008,15 +1008,17 @@ make format           # swiftformat . && swiftlint --fix
 - The preview CI job verifies every pinned acceptance resource against the committed
   bytes before installing preview dependencies. Regenerated resources must update
   `IOSAcceptanceTests/Resources/acceptance-resource-manifest.txt` in the same PR.
-- `make test-packages` builds every package's tests (`swift build --build-tests`), then
-  runs the test lanes the Makefile lists in `TEST_LANES`, through
-  `Scripts/run-test-lanes.py`, and finally runs `test-packages-sandbox` serially. Each
-  lane's `package-test-%` runs `swift test --skip-build` so `swift test` executes the
-  products built in the build phase without re-entering llbuild on the shared build plan
-  (avoiding a SwiftPM segfault). Running `test-packages-sandbox` after the lanes finish
-  keeps its `swift build`/`swift test`/`swiftc` invocations from compiling alongside timed
-  package tests in other lanes while reusing `WorkspaceKit`'s `.build`.
-  `TEST_PACKAGES_JOBS` is how many builds, then lanes, run at once. The default is 1: in
+- `make test-packages` builds every package's tests one package at a time
+  (`swift build --build-tests`, each build using all cores), then runs the test lanes
+  the Makefile lists in `TEST_LANES`, through `Scripts/run-test-lanes.py`, and finally
+  runs `test-packages-sandbox` serially. Each lane's `package-test-%` runs
+  `swift test --skip-build` so `swift test` executes the products built in the build
+  phase and skips the `Building for debugging...` phase where `swift-package` segfaulted
+  on CI (running three `swift build`s at once also hit that `build-delegate` segfault,
+  which is why builds run one at a time). Running `test-packages-sandbox` after the
+  lanes finish keeps its `swift build`/`swift test`/`swiftc` invocations from compiling
+  alongside timed package tests in other lanes while reusing `WorkspaceKit`'s `.build`.
+  `TEST_PACKAGES_JOBS` is how many test lanes run at once. The default is 1: in
   order, with live output, stopping at the first failure. CI's `packages` job passes 3,
   one per runner core. Above 1 each lane's log is printed whole when the lane ends, a
   failure lets the other lanes finish, the failed lanes' logs come last, and a stop

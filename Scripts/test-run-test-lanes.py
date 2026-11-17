@@ -11,6 +11,7 @@ import unittest
 from pathlib import Path
 
 RUNNER = Path(__file__).with_name("run-test-lanes.py")
+REPOSITORY_MAKEFILE = RUNNER.resolve().parent.parent / "Makefile"
 
 # `meet-a.b` passes only once lane `meet-b.a` has started too, so the pair proves that
 # two lanes ran at the same time without a sleep deciding the result.
@@ -49,6 +50,9 @@ newpg-hang-%:
 
 stubborn-hang-%:
 	@$(PYTHON) -c 'import os, pathlib, signal, sys, time; os.setpgid(0, 0); signal.signal(signal.SIGINT, signal.SIG_IGN); signal.signal(signal.SIGTERM, signal.SIG_IGN); print(f"{sys.argv[1]} stubborn", flush=True); pathlib.Path(f"sleeper-{sys.argv[1]}.tmp").write_text(str(os.getpid())); os.replace(f"sleeper-{sys.argv[1]}.tmp", f"sleeper-{sys.argv[1]}.pid"); time.sleep(60)' "$*"
+
+signal-lane-%:
+	@$(PYTHON) -c 'import os, signal, sys; print(f"{sys.argv[1]} before signal", flush=True); os.killpg(0, signal.SIGKILL)' "$*"
 """
 
 
@@ -322,6 +326,48 @@ class RunTestLanesTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 2, result.stdout)
         self.assertNotIn("a first", result.stdout)
+
+    def test_a_lane_killed_by_a_signal_with_several_jobs_lets_other_lanes_finish(self):
+        result = self.run_lanes(2, "signal-lane-a", "print-b")
+
+        self.assertEqual(result.returncode, 1, result.stdout)
+        output = result.stdout
+        self.assertIn("==> signal-lane-a: FAILED (signal 9) after", output)
+        self.assertIn("----- signal-lane-a: FAILED (signal 9) after", output)
+        self.assertIn("a before signal", output)
+        self.assertIn("b second", output)
+        self.assertIn("1 passed, 1 FAILED", output)
+
+    def test_makefile_lane_checks_reject_missing_or_duplicate_steps(self):
+        def dry_run(*overrides):
+            return subprocess.run(
+                ["make", "-n", "-f", str(REPOSITORY_MAKEFILE), *overrides, "test-packages"],
+                cwd=REPOSITORY_MAKEFILE.parent,
+                env=self.environment(),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=30,
+            )
+
+        ok = dry_run()
+        self.assertEqual(ok.returncode, 0, ok.stdout)
+
+        missing_package = dry_run("TEST_LANE_preview=")
+        self.assertNotEqual(missing_package.returncode, 0, missing_package.stdout)
+        self.assertIn("TEST_LANE_* must name package-test-<package> for each of:", missing_package.stdout)
+
+        duplicate_package = dry_run("TEST_LANE_preview=package-test-PreviewKit package-test-EditorKit")
+        self.assertNotEqual(duplicate_package.returncode, 0, duplicate_package.stdout)
+        self.assertIn("A package is in two test lanes:", duplicate_package.stdout)
+
+        missing_tooling = dry_run("TEST_LANE_editor=package-test-EditorKit")
+        self.assertNotEqual(missing_tooling.returncode, 0, missing_tooling.stdout)
+        self.assertIn("TEST_LANE_* must include test-packages-tooling exactly once.", missing_tooling.stdout)
+
+        duplicate_tooling = dry_run("TEST_LANE_preview=package-test-PreviewKit test-packages-tooling")
+        self.assertNotEqual(duplicate_tooling.returncode, 0, duplicate_tooling.stdout)
+        self.assertIn("TEST_LANE_* must include test-packages-tooling exactly once.", duplicate_tooling.stdout)
 
 
 if __name__ == "__main__":
