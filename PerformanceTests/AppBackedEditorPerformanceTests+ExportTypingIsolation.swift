@@ -22,7 +22,7 @@ extension AppBackedEditorPerformanceTests {
     static let exportTypingCadenceMilliseconds = 80.0
     static let exportTypingBaselineKeystrokes = 30
     static let exportTypingTailKeystrokes = 3
-    static let exportTypingMaximumKeystrokes = 400
+    static let exportTypingMaximumKeystrokes = 1500
     /// Where the export burst starts, as a fraction of a warm export, by round.
     static let exportTypingOffsetFractions = [0.05, 0.3, 0.55, 0.8]
 
