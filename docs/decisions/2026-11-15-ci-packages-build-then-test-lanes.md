@@ -99,12 +99,23 @@ delay). They now run while two other test lanes run, but never while anything co
 Local, an 8-core Mac at load 7–30, builds current: 198 s with one job; 88, 91 and 124 s
 with three, every test passing with the local budgets enforced.
 
-CI: see the table below, filled in from the pull request's runs.
+CI (run 44087904085, attempts 1–6, all six green):
 
 | `packages` on CI | Runs | Job, median (range) | `Test packages` step, median (range) |
 |---|---:|---:|---:|
 | Before, restored cache | 21 | 434 s (354–546) | 379 s (314–468) |
-| After | pending | pending | pending |
+| After, warm cache on matching image (`20261104.0514.1`, attempts 2, 4, 5, 6) | 4 | 276.5 s (214–314) | 223 s (178–253) |
+| After, all attempts including image-bump rebuilds (`20261112.0539.3`, attempts 1–6) | 6 | 302.5 s (214–459) | 243 s (178–397) |
+
+Individual attempts on run 44087904085 (`main`'s cache `spm-v3-macOS-3c5ff166...` was seeded on runner image `20261104.0514.1`, so attempts on `20261112.0539.3` recompiled every module):
+- Attempt 1 (`20261112.0539.3`): job 459 s, `Test packages` 397 s (builds 253 s, test lanes 128 s). `packages` started 161 s after `hosted (build)` (258 s) because it waited for a runner, and finished 362 s after `hosted (build)`.
+- Attempt 2 (`20261104.0514.1`): job 214 s, `Test packages` 178 s (builds 84 s, test lanes 83 s).
+- Attempt 3 (`20261112.0539.3`): job 456 s, `Test packages` 390 s (builds 252 s, test lanes 122 s).
+- Attempt 4 (`20261104.0514.1`): job 291 s, `Test packages` 233 s (builds 99 s, test lanes 118 s).
+- Attempt 5 (`20261104.0514.1`): job 262 s, `Test packages` 213 s (builds 105 s, test lanes 94 s).
+- Attempt 6 (`20261104.0514.1`): job 314 s, `Test packages` 253 s (builds 109 s, test lanes 128 s).
+
+On warm-cache runs (`20261104.0514.1`, plus run 44056852361 attempts 1 and 2 at 293 s / 235 s and 264 s / 222 s), `packages` takes ~277 s vs `hosted (build)`'s 240 s median (in 44056852361 attempt 1, `packages` was 293 s and `hosted (build)` 207 s, an 86 s overlap instead of the previous ~3 min).
 
 ## Limits
 
