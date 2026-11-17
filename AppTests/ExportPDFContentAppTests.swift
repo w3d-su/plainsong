@@ -53,6 +53,8 @@ final class ExportPDFContentAppTests: XCTestCase {
             let keyword = Self.saturatedPixelCount(of: "struct", on: page)
             let prose = Self.saturatedPixelCount(of: "Plainprose", on: page)
             XCTAssertGreaterThan(keyword, 20, "\(label): the keyword is not painted in color")
+            // -1 means the control word was not found, which would pass the check below.
+            XCTAssertGreaterThanOrEqual(prose, 0, "\(label): the prose control word was not found")
             XCTAssertLessThan(prose, 3, "\(label): the prose control is colored")
         }
     }
@@ -62,6 +64,8 @@ final class ExportPDFContentAppTests: XCTestCase {
     func testMissingImagePaintsNoSwatch() async throws {
         let support = ExportHTMLCommandAppTests()
         let result = try await capture(.pdf, theme: .light, support: support, writesSwatch: false)
+        // The theme proves the captured DOM was read; an unread snapshot also has no images.
+        XCTAssertEqual(result.snapshot.theme, "light")
         XCTAssertEqual(result.snapshot.images, [])
         let pages = (0 ..< result.document.pageCount).compactMap { result.document.page(at: $0) }
         XCTAssertEqual(pages.map { Self.tealPixelCount(in: $0) }.reduce(0, +), 0)

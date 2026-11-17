@@ -37,7 +37,8 @@
 > paper aspect becomes a soft page budget, so a tall image or diagram extends one
 > page (scaled to fit at print) instead of erroring. Real panel/Powerbox,
 > keyboard/VoiceOver, and idle PDF timing stay open. On 2026-11-17 hosted tests on
-> the written output check E3's kitchen-sink bullet and E5's shared-snapshot bullet.**
+> the written output check E3's kitchen-sink bullet and E5's shared-snapshot bullet,
+> and `main`'s full CI run checks E9's regression bullet.**
 > Precedent:
 > PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
 > or an owner-recorded result in the same commit.
@@ -1646,7 +1647,7 @@ for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
     `PreviewScrollDeliveryTests`, `EditorPreviewScrollCoordinatorTests`;
   - Save/Save Copy: `WorkspaceKitTests`, `AppStateTests`,
     `AppStateWorkspaceDataIntegrityTests`, `AppStateSessionStateCleanupTests`,
-    `ExportDestinationOwnershipAppTests`, `AppStateSaveAsTests` (50 `…SaveCopy…` cases
+    `ExportDestinationOwnershipAppTests`, `AppStateSaveAsTests` (40 `…SaveCopy…` cases
     across them);
   - workspace mutation/recovery: `WorkspaceMutationOperationRecoveryStoreTests`,
     `WorkspaceMutationTextRecoveryStoreTests`, `WorkspaceAnchoredItemMutationTests`.
