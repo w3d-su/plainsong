@@ -152,32 +152,35 @@ extension AppBackedEditorPerformanceTests {
         cancelScheduledAppWork(in: app.appState)
     }
 
+    /// Prints the summary and raw report; returns the failures the caller asserts at the end.
     func reportExportTypingIsolation(
         _ summary: ExportTypingSummary,
         rounds: [ExportTypingRound],
         windows: [ExportBusyWindow],
         isSmoke: Bool
-    ) throws {
+    ) throws -> [String] {
         summary.lines.forEach { print($0) }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let report = try encoder.encode(ExportTypingReport(summary: summary, rounds: rounds, windows: windows))
         print("E9 TYPING JSON " + String(decoding: report, as: UTF8.self))
         let product = summary.product
-        XCTAssertEqual(summary.untouchedViolations, 0, "A keystroke changed the \(product) export's state")
-        XCTAssertEqual(summary.fenceFailures, 0, "A fenced \(product) export did not stop or wrote a file")
-        XCTAssertGreaterThan(summary.roundsWithDuringSamples, 0, "No keystroke fell during the \(product) export")
+        var failures: [String] = []
+        if summary.untouchedViolations > 0 { failures.append("A keystroke changed the \(product) export's state") }
+        if summary.fenceFailures > 0 { failures.append("A fenced \(product) export did not stop or wrote a file") }
+        if summary.roundsWithDuringSamples == 0 { failures.append("No keystroke fell during the \(product) export") }
         if isSmoke {
             print("E9 TYPING SMOKE \(product): correctness only, no timing evidence")
-            return
+            return failures
         }
         #if DEBUG
             print("E9 TYPING \(product) Debug: G0-G2 informational; the gate is Release")
         #else
-            XCTAssertTrue(summary.coveragePasses, "G0 failed for \(product)")
-            XCTAssertTrue(summary.isolationPasses, "G1 failed for \(product): \(summary.comparisons)")
-            XCTAssertTrue(summary.budgetPasses, "G2 failed for \(product)")
+            if !summary.coveragePasses { failures.append("G0 failed for \(product)") }
+            if !summary.isolationPasses { failures.append("G1 failed for \(product): \(summary.comparisons)") }
+            if !summary.budgetPasses { failures.append("G2 failed for \(product)") }
         #endif
+        return failures
     }
 
     static func exportTypingMilliseconds(_ duration: Duration) -> Double {

@@ -106,7 +106,7 @@ if [ "$mode" = plain ]; then
     filters=(-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testTypingWithoutHTMLExportForRecordedLoadComparison)
 fi
 # --typing: interleaved typing with and without an active HTML/PDF export in one process
-# (docs/perf/2026-11-18-export-e9-typing-isolation.md). Rounds default to 12.
+# (docs/perf/2026-11-18-export-e9-typing-isolation.md). Rounds default to 16.
 typing=0
 if [ "$mode" = typing ]; then
     typing=1
@@ -115,7 +115,7 @@ fi
 set +e
 TEST_RUNNER_PLAINSONG_EXPORT_E9_SMOKE="$smoke" TEST_RUNNER_PLAINSONG_RUN_EXPORT_E9=1 \
     TEST_RUNNER_PLAINSONG_RUN_EXPORT_E9_TYPING="$typing" \
-    TEST_RUNNER_PLAINSONG_E9_TYPING_ROUNDS="${PLAINSONG_E9_TYPING_ROUNDS:-12}" \
+    TEST_RUNNER_PLAINSONG_E9_TYPING_ROUNDS="${PLAINSONG_E9_TYPING_ROUNDS:-16}" \
     xcodebuild -project Plainsong.xcodeproj -scheme PerformanceTests -configuration "$configuration" \
     -destination 'platform=macOS' -parallel-testing-enabled NO -derivedDataPath "$derived_data" \
     -resultBundlePath "$evidence_root/Results.xcresult" "${test_settings[@]}" test-without-building "${filters[@]}" \

@@ -67,39 +67,66 @@ extension AppBackedEditorPerformanceTests {
         app.editor.textView.textSelection = NSRange(location: 0, length: 0)
         try await pauseBetweenExportTypingArms(in: app)
 
+        // Gates are asserted after both products, and an error in one product is reported
+        // without discarding the other's results.
+        var failures: [String] = []
         for product in [ExportCommandProduct.html, .pdf] {
-            // The first export in the process pays one-time WebKit costs; it sets nothing.
-            _ = try await recordExportBusyWindow(product, in: app)
-            var windows = try await [recordExportBusyWindow(product, in: app)]
-            try await windows.append(recordIdleBusyWindow(milliseconds: windows[0].durationMilliseconds, in: app))
-            try await windows.append(recordIdleBusyWindow(milliseconds: windows[0].durationMilliseconds, in: app))
-            try await windows.append(recordExportBusyWindow(product, in: app))
-            let exportDurations = windows.filter { $0.kind == "export" }.map(\.durationMilliseconds)
-            let warm = exportDurations.reduce(0, +) / Double(exportDurations.count)
-
-            var rounds: [ExportTypingRound] = []
-            let fractions = Self.exportTypingOffsetFractions
-            for index in 0 ..< roundCount {
-                // Alternates by round, and flips every cycle of offsets, so each offset runs
-                // in both orders.
-                let exportFirst = index.isMultiple(of: 2) == ((index / fractions.count) % 2 == 1)
-                try await rounds.append(runExportTypingRound(
-                    index: index,
-                    product: product,
-                    offsetMilliseconds: warm * fractions[index % fractions.count],
-                    exportFirst: exportFirst,
-                    in: app
-                ))
+            do {
+                failures += try await runExportTypingProduct(product, roundCount: roundCount, isSmoke: isSmoke, in: app)
+            } catch {
+                print("E9 TYPING \(product.pathExtension) aborted: \(error)")
+                failures.append("\(product.pathExtension) aborted: \(error)")
             }
-            let summary = ExportTypingSummary(
-                product: product.pathExtension,
-                configuration: Self.exportTypingConfiguration,
-                warmExportMilliseconds: warm,
-                rounds: rounds,
-                windows: windows
-            )
-            try reportExportTypingIsolation(summary, rounds: rounds, windows: windows, isSmoke: isSmoke)
         }
+        for failure in failures {
+            XCTFail(failure)
+        }
+    }
+
+    /// Busy windows, then the interleaved rounds, for one product; returns its gate failures.
+    func runExportTypingProduct(
+        _ product: ExportCommandProduct,
+        roundCount: Int,
+        isSmoke: Bool,
+        in app: AppFixture
+    ) async throws -> [String] {
+        // The first export in the process pays one-time WebKit costs; it sets nothing.
+        _ = try await recordExportBusyWindow(product, in: app)
+        var windows = try await [recordExportBusyWindow(product, in: app)]
+        try await windows.append(recordIdleBusyWindow(milliseconds: windows[0].durationMilliseconds, in: app))
+        try await windows.append(recordIdleBusyWindow(milliseconds: windows[0].durationMilliseconds, in: app))
+        try await windows.append(recordExportBusyWindow(product, in: app))
+        let exportDurations = windows.filter { $0.kind == "export" }.map(\.durationMilliseconds)
+        let warm = exportDurations.reduce(0, +) / Double(exportDurations.count)
+
+        var rounds: [ExportTypingRound] = []
+        let fractions = Self.exportTypingOffsetFractions
+        for index in 0 ..< roundCount {
+            // Alternates by round, and flips every cycle of offsets, so each offset runs in
+            // both orders.
+            let exportFirst = index.isMultiple(of: 2) == ((index / fractions.count) % 2 == 1)
+            let round = try await runExportTypingRound(
+                index: index,
+                product: product,
+                offsetMilliseconds: warm * fractions[index % fractions.count],
+                exportFirst: exportFirst,
+                in: app
+            )
+            rounds.append(round)
+            print(String(
+                format: "E9 TYPING progress %@ round %d: offset %.0f ms, %d during, load %.2f, %@",
+                product.pathExtension, index, round.offsetMilliseconds, round.duringExport.count,
+                round.loadAfter, round.exportResult
+            ))
+        }
+        let summary = ExportTypingSummary(
+            product: product.pathExtension,
+            configuration: Self.exportTypingConfiguration,
+            warmExportMilliseconds: warm,
+            rounds: rounds,
+            windows: windows
+        )
+        return try reportExportTypingIsolation(summary, rounds: rounds, windows: windows, isSmoke: isSmoke)
     }
 
     /// One export run to completion with no typing, recording every main run loop slice.
