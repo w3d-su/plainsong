@@ -27,7 +27,7 @@ final class ExportPDFContentAppTests: XCTestCase {
 
     private static let swatchSize = NSSize(width: 96, height: 48)
 
-    func testPDFAndPrintPaintTheFinalizedImageAndHighlightedCodeFromOneSnapshot() async throws {
+    func testPDFAndPrintPaintTheFinalizedImageAndHighlightedCode() async throws {
         let support = ExportHTMLCommandAppTests()
         let lightPDF = try await capture(.pdf, theme: .light, support: support)
         let darkPDF = try await capture(.pdf, theme: .dark, support: support)
@@ -37,7 +37,8 @@ final class ExportPDFContentAppTests: XCTestCase {
         XCTAssertEqual(lightPDF.snapshot.theme, "light")
         XCTAssertEqual(darkPDF.snapshot.theme, "dark")
         XCTAssertEqual(print.snapshot.theme, "light")
-        // One snapshot: PDF and Print captured the same finalized DOM content.
+        // Three separate exports of one source: the same finalized text. The shared
+        // offscreen pipeline is shown by the per-capture image and keyword checks below.
         XCTAssertEqual(print.snapshot.content, lightPDF.snapshot.content)
         XCTAssertEqual(darkPDF.snapshot.content, lightPDF.snapshot.content)
 

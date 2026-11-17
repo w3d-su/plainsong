@@ -1058,8 +1058,10 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   writable. KaTeX typesets the inline formula and both display blocks. All nine
   non-Mermaid fences keep their language class and token spans, and the computed keyword
   color is each theme's `--hl-keyword`. Both Mermaid diagrams are SVG with their own
-  labels, and no Mermaid fence stays raw. The title is the frontmatter title, no
-  frontmatter value is in the body, and the one missing image is the only omission.
+  labels, and no Mermaid fence stays raw. The title is "Kitchen Sink Fixture" and no
+  frontmatter value is in the body; the fixture's first heading has the same text, so this
+  does not show frontmatter precedence, which `ExportHTMLTitleTests` covers. The export
+  reports exactly one omitted image, the fixture's missing `./assets/example-image.png`.
 
 ### E4 — Assets, fonts, and offline fidelity
 
@@ -1167,15 +1169,16 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   KaTeX, code, Mermaid, MDX placeholders, a wide table, and the light print theme are in
   the hosted capture/print job.
   Image and highlight evidence (2026-11-17):
-  `ExportPDFContentAppTests.testPDFAndPrintPaintTheFinalizedImageAndHighlightedCodeFromOneSnapshot`
-  runs Export as PDF… under light and dark and Print… under a dark preference. After
-  each capture, the captured offscreen DOM holds the image as a loaded 96×48 `data:`
-  image and the Swift fence's keyword spans. The light PDF, the dark PDF and Print
-  captured the same text, and Print rendered light. In every resulting PDF the pages,
+  `ExportPDFContentAppTests.testPDFAndPrintPaintTheFinalizedImageAndHighlightedCode`
+  runs Export as PDF… under light and dark and Print… under a dark preference, each a
+  separate export of the same source. After each capture, the captured offscreen DOM
+  holds the image as a loaded 96×48 `data:` image and the Swift fence's keyword spans, so
+  both products read the same finalized offscreen pipeline. The light PDF, the dark PDF
+  and Print captured the same text, and Print rendered light. In every resulting PDF the pages,
   rendered at 2×, paint the image's teal. The keyword `struct` has colored pixels;
   a prose control word has none. `testMissingImagePaintsNoSwatch` removes the image and
-  finds no teal pixels, so the count comes from the image and not from theme or code
-  colors.
+  finds no teal pixels in a light PDF, so in light the count comes from the image and not
+  from theme or code colors. The control does not run in dark.
 
 ### E6 — One-shot sandbox write and refusal matrix
 
@@ -1628,7 +1631,9 @@ for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
   the restored pre-PR-E write primitive, and the extracted Save Copy owner walk.
 - Regression evidence (2026-11-17): CI run 43696370006 on the `main` push of `f664c5af`
   (2026-11-15) contains every export PR and passed every job. Its logs record 2,869
-  passed XCTest cases, 0 failed and 36 skipped (opt-in probes), plus 231 of 231 vitest
+  passed XCTest cases, 0 failed and 36 skipped (30 opt-in probes and 6 platform or
+  volume gates: five macOS 27 split-shell cases and one case-sensitive-volume Save Copy
+  case), plus 231 of 231 vitest
   cases in 25 preview-src files. Every macOS XCTest class at that commit passed in it,
   apart from the `SharedRootAppTestCase` base class, which runs through its subclasses.
   The named suites, all passed in that run:
