@@ -2051,8 +2051,10 @@ run, superseded runs, and results: `docs/perf/2026-11-18-export-e9-typing-isolat
   fails it the same way: with no export, the first keystroke after about a second of
   idle has a median of 20–33 ms. That cost is a §12 finding of its own; the §12 hosted
   test, which types after 100 ms, cannot see it.
-- The export does up to 52 ms of main-thread CPU in one slice in Release, and up to 85 ms
-  wall at the command (lower bounds); a keystroke due then waits for it.
+- The export does up to 67 ms of main-thread CPU in one slice about 1 s in (Release), and
+  41–85 ms wall at the command; no Release slice reaches 100 ms. A keystroke due during
+  one waits for it. A Release replication with a corrected busy-slice monitor gives the
+  same verdicts.
 
 Open for the owner: whether the no-export control answers the PDF first-keystroke
 criterion or the after-idle cost must be fixed first, and whether those main-thread

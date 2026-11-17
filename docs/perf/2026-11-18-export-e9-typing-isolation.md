@@ -18,8 +18,9 @@
 - Result: Release HTML passes G0, G1 and G2. Release PDF passes G0 and G1 and fails G2's
   first-keystroke clause (p95 31.8 ms). The burst with no export, after the same idle
   time, fails that measure the same way (first keystroke median 22–28 ms), so the
-  failure comes from the idle pause, not the export. E9's typing bullet stays unchecked;
-  see "Verdict".
+  failure comes from the idle pause, not the export. A Release replication with a
+  corrected busy-slice monitor gives the same verdicts. E9's typing bullet stays
+  unchecked; see "Verdict".
 
 ## Why a new probe
 
@@ -302,12 +303,13 @@ unchecked. Two owner decisions would close it:
 1. Whether the first-keystroke clause is answered by the no-export control, or the
    first-keystroke-after-idle cost has to be found and fixed first (it is a §12 typing
    issue on its own, with or without export) and this probe re-run.
-2. Whether the export's main-thread chunks (in Release up to 52 ms of CPU in one slice,
-   and up to 85 ms wall at the command; lower bounds) are acceptable, or should move off
-   the main thread. The existing E9 rule names only the writer, at hundreds of
-   milliseconds.
+2. Whether the export's main-thread chunks are acceptable, or should move off the main
+   thread. With the corrected monitor (below), Release has up to 67 ms of CPU in one
+   slice about 1 s into the export. At the command the Release runs show 41–85 ms wall
+   with 28–37 ms CPU. No Release slice reaches 100 ms; a Debug PDF slice reached 112 ms. The existing E9 rule names only
+   the writer, at hundreds of milliseconds.
 
-## Busy-slice monitor
+## Busy-slice monitor and Release replication
 
 The runs above used one run loop observer at order 0 for both the wake and the sleep
 callback, as `MainRunLoopBusyMonitor` in the PlainsongTests target still does. The sleep
@@ -315,9 +317,35 @@ callback at order 0 runs before observers with a later order, such as Core Anima
 commit, so their work before the thread sleeps fell outside every slice. Since this
 record, `ExportTypingBusyMonitor` uses two observers: the wake callback at the lowest
 order and the sleep callback at the highest, so a slice spans everything the run loop
-does between waking and sleeping. A re-run with it will report slices at least as long
-as the ones above.
+does between waking and sleeping. A Debug smoke run with it found slices up to 112 ms
+(106 ms CPU) in a PDF export window, against 94.9 ms with the old monitor.
 
-Raw run logs are not committed; the two runs above are kept locally with their load
-snapshots, and every table here is recomputed from their `E9 TYPING JSON` lines by the
-probe's printed summary or `docs/evidence/export-e9-typing-analysis.py`.
+A full Release run at `446a9e80` with the corrected monitor
+(`Release-typing-20261118-031106-23640`, load 3.31–12.17) replicates every verdict.
+It is a replication; the gate result above is the run at `6e4c0fd1`.
+
+| | HTML | PDF |
+|---|---|---|
+| G0 / G1 / G2 | PASS / PASS / PASS | PASS / PASS / FAIL |
+| Burst start difference | −4.59 [−6.20, −3.39] | −1.64 [−4.12, −0.14] |
+| Sustained difference (rounds) | −4.83 [−5.46, −3.88] (4) | −3.12 [−4.45, −2.26] (12) |
+| First keystroke during export: median, max | 8.31, 14.11 | 19.23, 28.88 |
+| Same-position pairs: median [interval] | −4.08 [−6.24, −3.08] | −1.31 [−2.22, −0.52] |
+| No-export first keystroke after ≥ 1 s idle (medians of 4 rounds) | 20.7–26.2 | 21.9–27.7 |
+| Largest start delay during export / without | 13.7 / 13.2 | 15.5 / 13.5 |
+
+Busy slices with the corrected monitor, Release, wall/CPU ms at ms after the command:
+
+| | Export windows: max; slices ≥16 / ≥50 / ≥100 | At the command | About 1 s in | Idle windows: max |
+|---|---|---|---|---|
+| HTML | 66.2; 5 / 2 / 0 | 48.5/33.4, 53.4/36.8 | 66.2/65.9 @995; 48.9/48.7 @1065 | 0.5 |
+| PDF | 67.6; 39 / 3 / 0 | 52.2/35.7, 40.9/28.3 | 67.6/67.4 @983; 60.2/59.9 @1016 | 1.1 |
+
+The 1 s chunk is now one slice of 49–67 ms CPU in every window (HTML's second window
+also has a 16 ms slice just before it). PDF has 39 slices of
+16 ms or more against 13 with the old monitor, because the capture step's commit work is
+now counted.
+
+Raw run logs are not committed; the three full runs above are kept locally with their
+load snapshots, and every table here is recomputed from their `E9 TYPING JSON` lines by
+the probe's printed summary or `docs/evidence/export-e9-typing-analysis.py`.
