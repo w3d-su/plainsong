@@ -129,7 +129,7 @@ final class EditorReplaceLayeringTests: XCTestCase {
                 #".package(url: "https://github.com/krzyzanowskim/STTextView.git", exact: "2.4.1")"#,
             ],
             "MarkdownCore": [
-                #".package(url: "https://github.com/jpsim/Yams.git", from: "6.2.2")"#,
+                #".package(url: "https://github.com/jpsim/Yams.git", exact: "6.2.2")"#,
             ],
             "PreviewKit": [#".package(path: "../MarkdownCore")"#],
             "WorkspaceKit": [
