@@ -3,7 +3,7 @@ import MarkdownCore
 import UIKit
 import XCTest
 
-/// Synthetic `setMarkedText` guards. They do not accept Zhuyin or Pinyin on a device.
+/// Synthetic `setMarkedText` guards. They do not accept Zhuyin on a device.
 final class IOSMarkedTextGuardTests: XCTestCase {
     @MainActor
     func testFormatImageAndHighlightDoNotDisturbMarkedText() async throws {

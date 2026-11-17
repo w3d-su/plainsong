@@ -324,7 +324,7 @@ C0 architecture inventory `EditorReplaceLayeringTests.swift`, WorkspaceKitIOS Co
 ## M0 owner-only evidence
 
 - [ ] iPhone/iPad models, OS, app/source head and fixture hashes recorded.
-- [ ] Actual Traditional Chinese Zhuyin/Pinyin composition, candidate confirmation, selection and native Undo/Redo.
+- [ ] Actual Traditional Chinese Zhuyin composition, candidate confirmation, selection and native Undo/Redo.
 - [ ] Local Files and iCloud Drive file/folder in-place open/save, placeholders/offline, external changes and permission reselect.
 - [ ] Background save/recovery and relaunch; older completion cannot erase newer source.
 - [ ] Owner-re-signed unsigned IPA launches and opens/saves selected Files resources.

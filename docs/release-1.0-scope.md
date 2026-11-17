@@ -29,7 +29,7 @@ Tiers used below:
 |---|---|---|---|
 | V1 | Do macOS and iOS ship 1.0 together? | **Decided 2026-11-10: no.** macOS 1.0 first; iOS follows as its own 1.0 | iOS still has every device gate open; tying them blocks macOS on hardware evidence |
 | V2 | Is multi-window (Windows PR C–G) in macOS 1.0? | **Decided 2026-11-10: yes, through D2**; native tabs (F), restoration (E) and residency (G) are Should | Without D2 a user cannot work in a second window: New Window is not offered, and a second scene refuses file and root opens and closes itself (agent.md §5). D2 is draft #246 |
-| V3 | WYSIWYG at 1.0? | **Decided 2026-11-11: promoted.** WYSIWYG leaves Experimental for 1.0 through #213: on by default and a stop in the layout cycle, not the first-launch layout, with the Settings switch kept as the kill switch | The owner chose promotion over shipping it Experimental and off by default (the draft default). The decision sets the target; it does not close the gate. #213 still merges only after the `docs/wysiwyg-release-checklist.md` §D.4 gate: the owner's Zhuyin/Pinyin and pointer dogfood, since the last real IME runs predate STTextView 2.4.1 (R9), and a Decision Log entry |
+| V3 | WYSIWYG at 1.0? | **Decided 2026-11-11: promoted.** WYSIWYG leaves Experimental for 1.0 through #213: on by default and a stop in the layout cycle, not the first-launch layout, with the Settings switch kept as the kill switch | The owner chose promotion over shipping it Experimental and off by default (the draft default). The decision sets the target; it does not close the gate. #213 still merges only after the `docs/wysiwyg-release-checklist.md` §D.4 gate: the owner's Zhuyin and pointer dogfood, since the last real IME runs predate STTextView 2.4.1 (R9), and a Decision Log entry |
 | V4 | Distribution channel | **Decided 2026-11-10: unsigned direct DMG** (ad-hoc signature, README Gatekeeper bypass on first install). The Apple Developer Program membership is not planned in the short term; Developer ID signing, notarization and a Mac App Store build wait for it | agent.md §15 locks direct distribution first. The draft default was a signed, notarized DMG |
 | V5 | Updates | **Decided 2026-11-10: in-app updates are Must.** Sparkle 2 is integrated and off (U1, #232); turning it on needs U2 and U3 (`docs/auto-update-plan.md` §4). With V4 this means updating unsigned builds (U-D2) | An owner-run probe on 2026-11-10 updated an unsigned build with no second Gatekeeper prompt (`docs/auto-update-plan.md` §5). U-D4–U-D7 were adopted the same day (U-D6 reverses the 2026-07-02 no-secrets rule). README keeps "no auto-update" until U3 |
 | V6 | Version and channel naming | **Decided 2026-11-10: `1.0.0`**, with `0.9.x` betas before it; all unsigned, per V4 | `MARKETING_VERSION` is still `0.1.0` (release plan P0.5) |
@@ -85,7 +85,7 @@ items need the owner with physical hardware.
 |---|---|
 | Signed install | Sign the Release IPA and install it on a real device (needs the same Developer Program membership as macOS P1) |
 | Files / iCloud | Open, edit, save and reopen in place through Files and iCloud Drive, including offline/downloading documents |
-| Chinese IME and Undo | Physical Zhuyin and Pinyin composition plus Undo/Redo in the native editor (agent.md §13 treats IME as non-negotiable) |
+| Chinese IME and Undo | Physical Zhuyin composition plus Undo/Redo in the native editor (agent.md §13 treats IME as non-negotiable) |
 | Recovery, conflict, background | Real recovery list, conflict Save a Copy, and backgrounding/termination without data loss |
 | Export and print | HTML/PDF export and printing on a physical device (#228 left these to owner validation; not yet in the ledger) |
 | Minimum OS and iPad | Physical iPad and an iOS 26.0 device |
@@ -106,7 +106,7 @@ items need the owner with physical hardware.
 
 ## 4. Proposed order
 
-1. Owner runs the Zhuyin/Pinyin and pointer dogfood on #213 (V3 is decided: promote);
+1. Owner runs the Zhuyin and pointer dogfood on #213 (V3 is decided: promote);
    #213 merges when it passes.
 2. Owner smoke for D2 (#246), then merge it. C, D1-0 and D1a–D1c are already merged.
 3. First `0.9.0` beta with updates on (U2 and U2b are merged; the key and secret exist)

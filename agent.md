@@ -863,7 +863,8 @@ editor *folds* markdown tokens via rendering, not text mutation:
   and T1 passed; tables stay raw with the table helper (§6.3) until T2–T11 pass. Mermaid stays raw.
 - Undo, IME composition (Chinese input!), and selection across folded tokens are the risk
   areas — write exploratory tests early. **IME correctness is non-negotiable: test with
-  Traditional Chinese (Zhuyin/Pinyin) marked text at every change.**
+  Traditional Chinese Zhuyin marked text at every change.** Pinyin is not tested
+  (`docs/decisions/2026-11-17-zhuyin-only-ime-testing.md`).
 - Experimental single Replace edits raw UTF-16 source only. When the current match is
   not the selection, the action only selects it and synchronously removes any image
   marker over it; folded owners reveal later through the existing debounced

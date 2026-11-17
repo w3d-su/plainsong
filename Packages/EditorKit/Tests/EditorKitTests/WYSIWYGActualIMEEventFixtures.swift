@@ -26,23 +26,6 @@ struct ActualIMEScript {
         acceptableActiveCommitTexts: ["台", "臺"],
         acceptableCommittedTexts: ["台", "臺"]
     )
-
-    /// Toneless Pinyin "tai" + space commits the first candidate, which the macOS
-    /// Traditional Pinyin IME (`com.apple.inputmethod.TCIM.Pinyin`) ranks as 太. This is the
-    /// legitimate difference from the Zhuyin ㄊㄞˊ (tone 2) script, whose top candidates are
-    /// 台/臺. All listed candidates are single Han ideographs, so the committed selection length
-    /// stays one UTF-16 unit regardless of which candidate the IME picks.
-    static let pinyin = ActualIMEScript(
-        name: "Pinyin",
-        compositionSteps: [
-            ActualIMECompositionStep(key: .t, acceptableInsertedTexts: ["t"]),
-            ActualIMECompositionStep(key: .a, acceptableInsertedTexts: ["ta"]),
-            ActualIMECompositionStep(key: .i, acceptableInsertedTexts: ["tai"]),
-        ],
-        commitKeys: [.space, .returnKey, .returnKey],
-        acceptableActiveCommitTexts: ["tai", "太", "台", "臺"],
-        acceptableCommittedTexts: ["太", "台", "臺"]
-    )
 }
 
 struct ActualIMECompositionStep {
@@ -54,13 +37,10 @@ struct ActualIMEKey {
     let name: String
     let keyCode: CGKeyCode
 
-    static let a = ActualIMEKey(name: "a", keyCode: 0)
-    static let i = ActualIMEKey(name: "i", keyCode: 34)
     static let nine = ActualIMEKey(name: "9", keyCode: 25)
     static let returnKey = ActualIMEKey(name: "return", keyCode: 36)
     static let six = ActualIMEKey(name: "6", keyCode: 22)
     static let space = ActualIMEKey(name: "space", keyCode: 49)
-    static let t = ActualIMEKey(name: "t", keyCode: 17)
     static let w = ActualIMEKey(name: "w", keyCode: 13)
 }
 
@@ -268,7 +248,7 @@ struct ActualIMEInputSource {
     }
 
     /// True only for composition-capable keyboard input methods/modes. Plain keyboard
-    /// layouts (e.g. `com.apple.keylayout.PinyinKeyboard`) also match the CJK name filters
+    /// layouts (e.g. the Zhuyin Bopomofo layout) also match the CJK name filters
     /// but never produce marked text, so they must not be selected for the actual IME gate.
     var isComposingInputMethod: Bool {
         let composingTypes: Set<String> = [
@@ -281,10 +261,6 @@ struct ActualIMEInputSource {
 
     static func enabled(matching kind: Kind) -> ActualIMEInputSource? {
         inputSources(includeAllInstalled: false).first { kind.matches($0) && $0.isComposingInputMethod }
-    }
-
-    static func installed(matching kind: Kind) -> [ActualIMEInputSource] {
-        inputSources(includeAllInstalled: true).filter { kind.matches($0) }
     }
 
     static func identifier(of source: TISInputSource) -> String? {
@@ -313,16 +289,10 @@ struct ActualIMEInputSource {
     }
 
     enum Kind {
-        case pinyin
         case zhuyin
 
         func matches(_ inputSource: ActualIMEInputSource) -> Bool {
             switch self {
-            case .pinyin:
-                inputSource.identifier.localizedCaseInsensitiveContains("pinyin")
-                    || inputSource.identifier.localizedCaseInsensitiveContains("itabc")
-                    || inputSource.localizedName.localizedCaseInsensitiveContains("pinyin")
-                    || inputSource.localizedName.contains("拼音")
             case .zhuyin:
                 inputSource.identifier.localizedCaseInsensitiveContains("zhuyin")
                     || inputSource.localizedName.localizedCaseInsensitiveContains("zhuyin")

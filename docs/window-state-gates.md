@@ -902,7 +902,7 @@ scheduling root cause remains unknown. This is an additional gate, not closure b
 - [ ] Two windows opened with New Window, real key activation, menus act on the frontmost window, and every selector is scoped to a window. *Named XCUITest.*
 - [ ] VoiceOver reads distinct window titles, and Full Keyboard Access reaches each window's Find chrome. *Owner smoke.*
 - [ ] The existing UI tests use window-scoped queries and still pass. *Named XCUITests.*
-- [ ] Zhuyin and Pinyin composition in window 2 while window 1 holds marked text corrupts neither (`agent.md` §13). *Owner smoke.*
+- [ ] Zhuyin composition in window 2 while window 1 holds marked text corrupts neither (`agent.md` §13). *Owner smoke.*
 - Evidence: _open_
 
 ## 12. Risks and `agent.md` edits for implementation
