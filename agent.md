@@ -1004,8 +1004,8 @@ make format           # swiftformat . && swiftlint --fix
   its bundle's catch-all shard, so a new or renamed class still runs. `make test` is unchanged.
 - Pull requests cancel their older run and run the four shards at once. Every non-docs
   commit on `main` runs in full, never cancelled or queued out, and seeds the caches pull
-  requests restore; it runs its shards one at a time, so it holds at most two of the five
-  macOS runners. `workflow_dispatch` does the same when `serial_hosted` is set.
+  requests restore; it runs its shards one at a time, so each such run holds at most two
+  of the five macOS runners. `workflow_dispatch` does the same when `serial_hosted` is set.
 - The preview CI job verifies every pinned acceptance resource against the committed
   bytes before installing preview dependencies. Regenerated resources must update
   `IOSAcceptanceTests/Resources/acceptance-resource-manifest.txt` in the same PR.
