@@ -17,11 +17,18 @@ extension AppBackedEditorPerformanceTests {
         let fenceHeld: Bool
     }
 
-    func typeWithoutExport(schedule: [Double], in app: AppFixture) async throws -> [ExportTypingSample] {
+    /// Waits `offset` with the editor idle, as the export arm does while its export starts,
+    /// then types on `schedule`. The first keystroke after a long idle is slower, so the two
+    /// bursts must start after the same idle time.
+    func typeWithoutExport(
+        offset: Double,
+        schedule: [Double],
+        in app: AppFixture
+    ) async throws -> [ExportTypingSample] {
         let start = ContinuousClock.now
         var samples: [ExportTypingSample] = []
         for position in 0 ..< Self.exportTypingBaselineKeystrokes {
-            let scheduled = start + .milliseconds(schedule[position])
+            let scheduled = start + .milliseconds(offset + schedule[position])
             try await Task.sleep(until: scheduled, tolerance: .zero, clock: .continuous)
             await samples.append(timeExportTypingKeystroke(
                 in: app, position: position, scheduled: scheduled, armStart: start, exportOperationID: nil

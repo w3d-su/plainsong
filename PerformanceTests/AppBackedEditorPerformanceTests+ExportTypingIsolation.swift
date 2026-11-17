@@ -185,9 +185,9 @@ extension AppBackedEditorPerformanceTests {
                 in: app
             )
             try await pauseBetweenExportTypingArms(in: app)
-            withoutExport = try await typeWithoutExport(schedule: schedule, in: app)
+            withoutExport = try await typeWithoutExport(offset: offsetMilliseconds, schedule: schedule, in: app)
         } else {
-            withoutExport = try await typeWithoutExport(schedule: schedule, in: app)
+            withoutExport = try await typeWithoutExport(offset: offsetMilliseconds, schedule: schedule, in: app)
             try await pauseBetweenExportTypingArms(in: app)
             exportArm = try await typeDuringExport(
                 product,

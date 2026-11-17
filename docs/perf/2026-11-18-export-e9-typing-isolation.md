@@ -47,6 +47,27 @@ Its numbers are kept here only as the reason for the redesign: G1 passed for bot
 products, and G2 failed for PDF because the 30-keystroke baseline itself had p95 20.0 ms
 and 27.5% of keystrokes at or over 16 ms at that load.
 
+## Runs of version 2 before idle matching
+
+Three earlier runs of version 2 are not evidence for the gate; each found a defect in the
+harness, and none changed a criterion:
+
+- `87b308d2`, Release: the script's own default of 12 rounds overrode the probe's 16,
+  leaving HTML's sustained stratum covered by 3 rounds; and the PDF part ended in a
+  `CancellationError` partway through its rounds, losing its results. Gate failures are
+  now asserted after both products, each product runs in its own `do`/`catch`, and the
+  script defaults to 16 rounds (`190e3fbd`).
+- `190e3fbd`, Release: HTML passed G0, G1 and G2. The PDF part aborted when one export
+  under load (end load 22.5) outlasted the 400-keystroke schedule; the cap is now 1,500.
+- `190e3fbd`, Debug, complete: in the PDF export arm, the first keystroke of every burst
+  that started 4–11 s after the export command took 15–32 ms (main-thread CPU 15–25 ms),
+  against 9–12 ms for bursts that started 0.7 s after it and 6–26 ms for the first
+  keystroke of the no-export bursts, which then started 500 ms after the previous arm.
+  HTML offsets are all under 1.6 s and showed no such effect. The likeliest cause is the
+  idle time before the burst rather than the export, so the no-export burst now waits
+  the same offset before it starts. This run's PDF G2 failed on that first-keystroke
+  clause (p95 31.7 ms).
+
 ## Method (version 2)
 
 Fixture: the app-backed hosted editor of `AppBackedEditorPerformanceTests` (an
@@ -67,8 +88,10 @@ For each product (HTML, then PDF):
    that starts `0.05 T`, `0.3 T`, `0.55 T` or `0.8 T` after the export command
    (rotating by round) and continues until three keystrokes are due after the export
    finished. Both bursts in a round use the same schedule: keystroke `k` is due at
-   `80 k` ms plus a seeded jitter in `[0, 40)` ms, so keystrokes land at different
-   phases of the export's work from round to round. The order of the two bursts
+   the offset plus `80 k` ms plus a seeded jitter in `[0, 40)` ms, so keystrokes land at
+   different phases of the export's work from round to round. The burst with no export
+   also waits the offset first, with the editor idle, so both bursts start after the same
+   idle time (see "Runs of version 2 before idle matching" for why). The order of the two bursts
    alternates by round and flips every four rounds, so each offset runs in both orders.
    Bursts and windows are 500 ms apart.
 4. The first keystroke during an active export fences it (E1): the operation finishes
