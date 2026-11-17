@@ -66,7 +66,8 @@ final class FrontmatterWritebackTests: XCTestCase {
                 Frontmatter.updating(text, key: "date", value: .date(typed)),
                 typed.debugDescription
             )
-            let mapping = try Frontmatter.loadMapping(from: XCTUnwrap(Frontmatter.parse(updated).block).rawYAML)
+            let mapping = try Frontmatter.ParsedMapping(yaml: XCTUnwrap(Frontmatter.parse(updated).block).rawYAML)
+                .values
             XCTAssertEqual(mapping["date"] as? String, typed, typed.debugDescription)
             XCTAssertEqual(Set(mapping.keys), ["title", "date"], typed.debugDescription)
         }

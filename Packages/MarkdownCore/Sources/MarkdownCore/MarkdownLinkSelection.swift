@@ -39,7 +39,6 @@ enum MarkdownLinkSelection {
                 if source.first?.isASCIIPunctuation == true { source.removeFirst() }
             case "(": depth += 1
             case ")": depth -= 1
-            case "<", ">": return false
             default: break
             }
         }
@@ -61,11 +60,22 @@ enum MarkdownLinkSelection {
     ) -> Substring? {
         let original = source
         var depth = 1
+        var backticks: [Int: [Range<String.Index>]]?
         while let character = source.first {
             let index = source.startIndex
             source.removeFirst()
             if character == "\\", source.first?.isASCIIPunctuation == true {
                 source.removeFirst()
+            } else if opening == "[", character == "`" {
+                if backticks == nil { backticks = backtickRuns(in: original) }
+                source = source.drop(while: { $0 == "`" })
+                let length = original.distance(from: index, to: source.startIndex)
+                while let next = backticks?[length]?.popLast() {
+                    if next.lowerBound >= source.startIndex {
+                        source = original[next.upperBound...]
+                        break
+                    }
+                }
             } else if character == closing {
                 depth -= 1
                 if depth == 0 { return original[..<index] }
@@ -75,6 +85,24 @@ enum MarkdownLinkSelection {
             }
         }
         return nil
+    }
+
+    /// Store equal-length delimiters in reverse order so an unmatched opener stays
+    /// literal and repeated searches never rescan the rest of a large selection.
+    private static func backtickRuns(in text: Substring) -> [Int: [Range<String.Index>]] {
+        var runs: [Int: [Range<String.Index>]] = [:]
+        var end = text.endIndex
+        while end > text.startIndex {
+            var start = text.index(before: end)
+            if text[start] == "`" {
+                while start > text.startIndex, text[text.index(before: start)] == "`" {
+                    start = text.index(before: start)
+                }
+                runs[text.distance(from: start, to: end), default: []].append(start ..< end)
+            }
+            end = start
+        }
+        return runs
     }
 }
 

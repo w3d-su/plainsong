@@ -30,7 +30,7 @@ extension IOSUIDocumentStore {
         // baseline. Let those issued observations finish before deciding whether
         // close must retain the writer; cancellation is not proof of clean bytes.
         await drainExternalReadsForClose(entry)
-        if entry.session?.isDirty == true || entry.fenced || entry.hasDeferredExternalChange
+        if entry.needsCloseRecovery || entry.hasDeferredExternalChange
             || entry.externalToken != nil
             || !guardCurrentAuthority(entry, generation: generation)
         {
@@ -46,7 +46,7 @@ extension IOSUIDocumentStore {
             throw IOSDocumentFailure.closeFailed
         }
         // Closing a provider is asynchronous. A newer source cannot be retired by its result.
-        if session.version != version || session.isDirty || entry.fenced || entry.hasDeferredExternalChange
+        if session.version != version || entry.needsCloseRecovery || entry.hasDeferredExternalChange
             || entry.externalToken != nil
             || !guardCurrentAuthority(entry, generation: generation)
         {
@@ -117,7 +117,8 @@ extension IOSUIDocumentStore {
     /// A scene may leave an unavailable file after its latest edits are durable
     /// and the provider has actually relinquished its writer.
     public func retireRetainedWriter(_ identity: IOSDocumentIdentity, disconnecting: Bool) async throws {
-        if case .closed = state(for: identity) { return }
+        // Evicted terminal IDs have already relinquished their writer.
+        guard let registered = byIdentity[identity], !registered.closed else { return }
         let entry = try requireEntry(identity)
         guard disconnecting || entry.fenced || !entry.allowsProviderWrite || !leaseStillAuthorizes(
             entry,
@@ -173,7 +174,7 @@ extension IOSUIDocumentStore {
             }
             // Edits received during either drain or close must also be durable.
             retainedRecovery = try await persistRetirementRecovery(entry) ?? retainedRecovery
-            if let session = entry.session, session.isDirty || entry.fenced {
+            if let session = entry.session, entry.needsCloseRecovery {
                 guard retainedRecovery?.revision.version == session.version else {
                     throw IOSDocumentFailure.sourceChanged
                 }
@@ -194,7 +195,7 @@ extension IOSUIDocumentStore {
 
     /// Historical recovery does not make a subsequently saved clean document a retained draft.
     func persistRetirementRecovery(_ entry: IOSDocumentEntry) async throws -> IOSRecoveryReceipt? {
-        guard entry.session?.isDirty == true || entry.fenced else { return nil }
+        guard entry.needsCloseRecovery else { return nil }
         return try await persistStableRecovery(entry, reason: .closeIncomplete)
     }
 
@@ -203,7 +204,7 @@ extension IOSUIDocumentStore {
     {
         guard let session = entry.session else { return nil }
         for _ in 0 ..< 3 {
-            guard session.isDirty || entry.fenced else { return entry.recoveryReceipt }
+            guard entry.needsCloseRecovery else { return entry.recoveryReceipt }
             let version = session.version
             let text = session.text
             let receipt = try await persistRecovery(entry, reason: reason)

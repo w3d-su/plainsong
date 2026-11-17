@@ -22,6 +22,10 @@ extension IOSUIDocumentStore {
         case .deleted:
             fenceUnavailable(entry, .access(.notFound))
         case let .writePermissionChanged(writable):
+            if writable, entry.isUntouchedOpeningSnapshot {
+                if entry.externalToken == nil { startExternalRead(entry) }
+                return
+            }
             guard entry.allowsProviderWrite != writable else { return }
             entry.allowsProviderWrite = writable
             guard entry.session != nil, !entry.fenced else { return }
@@ -51,7 +55,7 @@ extension IOSUIDocumentStore {
     /// A provider can report changes after capturing its open snapshot. Finish all notified
     /// reads before publishing the first editable session or waking another opener.
     func finishOpeningSession(
-        _ entry: IOSDocumentEntry, initialText: String, canWrite: Bool
+        _ entry: IOSDocumentEntry, initialText: String, canWrite: Bool, existingFile: Bool
     ) async throws -> IOSDocumentHandle {
         var text = initialText
         while entry.hasDeferredExternalChange, !entry.fenced,
@@ -70,7 +74,8 @@ extension IOSUIDocumentStore {
                 text = latest
             } catch {
                 if !entry.fenced {
-                    fenceUnavailable(entry, (mapped(error) as? IOSDocumentFailure) ?? .unavailable)
+                    fenceUnavailable(entry, (mapped(error) as? IOSDocumentFailure) ?? .unavailable,
+                                     openingReadbackFailed: existingFile)
                 }
             }
         }
@@ -91,7 +96,10 @@ extension IOSUIDocumentStore {
         entry.explicitReloadOperationID = nil
     }
 
-    func fenceUnavailable(_ entry: IOSDocumentEntry, _ reason: IOSDocumentFailure) {
+    func fenceUnavailable(_ entry: IOSDocumentEntry, _ reason: IOSDocumentFailure,
+                          openingReadbackFailed: Bool = false)
+    {
+        entry.openingReadbackFailed = openingReadbackFailed
         if reason != .conflict { entry.cloudResolution?.cancel() }
         invalidateReloadProposals(entry)
         entry.fenced = true
@@ -160,6 +168,13 @@ extension IOSUIDocumentStore {
         guard let externalText = IOSDocumentTextCodec.decode(read.data) else {
             await failExternalRead(entry: entry, token: token, error: IOSDocumentFailure.access(.unsupportedType))
             return
+        }
+        if entry.isUntouchedOpeningSnapshot {
+            // A fresh read verified the original open. Keep the read token as a write
+            // barrier until these bytes match the session or the editor installs them.
+            entry.openingReadbackFailed = false
+            entry.fenced = false
+            entry.allowsProviderWrite = entry.filePort.canWrite
         }
         if matchesSelfWrite(entry, externalText) {
             finishExternalObservation(entry, token: token)
@@ -272,6 +287,8 @@ extension IOSUIDocumentStore {
             entry.lastPersistedText = proposal.text
             entry.pendingProposal = nil
             entry.explicitReloadOperationID = nil
+            entry.openingReadbackFailed = false
+            entry.allowsProviderWrite = entry.filePort.canWrite
             entry.fenced = false
             refreshWritableState(entry)
             emitSnapshot(entry)

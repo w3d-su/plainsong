@@ -13,6 +13,12 @@ final class UIDocumentFileAdapter: IOSDocumentFilePort {
         self.fileURL = fileURL
     }
 
+    var canWrite: Bool {
+        guard let document, !document.documentState.contains(.closed),
+              !document.documentState.contains(.inConflict) else { return false }
+        return canEdit(document)
+    }
+
     func setHandler(_ handler: (@MainActor (IOSDocumentFileEvent) -> Void)?) {
         self.handler = handler
         installHandler()

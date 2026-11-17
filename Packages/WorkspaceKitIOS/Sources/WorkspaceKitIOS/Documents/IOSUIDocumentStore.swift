@@ -12,7 +12,8 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
     let filePortFactory: @MainActor (URL) -> any IOSDocumentFilePort
     var byResource: [IOSDocumentResourceKey: IOSDocumentEntry] = [:]
     var byIdentity: [IOSDocumentIdentity: IOSDocumentEntry] = [:]
-    private var closedGenerations: [IOSDocumentIdentity: UInt64] = [:]
+    static let closedHistoryLimit = 128
+    private var recentlyClosed: [(identity: IOSDocumentIdentity, generation: UInt64)] = []
     var observations: [UUID: IOSDocumentStoreObservation] = [:]
     var grantObservations: [ObjectIdentifier: any IOSObservation] = [:]
     let cloudVersionsAtURL: @Sendable (URL) throws -> [IOSCloudFileVersion]
@@ -66,7 +67,8 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
     }
 
     public func state(for identity: IOSDocumentIdentity) -> IOSDocumentState? {
-        byIdentity[identity]?.state ?? closedGenerations[identity].map { .closed(accessGeneration: $0) }
+        if let entry = byIdentity[identity] { return entry.state }
+        return recentlyClosed.last { $0.identity == identity }.map { .closed(accessGeneration: $0.generation) }
     }
 
     public func snapshot(for identity: IOSDocumentIdentity) -> IOSStoredDocumentSnapshot? {
@@ -167,7 +169,8 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
                 text = decoded
                 canWrite = opened.canWrite
             }
-            return try await finishOpeningSession(entry, initialText: text, canWrite: canWrite)
+            return try await finishOpeningSession(entry, initialText: text, canWrite: canWrite,
+                                                  existingFile: initialText == nil)
         } catch {
             if error is CancellationError {
                 failOpen(entry, .unavailable)
@@ -180,7 +183,8 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
     }
 
     func forgetClosedEntry(_ entry: IOSDocumentEntry) {
-        closedGenerations[entry.identity] = entry.accessGeneration
+        if recentlyClosed.count == Self.closedHistoryLimit { recentlyClosed.removeFirst() }
+        recentlyClosed.append((entry.identity, entry.accessGeneration))
         byIdentity[entry.identity] = nil
     }
 

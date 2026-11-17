@@ -2,8 +2,7 @@ import Foundation
 import Yams
 
 extension Frontmatter {
-    static func rawValueSource(for key: String, in rawYAML: String, lineEnding: String) -> String? {
-        let lines = linesWithoutTerminators(rawYAML)
+    static func rawValueSource(for key: String, in lines: [String], lineEnding: String) -> String? {
         guard let startIndex = lines.firstIndex(where: { topLevelKey(in: $0) == key }) else {
             return nil
         }
@@ -158,26 +157,12 @@ extension Frontmatter {
         return nil
     }
 
-    static func linesWithoutTerminators(_ text: String) -> [String] {
-        guard !text.isEmpty else { return [] }
-
-        let storage = text as NSString
-        var lines: [String] = []
-        var lineStart = 0
-        var cursor = 0
-
-        while cursor < storage.length {
-            if isNewline(storage.character(at: cursor)) {
-                lines.append(storage.substring(with: NSRange(location: lineStart, length: cursor - lineStart)))
-                cursor += lineEndingLength(at: cursor, in: storage) ?? 1
-                lineStart = cursor
-            } else {
-                cursor += 1
-            }
+    /// LibYAML counts these five line breaks and treats CRLF as one break. Substrings
+    /// keep the original indices so editing a field preserves every surrounding separator.
+    static func yamlSourceLines(in yaml: String) -> [Substring] {
+        yaml.split(omittingEmptySubsequences: false) { character in
+            ["\n", "\r", "\r\n", "\u{85}", "\u{2028}", "\u{2029}"].contains(character)
         }
-
-        lines.append(storage.substring(from: lineStart))
-        return lines
     }
 
     static func endOfLine(startingAt startIndex: Int, in storage: NSString) -> Int {
@@ -231,12 +216,5 @@ extension Frontmatter {
             return "\r"
         }
         return "\n"
-    }
-
-    static func hasLineTerminatorSuffix(_ text: String) -> Bool {
-        let storage = text as NSString
-        guard storage.length > 0 else { return false }
-        let character = storage.character(at: storage.length - 1)
-        return character == 10 || character == 13
     }
 }
