@@ -10,7 +10,8 @@ public struct TextStatistics: Sendable, Equatable {
         self.init(text: text, isCancelled: { false })
     }
 
-    static func countUnlessCancelled(_ text: String) -> Self? {
+    /// Call from the counting task so cancellation interrupts enumeration and discards partial counts.
+    public static func countUnlessCancelled(_ text: String) -> Self? {
         guard !Task.isCancelled else { return nil }
         let counts = Self(text: text, isCancelled: { Task.isCancelled })
         return Task.isCancelled ? nil : counts

@@ -193,6 +193,9 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 ### Concurrency rules
 
 - UI mutation on `@MainActor` only.
+- The iOS source editor publishes text and version on each edit. It counts after a
+  300 ms pause and cancels the counting task on a newer edit or editor teardown.
+  Only the matching binding and revision publish counts to the status bar.
 - tree-sitter parsing and highlight query execution off main thread (`MarkdownHighlightService`
   handles this; do not block it).
 - Preview render requests are single-flight: one render is in JavaScript at a time and the

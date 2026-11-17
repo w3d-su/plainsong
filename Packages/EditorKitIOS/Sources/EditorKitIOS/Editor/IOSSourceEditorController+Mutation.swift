@@ -201,30 +201,11 @@ extension IOSSourceEditorController {
     }
 
     func publishCurrentText() {
-        guard let installation else { return }
+        guard isHostAlive, let installation else { return }
         let current = plainText()
         guard !ExactSourceFragment.matches(current, installation.session.text) else { return }
         installation.session.replaceTextFromAuthorizedEditor(current, refreshStatistics: false)
-        let version = installation.session.version
-        // Count off the main actor; drop the result if the session's version or text
-        // changed before it returns to the main actor.
-        Task.detached(priority: .utility) { [weak self] in
-            let statistics = TextStatistics(text: current)
-            await self?.republishDeferredStatistics(statistics, version: version, text: current)
-        }
-    }
-
-    private func republishDeferredStatistics(
-        _ statistics: TextStatistics,
-        version: Int,
-        text: String
-    ) {
-        guard let session = installation?.session else { return }
-        guard session.version == version, ExactSourceFragment.matches(session.text, text) else { return }
-        guard session.availableStatistics != statistics else { return }
-        session.applyStatistics(statistics)
-        // Chrome reads the editor snapshot, which was emitted before this count finished.
-        emitSnapshot()
+        scheduleStatisticsRefresh(for: installation)
     }
 
     func consumeSelectionEpoch() {

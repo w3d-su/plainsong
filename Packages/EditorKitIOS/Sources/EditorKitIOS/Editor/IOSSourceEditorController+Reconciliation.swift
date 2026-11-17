@@ -2,6 +2,26 @@ import MarkdownCore
 import UIKit
 
 extension IOSSourceEditorController {
+    func invalidateHost() {
+        isHostAlive = false
+        cancelStatisticsRefresh()
+        scheduler.cancel()
+        presentationGeneration &+= 1
+        presentationFloor = presentationGeneration
+        observations.forEach { $0.cancel() }
+        observations.removeAll()
+    }
+
+    func fenceInstallation() {
+        cancelStatisticsRefresh()
+        scheduler.cancel()
+        scheduler.activate()
+        presentationGeneration &+= 1
+        presentationFloor = presentationGeneration
+        textView.undoManager?.removeAllActions()
+        hadMarkedText = false
+    }
+
     public func installExternalReload(_ proposal: IOSDocumentReloadProposal) -> IOSDocumentReloadOutcome {
         guard let installation = reloadInstallation(matching: proposal) else {
             return reloadRefusal(for: proposal)
@@ -50,6 +70,7 @@ extension IOSSourceEditorController {
         // Groups created before this replacement address the buffer that no longer exists.
         // Hiding the view does not come through this path, so that undo stack stays.
         textView.undoManager?.removeAllActions()
+        cancelStatisticsRefresh()
         installation.session.replaceTextFromAuthorizedEditor(proposal.text, refreshStatistics: false)
         installation.session.applyStatistics(proposal.statistics)
         isAdjustingSelection = true

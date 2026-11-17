@@ -45,6 +45,8 @@ public final class DocumentSession: ObservableObject {
     @Published public private(set) var isDirty: Bool
     /// Nil while a newly opened file is being counted. Views should read this value.
     @Published public private(set) var availableStatistics: TextStatistics?
+    /// A deferred edit can outlive its editor. A new attachment must finish that count.
+    public private(set) var needsStatisticsRefresh = false
 
     /// Callers that require counts synchronously can still obtain them during opening.
     public var statistics: TextStatistics {
@@ -154,6 +156,8 @@ public final class DocumentSession: ObservableObject {
         text = newText
         if refreshStatistics {
             self.refreshStatistics()
+        } else {
+            needsStatisticsRefresh = true
         }
         // Dedupe the assignment: `isDirty` is @Published, and republishing the same
         // value on every keystroke would re-render observers needlessly.
@@ -183,6 +187,7 @@ public final class DocumentSession: ObservableObject {
     /// large document is O(n) and must stay off the typing hot path).
     public func applyStatistics(_ newStatistics: TextStatistics) {
         cancelInitialStatistics()
+        needsStatisticsRefresh = false
         if availableStatistics != newStatistics {
             availableStatistics = newStatistics
         }
