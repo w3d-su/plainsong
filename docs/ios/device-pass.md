@@ -13,9 +13,9 @@ M0 原型的結果都不能代替這裡的任何一項。
 
 | 欄位 | 值 |
 |---|---|
-| 來源 commit | `2175bfe339596ea0873a120c617eab954bd018a1`（`main` `f664c5af` 加上 #269） |
-| 未簽名 IPA | `PlainsongIOS-2175bfe33959.ipa` |
-| IPA SHA-256 | `892e35dd448be58666c5d77f66122af6d354bb2249e5d52fcec3f399a2a87211` |
+| 來源 commit | `be3587f152e6dcb0e846e4394bff246744195108`（`main` `f664c5af` 加上 #269） |
+| 未簽名 IPA | `PlainsongIOS-be3587f152e6.ipa` |
+| IPA SHA-256 | `ea4972de9ae48fa18607d046500229215c2b33bbfe10745cdb81ab8803f4bbed` |
 | 建置 | Release、arm64、Xcode 27.0、iOS SDK 27.0、最低版本 iOS 26.0 |
 
 換了 IPA 就要重新記錄這張表。#269 以 squash 合併後 `main` 上的 commit 會不同；
@@ -160,6 +160,7 @@ images；Files 區有 New file 與圖片資料夾名稱；最下面是 Version�
 | F5 | 手機開飛航模式改檔，同時 Mac 也改；手機恢復網路 | 出現 Review iCloud Versions，可以看兩個版本的內容 |
 | F6 | 在 F5 選一個版本 → Use Selected Version | 檔案變成選的那個版本；另一個沒有無聲消失 |
 | F7 | 在「檔案」App 刪掉 App 正在開的檔 | App 明確告知；手上的內容沒有丟 |
+| F8 | 資料夾模式開著 iCloud 那份 `fixtures`，不要按 Refresh；在 Mac 上往這個資料夾加一個 `from-mac.md`，再加一個子資料夾 `notes` | 幾分鐘內側欄自己出現 `from-mac.md` 與 `notes`，不必按 Refresh |
 
 ## G. 編寫工具
 

@@ -47,8 +47,20 @@ device pass is their first UI check: G10 for Insert Image → Files, D7 for the 
 switch during Zhuyin composition, and H6 for the `/private` spelling of a picked
 folder. Hosted `ios.yml` was not dispatched for this head.
 
-The device-pass kit is rebuilt from `2175bfe3`: `PlainsongIOS-2175bfe33959.ipa`,
-SHA-256 `892e35dd448be58666c5d77f66122af6d354bb2249e5d52fcec3f399a2a87211`.
+On #269's head `be3587f1` (after `416da03f`, which resolves the preview root only when
+the plain spelling fails and maps workspace-watcher callbacks across a symlinked root,
+and `be3587f1`, which maps folder callbacks spelled with a trailing slash and keeps the
+find shortcuts installed while a single pane shows the preview), #269 records `make
+ios-test` 726 run, 726 passed, 0 skipped on the iOS 27.0 simulator. The exact-head Mac
+CI passed for `be3587f1` (every job, run 44100001307). Neither commit touches
+PreviewKit or `index.html`, and no simulator walk is recorded for them: device-pass F8
+(a file and a folder added from the Mac appear without Refresh) is the first UI check of
+the watcher changes.
+
+The device-pass kit is rebuilt from `be3587f1` with `make ios-ipa` (clean source):
+`PlainsongIOS-be3587f152e6.ipa`, SHA-256
+`ea4972de9ae48fa18607d046500229215c2b33bbfe10745cdb81ab8803f4bbed`. It replaces the
+`2175bfe3` kit (`892e35dd…87211`), which lacks the watcher and find-shortcut fixes.
 `docs/ios/device-pass.md` names it and now says where each control is. The kit is
 local and not committed.
 
