@@ -97,6 +97,8 @@ WorkspaceKitIOS frozen `Contracts.swift` 中：
 - save acknowledgement 帶 document identity、captured saved version／text、location／operation ID；不可只有 Bool 成功。
 - 每個實際 resource 唯一序列 writer；同檔重複 open 由 store registry 收斂，不能讓兩個 UUID writer 各自覆寫。
 - save 完成後先驗 document／location／operation 順序，再用既有 `rebaseSavedText(to:)` 更新保存基準。**對舊快照呼叫 `markSaved(text:url:)` 會改 live source，禁止。**
+- 開檔期間若收到外部修改通知，先協調重讀最新內容才開放寫入。寫入結果不明時，保留草稿並封鎖原檔寫入，重新選取檔案後由提供者建立新的儲存基準。
+- 關檔成功後仍可查詢 closed 狀態及 access generation，文件內容與 writer 則隨工作階段釋放。
 - 外部 clean reload 只在 capture revision 仍有效且 native 非 composing 時套用；dirty conflict 先保存本地 recovery snapshot、阻擋 overwrite，顯示 reload／save-copy 選項。
 - recovery 在 app-private storage 以 operation/document IDs 定位，記錄 source、identity、captured version、原因。儲存／授權失敗不丟 dirty session；background flush 是 best effort，已持久化 recovery 才可聲稱可恢復。
 

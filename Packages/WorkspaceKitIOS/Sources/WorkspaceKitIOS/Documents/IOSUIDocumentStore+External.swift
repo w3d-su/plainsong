@@ -8,7 +8,9 @@ extension IOSUIDocumentStore {
         switch event {
         case .externalChange:
             guard !entry.hasUnresolvedVersions else { return }
-            if entry.isClosing || entry.portClosed {
+            if entry.session == nil {
+                entry.hasDeferredExternalChange = true
+            } else if entry.isClosing || entry.portClosed {
                 // A notice does not authorize a read concurrent with provider close.
                 // Keep an independent barrier until close or its retained entry reads it.
                 entry.hasDeferredExternalChange = true
@@ -44,6 +46,42 @@ extension IOSUIDocumentStore {
         case .unexpectedRelocation:
             fenceUnavailable(entry, .documentChanged)
         }
+    }
+
+    /// A provider can report changes after capturing its open snapshot. Finish all notified
+    /// reads before publishing the first editable session or waking another opener.
+    func finishOpeningSession(
+        _ entry: IOSDocumentEntry, initialText: String, canWrite: Bool
+    ) async throws -> IOSDocumentHandle {
+        var text = initialText
+        while entry.hasDeferredExternalChange, !entry.fenced,
+              guardCurrentAuthority(entry, generation: entry.accessGeneration)
+        {
+            try Task.checkCancellation()
+            entry.hasDeferredExternalChange = false
+            do {
+                let read = try await coordinatedAccess.read(
+                    entry.location, lease: entry.lease, operationID: UUID(), maximumByteCount: maximumExternalBytes
+                )
+                guard !entry.fenced else { break }
+                guard let latest = IOSDocumentTextCodec.decode(read.data) else {
+                    throw IOSDocumentFailure.access(.unsupportedType)
+                }
+                text = latest
+            } catch {
+                if !entry.fenced {
+                    fenceUnavailable(entry, (mapped(error) as? IOSDocumentFailure) ?? .unavailable)
+                }
+            }
+        }
+        try Task.checkCancellation()
+        guard guardCurrentAuthority(entry, generation: entry.accessGeneration) else {
+            throw IOSDocumentFailure.documentChanged
+        }
+        installSession(entry, text: text, canWrite: canWrite)
+        guard let handle = entry.handle() else { throw IOSDocumentFailure.unavailable }
+        finishOpen(entry, result: .success(handle))
+        return handle
     }
 
     func invalidateReloadProposals(_ entry: IOSDocumentEntry) {

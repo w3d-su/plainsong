@@ -749,7 +749,8 @@ attempt without a Decision Log entry.
   `'title':` included), writes a `date` plain only when YAML reads it back as exactly that
   plain scalar and the source had not quoted it, and is re-parsed before it is applied: an
   edit whose block would not load with the same keys and the requested value (a duplicate
-  key, a mapping typed into the date field) is refused.
+  key, a mapping typed into the date field) is refused. Field edits retain YAML comments,
+  including inline comments and indented notes on list items.
 
 ---
 

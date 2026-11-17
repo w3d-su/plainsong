@@ -226,6 +226,8 @@ extension IOSUIDocumentStore {
         if byResource[entry.resourceKey] === entry {
             byResource[entry.resourceKey] = nil
         }
+        entry.filePort.setHandler(nil)
+        forgetClosedEntry(entry)
         entry.lease.release()
         emit(.closed(entry.identity))
     }

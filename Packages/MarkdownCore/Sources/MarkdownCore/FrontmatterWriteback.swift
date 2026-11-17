@@ -6,6 +6,7 @@ import Yams
 extension Frontmatter {
     enum ParseError: Error, CustomStringConvertible {
         case notMapping
+        case unreadableTokens
 
         var description: String {
             "Frontmatter must be a YAML mapping."
@@ -52,10 +53,13 @@ extension Frontmatter {
             // Keep the source's spelling of the key (`"title"`, `'title'`), so the edit
             // replaces that entry instead of appending a second, duplicate `title`.
             let endIndex = valueSpanEndIndex(startingAt: startIndex, in: lines)
-            let replacementLines = try formattedLines(
+            var replacementLines = try formattedLines(
                 keyToken: span.keyToken,
                 value: value,
                 quotesDate: span.hasQuotedInlineValue
+            )
+            try preserveComments(
+                in: lines[startIndex ..< endIndex], rawYAML: rawYAML, replacement: &replacementLines
             )
             lines.replaceSubrange(startIndex ..< endIndex, with: replacementLines)
         } else {
