@@ -77,6 +77,10 @@ median) overlaps the four shards, between three and four minutes. Any other macO
 makes one shard wait until a runner is free. Shortening `packages` below the four minutes
 `hosted (build)` takes would remove the overlap; that is not part of this change.
 
+"At most two runners" is per `main` run: because a serial `main` run takes about 23 min,
+two merges less than that apart overlap two `main` runs at up to two runners each (four
+in total) for longer than before, which is still better than the old 2 × 4.
+
 ## Alternatives considered
 
 - Rebalancing three shards: it costs no runner, but 849 s of tests and three start-ups

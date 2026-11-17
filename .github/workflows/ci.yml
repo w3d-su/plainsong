@@ -44,9 +44,10 @@ permissions:
 # five concurrent macOS jobs, and a pull request run holds all five for the three
 # minutes or so that `packages` and the four shards overlap, so any other macOS job
 # running then makes one of them wait. Nobody waits for a push to main: it runs its
-# shards one at a time and holds at most two runners, which leaves three to the pull
-# requests that start after a merge. CodeQL's Swift analysis no longer takes a runner
-# per push; it runs weekly (codeql-swift.yml).
+# shards one at a time and holds at most two runners per run, which leaves three to the
+# pull requests that start after a merge (two back-to-back merges can overlap two main
+# runs). CodeQL's Swift analysis no longer takes a runner per push; it runs weekly
+# (codeql-swift.yml).
 jobs:
   # Docs-only fast path. A pull request counts as docs-only when every path it
   # changes is under docs/ or is a top-level *.md or LICENSE file. Two docs paths
