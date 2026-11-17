@@ -741,8 +741,8 @@ Setup (once):
 
 **Part A — IME in the find field (F6).** Leave Full Keyboard Access **off** for Part A.
 Run A1–A7 with **Zhuyin** selected while the find field has focus (Pinyin is not tested,
-`decisions/2026-11-17-zhuyin-only-ime-testing.md`). Before the round, click at the very start of the first line so the caret is at
-offset 0.
+`decisions/2026-11-17-zhuyin-only-ime-testing.md`). Before you start, click at the very
+start of the first line so the caret is at offset 0.
 
 - A1. Press ⌘F. Type a syllable that stays underlined as marked text in the find field
   (keys `h` `k` for ㄘㄜ). **Pass:** nothing appears in the document,
@@ -764,7 +764,7 @@ offset 0.
   the completion list closes and the find bar stays open. Press **Escape** again. **Pass:**
   the bar closes.
 - A7. Still in ABC, delete the `:sm` you typed and type `:sm` again so the completion list
-  reopens. Press ⌘F, switch the input source back to this round's method, and repeat A1 and
+  reopens. Press ⌘F, switch the input source back to **Zhuyin**, and repeat A1 and
   A3 in the find field. **Pass:** the find field receives the composition and nothing from it
   reaches the document (the document still ends with your `:sm`). Afterwards switch to ABC
   and delete the added line (or ⌘Z) to restore the three lines.

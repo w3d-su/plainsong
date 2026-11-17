@@ -111,7 +111,7 @@
 > message withdraws once its inspection settles; and a single Replace speaks
 > "Replaced 1 match". R8's in-process bullets and R6 deterministic bullets 1–4
 > close; R8 itself stays open on its owner Full Keyboard Access smoke, and R6's
-> owner Zhuyin/Pinyin bullets, R9 and R10 stay open. See
+> owner Zhuyin bullets, R9 and R10 stay open. See
 > [PR H verification](evidence/editor-replace-h-20261006.json).
 >
 > Check a gate only with named-test or owner-recorded evidence in the same

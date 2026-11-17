@@ -40,8 +40,8 @@ is actively editing.
   - selection outside a foldable node → hide/dim syntax delimiters and apply rendered styling;
   - selection inside a node's source range → reveal the raw Markdown for that node/block only.
 - **IME-safe by default.** While marked text exists, folding/reveal updates that could affect the
-  composition range are skipped or deferred. Traditional Chinese Zhuyin and Pinyin checks are gate
-  conditions, not polish.
+  composition range are skipped or deferred. Traditional Chinese Zhuyin checks are gate
+  conditions, not polish. Pinyin is not tested (`decisions/2026-11-17-zhuyin-only-ime-testing.md`).
 - **Undo remains text-only.** Folding attributes and layout fragments must not enter the undo stack.
 - **Preview remains the heavy renderer.** Math, Mermaid, complex MDX placeholders, and other block
   renderers stay in preview until the native WYSIWYG core proves stable.
@@ -130,7 +130,8 @@ Every step must keep source-only and source+preview behavior unchanged.
 
 ## 7. Testing requirements
 
-- IME regression tests for Zhuyin and Pinyin marked text at fold/reveal transitions.
+- IME regression tests for Zhuyin marked text at fold/reveal transitions. Pinyin is not tested
+  (`decisions/2026-11-17-zhuyin-only-ime-testing.md`).
 - Unit tests for pure fold/reveal boundary logic.
 - Programmatic EditorKit tests for selection, undo, copy, and typing through folded spans.
 - Performance tests proving visible-range fold recompute stays within §12 budgets.
@@ -221,8 +222,9 @@ and rerun these gates before any user-visible mode change.
 - Selection must remain raw UTF-16 source `NSRange`s. A production selection-normalization layer needs
   explicit leading/trailing hidden-edge semantics so arrow keys, shift-selection, mouse placement, and copy
   never stop inside hidden delimiters.
-- IME remains non-negotiable. Before shipping, repeat Spike A with actual macOS Zhuyin/Pinyin input method
+- IME remains non-negotiable. Before shipping, repeat Spike A with actual macOS Zhuyin input method
   event streams and with the real visual folding mechanism, not only `setMarkedText` plus attributes.
+  Pinyin is not tested (`decisions/2026-11-17-zhuyin-only-ime-testing.md`).
 - If v1 uses TextKit layout-fragment customization or attachments instead of simple attributes, rerun Spike
   A/B/C against that mechanism. Attribute-only success does not automatically prove zero-width fragment or
   attachment behavior.
