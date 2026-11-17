@@ -131,7 +131,16 @@ final class WYSIWYGImagePresentationMarker: NSObject {
     func makeAttachment() -> NSTextAttachment {
         let attachment = NSTextAttachment()
         attachment.image = image
-        attachment.bounds = NSRect(x: 0, y: -4, width: canvasSize.width, height: canvasSize.height)
+        // `lineHeightFont` reserves the canvas as its line box: its ascender above the
+        // baseline and its descender below. The attachment hangs from that descender so it
+        // fills the box. Hung from the baseline it rose about a fifth of its height into the
+        // lines above and left the same gap below.
+        attachment.bounds = NSRect(
+            x: 0,
+            y: lineHeightFont.descender,
+            width: canvasSize.width,
+            height: canvasSize.height
+        )
         attachment.allowsTextAttachmentView = false
         return attachment
     }
@@ -176,6 +185,28 @@ enum WYSIWYGImagePresentationMetrics {
             width: size.width,
             height: size.height
         )
+    }
+
+    /// STTextView paints each line raised by `height × (multiple − 1) / 2`, taking the
+    /// multiple from the paragraph's own style or else from the text view's default (1.25 in
+    /// the app). Highlighting replaces every attribute, so TextKit lays these paragraphs out
+    /// without a multiple while the painter still raises them: 2 pt for a text line, 30 pt
+    /// for a 240 pt canvas line, which then covers the lines above it. A projected paragraph
+    /// that holds an image gets multiple 1, so its lines paint where TextKit placed them.
+    static func paintLinesWhereLaidOut(in paragraph: NSMutableAttributedString) {
+        guard paragraph.length > 0 else { return }
+        let fullRange = NSRange(location: 0, length: paragraph.length)
+        guard let ownStyle = paragraph.attribute(.paragraphStyle, at: 0, effectiveRange: nil)
+            as? NSParagraphStyle
+        else {
+            paragraph.addAttribute(.paragraphStyle, value: NSParagraphStyle.default, range: fullRange)
+            return
+        }
+        guard ownStyle.lineHeightMultiple != 0 else { return }
+        let style = NSMutableParagraphStyle()
+        style.setParagraphStyle(ownStyle)
+        style.lineHeightMultiple = 0
+        paragraph.addAttribute(.paragraphStyle, value: style, range: fullRange)
     }
 }
 

@@ -855,6 +855,12 @@ editor *folds* markdown tokens via rendering, not text mutation:
 - A projected U+200B that ends a line (fold or image padding) lays out at x = 0, so the
   projection turns it into a 0.01 pt space with a negative kern that cancels its advance.
   The content before it keeps its segment, caret and IME rects (`WYSIWYGLineEndHangingSpace`).
+- An image's line is reserved by a run-local font as tall as its canvas; the attachment
+  hangs from that font's descender so it fills the line. STTextView paints each line raised
+  by half the height its line-height multiple adds, and highlighting strips the paragraph
+  style that layout would apply, so a projected paragraph holding an image carries a
+  multiple of 1. Together these keep a thumbnail or missing-file placeholder inside its own
+  line instead of over the lines above it.
 - When the cursor enters a node's range → reveal raw markdown for that node only
   (Typora's behavior).
 - Tables in WYSIWYG: the paragraph projection turns cell-starting pipes into `\t` with

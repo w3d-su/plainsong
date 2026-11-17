@@ -102,6 +102,12 @@ never touched:
   - `testLoadingPlaceholderAndReadyThumbnailShareGeometrySelectionAndScroll` and
     `testMissingFailureAndCorruptReadyDataKeepDeterministicAltPlaceholder` prove loading,
     missing, failed, and corrupt paths never blank or reflow unrelated lines.
+  - `WYSIWYGImagePaintedGeometryTests` (2026-11-17) reads rendered pixels: the
+    missing-file placeholder (standalone and inline) and a ready thumbnail paint inside
+    their own reserved line, with and without the app's 1.25 line-height multiple. Before
+    this, the canvas hung from the reserving font's baseline and STTextView raised the tall
+    line, so a 240 pt placeholder covered the lines above it by up to 69 pt while every
+    layout frame stayed correct.
   - `testMultipleImagesShareOneLineWithFoldedLinkAndCoalesceDuplicateLoad` covers multiple
     image regions in one paragraph alongside the existing folded-link projection.
   - `testRefreshProxyReloadsOnlyAffectedPathAndPreservesSelectionAndScroll` proves the
