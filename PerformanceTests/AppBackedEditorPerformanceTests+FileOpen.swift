@@ -93,7 +93,12 @@ extension AppBackedEditorPerformanceTests {
         XCTAssertTrue(installedWithPendingCounts, "A large file must reach the window before counting completes")
         XCTAssertEqual(appState.shownSession.fileURL?.lastPathComponent, file.lastPathComponent)
         XCTAssertEqual(MarkdownTextView.textStorage(of: editor)?.length, length + 1)
-        XCTAssertEqual(appState.shownSession.text, "Z" + source)
+        let expected = "Z" + source
+        XCTAssertEqual(appState.shownSession.text, expected)
+        // SwiftUI can release the editor after the temporary directory is removed.
+        // Persist the native edit while the file still exists, outside the timed interval.
+        try appState.saveCurrentDocument()
+        XCTAssertEqual(try Data(contentsOf: file), Data(expected.utf8))
         print(String(format: "OPEN PERF %@ %@ display %.2f ms first edit %.2f ms", file.lastPathComponent,
                      sidebar ? "sidebar" : "open", Double(display - start) / 1e6, Double(edit - start) / 1e6))
     }

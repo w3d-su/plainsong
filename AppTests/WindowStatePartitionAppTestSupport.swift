@@ -5,7 +5,7 @@ import MarkdownCore
 import WorkspaceKit
 import XCTest
 
-/// The §3.2 home of each of the 121 stored properties `AppState` had before Windows PR B1.
+/// The §3.2 properties that still live in the three B1 containers.
 enum WindowStatePartitionInventory {
     static let window: Set<String> = [
         "currentDocument", "documentChangeCancellable", "layoutMode", "wysiwygFallbackMessage",
