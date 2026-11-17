@@ -78,10 +78,9 @@ extension AppState {
             file: file,
             binding: binding,
             session: DocumentSession(
-                text: file.text,
+                opening: file.text,
                 url: file.url,
-                fileKind: file.fileKind,
-                isDirty: false
+                fileKind: file.fileKind
             ),
             source: .loaded,
             preparedImageAssetAuthority: preparedImageAssetAuthority

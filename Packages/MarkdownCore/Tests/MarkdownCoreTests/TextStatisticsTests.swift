@@ -32,6 +32,20 @@ final class TextStatisticsTests: XCTestCase {
         XCTAssertEqual(statistics.wordCount, 6)
     }
 
+    func testCountingWithoutMaterializingWordsKeepsFoundationBoundaries() {
+        let samples = ["", "中文 English 123_456—café", "e\u{301} 👩🏽‍💻\r\n\n台北", "  'shell'  3.14?!  "]
+        for text in samples {
+            var words: [String] = []
+            text.enumerateSubstrings(in: text.startIndex ..< text.endIndex, options: .byWords) { word, _, _, _ in
+                if let word { words.append(word) }
+            }
+            let counts = TextStatistics(text: text)
+            XCTAssertEqual(counts.wordCount, words.count, text)
+            XCTAssertEqual(counts.characterCount, text.count, text)
+            XCTAssertEqual(counts.lineCount, 1 + text.filter(\.isNewline).count, text)
+        }
+    }
+
     func testStatisticsAreEquatableAndSendable() {
         let statistics = TextStatistics(text: "same text")
 

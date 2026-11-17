@@ -221,7 +221,7 @@ extension IOSSourceEditorController {
     ) {
         guard let session = installation?.session else { return }
         guard session.version == version, ExactSourceFragment.matches(session.text, text) else { return }
-        guard session.statistics != statistics else { return }
+        guard session.availableStatistics != statistics else { return }
         session.applyStatistics(statistics)
         // Chrome reads the editor snapshot, which was emitted before this count finished.
         emitSnapshot()

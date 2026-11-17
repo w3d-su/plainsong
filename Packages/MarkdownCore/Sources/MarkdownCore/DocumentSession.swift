@@ -43,7 +43,15 @@ public final class DocumentSession: ObservableObject {
     @Published public private(set) var fileURL: URL?
     @Published public private(set) var fileKind: FileKind
     @Published public private(set) var isDirty: Bool
-    @Published public private(set) var statistics: TextStatistics
+    /// Nil while a newly opened file is being counted. Views should read this value.
+    @Published public private(set) var availableStatistics: TextStatistics?
+
+    /// Callers that require counts synchronously can still obtain them during opening.
+    public var statistics: TextStatistics {
+        availableStatistics ?? TextStatistics(text: text)
+    }
+
+    private var initialStatisticsTask: Task<Void, Never>?
 
     private var savedText: String?
     private var textChangeContinuations: [UUID: AsyncStream<DocumentTextChange>.Continuation] = [:]
@@ -55,7 +63,7 @@ public final class DocumentSession: ObservableObject {
             fileKind: fileKind,
             fileURL: fileURL,
             isDirty: isDirty,
-            statistics: statistics
+            statistics: availableStatistics
         )
     }
 
@@ -68,18 +76,50 @@ public final class DocumentSession: ObservableObject {
         )
     }
 
-    public init(
+    public convenience init(
         text: String = "",
         url: URL? = nil,
         fileKind: FileKind? = nil,
         isDirty: Bool = false
     ) {
+        self.init(text: text, url: url, fileKind: fileKind, isDirty: isDirty, statistics: TextStatistics(text: text))
+    }
+
+    /// Small documents have immediate counts. Opening a large document installs the editable
+    /// source first. The worker belongs to this session, including across window switches.
+    public convenience init(
+        opening text: String,
+        url: URL,
+        fileKind: FileKind,
+        onStatisticsReady: (@MainActor (DocumentSession) -> Void)? = nil
+    ) {
+        guard text.utf8.count >= 64 * 1024 else {
+            self.init(text: text, url: url, fileKind: fileKind)
+            return
+        }
+        self.init(text: text, url: url, fileKind: fileKind, isDirty: false, statistics: nil)
+        initialStatisticsTask = Task.detached(priority: .utility) { [weak self] in
+            guard let counts = TextStatistics.countUnlessCancelled(text) else { return }
+            await MainActor.run { [weak self] in
+                guard !Task.isCancelled, let self else { return }
+                initialStatisticsTask = nil
+                applyStatistics(counts)
+                onStatisticsReady?(self)
+            }
+        }
+    }
+
+    deinit {
+        initialStatisticsTask?.cancel()
+    }
+
+    private init(text: String, url: URL?, fileKind: FileKind?, isDirty: Bool, statistics: TextStatistics?) {
         self.text = text
         version = 0
         fileURL = url
         self.fileKind = fileKind ?? url.flatMap(FileKind.init(url:)) ?? .markdown
         self.isDirty = isDirty
-        statistics = TextStatistics(text: text)
+        availableStatistics = statistics
         savedText = isDirty ? nil : text
     }
 
@@ -110,6 +150,7 @@ public final class DocumentSession: ObservableObject {
             return
         }
 
+        cancelInitialStatistics()
         text = newText
         if refreshStatistics {
             self.refreshStatistics()
@@ -141,8 +182,9 @@ public final class DocumentSession: ObservableObject {
     /// Applies statistics computed elsewhere (e.g. on a background task — counting a
     /// large document is O(n) and must stay off the typing hot path).
     public func applyStatistics(_ newStatistics: TextStatistics) {
-        if statistics != newStatistics {
-            statistics = newStatistics
+        cancelInitialStatistics()
+        if availableStatistics != newStatistics {
+            availableStatistics = newStatistics
         }
     }
 
@@ -241,7 +283,7 @@ public final class DocumentSession: ObservableObject {
 
         if textChanged {
             text = newText
-            statistics = precomputedStatistics ?? TextStatistics(text: newText)
+            applyStatistics(precomputedStatistics ?? TextStatistics(text: newText))
         }
 
         if fileURL != newURL {
@@ -259,6 +301,11 @@ public final class DocumentSession: ObservableObject {
         if renderableStateChanged {
             emitTextChange()
         }
+    }
+
+    private func cancelInitialStatistics() {
+        initialStatisticsTask?.cancel()
+        initialStatisticsTask = nil
     }
 
     private func emitTextChange() {
