@@ -6,7 +6,7 @@ import MarkdownCore
 import XCTest
 
 /// R6 deterministic bullets 1–4 with synthetic AppKit marked text in each of the three owners
-/// (`docs/editor-replace-gates.md` §5.5). Real Zhuyin/Pinyin input stays the owner harness's.
+/// (`docs/editor-replace-gates.md` §5.5). Real Zhuyin input stays the owner harness's.
 @MainActor
 extension EditorFindHostedGateTests {
     enum MarkedTextOwner: CaseIterable {

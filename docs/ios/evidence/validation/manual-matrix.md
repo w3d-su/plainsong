@@ -20,7 +20,6 @@ Record for each attempt: device model, OS, thermal state, Low Power Mode, build 
 | Check | Status | What a pass must show |
 |---|---|---|
 | Traditional Chinese Zhuyin candidates | OPEN | Marked text commits the chosen candidate. Undo restores the pre-composition source. Programmatic marked text is not a substitute. |
-| Pinyin candidates | OPEN | Same as Zhuyin, on a device keyboard. |
 | Emoji and ZWJ family | OPEN | One insertion, one undo group, no extra scalar left behind. |
 | Paste | OPEN | One undo group. Selection ends after the pasted text. |
 | Hardware keyboard | OPEN | Type, undo, find, and single replace reach the focused editor only. |

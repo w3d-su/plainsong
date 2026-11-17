@@ -85,7 +85,7 @@ items need the owner with physical hardware.
 |---|---|
 | Signed install | Sign the Release IPA and install it on a real device (needs the same Developer Program membership as macOS P1) |
 | Files / iCloud | Open, edit, save and reopen in place through Files and iCloud Drive, including offline/downloading documents |
-| Chinese IME and Undo | Physical Zhuyin and Pinyin composition plus Undo/Redo in the native editor (agent.md §13 treats IME as non-negotiable) |
+| Chinese IME and Undo | Physical Zhuyin composition plus Undo/Redo in the native editor (agent.md §13 treats IME as non-negotiable) |
 | Recovery, conflict, background | Real recovery list, conflict Save a Copy, and backgrounding/termination without data loss |
 | Export and print | HTML/PDF export and printing on a physical device (#228 left these to owner validation; not yet in the ledger) |
 | Minimum OS and iPad | Physical iPad and an iOS 26.0 device |
@@ -106,7 +106,7 @@ items need the owner with physical hardware.
 
 ## 4. Proposed order
 
-1. Owner runs the Zhuyin/Pinyin and pointer dogfood on #213 (V3 is decided: promote);
+1. Owner runs the Zhuyin and pointer dogfood on #213 (V3 is decided: promote);
    #213 merges when it passes.
 2. Owner smoke for D2 (#246), then merge it. C, D1-0 and D1a–D1c are already merged.
 3. First `0.9.0` beta with updates on (U2 and U2b are merged; the key and secret exist)

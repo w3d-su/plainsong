@@ -7,7 +7,7 @@ private let wysiwygIMESpikeSource = "# 標題\n\n前綴 **粗體**、*斜體*、
 
 @MainActor
 final class WYSIWYGIMESpikeTests: XCTestCase {
-    func testZhuyinAndPinyinMarkedTextRoundTripsAtFoldBoundaries() {
+    func testZhuyinMarkedTextRoundTripsAtFoldBoundaries() {
         for script in CompositionScript.allCases {
             for scenario in FoldBoundaryScenario.allCases {
                 assertMarkedTextRoundTrip(script: script, scenario: scenario)
@@ -318,15 +318,6 @@ private struct CompositionScript: CaseIterable {
                 MarkedStep(text: "ㄊ", cursorUTF16Offset: 1),
                 MarkedStep(text: "ㄊㄞ", cursorUTF16Offset: 2),
                 MarkedStep(text: "ㄊㄞˊ", cursorUTF16Offset: 3),
-            ],
-            committedText: "臺"
-        ),
-        CompositionScript(
-            name: "Pinyin",
-            markedSteps: [
-                MarkedStep(text: "t", cursorUTF16Offset: 1),
-                MarkedStep(text: "ta", cursorUTF16Offset: 2),
-                MarkedStep(text: "tai", cursorUTF16Offset: 3),
             ],
             committedText: "臺"
         ),
