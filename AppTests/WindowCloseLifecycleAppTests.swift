@@ -211,6 +211,79 @@ final class WindowCloseLifecycleAppTests: SharedRootAppTestCase {
         XCTAssertEqual(second.presentedError?.title, "Could Not Close Window")
     }
 
+    /// A document whose file is gone is not retention proof: every way back to it (Open, the
+    /// sidebar, Search, the refusal's Show) reads the file first, so a closed one could never
+    /// be shown again. The close refuses, and the window keeps the document and its banner,
+    /// whose Save Copy and Close resolve it.
+    func testAMissingFileDocumentRefusesTheCloseAndKeepsItsBanner() throws {
+        let url = try writeLoose("gone.md", "original")
+        try second.open(url: url, rememberAsLastOpened: false, preserveWorkspace: false)
+        try assertMissingFileCloseIsRefused(in: second, window: secondWindow, expectedText: "original")
+    }
+
+    /// The same refusal for a document inside a root two windows share: D1c's detach skips
+    /// root documents, so without it window 2 would close and leave the last window unable
+    /// to release the root.
+    func testAMissingFileInASharedRootRefusesTheCloseAndKeepsTheRoot() async throws {
+        let root = try makeRoot("blog")
+        try await openPair(root: root)
+        second.openWorkspaceFile(root.appendingPathComponent("b.md"))
+        try await waitUntil("window 2 shows b.md") { self.second.shownSession.fileURL?.lastPathComponent == "b.md" }
+        let context = primary.workspaceRootContext
+
+        try assertMissingFileCloseIsRefused(in: second, window: secondWindow, expectedText: "beta text")
+
+        XCTAssertTrue(second.workspaceRootContext === context, "window 2 stays on the shared root")
+        XCTAssertEqual(
+            Set(context.facades.map(ObjectIdentifier.init)),
+            [ObjectIdentifier(primary), ObjectIdentifier(second)]
+        )
+    }
+
+    private func assertMissingFileCloseIsRefused(
+        in facade: AppState,
+        window: NSWindow,
+        expectedText: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let session = facade.shownSession
+        let stateURL = try XCTUnwrap(facade.sessionStateURL(for: session), file: file, line: line)
+        try FileManager.default.removeItem(at: stateURL)
+        facade.markSessionDetachedFromMissingFile(session, url: stateURL)
+        facade.restoreRecoveryPrompt(for: session)
+        XCTAssertEqual(facade.missingFilePrompt?.fileURL, stateURL, file: file, line: line)
+        XCTAssertTrue(session.isDirty, "a detached document is marked edited", file: file, line: line)
+        XCTAssertFalse(facade.canAutosave(session: session), file: file, line: line)
+        XCTAssertFalse(facade.hasCloseRetentionProof(for: session), file: file, line: line)
+
+        window.performClose(nil)
+
+        XCTAssertTrue(
+            KeyWindowRouter.shared.hasAttachedWindow(facade),
+            "the window stayed open",
+            file: file,
+            line: line
+        )
+        XCTAssertFalse(KeyWindowRouter.shared.isClosing(facade), file: file, line: line)
+        XCTAssertTrue(facade.shownSession === session, file: file, line: line)
+        XCTAssertEqual(session.text, expectedText, file: file, line: line)
+        XCTAssertEqual(
+            facade.missingFilePrompt?.fileURL, stateURL,
+            "the banner's Save Copy and Close stay reachable", file: file, line: line
+        )
+        let refusal = try XCTUnwrap(facade.presentedError, file: file, line: line)
+        XCTAssertEqual(refusal.title, "Could Not Close Window", file: file, line: line)
+        XCTAssertTrue(
+            refusal.message.contains("is no longer on disk. Save a copy or close it."),
+            "the refusal points at the banner: \(refusal.message)", file: file, line: line
+        )
+        XCTAssertNil(refusal.showWindow, "this window already shows the document", file: file, line: line)
+        XCTAssertTrue(
+            primary.registry.connectedWindows.contains { $0 === facade.windowState }, file: file, line: line
+        )
+    }
+
     /// The last window on a root releases it (D1b). The shown conflicted document has an
     /// editor, as it does in production, so the release retires it with its text and conflict
     /// instead of refusing, and the closed app-owned window keeps no prompt.

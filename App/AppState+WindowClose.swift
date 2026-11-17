@@ -103,8 +103,12 @@ extension AppState {
     /// WD8: whether a dirty document that cannot be saved may close and stay warm. The registry
     /// must keep its text (a warm session or a text-recovery copy), its authority (a retained
     /// location), and the state its prompt is rebuilt from when a window shows it again (a
-    /// missing file, a change on disk, or a recovery record). The LRU cannot drop it while it
-    /// stays dirty, because eviction saves first and that save is refused.
+    /// change on disk or a recovery record). The LRU cannot drop it while it stays dirty,
+    /// because eviction saves first and that save is refused.
+    ///
+    /// A missing file is not proof: every way back to a document (Open, the sidebar, Search,
+    /// the refusal's Show) reads its file first, so a closed detached document could never be
+    /// shown again, and its unsaved text would block every trim and Quit.
     func hasCloseRetentionProof(for session: DocumentSession) -> Bool {
         let sessionIdentity = ObjectIdentifier(session)
         if workspaceMutationTextRecoveryContexts[sessionIdentity] != nil,
@@ -118,9 +122,8 @@ extension AppState {
         else {
             return false
         }
-        return detachedSessionURLs.contains(url)
-            || pendingExternalTexts[url] != nil
-            || pendingExternalFileVersions[url] != nil
+        return !detachedSessionURLs.contains(url)
+            && (pendingExternalTexts[url] != nil || pendingExternalFileVersions[url] != nil)
     }
 
     /// Transient work and quarantine refuse the close; the user closes again once it settles.
@@ -170,6 +173,10 @@ extension AppState {
             return
         }
         guard hasCloseRetentionProof(for: session) else {
+            // A missing file stays in this window, where its banner offers Save Copy and Close.
+            if let url = sessionStateURL(for: session), detachedSessionURLs.contains(url) {
+                throw AppStateError.missingFile(url)
+            }
             throw AppStateError.unsavedChangesPreventWindowClose(
                 sessionStateURL(for: session) ?? session.fileURL ?? URL(fileURLWithPath: "Untitled")
             )

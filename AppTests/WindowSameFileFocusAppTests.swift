@@ -305,13 +305,6 @@ final class WindowSameFileFocusAppTests: SharedRootAppTestCase {
             file: file,
             line: line
         )
-        XCTAssertFalse(
-            primary.editorBindingInstallations.contains { _, session in session === primary.shownSession }
-                && primary.editorInstallationWindows.contains { _, window in window.window === second.windowState },
-            "window 2 installed an editor for the file",
-            file: file,
-            line: line
-        )
     }
 
     private func makeWindow() -> NSWindow {

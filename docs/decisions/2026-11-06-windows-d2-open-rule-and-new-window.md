@@ -32,6 +32,13 @@ in the window the request came from, so no blank window is left behind. When the
 window's own WD1 check finds the file in another window (that window opened it in the
 meantime), the new window closes the same way and the other window comes forward.
 
+Known limit: a request expires three seconds after it was made. A window that took the
+request and attaches later closes while still empty. A scene SwiftUI creates only after the
+expiry took nothing, so it stays as an ordinary empty window; the expired open is reported
+in the requesting window and never runs there
+(`testANewWindowThatNeverOpensIsReportedInTheRequestingWindow`). Closing such a scene was
+not done because nothing tells it apart from a scene the user asked for (a Dock reopen).
+
 Only the home window restores at launch: a window that New Window or a WD7 open creates
 never restores (§6.1). Until E decides restoration (WD5), only the app-owned window sets
 `isRestorable`, so a relaunch cannot bring the other windows back empty. New File's save

@@ -88,8 +88,8 @@ final class KeyWindowRouter: ObservableObject {
 
     /// Gives a new scene the app-owned façade when no open scene shows it. Returns that
     /// scene's claim token, or nil while another scene shows the owner so the caller builds
-    /// a sibling. The owner keeps its document across a close, as the one shared `AppState`
-    /// did before PR C.
+    /// a sibling. Since D2 the owner keeps no document across a close, so its next scene is
+    /// an empty window (`docs/decisions/2026-11-06-windows-d2-close-lifecycle.md`).
     func claimOwner(_ owner: AppState) -> UUID? {
         prune()
         let identifier = ObjectIdentifier(owner)

@@ -16,10 +16,13 @@ window open:
 2. A dirty document that can be saved is saved. A failed save keeps the window open.
 3. A dirty document that cannot be saved closes only with registry retention proof: it is a
    text-recovery copy, or it is warm at its state URL with a retained location and with the
-   state its prompt is rebuilt from (a missing file or a change on disk). The LRU cannot drop
-   it while it is dirty, because eviction saves first and that save is refused. Otherwise the
-   close is refused. An untitled document has no URL, so it can never be warm and always
-   refuses.
+   state its prompt is rebuilt from (a change on disk). The LRU cannot drop it while it is
+   dirty, because eviction saves first and that save is refused. Otherwise the close is
+   refused. An untitled document has no URL, so it can never be warm and always refuses. A
+   document whose file is missing refuses too: every way back to a closed document (Open,
+   the sidebar, Search, the refusal's Show) reads its file first, so it could never be shown
+   again, and its unsaved text would fail every trim and block Quit. The refusal names the
+   missing file, and the window keeps its banner, whose Save Copy and Close resolve it.
 4. The last window on a root runs D1b's release, which preflights, saves, and may refuse.
    Any other window leaves the shared root and releases its own documents from outside it
    (D1c), which may refuse too. The refusal names the document that blocks it. When no
@@ -37,7 +40,9 @@ and navigation work, and invalidates its preview controllers (step 5).
 Every window keeps no document after it closes, the app-owned one included. The app-owned
 façade stays alive and admitted. Its next scene (a Dock reopen, a file command with no
 window, or New Window) is an empty window and rejoins the inventories. A closed session
-stays warm, and its prompt comes back when a window shows the file again. This replaces C's
+stays warm, or, when its window was the last on its root, is retired with its text and
+conflict state by D1b's release; either way its prompt comes back when a window shows the
+file again. This replaces C's
 rule that the owner keeps its document across a close: under WD8 nothing a close keeps
 depends on the owner staying registered, and ⇧⌘N must open an empty window (W8).
 
