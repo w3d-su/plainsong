@@ -17,21 +17,24 @@ public struct TextStatistics: Sendable, Equatable {
     }
 
     private init(text: String, isCancelled: @escaping () -> Bool) {
-        characterCount = text.count
-        var words = 0
-        let options: String.EnumerationOptions = [.byWords, .substringNotRequired]
-        text.enumerateSubstrings(in: text.startIndex ..< text.endIndex, options: options) { _, _, _, stop in
-            words += 1
-            if words.isMultiple(of: 256), isCancelled() { stop = true }
-        }
-        wordCount = words
+        var characters = 0
         var lines = 1
+        for character in text {
+            characters += 1
+            if character.isNewline { lines += 1 }
+            if characters.isMultiple(of: 4096), isCancelled() { break }
+        }
+        characterCount = characters
+        lineCount = lines
+
+        var words = 0
         if !isCancelled() {
-            for character in text where character.isNewline {
-                lines += 1
-                if lines.isMultiple(of: 256), isCancelled() { break }
+            let options: String.EnumerationOptions = [.byWords, .substringNotRequired]
+            text.enumerateSubstrings(in: text.startIndex ..< text.endIndex, options: options) { _, _, _, stop in
+                words += 1
+                if words.isMultiple(of: 256), isCancelled() { stop = true }
             }
         }
-        lineCount = lines
+        wordCount = words
     }
 }

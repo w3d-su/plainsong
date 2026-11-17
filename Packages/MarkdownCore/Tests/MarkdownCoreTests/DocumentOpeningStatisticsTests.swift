@@ -1,3 +1,4 @@
+import Combine
 @testable import MarkdownCore
 import XCTest
 
@@ -22,6 +23,32 @@ final class DocumentOpeningStatisticsTests: XCTestCase {
         XCTAssertEqual(session.fileKind, .mdx)
         XCTAssertEqual(session.version, 1)
         XCTAssertFalse(session.isDirty)
+    }
+
+    func testDeferredEditSurvivesRelocationAndDropsSupersededSource() async throws {
+        let session = DocumentSession(opening: source, url: url, fileKind: .markdown)
+        session.replaceText("first", refreshStatistics: false)
+        session.scheduleStatisticsRefreshAfterEdit()
+        let first = try XCTUnwrap(session.statisticsTask)
+        session.replaceText("second newer source", refreshStatistics: false)
+        session.scheduleStatisticsRefreshAfterEdit()
+        let latest = try XCTUnwrap(session.statisticsTask)
+        session.relocate(to: url.deletingLastPathComponent().appendingPathComponent("renamed.mdx"))
+        XCTAssertTrue(first.isCancelled)
+        await latest.value
+        XCTAssertEqual(session.availableStatistics, TextStatistics(text: "second newer source"))
+        XCTAssertNil(session.statisticsTask)
+    }
+
+    func testResetWithSameCountsStillNotifiesDocumentObservers() {
+        let session = DocumentSession(text: "abc")
+        var notifications = 0
+        let observation = session.objectWillChange.sink { notifications += 1 }
+        defer { observation.cancel() }
+        session.reset(text: "def", url: nil, fileKind: .markdown, isDirty: false)
+        XCTAssertEqual(notifications, 1)
+        XCTAssertEqual(session.text, "def")
+        XCTAssertEqual(session.version, 1)
     }
 
     func testImmediateEditAndSecondOpenKeepIndependentCounts() async {

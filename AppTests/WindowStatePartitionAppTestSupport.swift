@@ -31,7 +31,7 @@ enum WindowStatePartitionInventory {
 
     static let registry: Set<String> = [
         // Per file: writer, bindings, external state, cache/LRU, proofs, quarantine, fences.
-        "isSaving", "autosaveTask", "statisticsTask", "sessionAutosaveTasks", "sessionStatisticsTasks",
+        "isSaving", "autosaveTask", "sessionAutosaveTasks",
         "editorDocumentBindingIDs", "editorDocumentBindingSessions", "editorBindingInstallations",
         "editorWriterInstallations", "pendingEditorSourceInstallations",
         "editorDocumentSourceSynchronizers", "editorDocumentSourceFullComparisonCounts",

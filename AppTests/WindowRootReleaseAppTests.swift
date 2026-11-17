@@ -1,6 +1,6 @@
 import EditorKit
 import Foundation
-import MarkdownCore
+@testable import MarkdownCore
 @testable import Plainsong
 import WorkspaceKit
 import XCTest
@@ -109,9 +109,9 @@ final class WindowRootReleaseAppTests: XCTestCase {
         let fixture = try SecondWindowRegistryFixture.make(testCase: self)
         let identity = ObjectIdentifier(fixture.second)
         let autosave = Task {}
-        let statistics = Task {}
+        fixture.second.scheduleStatisticsRefreshAfterEdit()
+        let statistics = try XCTUnwrap(fixture.second.statisticsTask)
         fixture.appState.sessionAutosaveTasks[identity] = SessionBackgroundTask(token: UUID(), task: autosave)
-        fixture.appState.sessionStatisticsTasks[identity] = SessionBackgroundTask(token: UUID(), task: statistics)
         defer {
             autosave.cancel()
             statistics.cancel()
@@ -122,7 +122,7 @@ final class WindowRootReleaseAppTests: XCTestCase {
         XCTAssertFalse(autosave.isCancelled)
         XCTAssertFalse(statistics.isCancelled)
         XCTAssertFalse(fixture.appState.sessionAutosaveTasks[identity]?.task.isCancelled ?? true)
-        XCTAssertFalse(fixture.appState.sessionStatisticsTasks[identity]?.task.isCancelled ?? true)
+        XCTAssertFalse(fixture.second.statisticsTask?.isCancelled ?? true)
     }
 
     func testClosingR1KeepsWarmCacheEntryForASecondWindowsSession() throws {
@@ -203,13 +203,13 @@ final class WindowRootReleaseAppTests: XCTestCase {
         let roots = try TwoRootReleaseFixture.make(testCase: self)
         let identity = ObjectIdentifier(roots.shownB)
         let autosave = Task {}
-        let statistics = Task {}
+        roots.shownB.scheduleStatisticsRefreshAfterEdit()
+        let statistics = try XCTUnwrap(roots.shownB.statisticsTask)
         defer {
             autosave.cancel()
             statistics.cancel()
         }
         roots.primary.sessionAutosaveTasks[identity] = SessionBackgroundTask(token: UUID(), task: autosave)
-        roots.primary.sessionStatisticsTasks[identity] = SessionBackgroundTask(token: UUID(), task: statistics)
 
         try roots.primary.closeWorkspaceForReplacement()
 
