@@ -813,7 +813,11 @@ SVG children only as non-authoritative pending content, avoiding a temporary col
 Editor main-thread rules (profiled 2026-10-18; evidence in `docs/perf-log.md`): no
 O(document) work per keystroke on the main thread. Publish native UTF-8 source strings,
 never the bridged `NSTextStorage` string: SwiftUI compares published text with `==`,
-which normalizes a bridged string from its first character. Edit derived indexes in
+which normalizes a bridged string from its first character. That native copy is the one
+O(document) step left per keystroke: one CoreFoundation pass (`ExactSourceText.nativeCopy`,
+~24 main-thread instructions per byte, ~1.5 ms per MiB of ASCII in Release; measuring the
+length with a second pass doubled it and made the first keystroke after an idle pause
+slow on cold caches, `docs/perf/2026-11-18-keystroke-native-copy.md`). Edit derived indexes in
 place. Release TextKit 2's cached text elements below the viewport once scrolling
 settles (`EditorTextElementCacheTrimmer`): each edit rewrites the range of every cached
 element after it, so typing above a once-viewed document end cost ~50 ms per keystroke.

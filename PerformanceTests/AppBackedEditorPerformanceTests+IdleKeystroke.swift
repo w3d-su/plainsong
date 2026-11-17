@@ -7,7 +7,7 @@ import SwiftUI
 import XCTest
 
 /// Why the first keystroke after an idle pause is slower than the next ones
-/// (`docs/perf/2026-11-18-export-e9-typing-isolation.md`). Each trial waits an idle time,
+/// (`docs/perf/2026-11-18-keystroke-native-copy.md`). Each trial waits an idle time,
 /// then types four keystrokes 80 ms apart, and records for every keystroke the hosted §12
 /// measure, the main thread's CPU time, and its retired instructions and cycles. More
 /// instructions on the first keystroke means the editor does more work after a pause;
@@ -90,6 +90,7 @@ extension AppBackedEditorPerformanceTests {
                     }
                     let cpu = Self.idleProbeThreadCPUMilliseconds() - cpuBefore
                     let after = counters.read()
+                    XCTAssertGreaterThanOrEqual(after.instructions, before.instructions, "a counter read failed")
                     cancelScheduledAppWork(in: app.appState)
                     samples.append(IdleKeystrokeSample(
                         trial: trial,
