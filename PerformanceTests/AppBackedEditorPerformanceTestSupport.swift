@@ -1,6 +1,6 @@
 import AppKit
 @testable import EditorKit
-import MarkdownCore
+@testable import MarkdownCore
 @testable import Plainsong
 import SwiftUI
 import WorkspaceKit
@@ -149,7 +149,7 @@ extension AppBackedEditorPerformanceTests {
     func tearDownAppFixture(_ fixture: AppFixture) {
         tearDownFixture(fixture.editor)
         fixture.appState.autosaveTask?.cancel()
-        fixture.appState.statisticsTask?.cancel()
+        fixture.appState.shownSession.statisticsTask?.cancel()
         fixture.appState.completionWorkspaceTask?.cancel()
         try? FileManager.default.removeItem(at: fixture.rootURL)
     }
@@ -157,8 +157,7 @@ extension AppBackedEditorPerformanceTests {
     func cancelScheduledAppWork(in appState: AppState) {
         appState.autosaveTask?.cancel()
         appState.autosaveTask = nil
-        appState.statisticsTask?.cancel()
-        appState.statisticsTask = nil
+        appState.shownSession.statisticsTask?.cancel()
         appState.completionWorkspaceTask?.cancel()
         appState.completionWorkspaceTask = nil
     }
