@@ -36,7 +36,10 @@
 > longer shrinks every page, and a shrunk page warns instead of failing; Print's
 > paper aspect becomes a soft page budget, so a tall image or diagram extends one
 > page (scaled to fit at print) instead of erroring. Real panel/Powerbox,
-> keyboard/VoiceOver, and idle PDF timing stay open.** Precedent:
+> keyboard/VoiceOver, and idle PDF timing stay open. On 2026-11-17 hosted tests on
+> the written output check E3's kitchen-sink bullet and E5's shared-snapshot bullet,
+> and `main`'s full CI run checks E9's regression bullet.**
+> Precedent:
 > PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
 > or an owner-recorded result in the same commit.
 
@@ -1008,7 +1011,7 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   no bridge/runtime script, event handler, or checkbox writeback.
 - [x] Output carries D3's exact CSP; every HTML/SVG URL-bearing attribute and CSS
   `url(...)` is accepted only by the documented scheme/fragment/data allowlist.
-- [ ] Markdown kitchen-sink output preserves GFM, math, highlighted code, task-checkbox
+- [x] Markdown kitchen-sink output preserves GFM, math, highlighted code, task-checkbox
   appearance, and Mermaid output.
 - [x] Frontmatter is absent from the body; `<title>` follows D3's frontmatter / first
   document heading / `Untitled` rule.
@@ -1045,8 +1048,20 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   `ExportHTMLHostedTests` covers the static
   document, disabled checkboxes, MDX placeholders, and MDX failure;
   `export-html.test.ts` freezes dark styling; `ExportHTMLOfflineTests` resolves `system`
-  to light or dark. The full `Fixtures/kitchen-sink.md` matrix stays open for E8, so
-  E3 stays open on that bullet only.
+  to light or dark.
+  Kitchen-sink evidence (2026-11-17):
+  `ExportHTMLKitchenSinkAppTests.testKitchenSinkMarkdownExportKeepsGFMMathCodeTasksAndMermaid`
+  exports the real `Fixtures/kitchen-sink.md` through the product command under light and
+  dark, then reopens the written file in a fresh non-persistent WebKit view. The reopened
+  document renders the table with its right-aligned column, strikethrough, and the bare
+  URL and email autolinks. Its five task checkboxes are laid out, two checked, none
+  writable. KaTeX typesets the inline formula and both display blocks. All nine
+  non-Mermaid fences keep their language class and token spans, and the computed keyword
+  color is each theme's `--hl-keyword`. Both Mermaid diagrams are SVG with their own
+  labels, and no Mermaid fence stays raw. The title is "Kitchen Sink Fixture" and no
+  frontmatter value is in the body; the fixture's first heading has the same text, so this
+  does not show frontmatter precedence, which `ExportHTMLTitleTests` covers. The export
+  reports exactly one omitted image, the fixture's missing `./assets/example-image.png`.
 
 ### E4 — Assets, fonts, and offline fidelity
 
@@ -1118,7 +1133,7 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   (`TEST_RUNNER_PLAINSONG_REAL_PRINT=1`, skipped by default) real `runModal` runs
   confirm a suppressed-panel job produces a readable PDF and that real-sheet
   cancel/supersede unwind the operation.
-- [ ] Both use the same completed offscreen snapshot and include finalized images,
+- [x] Both use the same completed offscreen snapshot and include finalized images,
   KaTeX, highlighting, Mermaid, MDX placeholders, and the right theme for the
   product (PDF: resolved invocation theme; Print: light by B1).
 - [x] Print uses panel-controlled paper pagination; PDF/Print prove equivalent
@@ -1152,8 +1167,18 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   With content asserted on the captured print PDF, only the final PDFKit-to-device
   print hop remains owner smoke, in `docs/export-pdf-print-checklist.md`.
   KaTeX, code, Mermaid, MDX placeholders, a wide table, and the light print theme are in
-  the hosted capture/print job; finalized raster images and highlighted-code styling in
-  the PDF are still not asserted, so that bullet stays open.
+  the hosted capture/print job.
+  Image and highlight evidence (2026-11-17):
+  `ExportPDFContentAppTests.testPDFAndPrintPaintTheFinalizedImageAndHighlightedCode`
+  runs Export as PDF… under light and dark and Print… under a dark preference, each a
+  separate export of the same source. After each capture, the captured offscreen DOM
+  holds the image as a loaded 96×48 `data:` image and the Swift fence's keyword spans, so
+  both products read the same finalized offscreen pipeline. The light PDF, the dark PDF
+  and Print captured the same text, and Print rendered light. In every resulting PDF the pages,
+  rendered at 2×, paint the image's teal. The keyword `struct` has colored pixels;
+  a prose control word has none. `testMissingImagePaintsNoSwatch` removes the image and
+  finds no teal pixels in a light PDF, so in light the count comes from the image and not
+  from theme or code colors. The control does not run in dark.
 
 ### E6 — One-shot sandbox write and refusal matrix
 
@@ -1590,7 +1615,7 @@ for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
   any export-specific wall-clock or memory budget.
 - [ ] Export work never enters the editor keystroke path; the existing < 16 ms typing
   budget remains green while export is active.
-- [ ] Existing preview protocol, asset containment, MDX sanitizer, theme, render,
+- [x] Existing preview protocol, asset containment, MDX sanitizer, theme, render,
   scroll-sync, Save/Save Copy, and workspace mutation/recovery suites remain green.
 - [x] Dependency manifests are unchanged.
 - PR E evidence: `git diff origin/main -- '*Package.swift' '*Package.resolved'
@@ -1604,6 +1629,33 @@ for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
   `AppStateWorkspaceDataIntegrityTests`, `AppStateSessionStateCleanupTests`, and
   `WorkspaceMutation{Operation,Text}RecoveryStoreTests` stay green with the leaf-path writer,
   the restored pre-PR-E write primitive, and the extracted Save Copy owner walk.
+- Regression evidence (2026-11-17): CI run 43696370006 on the `main` push of `f664c5af`
+  (2026-11-15) contains every export PR and passed every job. Its logs record 2,869
+  passed XCTest cases, 0 failed and 36 skipped (30 opt-in probes and 6 platform or
+  volume gates: five macOS 27 split-shell cases and one case-sensitive-volume Save Copy
+  case), plus 231 of 231 vitest
+  cases in 25 preview-src files. Every macOS XCTest class at that commit passed in it,
+  apart from the `SharedRootAppTestCase` base class, which runs through its subclasses.
+  The named suites, all passed in that run:
+  - preview protocol: `protocol.test.ts`, `PreviewBridgeTransportTests`,
+    `ExportHTMLProtocolTests`, `ExportHTMLBridgeDecodingTests`;
+  - asset containment: `PreviewKitTests` (the `asset://` `../` and symlink cases),
+    `SVGAssetContainmentTests`, `PreviewAssetFenceTests`, `ExportResourceResolverTests`,
+    `asset-path.test.ts`;
+  - MDX sanitizer: `pipeline.test.ts`, `preview-regressions.test.ts`;
+  - theme: `export-html.test.ts`, `CustomThemeValidationTests`,
+    `MarkdownSyntaxThemeCustomTests`;
+  - render: `PreviewRenderDispatchTests`, `PreviewRenderDispatchHostedTests`,
+    `PreviewRenderingRegressionTests`, `segmented-render.test.ts`,
+    `segmented-render-fallbacks.test.ts`;
+  - scroll sync: `scroll-sync.test.ts`, `scroll-index.test.ts`,
+    `PreviewScrollDeliveryTests`, `EditorPreviewScrollCoordinatorTests`;
+  - Save/Save Copy: `WorkspaceKitTests`, `AppStateTests`,
+    `AppStateWorkspaceDataIntegrityTests`, `AppStateSessionStateCleanupTests`,
+    `ExportDestinationOwnershipAppTests`, `AppStateSaveAsTests` (40 `…SaveCopy…` cases
+    across them);
+  - workspace mutation/recovery: `WorkspaceMutationOperationRecoveryStoreTests`,
+    `WorkspaceMutationTextRecoveryStoreTests`, `WorkspaceAnchoredItemMutationTests`.
 
 ### PR F Phase B verification — 2026-10-01
 
