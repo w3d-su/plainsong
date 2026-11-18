@@ -193,9 +193,6 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 ### Concurrency rules
 
 - UI mutation on `@MainActor` only.
-- The iOS source editor publishes text and version on each edit. It counts after a
-  300 ms pause and cancels the counting task on a newer edit or editor teardown.
-  Only the matching binding and revision publish counts to the status bar.
 - tree-sitter parsing and highlight query execution off main thread (`MarkdownHighlightService`
   handles this; do not block it).
 - Preview render requests are single-flight: one render is in JavaScript at a time and the
@@ -219,10 +216,13 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 
 Opening a Markdown or MDX file of 64 KiB or more (decoded UTF-8 size) installs its editable
 source immediately. The status bar shows “Counting…” until the first counts arrive. Smaller
-files open with counts available. In the macOS editor the document session owns its pending
-count, including the 300 ms pause after editing. Switching windows or files, renaming, and
-Save As keep that count with the source. On iOS a statistics-only snapshot preserves a
-pending preview render for the same document revision.
+files open with counts available. In the macOS and iOS editors the document session owns its
+pending count, including the 300 ms pause after editing. Switching windows or files, renaming,
+and Save As keep that count with the source; on iOS so do detaching and closing the editor.
+The iOS editor emits a snapshot when the counts land only if it still shows that session, and
+counts an edit made while text is marked (a Zhuyin composition) once the composition ends.
+On iOS a statistics-only snapshot preserves a pending preview render for the same document
+revision.
 
 - **App Sandbox: ON.** All file access via user-selected URLs; persist
   security-scoped bookmarks for recents/workspaces; always wrap access in

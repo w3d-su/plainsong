@@ -40,6 +40,24 @@ final class DocumentOpeningStatisticsTests: XCTestCase {
         XCTAssertNil(session.statisticsTask)
     }
 
+    func testEditCountReportsReadyOnlyForTheEditItCounted() async throws {
+        let session = DocumentSession(text: "")
+        session.replaceText("甲", refreshStatistics: false)
+        session.scheduleStatisticsRefreshAfterEdit { _ in XCTFail("A superseded count reported ready") }
+        let first = try XCTUnwrap(session.statisticsTask)
+        session.replaceText("甲乙", refreshStatistics: false)
+        let ready = expectation(description: "latest edit counted")
+        session.scheduleStatisticsRefreshAfterEdit { counted in
+            XCTAssertTrue(counted === session)
+            XCTAssertEqual(counted.availableStatistics, TextStatistics(text: "甲乙"))
+            ready.fulfill()
+        }
+        XCTAssertTrue(first.isCancelled)
+        await fulfillment(of: [ready], timeout: 5)
+        await first.value
+        XCTAssertNil(session.statisticsTask)
+    }
+
     func testResetWithSameCountsStillNotifiesDocumentObservers() {
         let session = DocumentSession(text: "abc")
         var notifications = 0

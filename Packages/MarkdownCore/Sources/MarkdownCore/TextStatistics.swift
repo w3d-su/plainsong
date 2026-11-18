@@ -10,11 +10,22 @@ public struct TextStatistics: Sendable, Equatable {
         self.init(text: text, isCancelled: { false })
     }
 
-    /// Call from the counting task so cancellation interrupts enumeration and discards partial counts.
-    public static func countUnlessCancelled(_ text: String) -> Self? {
+    static func countUnlessCancelled(_ text: String) -> Self? {
         guard !Task.isCancelled else { return nil }
-        let counts = Self(text: text, isCancelled: { Task.isCancelled })
+        let source = nativeSource(text)
+        let counts = Self(text: source, isCancelled: { Task.isCancelled })
         return Task.isCancelled ? nil : counts
+    }
+
+    /// The iOS editor publishes its text storage string, which Swift reads on the bridged
+    /// (foreign) path. Counting a native copy of 1 MiB of Traditional Chinese took 102 ms
+    /// instead of 155 ms (docs/perf/2026-11-18-ios-edit-statistics.md). An unpaired
+    /// surrogate has no exact native copy, so that text is counted as it is.
+    static func nativeSource(_ text: String) -> String {
+        if text.utf8.withContiguousStorageIfAvailable({ _ in true }) == true {
+            return text
+        }
+        return ExactSourceText.nativeCopy(of: text as NSString) ?? text
     }
 
     private init(text: String, isCancelled: @escaping () -> Bool) {

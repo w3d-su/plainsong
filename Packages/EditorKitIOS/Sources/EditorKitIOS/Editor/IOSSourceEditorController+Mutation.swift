@@ -59,7 +59,7 @@ extension IOSSourceEditorController {
     }
 
     func performOutdent() {
-        guard let installation, installation.canWrite, textView.markedTextRange == nil, !isMutating else {
+        guard isHostAlive, let installation, installation.canWrite, textView.markedTextRange == nil, !isMutating else {
             return
         }
         let selection = textView.selectedRange
@@ -201,11 +201,11 @@ extension IOSSourceEditorController {
     }
 
     func publishCurrentText() {
-        guard isHostAlive, let installation else { return }
+        guard let installation else { return }
         let current = plainText()
         guard !ExactSourceFragment.matches(current, installation.session.text) else { return }
         installation.session.replaceTextFromAuthorizedEditor(current, refreshStatistics: false)
-        scheduleStatisticsRefresh(for: installation)
+        scheduleStatisticsRefresh(for: installation.session)
     }
 
     func consumeSelectionEpoch() {

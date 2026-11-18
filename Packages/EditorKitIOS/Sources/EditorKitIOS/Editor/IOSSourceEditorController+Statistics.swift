@@ -1,42 +1,30 @@
-import Foundation
 import MarkdownCore
 
 extension IOSSourceEditorController {
-    func cancelStatisticsRefresh() {
-        statisticsTask?.cancel()
-        statisticsTask = nil
-    }
-
-    func scheduleStatisticsRefresh(for binding: IOSSourceEditorDocumentBinding) {
-        cancelStatisticsRefresh()
-        let revision = currentRevision(binding)
-        let bindingID = binding.bindingID
-        let text = binding.session.text
-        statisticsTask = Task.detached(priority: .utility) { [weak self, statisticsDebounce, countStatistics] in
-            do {
-                try await statisticsDebounce()
-            } catch {
-                return
-            }
-            guard !Task.isCancelled, let statistics = await countStatistics(text) else { return }
-            await self?.publishStatistics(statistics, for: revision, bindingID: bindingID)
+    /// The session owns the count and its 300 ms pause, as on macOS: a newer edit cancels it,
+    /// and it keeps running for its document when the editor detaches or closes. While text
+    /// is marked (a Zhuyin composition), counting waits until the composition ends.
+    func scheduleStatisticsRefresh(for session: DocumentSession) {
+        if textView.markedTextRange != nil {
+            hasUncountedComposition = true
+        } else {
+            countStatistics(of: session)
         }
     }
 
-    private func publishStatistics(_ statistics: TextStatistics, for revision: IOSDocumentRevision, bindingID: UUID) {
-        guard !Task.isCancelled, isHostAlive, let installation,
-              installation.bindingID == bindingID, installation.identity == revision.documentID else { return }
-        statisticsTask = nil
-        let session = installation.session
-        guard session.version == revision.version else {
-            // A URL or file-kind change can advance the revision without supplying fresh counts.
-            if session.needsStatisticsRefresh {
-                scheduleStatisticsRefresh(for: installation)
-            }
-            return
+    /// Counts the source a composition left uncounted, once it is committed or cancelled,
+    /// or when its document leaves this editor first.
+    func countStatisticsAfterComposition() {
+        guard hasUncountedComposition, let session = installation?.session else { return }
+        countStatistics(of: session)
+    }
+
+    private func countStatistics(of session: DocumentSession) {
+        hasUncountedComposition = false
+        session.scheduleStatisticsRefreshAfterEdit { [weak self] counted in
+            // Chrome reads the editor snapshot, which was emitted before this count finished.
+            guard let self, installation?.session === counted else { return }
+            emitSnapshot()
         }
-        let changed = session.availableStatistics != statistics
-        session.applyStatistics(statistics)
-        if changed { emitSnapshot() }
     }
 }

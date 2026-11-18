@@ -45,8 +45,6 @@ public final class DocumentSession: ObservableObject {
     @Published public private(set) var isDirty: Bool
     /// Nil while a newly opened file is being counted. Views should read this value.
     @Published public private(set) var availableStatistics: TextStatistics?
-    /// A deferred edit can outlive its editor. A new attachment must finish that count.
-    public private(set) var needsStatisticsRefresh = false
 
     /// Callers that require counts synchronously can still obtain them during opening.
     public var statistics: TextStatistics {
@@ -105,8 +103,9 @@ public final class DocumentSession: ObservableObject {
 
     /// Count the most recent edit after a typing pause. The work follows this session
     /// through window switches and URL changes. Only a source change invalidates it.
-    public func scheduleStatisticsRefreshAfterEdit() {
-        scheduleStatisticsCount(debounced: true)
+    /// `onReady` runs after the counts are applied, and not when a newer change cancels them.
+    public func scheduleStatisticsRefreshAfterEdit(onReady: (@MainActor (DocumentSession) -> Void)? = nil) {
+        scheduleStatisticsCount(debounced: true, onReady: onReady)
     }
 
     private func scheduleStatisticsCount(
@@ -174,8 +173,6 @@ public final class DocumentSession: ObservableObject {
         text = newText
         if refreshStatistics {
             self.refreshStatistics()
-        } else {
-            needsStatisticsRefresh = true
         }
         // Dedupe the assignment: `isDirty` is @Published, and republishing the same
         // value on every keystroke would re-render observers needlessly.
@@ -205,7 +202,6 @@ public final class DocumentSession: ObservableObject {
     /// large document is O(n) and must stay off the typing hot path).
     public func applyStatistics(_ newStatistics: TextStatistics) {
         cancelStatisticsTask()
-        needsStatisticsRefresh = false
         if availableStatistics != newStatistics {
             availableStatistics = newStatistics
         }

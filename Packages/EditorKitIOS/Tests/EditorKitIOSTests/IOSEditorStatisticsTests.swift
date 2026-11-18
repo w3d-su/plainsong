@@ -1,220 +1,187 @@
+import Combine
 @testable import EditorKitIOS
-import MarkdownCore
+@testable import MarkdownCore
 import XCTest
 
+/// The document session owns the count (`DocumentSession.scheduleStatisticsRefreshAfterEdit`).
+/// These tests await its real 300 ms pause and assert outcomes, not scheduling order.
 @MainActor
 final class IOSEditorStatisticsTests: XCTestCase {
-    func testBurstCountsOnlyFinalEditAndPublishesIt() async throws {
+    func testBurstCountsOnlyTheFinalEditAndPublishesIt() async throws {
         let harness = IOSEditorHarness(text: "")
-        let gate = StatisticsGate()
-        harness.controller.statisticsDebounce = { await gate.wait() }
-        let trace = recordCounts(in: harness)
-        var snapshots = [IOSSourceEditorSnapshot]()
-        let observation = harness.controller.observe {
-            if case let .snapshotChanged(snapshot) = $0 { snapshots.append(snapshot) }
-        }
-        defer { observation.cancel() }
-        var requests = [Task<Void, Never>]()
+        var applied = [TextStatistics?]()
+        let counts = harness.session.$availableStatistics.dropFirst().sink { applied.append($0) }
+        defer { counts.cancel() }
+        let snapshots = recordSnapshots(of: harness.controller)
+        var tasks = [Task<Void, Never>]()
         for version in 1 ... 5 {
             harness.textView.insertText("甲")
             XCTAssertEqual(harness.session.version, version)
             XCTAssertEqual(harness.session.text, String(repeating: "甲", count: version))
-            try requests.append(XCTUnwrap(harness.controller.statisticsTask))
+            try tasks.append(XCTUnwrap(harness.session.statisticsTask))
         }
-        XCTAssertTrue(trace.starts.isEmpty)
-        await gate.open()
-        for request in requests {
-            await request.value
-        }
+        XCTAssertEqual(tasks.map(\.isCancelled), [true, true, true, true, false])
+        await tasks[4].value
         let expected = TextStatistics(text: "甲甲甲甲甲")
-        XCTAssertEqual(trace.starts, [5])
-        XCTAssertEqual(harness.session.availableStatistics, expected)
-        XCTAssertEqual(snapshots.last?.revision.version, 5)
-        XCTAssertEqual(snapshots.last?.document.availableStatistics, expected)
+        XCTAssertEqual(applied, [expected])
+        XCTAssertEqual(snapshots.values.last?.revision.version, 5)
+        XCTAssertEqual(snapshots.values.last?.document.availableStatistics, expected)
     }
 
-    func testNewEditCancelsInsideRunningCounter() async throws {
+    func testDetachLeavesTheCountWithItsDocument() async throws {
         let harness = IOSEditorHarness(text: "")
-        let gate = StatisticsGate()
-        let started = expectation(description: "first count entered")
-        let count = harness.controller.countStatistics
-        harness.controller.statisticsDebounce = {}
-        harness.controller.countStatistics = { text in
-            if text == "甲" {
-                started.fulfill()
-                await gate.wait()
-                XCTAssertTrue(Task.isCancelled)
-                let result = await count(text)
-                XCTAssertNil(result)
-                return result
-            }
-            return await count(text)
-        }
         harness.textView.insertText("甲")
-        let first = try XCTUnwrap(harness.controller.statisticsTask)
-        await fulfillment(of: [started], timeout: 5)
-        harness.textView.insertText("乙")
-        let last = try XCTUnwrap(harness.controller.statisticsTask)
-        await last.value
-        await gate.open()
-        await first.value
-        XCTAssertEqual(harness.session.availableStatistics, TextStatistics(text: "甲乙"))
+        let task = try XCTUnwrap(harness.session.statisticsTask)
+        harness.controller.detach(expected: harness.identity, bindingID: harness.bindingID)
+        XCTAssertFalse(task.isCancelled)
+        await task.value
+        XCTAssertEqual(harness.session.availableStatistics, TextStatistics(text: "甲"))
+
+        harness.controller.attach(binding(for: harness.session, identity: harness.identity))
+        XCTAssertNil(harness.session.statisticsTask)
+        XCTAssertEqual(harness.controller.captureSnapshot()?.document.availableStatistics, TextStatistics(text: "甲"))
     }
 
-    func testSwitchRejectsLateCountWithIdenticalSourceAndVersionAndReattachFinishesCount() async throws {
+    func testReattachKeepsThePendingCountInsteadOfRestartingIt() async throws {
         let harness = IOSEditorHarness(text: "")
-        let firstBinding = try XCTUnwrap(harness.controller.installation)
-        let gate = StatisticsGate()
-        let started = expectation(description: "first result computed")
-        let count = harness.controller.countStatistics
-        harness.controller.statisticsDebounce = {}
-        harness.controller.countStatistics = { text in
-            let result = await count(text)
-            started.fulfill()
-            await gate.wait()
-            return result
-        }
         harness.textView.insertText("甲")
-        let first = try XCTUnwrap(harness.controller.statisticsTask)
-        await fulfillment(of: [started], timeout: 5)
+        let task = try XCTUnwrap(harness.session.statisticsTask)
+        harness.controller.detach(expected: harness.identity, bindingID: harness.bindingID)
+        let snapshots = recordSnapshots(of: harness.controller)
+        let rebinding = binding(for: harness.session, identity: harness.identity)
+        harness.controller.attach(rebinding)
+        XCTAssertEqual(harness.session.statisticsTask, task)
+        await task.value
+        XCTAssertEqual(snapshots.values.last?.bindingID, rebinding.bindingID)
+        XCTAssertEqual(snapshots.values.last?.document.availableStatistics, TextStatistics(text: "甲"))
+    }
 
+    func testLateCountStaysWithItsDocumentWhenAnotherHasTheSameSourceAndVersion() async throws {
+        let harness = IOSEditorHarness(text: "")
+        harness.textView.insertText("甲")
+        let task = try XCTUnwrap(harness.session.statisticsTask)
         let second = DocumentSession(text: "another document")
         let secondCounts = second.availableStatistics
         second.replaceText("甲", refreshStatistics: false)
         XCTAssertEqual(second.version, harness.session.version)
-        let secondGate = StatisticsGate()
-        harness.controller.statisticsDebounce = { await secondGate.wait() }
-        harness.controller.countStatistics = count
-        let secondBinding = IOSSourceEditorDocumentBinding(
-            bindingID: UUID(), identity: IOSDocumentIdentity(rawValue: UUID()),
-            session: second, accessGeneration: 1, canWrite: true
-        )
-        harness.controller.attach(secondBinding)
-        let pending = try XCTUnwrap(harness.controller.statisticsTask)
-        await gate.open()
-        await first.value
+        harness.controller.attach(binding(for: second, identity: IOSDocumentIdentity(rawValue: UUID())))
+        let snapshots = recordSnapshots(of: harness.controller)
+        await task.value
+        XCTAssertEqual(harness.session.availableStatistics, TextStatistics(text: "甲"))
         XCTAssertEqual(second.availableStatistics, secondCounts)
-        XCTAssertTrue(harness.session.needsStatisticsRefresh)
-        harness.controller.detach(expected: secondBinding.identity, bindingID: secondBinding.bindingID)
-        await secondGate.open()
-        await pending.value
-        XCTAssertTrue(pending.isCancelled)
-        XCTAssertEqual(second.availableStatistics, secondCounts)
-        XCTAssertNil(harness.controller.captureSnapshot())
-
-        harness.controller.attach(firstBinding)
-        let resumed = try XCTUnwrap(harness.controller.statisticsTask)
-        await resumed.value
-        XCTAssertEqual(harness.controller.captureSnapshot()?.document.availableStatistics, TextStatistics(text: "甲"))
-        XCTAssertFalse(harness.session.needsStatisticsRefresh)
+        XCTAssertTrue(snapshots.values.isEmpty)
+        XCTAssertEqual(harness.controller.captureSnapshot()?.document.availableStatistics, secondCounts)
     }
 
-    func testHostTeardownCancelsPendingStatistics() async throws {
+    func testHostTeardownLetsTheDocumentFinishItsCount() async throws {
         let harness = IOSEditorHarness(text: "")
-        let gate = StatisticsGate()
-        harness.controller.statisticsDebounce = { await gate.wait() }
-        let trace = recordCounts(in: harness)
         harness.textView.insertText("甲")
-        let pending = try XCTUnwrap(harness.controller.statisticsTask)
+        let task = try XCTUnwrap(harness.session.statisticsTask)
         harness.controller.invalidateHost()
-        await gate.open()
-        await pending.value
-        XCTAssertTrue(pending.isCancelled)
-        XCTAssertTrue(trace.starts.isEmpty)
+        XCTAssertFalse(task.isCancelled)
+        await task.value
+        XCTAssertEqual(harness.session.availableStatistics, TextStatistics(text: "甲"))
         XCTAssertNil(harness.controller.captureSnapshot())
     }
 
-    func testRelocationBeforePublicationFinishesAtNewRevision() async throws {
-        let harness = IOSEditorHarness(text: "")
-        let gate = StatisticsGate()
-        harness.controller.statisticsDebounce = { await gate.wait() }
-        harness.textView.insertText("甲")
-        let first = try XCTUnwrap(harness.controller.statisticsTask)
-        harness.session.relocate(to: URL(fileURLWithPath: "/tmp/moved.mdx"))
+    func testOutdentAfterHostTeardownLeavesSourceAndSessionTogether() {
+        let source = "- a\n  - b"
+        let live = IOSEditorHarness(text: source)
+        live.placeCaret(at: iosUTF16(source))
+        live.controller.performOutdent()
+        XCTAssertNotEqual(live.textView.textStorage.string, source)
+        XCTAssertEqual(live.session.text, live.textView.textStorage.string)
 
-        let nextGate = StatisticsGate()
-        harness.controller.statisticsDebounce = { await nextGate.wait() }
-        await gate.open()
-        await first.value
-        let retry = try XCTUnwrap(harness.controller.statisticsTask)
-        XCTAssertEqual(harness.session.availableStatistics, TextStatistics(text: ""))
-        await nextGate.open()
-        await retry.value
-        let snapshot = try XCTUnwrap(harness.controller.captureSnapshot())
-        XCTAssertEqual(snapshot.revision.version, 2)
-        XCTAssertEqual(snapshot.document.availableStatistics, TextStatistics(text: "甲"))
+        let harness = IOSEditorHarness(text: source)
+        harness.placeCaret(at: iosUTF16(source))
+        harness.controller.invalidateHost()
+        harness.controller.performOutdent()
+        XCTAssertEqual(harness.textView.textStorage.string, source)
+        XCTAssertEqual(harness.session.text, source)
+        XCTAssertEqual(harness.session.version, 0)
+    }
+
+    func testZhuyinCompositionIsCountedOnlyAfterItIsCommitted() async throws {
+        for commitsByInsertion in [false, true] {
+            let harness = IOSEditorHarness(text: "")
+            var applied = [TextStatistics?]()
+            let counts = harness.session.$availableStatistics.dropFirst().sink { applied.append($0) }
+            defer { counts.cancel() }
+            harness.textView.setMarkedText("ㄓ", selectedRange: NSRange(location: 1, length: 0))
+            harness.textView.setMarkedText("ㄓㄨ", selectedRange: NSRange(location: 2, length: 0))
+            harness.textView.setMarkedText("ㄓㄨㄥ", selectedRange: NSRange(location: 3, length: 0))
+            XCTAssertNotNil(harness.textView.markedTextRange)
+            XCTAssertEqual(harness.session.text, "ㄓㄨㄥ")
+            XCTAssertNil(harness.session.statisticsTask)
+            if commitsByInsertion {
+                harness.textView.insertText("中")
+            } else {
+                harness.textView.setMarkedText("中", selectedRange: NSRange(location: 1, length: 0))
+                XCTAssertNil(harness.session.statisticsTask)
+                harness.textView.unmarkText()
+            }
+            XCTAssertNil(harness.textView.markedTextRange)
+            XCTAssertEqual(harness.session.text, "中")
+            let task = try XCTUnwrap(harness.session.statisticsTask)
+            await task.value
+            XCTAssertEqual(applied, [TextStatistics(text: "中")], "commit by insertion: \(commitsByInsertion)")
+            XCTAssertEqual(
+                harness.controller.captureSnapshot()?.document.availableStatistics,
+                TextStatistics(text: "中")
+            )
+        }
+    }
+
+    func testDetachDuringCompositionCountsTheDocumentItLeaves() async throws {
+        let harness = IOSEditorHarness(text: "")
+        harness.textView.setMarkedText("ㄓㄨ", selectedRange: NSRange(location: 2, length: 0))
+        XCTAssertNil(harness.session.statisticsTask)
+        harness.controller.detach(expected: harness.identity, bindingID: harness.bindingID)
+        let task = try XCTUnwrap(harness.session.statisticsTask)
+        await task.value
+        XCTAssertEqual(harness.session.availableStatistics, TextStatistics(text: "ㄓㄨ"))
     }
 
     func testOneMiBTraditionalChineseBurst() async throws {
         let paragraph = "## 草稿\n\n我們在寫一份繁體中文的技術文件，內容包含 Unicode、標點與數字 123。\n\n"
         let original = String(repeating: paragraph, count: 1_048_576 / paragraph.utf8.count)
         let harness = IOSEditorHarness(text: original)
-        let trace = recordCounts(in: harness)
+        var applied = [TextStatistics?]()
+        let counts = harness.session.$availableStatistics.dropFirst().sink { applied.append($0) }
+        defer { counts.cancel() }
         harness.placeCaret(at: 0)
-        var requests = [Task<Void, Never>]()
-        let clock = ContinuousClock()
-        let started = clock.now
+        var tasks = [Task<Void, Never>]()
         for _ in 0 ..< 5 {
             harness.textView.insertText("甲")
-            try requests.append(XCTUnwrap(harness.controller.statisticsTask))
+            try tasks.append(XCTUnwrap(harness.session.statisticsTask))
         }
-        let insertion = started.duration(to: clock.now)
         XCTAssertEqual(harness.session.version, 5)
-        for request in requests {
-            await request.value
-        }
+        XCTAssertEqual(tasks.map(\.isCancelled), [true, true, true, true, false])
+        await tasks[4].value
         XCTAssertEqual(harness.session.text, "甲甲甲甲甲" + original)
-        let expected = TextStatistics(text: harness.session.text)
-        XCTAssertEqual(harness.session.availableStatistics, expected)
-        XCTAssertEqual(trace.starts, [5])
-        XCTAssertEqual(trace.stale, 0)
-        print("iOS burst: bytes=\(original.utf8.count) starts=\(trace.starts) stale=\(trace.stale) " +
-            "words=\(expected.wordCount) fiveInserts=\(insertion)")
+        XCTAssertEqual(applied, [TextStatistics(text: harness.session.text)])
     }
 
-    private func recordCounts(in harness: IOSEditorHarness) -> StatisticsTrace {
-        let trace = StatisticsTrace()
-        let count = harness.controller.countStatistics
-        harness.controller.countStatistics = { [session = harness.session] text in
-            let version = text.prefix(while: { $0 == "甲" }).count
-            await trace.start(version)
-            let result = await count(text)
-            await trace.finish(version, session: session)
-            return result
+    private func binding(for session: DocumentSession,
+                         identity: IOSDocumentIdentity) -> IOSSourceEditorDocumentBinding
+    {
+        IOSSourceEditorDocumentBinding(
+            bindingID: UUID(), identity: identity, session: session, accessGeneration: 1, canWrite: true
+        )
+    }
+
+    private func recordSnapshots(of controller: IOSSourceEditorController) -> SnapshotRecorder {
+        let recorder = SnapshotRecorder()
+        recorder.observation = controller.observe { [weak recorder] event in
+            if case let .snapshotChanged(snapshot) = event { recorder?.values.append(snapshot) }
         }
-        return trace
+        addTeardownBlock { @MainActor in recorder.observation?.cancel() }
+        return recorder
     }
 }
 
 @MainActor
-private final class StatisticsTrace {
-    var starts = [Int]()
-    var stale = 0
-
-    func start(_ version: Int) {
-        starts.append(version)
-    }
-
-    func finish(_ version: Int, session: DocumentSession) {
-        if session.version != version { stale += 1 }
-    }
-}
-
-private actor StatisticsGate {
-    private var isOpen = false
-    private var waiters = [CheckedContinuation<Void, Never>]()
-
-    func wait() async {
-        if !isOpen {
-            await withCheckedContinuation { waiters.append($0) }
-        }
-    }
-
-    func open() {
-        isOpen = true
-        for waiter in waiters {
-            waiter.resume()
-        }
-        waiters.removeAll()
-    }
+private final class SnapshotRecorder {
+    var values = [IOSSourceEditorSnapshot]()
+    var observation: (any IOSObservation)?
 }

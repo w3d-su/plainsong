@@ -30,9 +30,6 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
     public var onHighlightApplied: ((Int) -> Void)?
 
     let scheduler: IOSHighlightScheduler
-    var statisticsTask: Task<Void, Never>?
-    var statisticsDebounce: @Sendable () async throws -> Void = { try await Task.sleep(for: .milliseconds(300)) }
-    var countStatistics: @Sendable (String) async -> TextStatistics? = { TextStatistics.countUnlessCancelled($0) }
     let syntaxTokenizer: (any MarkdownSyntaxTokenizing)?
     var installation: IOSSourceEditorDocumentBinding?
     var observations: [IOSSourceEditorObservation] = []
@@ -44,6 +41,7 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
     var isAdjustingSelection = false
     var isHostAlive = true
     var hadMarkedText = false
+    var hasUncountedComposition = false
     var presentationGeneration: UInt64 = 0
     var presentationFloor: UInt64 = 0
     var lastSelectionViewport = NSRange(location: NSNotFound, length: 0)
@@ -94,10 +92,6 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
         textView.isTextKit2
     }
 
-    deinit {
-        statisticsTask?.cancel()
-    }
-
     public func captureSnapshot() -> IOSSourceEditorSnapshot? {
         guard isHostAlive, textView.isTextKit2, let installation else { return nil }
         return IOSSourceEditorSnapshot(
@@ -123,9 +117,6 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
         installation = binding
         isCommandFocused = false
         installInitialText(binding.session.text)
-        if binding.session.needsStatisticsRefresh {
-            scheduleStatisticsRefresh(for: binding)
-        }
         selectionGeneration = 1
         lastSelection = textView.selectedRange
         emitSnapshot()

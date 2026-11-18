@@ -4,7 +4,7 @@ import UIKit
 extension IOSSourceEditorController {
     func invalidateHost() {
         isHostAlive = false
-        cancelStatisticsRefresh()
+        countStatisticsAfterComposition()
         scheduler.cancel()
         presentationGeneration &+= 1
         presentationFloor = presentationGeneration
@@ -13,7 +13,7 @@ extension IOSSourceEditorController {
     }
 
     func fenceInstallation() {
-        cancelStatisticsRefresh()
+        countStatisticsAfterComposition()
         scheduler.cancel()
         scheduler.activate()
         presentationGeneration &+= 1
@@ -70,7 +70,6 @@ extension IOSSourceEditorController {
         // Groups created before this replacement address the buffer that no longer exists.
         // Hiding the view does not come through this path, so that undo stack stays.
         textView.undoManager?.removeAllActions()
-        cancelStatisticsRefresh()
         installation.session.replaceTextFromAuthorizedEditor(proposal.text, refreshStatistics: false)
         installation.session.applyStatistics(proposal.statistics)
         isAdjustingSelection = true

@@ -46,6 +46,27 @@ final class TextStatisticsTests: XCTestCase {
         }
     }
 
+    func testBridgedSourceIsCountedFromAnExactNativeCopy() {
+        let text = String(repeating: "## 草稿\n\n繁體中文 Unicode 123 👩🏽‍💻\r\n", count: 64)
+        // An edited text storage string is foreign to Swift, as on the iOS editor.
+        let storage = NSTextStorage(string: String(text.dropFirst()))
+        storage.replaceCharacters(in: NSRange(location: 0, length: 0), with: String(text.prefix(1)))
+        let bridged = storage.string
+        XCTAssertNil(ExactSourceText.nativeUTF8Matches(bridged, text))
+
+        let native = TextStatistics.nativeSource(bridged)
+
+        XCTAssertEqual(ExactSourceText.nativeUTF8Matches(native, text), true)
+        XCTAssertEqual(TextStatistics.countUnlessCancelled(bridged), TextStatistics(text: text))
+    }
+
+    func testUnpairedSurrogateIsCountedWithoutANativeCopy() {
+        let lone = NSString(characters: [0x4E2D, 0xD800, 0x0061], length: 3) as String
+
+        XCTAssertNil(ExactSourceText.nativeUTF8Matches(TextStatistics.nativeSource(lone), lone))
+        XCTAssertEqual(TextStatistics.countUnlessCancelled(lone), TextStatistics(text: lone))
+    }
+
     func testStatisticsAreEquatableAndSendable() {
         let statistics = TextStatistics(text: "same text")
 

@@ -111,21 +111,11 @@ final class DocumentSessionTests: XCTestCase {
 
         session.replaceText("Initial text with more words", refreshStatistics: false)
 
-        XCTAssertTrue(session.needsStatisticsRefresh)
         XCTAssertEqual(session.statistics, TextStatistics(text: "Initial text"))
 
         session.refreshStatistics()
 
-        XCTAssertFalse(session.needsStatisticsRefresh)
         XCTAssertEqual(session.statistics, TextStatistics(text: "Initial text with more words"))
-    }
-
-    func testDeferredEditWithUnchangedCountsCanFinish() {
-        let session = DocumentSession(text: "one")
-        session.replaceText("two", refreshStatistics: false)
-        XCTAssertTrue(session.needsStatisticsRefresh)
-        session.applyStatistics(TextStatistics(text: "two"))
-        XCTAssertFalse(session.needsStatisticsRefresh)
     }
 
     func testReplacingTextBackToSavedBaselineClearsDirty() {
