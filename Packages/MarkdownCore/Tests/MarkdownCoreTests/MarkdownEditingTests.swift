@@ -340,6 +340,25 @@ final class MarkdownEditingTests: XCTestCase {
             to: "Title<caret>"
         )
 
+        // A selection over the removed prefix shrinks with it and stays inside the text.
+        assertEdit(
+            .format(.paragraph),
+            from: "[[### Title]]",
+            to: "[[Title]]"
+        )
+
+        assertEdit(
+            .format(.heading(level: 3)),
+            from: "old\n[[### Title]]",
+            to: "old\n[[Title]]"
+        )
+
+        assertEdit(
+            .format(.heading(level: 1)),
+            from: "#<caret>## Title",
+            to: "# <caret>Title"
+        )
+
         assertEdit(
             .format(.quote),
             from: "Quote me<caret>",
