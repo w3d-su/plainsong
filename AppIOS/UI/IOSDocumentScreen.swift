@@ -74,7 +74,10 @@ struct IOSDocumentScreen: View {
             IOSEditorPreviewContainer(
                 layout: scene.layout,
                 editorView: scene.editorHostView,
-                previewView: scene.previewHostView
+                previewView: scene.previewHostView,
+                prepareEditorView: { [scene, router] editorView in
+                    IOSKeyboardAccessoryInputView.install(on: editorView, scene: scene, router: router)
+                }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onAppear {

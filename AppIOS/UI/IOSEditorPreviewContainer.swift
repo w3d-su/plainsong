@@ -115,15 +115,19 @@ struct IOSEditorPreviewContainer: UIViewRepresentable {
     let layout: IOSContentLayout
     let editorView: UIView?
     let previewView: UIView?
+    /// Runs before the editor view is attached, on every update; must be idempotent.
+    var prepareEditorView: ((UIView?) -> Void)?
 
     func makeUIView(context _: Context) -> IOSDualPaneContainerView {
         let container = IOSDualPaneContainerView()
+        prepareEditorView?(editorView)
         container.setPanes(editor: editorView, preview: previewView)
         container.apply(mode: layout.containerMode)
         return container
     }
 
     func updateUIView(_ container: IOSDualPaneContainerView, context _: Context) {
+        prepareEditorView?(editorView)
         container.setPanes(editor: editorView, preview: previewView)
         container.apply(mode: layout.containerMode)
     }

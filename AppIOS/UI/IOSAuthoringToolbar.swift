@@ -44,64 +44,15 @@ struct AuthoringShortcutModifier: ViewModifier {
     }
 }
 
-/// Toolbar content driven by 08's `IOSAuthoringAction` descriptors. The shell
-/// installs buttons and their declared shortcuts; every tap routes through the
-/// scene-scoped `IOSShellActionRouter`. Items that don't fit in the primary
-/// row collapse into an accessible "Format" overflow menu rather than
-/// shrinking below 44 pt targets.
+/// Navigation-bar toolbar content. It also installs the shortcuts declared by
+/// 08's `IOSAuthoringAction` descriptors; every tap routes through the
+/// scene-scoped `IOSShellActionRouter`. The authoring buttons themselves are
+/// in `IOSKeyboardAccessoryBar`.
 struct IOSAuthoringToolbarItems: ToolbarContent {
     let scene: IOSShellSceneState
     let router: IOSShellActionRouter
 
     var body: some ToolbarContent {
-        // iPhone/iPad keyboard accessory: undo/redo, frequent actions, Format
-        // overflow, find. Presented above the hardware or software keyboard.
-        ToolbarItemGroup(placement: .keyboard) {
-            Button {
-                _ = router.undo()
-            } label: {
-                Label("Undo", systemImage: "arrow.uturn backward")
-            }
-            .disabled(!scene.chrome.editorFocused || !scene.chrome.editorCanWrite)
-            .keyboardShortcut("z", modifiers: .command)
-            .accessibilityIdentifier("plainsong.ios.toolbar.undo")
-
-            Button {
-                _ = router.redo()
-            } label: {
-                Label("Redo", systemImage: "arrow.uturn.forward")
-            }
-            .disabled(!scene.chrome.editorFocused || !scene.chrome.editorCanWrite)
-            .keyboardShortcut("z", modifiers: [.command, .shift])
-            .accessibilityIdentifier("plainsong.ios.toolbar.redo")
-
-            ForEach(primaryActions, id: \.id) { action in
-                authoringButton(action)
-            }
-
-            ForEach(toolbarGroups) { group in
-                Menu {
-                    ForEach(group.actions, id: \.id) { action in
-                        overflowButton(action)
-                    }
-                } label: {
-                    Label(group.name, systemImage: groupSymbol(group.name))
-                }
-                .accessibilityLabel(group.name)
-            }
-
-            if !overflowActions.isEmpty {
-                Menu {
-                    ForEach(overflowActions, id: \.id) { action in
-                        overflowButton(action)
-                    }
-                } label: {
-                    Label("Format", systemImage: "textformat")
-                }
-                .accessibilityIdentifier("plainsong.ios.toolbar.formatMenu")
-            }
-        }
-
         // Top-right: save, find, frontmatter inspector, image insertion.
         ToolbarItemGroup(placement: .topBarTrailing) {
             Button {
@@ -156,65 +107,18 @@ struct IOSAuthoringToolbarItems: ToolbarContent {
         }
     }
 
-    private struct ToolbarGroup: Identifiable {
-        let name: String
-        let actions: [IOSAuthoringAction]
-        var id: String {
-            name
-        }
-    }
-
-    /// Frequent commands stay as 44 pt icon buttons. Heading and code commands
-    /// stay in menus so the keyboard accessory does not overflow on iPhone.
-    private var primaryActions: [IOSAuthoringAction] {
-        router.actions.filter { action in
-            if case .toolbar = action.placement {
-                return true
-            }
-            return false
-        }
-    }
-
-    private var toolbarGroups: [ToolbarGroup] {
-        var order: [String] = []
-        var grouped: [String: [IOSAuthoringAction]] = [:]
-        for action in router.actions {
-            guard case let .toolbarGroup(name) = action.placement else { continue }
-            if grouped[name] == nil {
-                order.append(name)
-            }
-            grouped[name, default: []].append(action)
-        }
-        return order.map { ToolbarGroup(name: $0, actions: grouped[$0] ?? []) }
-    }
-
-    private func groupSymbol(_ name: String) -> String {
-        switch name {
-        case "Heading": "textformat.size"
-        case "Code": "chevron.left.forwardslash.chevron.right"
-        default: "textformat"
-        }
-    }
-
-    private var overflowActions: [IOSAuthoringAction] {
-        router.actions.filter { $0.placement == .formatMenu }
-    }
-
-    /// Menus are not a reliable key-command source, and Find Next / Find
-    /// Previous / Use Selection have no always-visible control. Mount the same
-    /// installer so those shortcuts exist while the toolbar is on screen.
-    /// Cmd-F stays on the visible Find button. Primary buttons install their
-    /// own shortcuts and are not repeated here.
+    /// The keyboard accessory is a UIKit input accessory view and menus are not a
+    /// reliable key-command source, so every authoring shortcut except Cmd-F
+    /// (on the visible Find button) is mounted once here, on a hidden host that
+    /// stays on screen with the navigation bar.
     private var unplacedShortcutActions: [IOSAuthoringAction] {
         router.actions.filter { action in
             guard action.keyEquivalent != nil else { return false }
             switch action.placement {
-            case .formatMenu, .toolbarGroup:
+            case .formatMenu, .toolbarGroup, .toolbar:
                 return true
             case .find:
                 return action.id != .find
-            case .toolbar:
-                return false
             }
         }
     }
@@ -245,39 +149,8 @@ struct IOSAuthoringToolbarItems: ToolbarContent {
         return AnyView(button.keyboardShortcut("f", modifiers: .command))
     }
 
-    private func authoringButton(_ action: IOSAuthoringAction) -> some View {
-        Button {
-            _ = router.perform(action.id)
-        } label: {
-            Label(action.title, systemImage: symbol(for: action.id))
-                .labelStyle(.iconOnly)
-        }
-        .disabled(!router.isEnabled(action.id))
-        .accessibilityLabel(action.accessibilityLabel)
-        .modifier(AuthoringShortcutModifier(action: action))
-    }
-
-    private func symbol(for id: IOSAuthoringActionID) -> String {
-        switch id {
-        case .bold: "bold"
-        case .italic: "italic"
-        case .link: "link"
-        default: "textformat"
-        }
-    }
-
-    private func overflowButton(_ action: IOSAuthoringAction) -> some View {
-        Button(action.title) {
-            _ = router.perform(action.id)
-        }
-        .disabled(!router.isEnabled(action.id))
-        .accessibilityLabel(action.accessibilityLabel)
-    }
-
-    /// Menu rows are not a reliable key-command source, so format and find
-    /// commands are also mounted here with the same installer. The host is
-    /// hidden; the menu row remains the visible control. Primary shortcuts
-    /// stay on their buttons and are not repeated here.
+    /// The host is hidden; the accessory button or menu row remains the visible
+    /// control.
     private func shortcutHost(_ action: IOSAuthoringAction) -> some View {
         Button(action.title) {
             _ = router.perform(action.id)
