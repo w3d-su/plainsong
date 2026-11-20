@@ -177,7 +177,9 @@ static unsigned serialize(Scanner *scanner, char *buffer) {
     int16_t *typ_itr = scanner->ind_typ_stk.contents + 1;
     int16_t *typ_end = scanner->ind_typ_stk.contents + scanner->ind_typ_stk.size;
     int16_t *len_itr = scanner->ind_len_stk.contents + 1;
-    for (; typ_itr != typ_end && size < TREE_SITTER_SERIALIZATION_BUFFER_SIZE; ++typ_itr, ++len_itr) {
+    // Plainsong: each entry writes two int16_t; stop before one would pass the buffer end.
+    for (; typ_itr != typ_end && size + 2 * sizeof(int16_t) <= TREE_SITTER_SERIALIZATION_BUFFER_SIZE;
+         ++typ_itr, ++len_itr) {
         *(int16_t *)&buffer[size] = *typ_itr;
         size += sizeof(int16_t);
         *(int16_t *)&buffer[size] = *len_itr;
@@ -196,7 +198,8 @@ static void deserialize(Scanner *scanner, const char *buffer, unsigned length) {
     array_push(&scanner->ind_typ_stk, IND_ROT);
     array_delete(&scanner->ind_len_stk);
     array_push(&scanner->ind_len_stk, -1);
-    if (length > 0) {
+    // Plainsong: a state shorter than the fixed header is not read.
+    if (length >= 5 * sizeof(int16_t)) {
         size_t size = 0;
         scanner->row = *(int16_t *)&buffer[size];
         size += sizeof(int16_t);
@@ -208,7 +211,7 @@ static void deserialize(Scanner *scanner, const char *buffer, unsigned length) {
         size += sizeof(int16_t);
         scanner->blk_imp_tab = *(int16_t *)&buffer[size];
         size += sizeof(int16_t);
-        while (size < length) {
+        while (size + 2 * sizeof(int16_t) <= length) {
             array_push(&scanner->ind_typ_stk, *(int16_t *)&buffer[size]);
             size += sizeof(int16_t);
             array_push(&scanner->ind_len_stk, *(int16_t *)&buffer[size]);

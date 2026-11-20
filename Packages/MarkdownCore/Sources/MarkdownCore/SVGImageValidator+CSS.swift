@@ -7,7 +7,7 @@ extension SVGImageValidator {
 
     static func cssContainsDisallowedReference(_ css: String) -> Bool {
         // Decode escapes first: `u\72l(` and `@\69mport` are `url(` and `@import` to CSS.
-        let text = decodingCSSEscapes(css).lowercased()
+        let text = decodingCSSEscapes(normalizingCSSNewlines(css)).lowercased()
         if disallowedCSSTokens.contains(where: { text.contains($0) }) {
             return true
         }
@@ -22,6 +22,23 @@ extension SVGImageValidator {
             remainder = remainder[remainder.index(after: close)...]
         }
         return false
+    }
+
+    /// CSS Syntax §3.3: CRLF, CR and FF are one LF before tokenizing, so `\75` + CRLF
+    /// + `rl(` is `url(` to CSS.
+    static func normalizingCSSNewlines(_ css: String) -> String {
+        guard css.unicodeScalars.contains(where: { $0 == "\r" || $0 == "\u{0C}" }) else { return css }
+        var output = String.UnicodeScalarView()
+        var previousWasCarriageReturn = false
+        for scalar in css.unicodeScalars {
+            defer { previousWasCarriageReturn = scalar == "\r" }
+            switch scalar {
+            case "\r", "\u{0C}": output.append("\n")
+            case "\n" where previousWasCarriageReturn: continue
+            default: output.append(scalar)
+            }
+        }
+        return String(output)
     }
 
     /// CSS Syntax §4.3.7: `\` + 1–6 hex digits (+ one optional whitespace), or `\` + any

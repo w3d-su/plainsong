@@ -60,7 +60,7 @@ struct IOSAuthoringToolbarItems: ToolbarContent {
             Button {
                 _ = router.undo()
             } label: {
-                Label("Undo", systemImage: "arrow.uturn backward")
+                Label("Undo", systemImage: "arrow.uturn.backward")
             }
             .disabled(!scene.chrome.editorFocused || !scene.chrome.editorCanWrite)
             .keyboardShortcut("z", modifiers: .command)
