@@ -261,9 +261,16 @@ final class IOSProductionRuntime: ObservableObject {
         isSceneActive = active
         if active {
             defer { inactiveFocus = nil }
-            guard let focus = inactiveFocus,
-                  let current = editor.captureSnapshot(),
-                  current.revision.documentID == focus.identity,
+            guard let current = editor.captureSnapshot() else { return }
+            guard let focus = inactiveFocus else {
+                // A document bound while the scene was inactive (opened from Files
+                // at launch) was never queued by `noteNewBinding`.
+                if observedBindingID == current.bindingID, canClaimFocusOnActivation {
+                    noteNewBinding(current)
+                }
+                return
+            }
+            guard current.revision.documentID == focus.identity,
                   current.bindingID == focus.bindingID
             else { return }
             _ = controller.setCommandFocus(true, expected: focus.identity, bindingID: focus.bindingID)
@@ -276,6 +283,13 @@ final class IOSProductionRuntime: ObservableObject {
             focusTask = nil
             scene.releaseCommandFocus()
         }
+    }
+
+    /// A read-only modal or sheet released the route on purpose; activation must
+    /// not take it back.
+    private var canClaimFocusOnActivation: Bool {
+        scene.presentation == nil && !recentPresentation.isActive && recovery?.isPresented != true &&
+            conflictCopy?.draft?.id == nil
     }
 
     private func noteNewBinding(_ snapshot: IOSSourceEditorSnapshot) {

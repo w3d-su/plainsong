@@ -35,6 +35,11 @@ struct IOSDocumentScreen: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .background {
+            if scene.chrome.hasDocument {
+                IOSAuthoringShortcutHosts(scene: scene, router: router)
+            }
+        }
         .toolbar {
             if scene.chrome.hasDocument {
                 ToolbarItem(placement: .principal) {

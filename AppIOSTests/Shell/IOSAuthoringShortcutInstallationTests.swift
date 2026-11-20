@@ -112,6 +112,7 @@ private struct ShortcutToolbarHost: View {
     var body: some View {
         NavigationStack {
             TextField("Editor", text: .constant("hello"))
+                .background(IOSAuthoringShortcutHosts(scene: scene, router: router))
                 .toolbar {
                     IOSAuthoringToolbarItems(scene: scene, router: router)
                 }

@@ -83,10 +83,6 @@ struct IOSAuthoringToolbarItems: ToolbarContent {
 
             workspaceSearchButton
 
-            ForEach(unplacedShortcutActions, id: \.id) { action in
-                shortcutHost(action)
-            }
-
             Button {
                 router.presentFrontmatter()
             } label: {
@@ -103,22 +99,6 @@ struct IOSAuthoringToolbarItems: ToolbarContent {
                 }
                 .disabled(!scene.chrome.hasDocument || !scene.chrome.editorCanWrite)
                 .accessibilityIdentifier("plainsong.ios.toolbar.insertImage")
-            }
-        }
-    }
-
-    /// The keyboard accessory is a UIKit input accessory view and menus are not a
-    /// reliable key-command source, so every authoring shortcut except Cmd-F
-    /// (on the visible Find button) is mounted once here, on a hidden host that
-    /// stays on screen with the navigation bar.
-    private var unplacedShortcutActions: [IOSAuthoringAction] {
-        router.actions.filter { action in
-            guard action.keyEquivalent != nil else { return false }
-            switch action.placement {
-            case .formatMenu, .toolbarGroup, .toolbar:
-                return true
-            case .find:
-                return action.id != .find
             }
         }
     }
@@ -148,19 +128,6 @@ struct IOSAuthoringToolbarItems: ToolbarContent {
         }
         return AnyView(button.keyboardShortcut("f", modifiers: .command))
     }
-
-    /// The host is hidden; the accessory button or menu row remains the visible
-    /// control.
-    private func shortcutHost(_ action: IOSAuthoringAction) -> some View {
-        Button(action.title) {
-            _ = router.perform(action.id)
-        }
-        .disabled(!router.isEnabled(action.id))
-        .accessibilityLabel(action.accessibilityLabel)
-        .modifier(AuthoringShortcutModifier(action: action))
-        .accessibilityHidden(true)
-        .frame(width: 1, height: 1)
-    }
 }
 
 /// Source/preview toggle for single-pane (compact or narrow) layouts.
@@ -180,6 +147,37 @@ struct IOSPaneToggle: View {
             .pickerStyle(.segmented)
             .frame(maxWidth: 220)
             .accessibilityIdentifier("plainsong.ios.paneToggle")
+        }
+    }
+}
+
+/// The keyboard accessory is a UIKit input accessory view and menus are not a
+/// reliable key-command source, so every authoring shortcut except Cmd-F (on
+/// the visible Find button) is installed here. Mounted as a background of the
+/// document column: toolbar items would show up in the navigation overflow.
+struct IOSAuthoringShortcutHosts: View {
+    @ObservedObject var scene: IOSShellSceneState
+    @ObservedObject var router: IOSShellActionRouter
+
+    var body: some View {
+        ZStack {
+            ForEach(shortcutActions, id: \.id) { action in
+                Button(action.title) {
+                    _ = router.perform(action.id)
+                }
+                .disabled(!router.isEnabled(action.id))
+                .modifier(AuthoringShortcutModifier(action: action))
+            }
+        }
+        .frame(width: 0, height: 0)
+        .opacity(0)
+        .accessibilityHidden(true)
+    }
+
+    private var shortcutActions: [IOSAuthoringAction] {
+        router.actions.filter { action in
+            guard action.keyEquivalent != nil else { return false }
+            return action.id != .find
         }
     }
 }
