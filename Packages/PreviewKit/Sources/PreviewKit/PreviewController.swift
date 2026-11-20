@@ -462,7 +462,8 @@ extension PreviewController {
                 PreviewPlatform.openExternalURL(url)
             }
         default:
-            reportRelativeLink(href)
+            // `file:`, `mailto:`, `javascript:`, `data:` and the rest are not relative links.
+            break
         }
     }
 
