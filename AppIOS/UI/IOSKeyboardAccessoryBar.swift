@@ -177,7 +177,8 @@ final class IOSKeyboardAccessoryInputView: UIInputView {
     static func install(on editorView: UIView?, scene: IOSShellSceneState, router: IOSShellActionRouter) {
         guard let textView = editorView as? UITextView else { return }
         if let installed = textView.inputAccessoryView as? IOSKeyboardAccessoryInputView,
-           installed.router === router {
+           installed.router === router
+        {
             return
         }
         textView.inputAccessoryView = IOSKeyboardAccessoryInputView(scene: scene, router: router)
