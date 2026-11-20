@@ -265,17 +265,19 @@ final class IOSProductionRuntime: ObservableObject {
         if active {
             defer { inactiveFocus = nil }
             guard let current = editor.captureSnapshot() else { return }
-            guard let focus = inactiveFocus,
-                  current.revision.documentID == focus.identity,
-                  current.bindingID == focus.bindingID
-            else {
-                // A document bound while the scene was inactive (opened or reopened
-                // from Files) was never queued by `noteNewBinding`.
+            guard let focus = inactiveFocus else {
+                // A document bound while the scene was inactive and unfocused
+                // (opened from Files at launch) was never queued by `noteNewBinding`.
                 if observedBindingID == current.bindingID, canClaimCommandFocus {
                     noteNewBinding(current)
                 }
                 return
             }
+            // Focus held by an older binding is not transferred to its replacement;
+            // the source claims the route when it next begins editing.
+            guard current.revision.documentID == focus.identity,
+                  current.bindingID == focus.bindingID
+            else { return }
             _ = controller.setCommandFocus(true, expected: focus.identity, bindingID: focus.bindingID)
         } else {
             if let current = editor.captureSnapshot(), current.isFocused {
