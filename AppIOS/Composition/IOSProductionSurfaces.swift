@@ -517,8 +517,9 @@ extension IOSProductionRuntime {
         scene.releaseCommandFocus()
         retireAuthoringCapture()
         // The modal does not always take first responder (an iPad sheet with no
-        // text input), which left typing and Cmd-Z reaching the source behind it.
-        // Resigning also makes the next tap in the source claim the route again.
+        // text input). Resigning makes the next tap in the source begin editing,
+        // which claims the route again. It does not isolate a hardware keyboard:
+        // on iPad, keys still reach the source behind the Recents sheet.
         // A composition is left alone: resigning would commit its marked text.
         if editor.textView.isFirstResponder, editor.textView.markedTextRange == nil {
             editor.textView.resignFirstResponder()
