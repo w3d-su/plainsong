@@ -288,18 +288,36 @@ final class MarkdownSTTextView: STTextView {
         snapshot: MarkedTextSnapshot,
         event: NSEvent
     ) -> Int? {
-        if let textAfterDeletingMarkedText = snapshot.fullText.replacing(range: snapshot.range, with: ""),
-           textAfterDeletingMarkedText == currentText
-        {
-            return 0
-        }
+        Self.discardedReplacementLength(
+            currentText: currentText,
+            fullText: snapshot.fullText,
+            markedRange: snapshot.range,
+            strayReplacements: Self.strayReplacementStrings(forReservedMarkedTextKey: event)
+        )
+    }
 
-        for replacement in Self.strayReplacementStrings(forReservedMarkedTextKey: event) {
-            if let textAfterStrayReplacement = snapshot.fullText.replacing(range: snapshot.range, with: replacement),
-               textAfterStrayReplacement == currentText
-            {
-                return replacement.utf16.count
+    /// The length of what replaced the marked text when the input context dropped it, or nil
+    /// when the text changed in any other way. A normal commit differs in length or in the
+    /// replaced units, so those are checked before any copy of the document is built.
+    static func discardedReplacementLength(
+        currentText: String,
+        fullText: String,
+        markedRange: NSRange,
+        strayReplacements: [String]
+    ) -> Int? {
+        let current = currentText as NSString
+        let lengthWithoutMarkedText = (fullText as NSString).length - markedRange.length
+        for replacement in [""] + strayReplacements {
+            let replacementRange = NSRange(location: markedRange.location, length: replacement.utf16.count)
+            guard current.length == lengthWithoutMarkedText + replacementRange.length,
+                  NSMaxRange(replacementRange) <= current.length,
+                  current.substring(with: replacementRange) == replacement,
+                  let expected = fullText.replacing(range: markedRange, with: replacement),
+                  expected == currentText
+            else {
+                continue
             }
+            return replacementRange.length
         }
 
         return nil
