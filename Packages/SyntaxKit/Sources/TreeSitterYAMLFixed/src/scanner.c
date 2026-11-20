@@ -217,7 +217,6 @@ static void deserialize(Scanner *scanner, const char *buffer, unsigned length) {
             array_push(&scanner->ind_len_stk, *(int16_t *)&buffer[size]);
             size += sizeof(int16_t);
         }
-        assert(size == length);
     }
 }
 
