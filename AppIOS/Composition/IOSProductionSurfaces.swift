@@ -59,6 +59,7 @@ final class IOSProductionRuntime: ObservableObject {
     private var hostedSheet: AnyView?
     private var editorObservation: (any IOSObservation)?
     private var observedBindingID: UUID?
+    private var editingObserver: (any NSObjectProtocol)?
     private var isSceneActive = true
     private var inactiveFocus: IOSProductionFocus?
     private var pendingFocus: IOSProductionFocus?
@@ -131,6 +132,7 @@ final class IOSProductionRuntime: ObservableObject {
 
     func startObserving() {
         guard !isShutDown, editorObservation == nil else { return }
+        observeEditingBegan()
         let currentBinding = editor.captureSnapshot()?.bindingID
         if observedBindingID != currentBinding {
             retireAuthoringCapture()
@@ -161,6 +163,7 @@ final class IOSProductionRuntime: ObservableObject {
     }
 
     func stopObserving() {
+        stopObservingEditingBegan()
         exporter.cancel()
         editorObservation?.cancel()
         editorObservation = nil
@@ -262,17 +265,17 @@ final class IOSProductionRuntime: ObservableObject {
         if active {
             defer { inactiveFocus = nil }
             guard let current = editor.captureSnapshot() else { return }
-            guard let focus = inactiveFocus else {
-                // A document bound while the scene was inactive (opened from Files
-                // at launch) was never queued by `noteNewBinding`.
-                if observedBindingID == current.bindingID, canClaimFocusOnActivation {
+            guard let focus = inactiveFocus,
+                  current.revision.documentID == focus.identity,
+                  current.bindingID == focus.bindingID
+            else {
+                // A document bound while the scene was inactive (opened or reopened
+                // from Files) was never queued by `noteNewBinding`.
+                if observedBindingID == current.bindingID, canClaimCommandFocus {
                     noteNewBinding(current)
                 }
                 return
             }
-            guard current.revision.documentID == focus.identity,
-                  current.bindingID == focus.bindingID
-            else { return }
             _ = controller.setCommandFocus(true, expected: focus.identity, bindingID: focus.bindingID)
         } else {
             if let current = editor.captureSnapshot(), current.isFocused {
@@ -285,11 +288,33 @@ final class IOSProductionRuntime: ObservableObject {
         }
     }
 
-    /// A read-only modal or sheet released the route on purpose; activation must
-    /// not take it back.
-    private var canClaimFocusOnActivation: Bool {
+    /// A read-only modal or sheet released the route on purpose; neither
+    /// activation nor the text view may take it back while one is up.
+    private var canClaimCommandFocus: Bool {
         scene.presentation == nil && !recentPresentation.isActive && recovery?.isPresented != true &&
             conflictCopy?.draft?.id == nil
+    }
+
+    /// The route is released for read-only modals and while inactive, and not
+    /// every dismissal path claims it back. The user putting the caret in the
+    /// source is the claim: the keyboard accessory acts on that text view.
+    private func observeEditingBegan() {
+        guard editingObserver == nil else { return }
+        editingObserver = NotificationCenter.default.addObserver(
+            forName: UITextView.textDidBeginEditingNotification, object: editor.textView, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.isSceneActive, self.canClaimCommandFocus else { return }
+                _ = self.scene.claimCommandFocus()
+            }
+        }
+    }
+
+    private func stopObservingEditingBegan() {
+        if let editingObserver {
+            NotificationCenter.default.removeObserver(editingObserver)
+        }
+        editingObserver = nil
     }
 
     private func noteNewBinding(_ snapshot: IOSSourceEditorSnapshot) {
