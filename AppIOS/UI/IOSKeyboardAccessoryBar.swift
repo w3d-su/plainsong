@@ -186,4 +186,16 @@ final class IOSKeyboardAccessoryInputView: UIInputView {
             textView.reloadInputViews()
         }
     }
+
+    /// The hosted bar keeps its scene alive, and the scene retains the text view.
+    /// Removing the bar breaks that cycle when the editor leaves the screen or
+    /// its scene shuts down.
+    static func uninstall(from editorView: UIView?) {
+        guard let textView = editorView as? UITextView,
+              textView.inputAccessoryView is IOSKeyboardAccessoryInputView else { return }
+        textView.inputAccessoryView = nil
+        if textView.isFirstResponder {
+            textView.reloadInputViews()
+        }
+    }
 }

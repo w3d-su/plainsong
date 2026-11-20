@@ -131,6 +131,10 @@ struct IOSEditorPreviewContainer: UIViewRepresentable {
         container.setPanes(editor: editorView, preview: previewView)
         container.apply(mode: layout.containerMode)
     }
+
+    static func dismantleUIView(_ container: IOSDualPaneContainerView, coordinator _: Coordinator) {
+        IOSKeyboardAccessoryInputView.uninstall(from: container.editorView)
+    }
 }
 
 extension IOSContentLayout {

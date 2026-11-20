@@ -207,6 +207,7 @@ final class IOSProductionRuntime: ObservableObject {
         isShuttingDown = false
         if closed {
             isShutDown = true
+            IOSKeyboardAccessoryInputView.uninstall(from: editor.textView)
             stopObserving()
             disconnectObserver?.stop()
             disconnectObserver = nil
