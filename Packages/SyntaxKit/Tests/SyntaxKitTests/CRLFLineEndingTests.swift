@@ -12,7 +12,7 @@ final class CRLFLineEndingTests: XCTestCase {
         parser = try MarkdownSyntaxParser()
     }
 
-    func testFrontmatterKeysAreHighlightedWithCRLF() throws {
+    func testFrontmatterKeysAreHighlightedWithCRLF() {
         let lf = "---\ntitle: Hello\ndraft: true\n---\n\n# Body\n"
         let crlf = lf.replacingOccurrences(of: "\n", with: "\r\n")
 

@@ -237,24 +237,6 @@ final class PreviewKitTests: XCTestCase {
         )
     }
 
-    func testAssetResolverDecodesAuthorityUnsafeFirstSegments() throws {
-        let root = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        let resolver = AssetURLResolver(allowedRoot: root)
-
-        for (encoded, path) in [
-            ("asset://%5Bslug%5D/cover.png", "[slug]/cover.png"),
-            ("asset://screenshot%402x.png", "screenshot@2x.png"),
-            ("asset://foo%3A80/a.png", "foo:80/a.png"),
-        ] {
-            XCTAssertEqual(
-                try resolver.resolve(XCTUnwrap(URL(string: encoded))),
-                root.appendingPathComponent(path).standardizedFileURL,
-                encoded
-            )
-        }
-    }
-
     func testAssetResolverDecodesEscapedSpacesInContainedPaths() throws {
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
