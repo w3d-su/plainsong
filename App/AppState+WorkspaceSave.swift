@@ -250,13 +250,6 @@ extension AppState {
         KeyWindowRouter.shared.forgetNotice(id)
     }
 
-    func cancelForegroundDocumentTasks() {
-        autosaveTask?.cancel()
-        autosaveTask = nil
-        statisticsTask?.cancel()
-        statisticsTask = nil
-    }
-
     func moveCurrentDocumentWorkToBackgroundBeforeSwitch() {
         let previousSession = shownSession
         moveCurrentAutosaveToBackground(for: previousSession)

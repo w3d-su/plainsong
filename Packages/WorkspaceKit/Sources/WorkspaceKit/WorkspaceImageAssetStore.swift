@@ -1,6 +1,7 @@
 import Foundation
 import MarkdownCore
 import UniformTypeIdentifiers
+import WorkspaceCore
 
 public enum WorkspaceImageAssetSource: Equatable, Sendable {
     case data(Data, suggestedFilename: String)
@@ -153,9 +154,9 @@ private extension WorkspaceImageAssetStore {
     }
 
     func containedAssetDirectoryURL(currentDirectoryURL: URL, rootURL: URL) throws -> URL {
-        guard !assetFolderRelativePath.hasPrefix("/"),
+        guard !assetFolderRelativePath.hasLeadingPathSeparator,
               !assetFolderRelativePath
-              .split(separator: "/", omittingEmptySubsequences: false)
+              .splitOnPathSeparator(omittingEmptySubsequences: false)
               .contains("..")
         else {
             throw WorkspaceImageAssetStoreError.assetFolderEscapesWorkspace(assetFolderRelativePath)
@@ -289,7 +290,7 @@ private extension WorkspaceImageAssetStore {
 
     static func containsParentDirectoryComponent(_ path: String) -> Bool {
         path
-            .split(separator: "/", omittingEmptySubsequences: false)
+            .splitOnPathSeparator(omittingEmptySubsequences: false)
             .contains("..")
     }
 }

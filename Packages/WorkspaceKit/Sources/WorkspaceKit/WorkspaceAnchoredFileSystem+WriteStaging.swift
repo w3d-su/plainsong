@@ -184,7 +184,7 @@ extension WorkspaceAnchoredFileSystem {
         guard path.withCString({ Darwin.lstat($0, &status) }) == 0,
               (status.st_mode & S_IFMT) == S_IFDIR,
               WorkspaceFileSystemIdentity(
-                  device: UInt64(status.st_dev),
+                  device: UInt64(UInt32(bitPattern: status.st_dev)),
                   inode: UInt64(status.st_ino)
               ) == identity
         else {

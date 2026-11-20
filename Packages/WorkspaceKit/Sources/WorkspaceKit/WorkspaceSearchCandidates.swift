@@ -1,5 +1,6 @@
 import Foundation
 import MarkdownCore
+import WorkspaceCore
 
 struct WorkspaceSearchCandidatePlan {
     let items: [WorkspaceSearchCandidatePlanItem]
@@ -198,7 +199,7 @@ enum WorkspaceSearchCandidatePlanner {
     }
 
     private static func isAlwaysIgnored(_ relativePath: String) -> Bool {
-        let components = relativePath.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
+        let components = relativePath.splitOnPathSeparator(omittingEmptySubsequences: true).map(String.init)
         return components.contains { component in
             let lowercased = component.lowercased()
             return component.hasPrefix(".")

@@ -177,7 +177,7 @@ struct IOSDocumentStateBanner: View {
                 {
                     bannerButton("Review iCloud Versions") { reviewingVersions = IOSCloudVersionRequest(documentID: id)
                     }
-                    .sheet(item: $reviewingVersions) { request in
+                    .sheet(item: $reviewingVersions, onDismiss: scene.surfaces.cloudVersionsDidDismiss) { request in
                         IOSCloudVersionPicker(documentID: request.documentID, load: load, apply: apply)
                     }
                 }

@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import WorkspaceCore
 
 /// One immutable filesystem namespace authority captured before an operation begins.
 ///
@@ -194,7 +195,7 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
     }
 
     private static func literalPathComponents(_ path: String) -> [Substring] {
-        path.split(separator: "/", omittingEmptySubsequences: true)
+        path.splitOnPathSeparator(omittingEmptySubsequences: true)
     }
 
     /// Resolves one file URL through this retained authority and returns the exact canonical,
@@ -237,7 +238,7 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
             throw WorkspaceAnchoredFileSystemError.notRegularFile
         }
         let openedIdentity = WorkspaceFileSystemIdentity(
-            device: UInt64(status.st_dev),
+            device: UInt64(UInt32(bitPattern: status.st_dev)),
             inode: UInt64(status.st_ino)
         )
         let canonicalFileURL = try Self.descriptorURL(descriptor, isDirectory: false)
@@ -398,7 +399,7 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
                 String(cString: $0)
             }
         }
-        guard path.hasPrefix("/") else {
+        guard path.hasLeadingPathSeparator else {
             throw WorkspaceAnchoredFileSystemError.unreadable
         }
         return WorkspaceLiteralFileURL.fileURL(path: path, isDirectory: isDirectory)

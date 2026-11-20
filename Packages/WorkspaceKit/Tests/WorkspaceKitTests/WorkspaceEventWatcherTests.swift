@@ -231,3 +231,61 @@ final class WorkspaceEventWatcherTests: XCTestCase {
         XCTAssertTrue(showAll.isRelevant(ignoredOnly))
     }
 }
+
+extension WorkspaceEventWatcherTests {
+    /// The stream's context holds the watcher weakly, so dropping the last reference
+    /// without `stop()` while batches are queued neither crashes nor reaches the handler late.
+    func testReleasingARunningWatcherWithQueuedBatchesIsSafe() async throws {
+        for _ in 0 ..< 200 {
+            let root = FileManager.default.temporaryDirectory
+                .appendingPathComponent("WorkspaceEventWatcherTests-\(UUID().uuidString)")
+            var watcher: WorkspaceEventWatcher? = WorkspaceEventWatcher(
+                rootURL: root,
+                debounceNanoseconds: 1_000_000
+            ) {}
+            watcher?.start()
+            for _ in 0 ..< 8 {
+                watcher?.simulateDeliveredEventForTesting()
+            }
+            watcher = nil
+        }
+        try await Task.sleep(nanoseconds: 50_000_000)
+    }
+
+    /// Past the cap each batch runs the handler itself: a zero-length debounce that the next
+    /// batch cancels could otherwise be starved by a writer that never pauses.
+    func testABatchPastTheMaximumDelayRunsTheHandlerInItsOwnTurn() {
+        let calls = LockedCounter()
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("WorkspaceEventWatcherTests-\(UUID().uuidString)")
+        let watcher = WorkspaceEventWatcher(
+            rootURL: root,
+            debounceNanoseconds: 5_000_000_000,
+            maximumDelayNanoseconds: 5_000_000_000
+        ) { calls.increment() }
+        watcher.start()
+        defer { watcher.stop() }
+
+        watcher.simulateDeliveredEventForTesting(pendingSinceNanosecondsAgo: 6_000_000_000)
+        XCTAssertFalse(watcher.isStopped)
+
+        XCTAssertEqual(calls.value, 1)
+    }
+}
+
+private final class LockedCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
+
+    func increment() {
+        lock.lock()
+        count += 1
+        lock.unlock()
+    }
+}

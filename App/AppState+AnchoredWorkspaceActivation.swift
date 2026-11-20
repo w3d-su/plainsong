@@ -126,7 +126,6 @@ extension AppState {
         switch activation.source {
         case .cached:
             if session !== shownSession {
-                cancelForegroundDocumentTasks()
                 setCurrentDocument(session, synchronizingWorkspaceTree: false)
             }
             guard reconcileObservedRetainedFileVersion(

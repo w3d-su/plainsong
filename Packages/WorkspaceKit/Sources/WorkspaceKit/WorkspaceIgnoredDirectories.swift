@@ -1,4 +1,5 @@
 import Foundation
+import WorkspaceCore
 
 /// Generated, vendored and tool directories (`node_modules`, `dist`, `.next`, …) that a blog
 /// workspace never edits. Search always skips paths through them; the Files scan skips them in
@@ -45,7 +46,7 @@ public enum WorkspaceScanPruning: Sendable, Equatable {
     }
 
     private static func hasIgnoredAncestor(_ relativePath: String) -> Bool {
-        relativePath.split(separator: "/").dropLast().contains {
+        relativePath.splitOnPathSeparator().dropLast().contains {
             WorkspaceIgnoredDirectories.contains(String($0))
         }
     }

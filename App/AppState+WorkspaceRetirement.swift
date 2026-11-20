@@ -352,8 +352,7 @@ private extension AppState {
             autosaveTask?.cancel()
             autosaveTask = nil
         }
-        statisticsTask?.cancel()
-        statisticsTask = nil
+        cancelStatisticsRefresh(for: shownSession)
     }
 
     func resetWindowPromptsAfterClosure() {

@@ -110,6 +110,8 @@ struct IOSShellFeatureSurfaces {
     var reviewCloudVersions: ((IOSDocumentIdentity) async throws -> IOSCloudVersionReview)?
     var applyCloudVersion: ((UUID, IOSCloudVersionReview) async throws -> Void)?
     var resolveConflictCopy: (() -> Void)?
+    /// The versions sheet released the command route; its dismissal gives it back.
+    var cloudVersionsDidDismiss: (() -> Void)?
 
     /// Workspace refresh requires the live grant; composition routes it (W15).
     var refreshWorkspace: (() -> Void)?

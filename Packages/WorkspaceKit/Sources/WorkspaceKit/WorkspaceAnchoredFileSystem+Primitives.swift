@@ -1,6 +1,7 @@
 import CryptoKit
 import Darwin
 import Foundation
+import WorkspaceCore
 
 extension WorkspaceAnchoredFileSystem {
     struct DirectoryEntryIdentity: Equatable {
@@ -195,7 +196,7 @@ extension WorkspaceAnchoredFileSystem {
         hooks.emit(.rootAnchored)
 
         let components = location.relativePath
-            .split(separator: "/", omittingEmptySubsequences: true)
+            .splitOnPathSeparator(omittingEmptySubsequences: true)
             .map(String.init)
         guard let leaf = components.last else {
             throw WorkspaceAnchoredFileSystemError.missing
@@ -226,7 +227,7 @@ extension WorkspaceAnchoredFileSystem {
             throw WorkspaceAnchoredFileSystemError.notRegularFile
         }
         return WorkspaceFileSystemIdentity(
-            device: UInt64(status.st_dev),
+            device: UInt64(UInt32(bitPattern: status.st_dev)),
             inode: UInt64(status.st_ino)
         )
     }
@@ -257,6 +258,7 @@ extension WorkspaceAnchoredFileSystem {
         parentDescriptor: Int32,
         component: String
     ) throws -> DirectoryEntryIdentity {
+        try requireSingleComponent(component)
         var status = stat()
         let result = component.withCString {
             Darwin.fstatat(parentDescriptor, $0, &status, AT_SYMLINK_NOFOLLOW)
@@ -268,7 +270,7 @@ extension WorkspaceAnchoredFileSystem {
         }
         return DirectoryEntryIdentity(
             identity: WorkspaceFileSystemIdentity(
-                device: UInt64(status.st_dev),
+                device: UInt64(UInt32(bitPattern: status.st_dev)),
                 inode: UInt64(status.st_ino)
             ),
             fileType: status.st_mode & S_IFMT
@@ -313,7 +315,16 @@ extension WorkspaceAnchoredFileSystem {
         }
     }
 
+    /// `openat` and `fstatat` resolve every `0x2F` byte in the name, and a leading one discards
+    /// the parent descriptor. A name that is not one component would leave the anchored walk.
+    static func requireSingleComponent(_ component: String) throws {
+        guard !component.isEmpty, !component.containsPathSeparator, !component.utf8.contains(0) else {
+            throw WorkspaceAnchoredFileSystemError.namespaceChanged
+        }
+    }
+
     static func openDirectory(parentDescriptor: Int32, component: String) throws -> Int32 {
+        try requireSingleComponent(component)
         let descriptor = component.withCString {
             Darwin.openat(
                 parentDescriptor,
@@ -328,6 +339,7 @@ extension WorkspaceAnchoredFileSystem {
     }
 
     static func openFile(parentDescriptor: Int32, leaf: String, flags: Int32) throws -> Int32 {
+        try requireSingleComponent(leaf)
         let descriptor = leaf.withCString { Darwin.openat(parentDescriptor, $0, flags) }
         guard descriptor >= 0 else {
             throw errorForFailedOpen(parentDescriptor: parentDescriptor, component: leaf)
