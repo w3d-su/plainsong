@@ -17,8 +17,8 @@ function fakeMermaid() {
   };
 }
 
-const light = { startOnLoad: false, securityLevel: "strict", theme: "default" } as const;
-const dark = { startOnLoad: false, securityLevel: "strict", theme: "dark" } as const;
+const light = { startOnLoad: false, securityLevel: "strict", suppressErrorRendering: true, theme: "default" } as const;
+const dark = { startOnLoad: false, securityLevel: "strict", suppressErrorRendering: true, theme: "dark" } as const;
 
 function mermaidScripts(): HTMLScriptElement[] {
   return Array.from(

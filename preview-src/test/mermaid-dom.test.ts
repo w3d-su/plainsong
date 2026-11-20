@@ -147,6 +147,7 @@ describe("Mermaid preview DOM patching", () => {
         {
           startOnLoad: false,
           securityLevel: "strict",
+          suppressErrorRendering: true,
           theme: "default",
         },
       ],
@@ -154,6 +155,7 @@ describe("Mermaid preview DOM patching", () => {
         {
           startOnLoad: false,
           securityLevel: "strict",
+          suppressErrorRendering: true,
           theme: "dark",
         },
       ],

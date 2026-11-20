@@ -3,6 +3,7 @@ export const MERMAID_RENDER_CACHE_CAPACITY = 64;
 export interface MermaidInitialization {
   startOnLoad: false;
   securityLevel: "strict";
+  suppressErrorRendering: true;
   theme: "dark" | "default";
 }
 
@@ -115,6 +116,8 @@ export class MermaidRenderCoordinator {
     this.initializeFunction({
       startOnLoad: false,
       securityLevel: "strict",
+      // A failed render otherwise leaves its error diagram in document.body.
+      suppressErrorRendering: true,
       theme: theme === "dark" ? "dark" : "default",
     });
     this.theme = theme;
