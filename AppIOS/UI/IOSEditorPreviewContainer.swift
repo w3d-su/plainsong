@@ -133,7 +133,10 @@ struct IOSEditorPreviewContainer: UIViewRepresentable {
     }
 
     static func dismantleUIView(_ container: IOSDualPaneContainerView, coordinator _: Coordinator) {
-        IOSKeyboardAccessoryInputView.uninstall(from: container.editorView)
+        // A replacement container may already host the shared text view and its bar.
+        guard let editorView = container.editorView,
+              editorView.superview == nil || editorView.superview === container else { return }
+        IOSKeyboardAccessoryInputView.uninstall(from: editorView)
     }
 }
 

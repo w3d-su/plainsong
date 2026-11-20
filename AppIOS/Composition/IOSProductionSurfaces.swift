@@ -516,6 +516,13 @@ extension IOSProductionRuntime {
         focusTask = nil
         scene.releaseCommandFocus()
         retireAuthoringCapture()
+        // The modal does not always take first responder (an iPad sheet with no
+        // text input), which left typing and Cmd-Z reaching the source behind it.
+        // Resigning also makes the next tap in the source claim the route again.
+        // A composition is left alone: resigning would commit its marked text.
+        if editor.textView.isFirstResponder, editor.textView.markedTextRange == nil {
+            editor.textView.resignFirstResponder()
+        }
     }
 
     func requestConflictCopy() {
