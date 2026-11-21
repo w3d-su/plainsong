@@ -60,15 +60,15 @@ public final class MarkdownSyntaxParser {
         fileKind: FileKind,
         expandedVisibleRange range: NSRange
     ) -> [MarkdownSyntaxToken] {
-        guard let fragment = source.fragment(in: range) else {
+        guard let fragment = MarkdownParseFragment(source: source, range: range) else {
             return []
         }
 
-        return tokens(in: fragment, fileKind: fileKind, parsesInlineMarkup: true)
+        return tokens(in: fragment.text, fileKind: fileKind, parsesInlineMarkup: true)
             .map { token in
                 MarkdownSyntaxToken(
                     kind: token.kind,
-                    range: NSRange(location: token.range.location + range.location, length: token.range.length)
+                    range: NSRange(location: token.range.location + fragment.base, length: token.range.length)
                 )
             }
     }
@@ -448,14 +448,5 @@ extension MarkdownSyntaxParser {
         let location = Int(bytes.lowerBound / 2) + offset
         let length = Int((bytes.upperBound - bytes.lowerBound) / 2)
         return NSRange(location: location, length: length)
-    }
-}
-
-private extension String {
-    func fragment(in range: NSRange) -> String? {
-        guard let stringRange = Range(range, in: self) else {
-            return nil
-        }
-        return String(self[stringRange])
     }
 }

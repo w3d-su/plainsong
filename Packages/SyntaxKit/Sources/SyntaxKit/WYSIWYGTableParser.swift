@@ -73,16 +73,25 @@ public extension MarkdownSyntaxParser {
 
 extension MarkdownSyntaxParser {
     /// Collects every `pipe_table` under `node` as a region in document coordinates.
+    /// `fragmentBase` is the document offset of the fragment's first unit, when that is
+    /// not the start of `parseRange`.
     func appendTableRegions(
         from node: Node,
         fragment: NSString,
         parseRange: WYSIWYGTableParseRange,
+        fragmentBase: Int? = nil,
         isNested: Bool = false,
         to regions: inout [WYSIWYGTableRegion]
     ) {
         switch node.nodeType {
         case "pipe_table":
-            regions.append(tableRegion(from: node, fragment: fragment, parseRange: parseRange, isNested: isNested))
+            regions.append(tableRegion(
+                from: node,
+                fragment: fragment,
+                parseRange: parseRange,
+                base: fragmentBase ?? parseRange.range.location,
+                isNested: isNested
+            ))
             return
         case "paragraph", "inline", "fenced_code_block", "indented_code_block", "minus_metadata", "plus_metadata",
              "html_block":
@@ -97,6 +106,7 @@ extension MarkdownSyntaxParser {
                 from: child,
                 fragment: fragment,
                 parseRange: parseRange,
+                fragmentBase: fragmentBase,
                 isNested: childIsNested,
                 to: &regions
             )
@@ -107,9 +117,9 @@ extension MarkdownSyntaxParser {
         from table: Node,
         fragment: NSString,
         parseRange: WYSIWYGTableParseRange,
+        base: Int,
         isNested: Bool
     ) -> WYSIWYGTableRegion {
-        let base = parseRange.range.location
         let lines = MarkdownTableLineScanner(text: fragment)
         var rows: [MarkdownTableRowStructure?] = []
         var pipeOffsets: [[Int]] = []

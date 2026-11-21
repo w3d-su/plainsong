@@ -11,3 +11,26 @@ extension NSRange {
         return NSRange(location: clampedLocation, length: clampedEnd - clampedLocation)
     }
 }
+
+/// The slice of a document that one visible-range parse reads.
+struct MarkdownParseFragment {
+    let text: String
+    /// Added to a fragment offset to get the document offset.
+    let base: Int
+
+    /// A slice that starts after the first character cannot hold frontmatter, but
+    /// tree-sitter-markdown reads a leading `---` or `+++` line as its opening fence.
+    /// A blank line in front keeps that line a thematic break.
+    init?(source: String, range: NSRange) {
+        guard let stringRange = Range(range, in: source) else {
+            return nil
+        }
+        if range.location > 0 {
+            text = "\n" + source[stringRange]
+            base = range.location - 1
+        } else {
+            text = String(source[stringRange])
+            base = range.location
+        }
+    }
+}
