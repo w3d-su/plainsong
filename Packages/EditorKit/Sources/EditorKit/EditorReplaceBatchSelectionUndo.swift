@@ -14,8 +14,10 @@ final class EditorReplaceBatchSelectionUndo {
     }
 
     func register(priorSelection: NSRange, postSelection: NSRange) {
-        textView?.undoManager?.registerUndo(withTarget: self) { [self] _ in
-            restoreAfterNativeGroup(priorSelection, inverse: postSelection)
+        textView?.undoManager?.registerUndo(withTarget: self) { target in
+            MainActor.assumeIsolated {
+                target.restoreAfterNativeGroup(priorSelection, inverse: postSelection)
+            }
         }
     }
 
@@ -33,8 +35,10 @@ final class EditorReplaceBatchSelectionUndo {
                 view?.textSelection = selection
             }
         }
-        manager.registerUndo(withTarget: self) { [self] _ in
-            restoreAfterNativeGroup(inverse, inverse: selection)
+        manager.registerUndo(withTarget: self) { target in
+            MainActor.assumeIsolated {
+                target.restoreAfterNativeGroup(inverse, inverse: selection)
+            }
         }
     }
 }
