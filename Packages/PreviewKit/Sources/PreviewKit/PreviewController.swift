@@ -326,6 +326,7 @@ public final class PreviewController: NSObject, ObservableObject {
         onCheckboxToggled = nil
         renderCompletionObserver = nil
         iosDocumentIdentity = nil
+        eventHub.invalidate()
         assetSchemeHandler.invalidateReads()
         failPendingExportWork(reason: "invalidated")
     }
