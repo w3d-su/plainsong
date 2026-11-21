@@ -3,15 +3,19 @@ import SwiftUI
 
 /// Quiet bottom bar with document counts; the file type lives in the jump bar.
 struct WorkspaceStatusBar: View {
-    let statistics: TextStatistics
+    let statistics: TextStatistics?
 
     var body: some View {
         HStack(spacing: 6) {
-            Text("\(statistics.lineCount) lines")
-            Text("·").foregroundStyle(.tertiary)
-            Text("\(statistics.wordCount) words")
-            Text("·").foregroundStyle(.tertiary)
-            Text("\(statistics.characterCount) characters")
+            if let statistics {
+                Text("\(statistics.lineCount) lines")
+                Text("·").foregroundStyle(.tertiary)
+                Text("\(statistics.wordCount) words")
+                Text("·").foregroundStyle(.tertiary)
+                Text("\(statistics.characterCount) characters")
+            } else {
+                Text("Counting…")
+            }
             Spacer()
         }
         .font(.caption)
