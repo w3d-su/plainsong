@@ -49,7 +49,13 @@ enum IOSWorkspaceRootAuthority {
             throw IOSWorkspaceFailure.invalidPath
         }
         guard let resolved = realpath(cPath, nil) else {
-            throw IOSWorkspaceFailure.outsideGrant
+            // Only an unresolvable path is a containment failure. A missing or unreadable
+            // item is reported as such, so the caller does not ask for a new grant.
+            switch errno {
+            case ENOENT, ENOTDIR: throw IOSWorkspaceFailure.notFound
+            case EACCES, EPERM: throw IOSWorkspaceFailure.permissionDenied
+            default: throw IOSWorkspaceFailure.outsideGrant
+            }
         }
         defer { free(resolved) }
         return String(cString: resolved)
