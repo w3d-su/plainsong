@@ -364,6 +364,16 @@ final class ScriptedRecovery: IOSRecoveryPersisting, @unchecked Sendable {
         records[recordID] = nil
         stateLock.unlock()
     }
+
+    func discardSuperseded(recordID: UUID, documentID: UUID, newerVersion: Int) async throws {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard let record = records[recordID] else { throw IOSRecoveryDiscardError.missing }
+        guard record.documentID == documentID, record.revisionVersion < newerVersion else {
+            throw IOSRecoveryDiscardError.newerLocalRevision
+        }
+        records[recordID] = nil
+    }
 }
 
 @MainActor
