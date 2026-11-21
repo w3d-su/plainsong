@@ -253,4 +253,27 @@ final class AppViewsReviewFixTests: XCTestCase {
         XCTAssertTrue(owns(nil, sheet), "the key sheet (alert or save panel)")
         XCTAssertTrue(owns(nil, parent), "the window behind its sheet")
     }
+
+    // MARK: - #34 frontmatter dates where midnight does not exist
+
+    func testFrontmatterDateRoundTripsOnDaysWithoutLocalMidnight() throws {
+        let cases = [
+            ("America/Havana", "2025-03-09"),
+            ("America/Santiago", "2024-09-08"),
+            ("Asia/Beirut", "2024-03-31"),
+            ("Asia/Taipei", "2025-01-01"),
+            ("UTC", "2024-02-29"),
+        ]
+        for (identifier, day) in cases {
+            let zone = try XCTUnwrap(TimeZone(identifier: identifier))
+            let date = try XCTUnwrap(
+                FrontmatterDateFormatting.date(from: day, timeZone: zone),
+                "\(day) in \(identifier)"
+            )
+            XCTAssertEqual(FrontmatterDateFormatting.string(from: date, timeZone: zone), day, identifier)
+        }
+        let taipei = try XCTUnwrap(TimeZone(identifier: "Asia/Taipei"))
+        XCTAssertNil(FrontmatterDateFormatting.date(from: "2025-02-30", timeZone: taipei))
+        XCTAssertNil(FrontmatterDateFormatting.date(from: "not a date", timeZone: taipei))
+    }
 }
