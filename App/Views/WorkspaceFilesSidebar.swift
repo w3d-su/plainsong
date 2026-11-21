@@ -63,8 +63,9 @@ struct WorkspaceFilesSidebar: View {
         // so a deferred open still retrying when the navigator unmounts is cancelled.
         .onDisappear { selectionDeferral.cancelPendingOpen() }
         // A file opened from elsewhere (a preview link) is revealed under a collapsed root.
-        .onChange(of: appState.workspaceTree?.selectedNodeID) { _, id in
-            isRootExpanded = isRootExpanded || id != nil
+        // Keyed by path: a save's refresh gives the same file a new row ID.
+        .onChange(of: appState.workspaceTree?.selectedNode?.relativePath) { _, path in
+            isRootExpanded = isRootExpanded || path != nil
         }
     }
 
