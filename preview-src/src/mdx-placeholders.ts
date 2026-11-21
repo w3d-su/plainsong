@@ -31,7 +31,12 @@ const componentPropLimit = 96;
 const componentPropCountLimit = 4;
 const esmPreviewLimit = 120;
 const expressionPreviewLimit = 96;
-const safeClassNameRule: [string, RegExp] = ["className", /^[A-Za-z0-9_-]+$/];
+// Not the classes the preview reads as its own state: an authored `mermaid-pending` holds
+// an export forever, and an authored `mdx-error-banner` is removed by the next render.
+const safeClassNameRule: [string, RegExp] = [
+  "className",
+  /^(?!(?:mermaid-(?:rendered|pending|error)|mdx-error-banner|preview-stale)$)[A-Za-z0-9_-]+$/,
+];
 const unsafePreviewAttributes = new Set(["height", "style", "width"]);
 
 export const mdxSanitizeSchema: SanitizeSchema = {
@@ -40,12 +45,18 @@ export const mdxSanitizeSchema: SanitizeSchema = {
     ...defaultSchema.required,
     input: { type: "checkbox" },
   },
+  protocols: {
+    ...defaultSchema.protocols,
+    // As in Markdown, where the image policy decides which `data:` images load
+    // (`rewriteImageSources` runs before the nodes enter the live document).
+    src: [...(defaultSchema.protocols?.src ?? []), "data"],
+  },
   attributes: {
     ...defaultSchema.attributes,
     "*": [
       ...safeSanitizeAttributes(defaultSchema.attributes?.["*"]),
-      "dataLine",
-      "dataTaskCheckbox",
+      // `data-line` and `data-task-checkbox` are written after sanitizing (rehypeSourceLines),
+      // so an authored one never reaches scroll sync or the checkbox write-back.
       safeClassNameRule,
       "ariaHidden",
     ],
@@ -63,7 +74,6 @@ export const mdxSanitizeSchema: SanitizeSchema = {
       ["type", "checkbox"],
       "checked",
       "disabled",
-      "dataTaskCheckbox",
     ],
     img: [...safeSanitizeAttributes(defaultSchema.attributes?.img), "alt", "title"],
     li: [...safeSanitizeAttributes(defaultSchema.attributes?.li)],
@@ -72,10 +82,6 @@ export const mdxSanitizeSchema: SanitizeSchema = {
       "display",
       "overflow",
       "alttext",
-      "altimg",
-      "altimgWidth",
-      "altimgHeight",
-      "altimgValign",
     ],
     mi: ["mathvariant"],
     mn: [],

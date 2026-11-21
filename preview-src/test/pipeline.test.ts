@@ -63,6 +63,35 @@ describe.each([
 });
 
 describe("mdx preview pipeline", () => {
+  it("drops authored preview-internal attributes and classes but keeps data images", async () => {
+    const html = await renderMdx([
+      "first",
+      "",
+      '<div data-line="1" class="note mermaid-pending mermaid-rendered mdx-error-banner">',
+      '  <input type="checkbox" data-task-checkbox="true" /> <span data-line="1">s</span>',
+      "</div>",
+      "",
+      '<math altimg="https://evil.example/a.png" alttext="x"><mi>x</mi></math>',
+      "",
+      "![a](data:image/png;base64,iVBORw0KGgo=)",
+      "",
+      "- [ ] task",
+      "",
+    ].join("\n"));
+    const root = document.createElement("div");
+    root.innerHTML = html;
+
+    const div = root.querySelector("div")!;
+    expect(div.className).toBe("note");
+    expect(div.dataset.line).toBe("3");
+    expect(div.querySelector("input")!.hasAttribute("data-task-checkbox")).toBe(false);
+    expect(div.querySelector("span")!.hasAttribute("data-line")).toBe(false);
+    expect(root.querySelector("math")!.getAttributeNames()).toEqual(["alttext"]);
+    expect(root.querySelector("img")!.getAttribute("src")).toBe("data:image/png;base64,iVBORw0KGgo=");
+    // The generated task checkbox still carries its marker.
+    expect(root.querySelector("li input")!.getAttribute("data-task-checkbox")).toBe("true");
+  });
+
   it("renders the MDX kitchen sink fixture", async () => {
     await expect(renderMdx(kitchenSinkMdx)).resolves.toMatchSnapshot();
   });
