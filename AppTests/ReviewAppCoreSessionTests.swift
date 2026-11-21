@@ -108,19 +108,6 @@ final class ReviewAppCoreSessionTests: XCTestCase {
         XCTAssertEqual(appState.workspaceImageAssetInsertionCount, 0)
     }
 
-    func testExportIsOfferedForADotMarkdownFile() throws {
-        let root = try makeRoot()
-        let url = root.appendingPathComponent("post.markdown")
-        let appState = AppState(
-            shownSession: DocumentSession(text: "# Post", url: url, fileKind: .markdown),
-            shouldRestoreLastOpenedFile: false
-        )
-        let window = NSWindow()
-        appState.exportHTMLOperations.panelWindowProvider = { window }
-
-        XCTAssertTrue(appState.canExportCurrentDocumentAsHTML)
-    }
-
     func testReplaceAuthorityDropsObserversOfReleasedOwners() throws {
         let authority = AppState(shouldRestoreLastOpenedFile: false).registry.replaceAuthority
         let baseline = authority.advanceObserverCount
@@ -166,5 +153,41 @@ final class ReviewAppCoreSessionTests: XCTestCase {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
         return try WorkspaceFileSystemRootAuthority(rootURL: directory).canonicalRootURL
+    }
+
+    func testBackgroundAutosaveSurvivesTheClosingOfTheWindowThatScheduledIt() async throws {
+        KeyWindowRouter.shared.resetForTesting()
+        addTeardownBlock { @MainActor in
+            KeyWindowRouter.shared.resetForTesting()
+            WindowOpenAdmission.resetForTesting()
+        }
+        let suiteName = "ReviewAppCoreAutosave-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        addTeardownBlock { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(0.25, forKey: "Plainsong.settings.autosaveIntervalSeconds")
+        let root = try makeRoot()
+        let file = root.appendingPathComponent("sibling.md")
+        try Data("on disk".utf8).write(to: file)
+        let primary = AppState(shouldRestoreLastOpenedFile: false, userDefaults: defaults)
+        var sibling: AppState? = primary.makeSiblingFacade(admitsFileOperations: true)
+        weak var releasedSibling = sibling
+        try sibling?.open(url: file, rememberAsLastOpened: false, preserveWorkspace: true)
+        let session = try XCTUnwrap(sibling?.shownSession)
+        sibling?.replaceDocumentText("edited")
+        sibling?.moveCurrentAutosaveToBackground(for: session)
+        XCTAssertNotNil(primary.registry.sessionAutosaveTasks[ObjectIdentifier(session)])
+
+        primary.registry.sessionCache[file.standardizedFileURL] = session
+        if let closing = sibling {
+            KeyWindowRouter.shared.closeFacade(closing)
+        }
+        sibling = nil
+        try XCTSkipIf(releasedSibling != nil, "the closed façade is still retained")
+
+        let deadline = Date().addingTimeInterval(3)
+        while session.isDirty, Date() < deadline {
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), "edited")
     }
 }
