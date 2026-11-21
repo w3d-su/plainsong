@@ -173,14 +173,24 @@ def record_archive(archive, repository, result, start, end):
 
 
 def select_archive(output_root, repository):
-    head = source_snapshot(repository)["source_sha"]
+    """Newest archive whose receipt is a success for the current source, or "".
+
+    A failed attempt or an archive of other inputs can never be repackaged, so
+    it is skipped and the runner builds a new archive. The selected archive is
+    still verified in full: changed bytes behind a matching receipt fail loudly.
+    """
+    current = source_snapshot(repository)
     candidates = []
     for archive in Path(output_root).rglob("*.xcarchive"):
         receipt_path = Path(str(archive) + "-meta") / "archive.json"
-        if not receipt_path.is_file():
+        try:
+            receipt = json.loads(receipt_path.read_text())
+        except (OSError, ValueError):
             continue
-        receipt = json.loads(receipt_path.read_text())
-        if receipt.get("source_sha") == head:
+        if (isinstance(receipt, dict) and type(receipt.get("exit_code")) is int
+                and receipt["exit_code"] == 0
+                and receipt.get("source_sha") == current["source_sha"]
+                and receipt.get("source_fingerprint") == current["source_fingerprint"]):
             candidates.append(archive)
     if not candidates:
         return ""
