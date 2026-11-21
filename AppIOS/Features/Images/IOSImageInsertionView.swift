@@ -3,14 +3,10 @@ import SwiftUI
 
 /// Entry points for one image. Lane 10 places this view; lane 13 supplies the real writer and editor.
 struct IOSImageInsertionView: View {
-    private struct FilesPick: Identifiable {
-        let id: UUID
-    }
-
     @ObservedObject var session: IOSImageInsertionSession
 
     @State private var showPhotos = false
-    @State private var filesPick: FilesPick?
+    @State private var filesPick: UUID?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -37,13 +33,15 @@ struct IOSImageInsertionView: View {
                 showPhotos = false
             }
         }
-        .sheet(item: $filesPick, onDismiss: session.filesPickerPresentationEnded) { request in
-            IOSImageFilePicker { urls in
-                handleFiles(urls, operationID: request.id)
-                if filesPick?.id == request.id {
+        .background {
+            IOSImageFilePicker(operationID: filesPick) { operationID, urls in
+                if filesPick == operationID {
                     filesPick = nil
                 }
+                handleFiles(urls, operationID: operationID)
             }
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
         }
     }
 
@@ -75,6 +73,9 @@ struct IOSImageInsertionView: View {
     }
 
     private var isBusy: Bool {
+        if filesPick != nil {
+            return true
+        }
         if case .importing = session.phase {
             return true
         }
@@ -88,7 +89,7 @@ struct IOSImageInsertionView: View {
 
     private func presentFiles() {
         guard let context = session.preparePicker() else { return }
-        filesPick = FilesPick(id: context.operationID)
+        filesPick = context.operationID
     }
 
     private func chooseFolder() {
