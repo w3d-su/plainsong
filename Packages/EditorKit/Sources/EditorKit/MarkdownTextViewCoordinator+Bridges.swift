@@ -114,6 +114,7 @@ extension MarkdownTextViewCoordinator {
                 in: textView
             )
             visibleRangeChangeHandler?(visibleRange)
+            refreshFindMatchHighlightAfterViewportChange(in: textView)
         }
         // Selection protection can refuse a trim even while the viewport stays fixed.
         // Retry when that input range changes, without republishing visible text or
