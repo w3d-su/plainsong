@@ -257,7 +257,7 @@ export function shouldUpdatePreviewElement(
   }
   return (
     fromElement.textContent !== toElement.textContent ||
-    codeLanguageClass(fromElement) !== codeLanguageClass(toElement)
+    authoredLanguageClass(fromElement) !== codeLanguageClass(toElement)
   );
 }
 
@@ -317,6 +317,12 @@ function shouldPreserveMermaidWrapper(
     fromElement.dataset.mermaidOrdinal === toElement.dataset.mermaidOrdinal &&
     fromElement.dataset.mermaidGeneration === toElement.dataset.mermaidGeneration
   );
+}
+
+/** The language class the rendered source had: highlighting records it before
+ * highlight.js adds the class of the language it detected for a bare fence. */
+function authoredLanguageClass(element: HTMLElement): string {
+  return element.dataset.plainsongLanguage ?? codeLanguageClass(element);
 }
 
 function codeLanguageClass(element: HTMLElement): string {

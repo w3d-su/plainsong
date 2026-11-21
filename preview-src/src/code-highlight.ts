@@ -24,9 +24,12 @@ export function highlightCodeBlocks(root: ParentNode): void {
   for (const code of root.querySelectorAll<HTMLElement>("pre code")) {
     if (code.classList.contains("language-mermaid")) continue;
     if (code.dataset.highlighted) continue;
+    // highlight.js adds the detected `language-*` class to a bare fence. The class the
+    // source had is kept apart so the next render still compares equal (mermaid-renderer.ts).
+    code.dataset.plainsongLanguage = languageClass(code);
 
     if (
-      !hasLanguageClass(code) &&
+      languageClass(code) === "" &&
       (code.textContent?.length ?? 0) > AUTO_DETECT_MAX_LENGTH
     ) {
       // Plain text with the highlighted block styling. The language class stays
@@ -41,32 +44,30 @@ export function highlightCodeBlocks(root: ParentNode): void {
 }
 
 export function registerHighlightLanguages(): void {
+  // Each grammar is registered once, under its own name. `js`, `ts`, `py`, `rs`, `sh`,
+  // `md`, `yml` and `html` are aliases the grammars declare; registering them again as
+  // languages made auto-detection run those grammars twice for every bare fence.
   hljs.registerLanguage("bash", bash);
   hljs.registerLanguage("css", css);
   hljs.registerLanguage("go", go);
-  hljs.registerLanguage("html", xml);
   hljs.registerLanguage("javascript", javascript);
-  hljs.registerLanguage("js", javascript);
   hljs.registerLanguage("json", json);
   hljs.registerLanguage("markdown", markdown);
-  hljs.registerLanguage("md", markdown);
   hljs.registerLanguage("python", python);
-  hljs.registerLanguage("py", python);
   hljs.registerLanguage("rust", rust);
-  hljs.registerLanguage("rs", rust);
-  hljs.registerLanguage("sh", bash);
   hljs.registerLanguage("swift", swift);
   hljs.registerLanguage("typescript", typescript);
-  hljs.registerLanguage("ts", typescript);
   hljs.registerLanguage("xml", xml);
   hljs.registerLanguage("yaml", yaml);
-  hljs.registerLanguage("yml", yaml);
-  hljs.registerLanguage("mermaid", markdown);
+  hljs.registerAliases("mermaid", { languageName: "markdown" });
 }
 
-function hasLanguageClass(code: HTMLElement): boolean {
-  return Array.from(code.classList).some(
-    (className) =>
-      className.startsWith("language-") || className.startsWith("lang-"),
+/** The `language-*` or `lang-*` class of a code element, or "" for a bare fence. */
+export function languageClass(code: Element): string {
+  return (
+    Array.from(code.classList).find(
+      (className) =>
+        className.startsWith("language-") || className.startsWith("lang-"),
+    ) ?? ""
   );
 }
