@@ -187,6 +187,9 @@ final class MarkdownSTTextView: STTextView {
 
         if window != nil {
             windowAttachmentHandler?(self)
+            // Leaving the last window removed the selection observer; a custom color
+            // set before that would no longer repaint new selections.
+            refreshEditorSelectionColor()
         } else {
             removeEditorSelectionColorObserver()
         }
