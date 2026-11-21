@@ -47,7 +47,10 @@ enum IOSNativeTextMutation {
         let undoManager = textView.undoManager
         undoManager?.registerUndo(withTarget: textView) { view in
             MainActor.assumeIsolated {
-                guard view.editor?.canUseHistory() == true else { return }
+                guard view.editor?.canUseHistory() == true else {
+                    view.discardHistoryAfterReplay()
+                    return
+                }
                 apply(inverse, inverse: edit, in: view, actionName: actionName)
             }
         }
@@ -74,5 +77,22 @@ enum IOSNativeTextMutation {
         storage.endEditing()
         markdownView?.suppressesUndoRegistration = false
         return true
+    }
+}
+
+private extension IOSMarkdownTextView {
+    func discardHistoryAfterReplay() {
+        guard let manager = undoManager else { return }
+        let name: Notification.Name = manager.isUndoing ? .NSUndoManagerDidUndoChange : .NSUndoManagerDidRedoChange
+        let center = NotificationCenter.default
+        center.removeObserver(self, name: name, object: manager)
+        center.addObserver(self, selector: #selector(discardStaleHistory), name: name, object: manager)
+    }
+
+    @objc func discardStaleHistory(_ notification: Notification) {
+        guard let manager = notification.object as? UndoManager else { return }
+        NotificationCenter.default.removeObserver(self, name: notification.name, object: manager)
+        // The refused entry was already consumed. Older ranges no longer describe the buffer.
+        manager.removeAllActions()
     }
 }
