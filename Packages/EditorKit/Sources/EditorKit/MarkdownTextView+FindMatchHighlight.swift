@@ -1,4 +1,5 @@
 import AppKit
+import STTextView
 
 extension MarkdownTextView {
     /// Applies find-match decoration when the request, or the document it belongs to, changed (F8).
@@ -51,6 +52,34 @@ extension MarkdownTextView {
 
 @MainActor
 extension MarkdownTextViewCoordinator {
+    /// Re-materialises the applied request once a scroll leaves the decorated window.
+    ///
+    /// A viewport change reaches `updateNSView` only when it also needs a syntax highlight,
+    /// and that window is padded more widely than this one. Between the two the scroll
+    /// would show matches without decoration.
+    func refreshFindMatchHighlightAfterViewportChange(in textView: STTextView) {
+        guard !isUpdating,
+              let request = appliedFindMatchHighlight,
+              let visibleRange = lastVisibleTextRange,
+              let applied = appliedFindMatchHighlightMaterialisation,
+              !EditorFindMatchHighlight.range(applied, contains: visibleRange),
+              let textStorage = MarkdownTextView.textStorage(of: textView)
+        else {
+            return
+        }
+        appliedFindMatchHighlightSpan = EditorFindMatchHighlight.apply(
+            request,
+            visibleRange: visibleRange,
+            previouslyDecorated: appliedFindMatchHighlightSpan,
+            to: textStorage
+        )
+        appliedFindMatchHighlightMaterialisation = EditorFindMatchHighlight.materialisationRange(
+            for: visibleRange,
+            storageLength: textStorage.length
+        )
+        textView.needsDisplay = true
+    }
+
     /// Keeps the bounded clear span in the text storage's coordinate space as edits move marker
     /// attributes. Without this, a large insertion before a decorated match shifts the marker but
     /// leaves the recorded `NSRange` behind, so closing find can permanently strand decoration.

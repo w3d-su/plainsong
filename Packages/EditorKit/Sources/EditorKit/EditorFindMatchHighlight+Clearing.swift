@@ -65,10 +65,23 @@ extension EditorFindMatchHighlight {
             textStorage.removeAttribute(.backgroundColor, range: range)
         }
         // Also remove any fragment that an attribute-inheritance edge left without a marker.
+        // Only where one exists: removing an absent attribute still edits the range, and a
+        // whole-buffer bound then invalidated the layout of a document with nothing to clear.
+        var strandedRanges: [NSRange] = []
         for bound in searchBounds {
+            textStorage.enumerateAttribute(
+                EditorFindMatchHighlightMarker.coveredBackgroundAttribute,
+                in: bound
+            ) { value, range, _ in
+                if value != nil {
+                    strandedRanges.append(range)
+                }
+            }
+        }
+        for range in strandedRanges {
             textStorage.removeAttribute(
                 EditorFindMatchHighlightMarker.coveredBackgroundAttribute,
-                range: bound
+                range: range
             )
         }
     }
