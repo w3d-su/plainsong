@@ -134,6 +134,11 @@ jobs:
       - name: Test preview
         run: make test-preview
 
+      # The app loads the committed bundle, so a preview-src change without a
+      # rebuild would pass every test above and ship the old preview.
+      - name: Check the committed preview bundle is current
+        run: make check-preview-bundle
+
   # SwiftFormat and SwiftLint parse text and do not care which OS runs them. Both are
   # pinned to exact release binaries instead of `brew install`: Homebrew tracks the
   # latest release, and a runner-image bump from SwiftFormat 0.62.1 to 0.63.0
@@ -249,6 +254,11 @@ jobs:
       - name: Test packages
         run: make test-packages
 
+      # The iOS runners' provenance, admission and archive-selection logic.
+      # ios.yml runs only on a schedule and by hand, so a pull request tests it here.
+      - name: Test iOS tooling
+        run: make test-ios-tooling
+
   # Hosted XCTest bundles: one job builds every bundle once (~3 min) and the shards
   # run the same products. A shard that names a class also skips it in that bundle's
   # catch-all shard, so a renamed or new class always still runs; a new bundle fails
@@ -307,6 +317,11 @@ jobs:
 
       - name: Check built update configuration
         run: Scripts/check-shipped-update-configuration.sh "$XCODE_DERIVED_DATA/Build/Products/Debug/Plainsong.app/Contents/Info.plist"
+
+      # Scripts/make-appcast.sh against the Sparkle tools this build resolved and a
+      # throwaway key. release.yml runs it only on a tag, after the release is built.
+      - name: Appcast self-test
+        run: Scripts/make-appcast.sh --self-test --sparkle-bin "$XCODE_DERIVED_DATA/SourcePackages/artifacts/sparkle/Sparkle/bin"
 
       # tar keeps the symlinks and signatures an artifact zip would lose. Objects and
       # module files only serve the link step, which is finished.

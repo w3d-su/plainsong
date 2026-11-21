@@ -52,6 +52,22 @@ run_xcode() {
         xcodebuild "${args[@]}" "$@"
     fi
 }
+# ExportHTMLOfflineTests reads the loopback request recorder's port and skips
+# without it, so a run that did not start the recorder never checked that an
+# export makes no network request. Start it for every run that executes tests.
+if [ "$phase" != build ] && [ -z "${TEST_RUNNER_PLAINSONG_EXPORT_TEST_PROXY_PORT:-}" ]; then
+    proxy_root="$(mktemp -d /private/tmp/plainsong-export-f-proxy.XXXXXX)"
+    /usr/bin/python3 Scripts/export_html_network_proxy.py --port-file "$proxy_root/port" > "$proxy_root/proxy.log" 2>&1 &
+    proxy_pid=$!
+    trap 'kill "$proxy_pid" 2>/dev/null || true' EXIT
+    for _ in {1..100}; do
+        if [ -s "$proxy_root/port" ]; then break; fi
+        sleep 0.05
+    done
+    if [ ! -s "$proxy_root/port" ]; then cat "$proxy_root/proxy.log" >&2; exit 1; fi
+    TEST_RUNNER_PLAINSONG_EXPORT_TEST_PROXY_PORT="$(cat "$proxy_root/port")"
+    export TEST_RUNNER_PLAINSONG_EXPORT_TEST_PROXY_PORT
+fi
 test_action=test
 if [ -n "${XCODE_ARTIFACT_DIR:-}" ]; then
     : "${XCODE_DERIVED_DATA:?CI preflight requires isolated DerivedData}"
