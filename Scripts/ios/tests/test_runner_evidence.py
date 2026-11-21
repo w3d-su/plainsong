@@ -1,19 +1,23 @@
 """Synthetic build artifacts exercise tooling gates, never product providers."""
+import hashlib
 import importlib.util
 import json
 import os
 from pathlib import Path
 import plistlib
 import shlex
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 import zipfile
 
 sys.dont_write_bytecode = True
 SCRIPTS = Path(__file__).resolve().parents[1]
+CANONICAL_LOCK = "/private/tmp/plainsong-xcodebuild-test.lock"
 
 
 def load(name):
@@ -171,6 +175,24 @@ class RunnerEvidenceTests(unittest.TestCase):
         proof.write_json(source, proof.source_snapshot(self.repository))
         result = self.verify_required_copy_cli(source, copied, relative)
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), hashlib.sha256(copied.read_bytes()).hexdigest())
+
+    def testResultGateParsesOnlyBytesMatchingTheCapturedDigest(self):
+        source = self.root / "tests.json"
+        source.write_text(json.dumps({"testNodes": [
+            {"nodeType": "Test Case", "nodeIdentifier": "Suite/required()", "result": "Passed"}]}))
+        required = self.root / "required.txt"
+        required.write_text("Suite/required\n")
+        report = self.root / "report.json"
+        digest = hashlib.sha256(required.read_bytes()).hexdigest()
+        for expected, code in ((digest, 0), ("0" * 64, 65)):
+            result = subprocess.run([
+                sys.executable, str(SCRIPTS / "ios-test-results.py"), str(source),
+                "--required", str(required), "--required-sha256", expected,
+                "--report", str(report), "--names", str(self.root / "names.txt"),
+            ], text=True, capture_output=True)
+            self.assertEqual(result.returncode, code, result.stderr)
+        self.assertIn("does not match captured source", json.loads(report.read_text())["reason"])
 
     def testCopyThenManifestEditBeforeCaptureIsRejected(self):
         relative, manifest, copied = self.required_copy_fixture()
@@ -336,6 +358,7 @@ class RunnerLockTests(unittest.TestCase):
         self.probe.write_text("#!/bin/bash\nset -euo pipefail\nsource " + shlex.quote(str(SCRIPTS / "ios-common.sh")) +
                               '\nios_lock_or_exec "$0" "$@"\n'
                               'if [ "${1:-}" = nested ]; then "$0" inner\n'
+                              'elif [ "${1:-}" = fail1 ]; then echo entered; exit 1\n'
                               'elif [ "${1:-}" = fail75 ]; then echo entered; exit 75\n'
                               'elif [ "${1:-}" = fail65 ]; then echo entered; exit 65\n'
                               'else echo entered; fi\n')
@@ -345,8 +368,20 @@ class RunnerLockTests(unittest.TestCase):
         self.environment.pop("IOS_RUNNER_LOCK_HOLDER", None)
 
     def run_probe(self, *arguments, **extra):
-        return subprocess.run([str(self.probe), *arguments], env=dict(self.environment, **extra),
-                              text=True, capture_output=True, timeout=10)
+        environment = dict(self.environment, **extra)
+        # A busy lock is retried every 5 s until the wait ends. The probe has
+        # to outlive that wait, so it reports its own exit code instead of
+        # raising TimeoutExpired here.
+        timeout = int(environment["IOS_LOCK_WAIT_SECONDS"]) + 20
+        return subprocess.run([str(self.probe), *arguments], env=environment,
+                              text=True, capture_output=True, timeout=timeout)
+
+    def run_admitted(self, *arguments, **extra):
+        """Run a probe that has to take the shared lock; skip while another lane holds it."""
+        result = self.run_probe(*arguments, **extra)
+        if result.returncode == 75 and "admission timeout" in result.stderr and "entered" not in result.stdout:
+            self.skipTest("another lane holds " + CANONICAL_LOCK)
+        return result
 
     def testPublicLockedFlagIsRejectedWithoutExecutingPayload(self):
         result = self.run_probe("--locked")
@@ -359,53 +394,70 @@ class RunnerLockTests(unittest.TestCase):
         self.assertNotIn("entered", result.stdout)
 
     def testLegitimateNestedOperationUsesOneCanonicalLock(self):
-        result = self.run_probe("nested")
+        result = self.run_admitted("nested")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "entered")
 
     def testPayloadFailureStaysDistinctFromAdmission(self):
-        for argument, code in (("fail65", 65), ("fail75", 75)):
+        # A wait longer than one 5 s retry would run the payload again if its
+        # own 75 were read as a busy lock.
+        for argument, code in (("fail1", 1), ("fail65", 65), ("fail75", 75)):
             with self.subTest(argument=argument):
-                result = self.run_probe(argument, IOS_LOCK_WAIT_SECONDS="30")
+                result = self.run_admitted(argument, IOS_LOCK_WAIT_SECONDS="6")
                 self.assertEqual(result.returncode, code, result.stderr)
                 self.assertEqual(result.stdout.strip(), "entered")
                 self.assertNotIn("admission timeout", result.stderr)
 
+    def testLockfFailureExitsAtOnceWithoutWaiting(self):
+        # The sandbox denies the lock file, so lockf exits 73 (EX_CANTCREAT)
+        # before the payload starts. That is not another lane's lock.
+        sandbox = "/usr/bin/sandbox-exec"
+        if not os.path.exists(sandbox):
+            self.skipTest("sandbox-exec is unavailable")
+        profile = '(version 1)(allow default)(deny file-read* file-write* (literal "%s"))' % CANONICAL_LOCK
+        result = subprocess.run([sandbox, "-p", profile, str(self.probe)],
+                                env=dict(self.environment, IOS_LOCK_WAIT_SECONDS="6"),
+                                text=True, capture_output=True, timeout=30)
+        if "sandbox_apply" in result.stderr:
+            self.skipTest("this process cannot apply a sandbox profile")
+        self.assertEqual(result.returncode, 73, result.stderr)
+        self.assertIn("not waiting", result.stderr)
+        self.assertNotIn("admission timeout", result.stderr)
+        self.assertNotIn("entered", result.stdout)
+
+    def lock_is_free(self):
+        return subprocess.run(["/usr/bin/lockf", "-k", "-t", "0", CANONICAL_LOCK, "true"],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+
+    def release(self, holder):
+        try:
+            os.killpg(holder.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        holder.wait(timeout=5)
+        for _ in range(50):
+            if self.lock_is_free():
+                return
+            time.sleep(0.05)
+
     def testBusyLockAdmissionExits75WithoutRunningPayload(self):
-        import os
-        import signal
-        import time
-        lock = "/private/tmp/plainsong-xcodebuild-test.lock"
-        probe = subprocess.run(["/usr/bin/lockf", "-k", "-t", "0", lock, "true"],
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        holder = None
-        if probe.returncode == 0:
+        if self.lock_is_free():
             holder = subprocess.Popen(
-                ["/usr/bin/lockf", "-k", "-t", "0", lock, "sleep", "8"], start_new_session=True)
+                ["/usr/bin/lockf", "-k", "-t", "0", CANONICAL_LOCK, "sleep", "8"], start_new_session=True)
+            # Registered before any assertion, so a failure cannot leave the
+            # holder on the lock every lane shares.
+            self.addCleanup(self.release, holder)
             held = False
             for _ in range(50):
-                busy = subprocess.run(["/usr/bin/lockf", "-k", "-t", "0", lock, "true"],
-                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                if busy.returncode != 0:
+                if not self.lock_is_free():
                     held = True
                     break
                 time.sleep(0.05)
             self.assertTrue(held, "canonical lock was not observed busy")
-        try:
-            result = self.run_probe()
-            self.assertEqual(result.returncode, 75, result.stderr)
-            self.assertIn("admission timeout", result.stderr)
-            self.assertNotIn("entered", result.stdout)
-        finally:
-            if holder is not None:
-                os.killpg(holder.pid, signal.SIGKILL)
-                holder.wait(timeout=5)
-                for _ in range(50):
-                    released = subprocess.run(["/usr/bin/lockf", "-k", "-t", "0", lock, "true"],
-                                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    if released.returncode == 0:
-                        break
-                    time.sleep(0.05)
+        result = self.run_probe()
+        self.assertEqual(result.returncode, 75, result.stderr)
+        self.assertIn("admission timeout", result.stderr)
+        self.assertNotIn("entered", result.stdout)
 
     def testDefaultAdmissionWaitIs45Seconds(self):
         text = (SCRIPTS / "ios-common.sh").read_text()
