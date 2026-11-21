@@ -29,7 +29,7 @@ final class WorkspaceSearchServiceTests: XCTestCase {
             ])
         )
 
-        let events = await collectEvents(from: WorkspaceSearchService(reader: reader), request: request)
+        let events = await Self.collectEvents(from: WorkspaceSearchService(reader: reader), request: request)
         let results = fileResults(in: events)
 
         XCTAssertEqual(results.map(\.relativePath), ["disk.md", "notes.markdown", "page.mdx"])
@@ -71,7 +71,7 @@ final class WorkspaceSearchServiceTests: XCTestCase {
             limits: WorkspaceSearchLimits(maximumFileSizeBytes: 4)
         )
 
-        let events = await collectEvents(from: WorkspaceSearchService(reader: reader), request: request)
+        let events = await Self.collectEvents(from: WorkspaceSearchService(reader: reader), request: request)
         let skipped = skippedFiles(in: events)
 
         XCTAssertEqual(skipped.map(\.relativePath), ["bad.md", "gone.md", "huge.md", "overlay.md", "unreadable.md"])
@@ -110,7 +110,7 @@ final class WorkspaceSearchServiceTests: XCTestCase {
             )
         )
 
-        let events = await collectEvents(from: WorkspaceSearchService(reader: reader), request: request)
+        let events = await Self.collectEvents(from: WorkspaceSearchService(reader: reader), request: request)
         let results = fileResults(in: events)
         let summary = try XCTUnwrap(completedSummary(in: events))
 
@@ -136,7 +136,7 @@ final class WorkspaceSearchServiceTests: XCTestCase {
             limits: WorkspaceSearchLimits(maximumConcurrentReads: 2)
         )
 
-        let events = await collectEvents(from: WorkspaceSearchService(reader: reader), request: request)
+        let events = await Self.collectEvents(from: WorkspaceSearchService(reader: reader), request: request)
         let summary = try XCTUnwrap(completedSummary(in: events))
 
         XCTAssertEqual(fileResults(in: events).map(\.relativePath), ["a.md", "b.md", "c.md"])
@@ -151,7 +151,7 @@ final class WorkspaceSearchServiceTests: XCTestCase {
         let request = try makeRequest(root: root, entries: [entry("post.md")], query: "")
         let service = WorkspaceSearchService(reader: ScriptedReader(responses: [:]))
 
-        let emptyEvents = await collectEvents(from: service, request: request)
+        let emptyEvents = await Self.collectEvents(from: service, request: request)
         XCTAssertEqual(validationErrors(in: emptyEvents), [.emptyQuery])
         XCTAssertNil(completedSummary(in: emptyEvents))
 
@@ -160,7 +160,7 @@ final class WorkspaceSearchServiceTests: XCTestCase {
             entries: [entry("post.md")],
             query: String(repeating: "a", count: TextSearchEngine.maximumPatternUTF16Length + 1)
         )
-        let overlongEvents = await collectEvents(from: service, request: overlong)
+        let overlongEvents = await Self.collectEvents(from: service, request: overlong)
         XCTAssertEqual(
             validationErrors(in: overlongEvents),
             [.overlongQuery(maximumUTF16Length: TextSearchEngine.maximumPatternUTF16Length)]
@@ -177,7 +177,7 @@ final class WorkspaceSearchServiceTests: XCTestCase {
         let service = WorkspaceSearchService(reader: reader)
 
         let consumer = Task { () -> [WorkspaceSearchEvent] in
-            await collectEvents(from: service, request: request)
+            await WorkspaceSearchServiceTests.collectEvents(from: service, request: request)
         }
         await reader.waitUntilFirstRead()
         consumer.cancel()
@@ -220,7 +220,7 @@ final class WorkspaceSearchServiceTests: XCTestCase {
         )
     }
 
-    private func collectEvents(
+    private static func collectEvents(
         from service: WorkspaceSearchService,
         request: WorkspaceSearchRequest
     ) async -> [WorkspaceSearchEvent] {
@@ -246,7 +246,7 @@ final class WorkspaceSearchServiceTests: XCTestCase {
     }
 
     private func completedSummary(in events: [WorkspaceSearchEvent]) -> WorkspaceSearchSummary? {
-        events.compactMap { event in
+        events.compactMap { event -> WorkspaceSearchSummary? in
             guard case let .completed(_, summary) = event else { return nil }
             return summary
         }.last
