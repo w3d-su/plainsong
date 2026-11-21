@@ -273,6 +273,11 @@ extension AppState {
         }
 
         if !preserveWorkspace {
+            // A file this window cannot read (outside the sandbox grant, or unreadable) must
+            // fail before the workspace it replaces is closed.
+            try SecurityScopedAccess.withAccess(to: url) {
+                try FileHandle(forReadingFrom: url).close()
+            }
             try closeWorkspaceForReplacement()
         }
         try activateFileSession(url: url)
@@ -295,6 +300,7 @@ extension AppState {
                 }
                 let location = try rootAuthority.canonicalizedLocation(forFileURL: url)
                 try activateAnchoredFileSession(at: location)
+                synchronizeWorkspaceTreeSelection(for: shownSession, revealingAncestors: true)
             } else {
                 try activateFileSession(url: url)
             }
