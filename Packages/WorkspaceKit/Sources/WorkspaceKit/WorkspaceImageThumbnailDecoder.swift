@@ -3,7 +3,7 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-struct WorkspaceImageThumbnailDecodeResult: Equatable {
+struct WorkspaceImageThumbnailDecodeResult: Equatable, Sendable {
     let pngData: Data
     let width: Int
     let height: Int
@@ -14,12 +14,14 @@ enum WorkspaceImageThumbnailDecoder {
     /// Downsamples with `CGImageSource` thumbnailing. Never materializes a full-size bitmap of a
     /// huge photo; animated GIF yields only the first frame (`index: 0`).
     static func decodePNGThumbnail(
-        from fileURL: URL,
+        from imageData: Data,
         maxPixelSize: Int
     ) throws -> WorkspaceImageThumbnailDecodeResult {
         precondition(maxPixelSize > 0, "maxPixelSize must be positive")
 
-        guard let source = CGImageSourceCreateWithURL(fileURL as CFURL, nil) else {
+        // Decodes bytes the caller already read through an anchored no-follow descriptor, so
+        // ImageIO never reopens the path after the containment check.
+        guard let source = CGImageSourceCreateWithData(imageData as CFData, nil) else {
             throw WorkspaceImageThumbnailFailure.unreadableFile
         }
         guard CGImageSourceGetCount(source) > 0 else {
