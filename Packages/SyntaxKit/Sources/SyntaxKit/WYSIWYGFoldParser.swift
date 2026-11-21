@@ -117,6 +117,7 @@ public extension MarkdownSyntaxParser {
             from: root,
             fragment: fragment,
             baseLocation: parsed.base,
+            skipsMDXESM: fileKind == .mdx,
             to: &candidates,
             imageRegions: &imageRegions
         )
@@ -152,7 +153,7 @@ public extension MarkdownSyntaxParser {
 
     func foldPlan(
         in source: String,
-        fileKind _: FileKind,
+        fileKind: FileKind,
         visibleRange requestedRange: NSRange,
         selection: NSRange,
         tableRegionsEnabled: Bool = false
@@ -183,6 +184,7 @@ public extension MarkdownSyntaxParser {
             from: root,
             fragment: fragment,
             baseLocation: parsed.base,
+            skipsMDXESM: fileKind == .mdx,
             to: &candidates,
             imageRegions: &imageRegions
         )
@@ -255,11 +257,15 @@ extension MarkdownSyntaxParser {
         from node: Node,
         fragment: String,
         baseLocation: Int,
+        skipsMDXESM: Bool = false,
         to candidates: inout [WYSIWYGFoldCandidate],
         imageRegions: inout [MarkdownInlineImageRegion]
     ) {
         switch node.nodeType {
         case "minus_metadata", "plus_metadata", "fenced_code_block", "indented_code_block":
+            return
+
+        case "paragraph" where skipsMDXESM && isMDXESMBlock(node, fragment: fragment):
             return
 
         case "atx_heading", "setext_heading":
@@ -288,10 +294,34 @@ extension MarkdownSyntaxParser {
                 from: child,
                 fragment: fragment,
                 baseLocation: baseLocation,
+                skipsMDXESM: skipsMDXESM,
                 to: &candidates,
                 imageRegions: &imageRegions
             )
         }
+    }
+
+    /// MDX reads a top-level block whose first line starts with `import ` or `export ` at
+    /// column 0 as JavaScript up to the next blank line. Markdown parses it as a paragraph,
+    /// so its `*`, `_` and backticks would fold as inline markup.
+    func isMDXESMBlock(_ paragraph: Node, fragment: String) -> Bool {
+        guard let parentType = paragraph.parent?.nodeType, parentType == "document" || parentType == "section"
+        else {
+            return false
+        }
+        let storage = fragment as NSString
+        let location = nsRange(for: paragraph).location
+        let keywordLength = 7
+        guard location + keywordLength <= storage.length else {
+            return false
+        }
+        if location > 0 {
+            let previous = storage.character(at: location - 1)
+            guard previous == 10 || previous == 13 else {
+                return false
+            }
+        }
+        return isMDXESMLine(storage.substring(with: NSRange(location: location, length: keywordLength)))
     }
 
     func headingCandidate(
