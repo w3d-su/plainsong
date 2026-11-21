@@ -28,6 +28,7 @@ enum IOSDocumentFileEvent: Equatable, Sendable {
 @MainActor
 protocol IOSDocumentFilePort: AnyObject {
     var fileURL: URL { get }
+    var canWrite: Bool { get }
 
     func open() async throws -> IOSDocumentFileOpenResult
     func create(snapshot: Data) async throws

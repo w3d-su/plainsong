@@ -8,6 +8,7 @@ import WorkspaceCore
 @MainActor
 final class IOSDeferredReloadClosePort: IOSDocumentFilePort {
     let fileURL: URL
+    var canWrite = true
     var closeFailure = false
     var closeLatch: IOSSceneControllerLatch?
     private(set) var closeCalls = 0
@@ -27,6 +28,7 @@ final class IOSDeferredReloadClosePort: IOSDocumentFilePort {
     }
 
     func emit(_ event: IOSDocumentFileEvent) {
+        if case let .writePermissionChanged(writable) = event { canWrite = writable }
         handler?(event)
     }
 

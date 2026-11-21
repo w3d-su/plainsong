@@ -96,8 +96,7 @@ enum FormattingEditing {
         }
 
         let selected = MarkdownTextEditingSupport.substring(selection, in: text)
-        if selected.hasPrefix("["), selected.hasSuffix(")"), let closeBracket = selected.range(of: "](") {
-            let label = String(selected[selected.index(after: selected.startIndex) ..< closeBracket.lowerBound])
+        if let label = MarkdownLinkSelection.label(in: selected) {
             return MarkdownTextEditingSupport.replacement(
                 range: selection,
                 string: label,

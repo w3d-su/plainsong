@@ -232,6 +232,12 @@ public final class DocumentSession: ObservableObject {
         }
     }
 
+    /// A provider finished a write without confirming which bytes are durable.
+    public func invalidateSavedText() {
+        savedText = nil
+        if !isDirty { isDirty = true }
+    }
+
     /// Retargets the session after an authority-safe filesystem relocation.
     ///
     /// Relocation changes only the document identity presented to consumers. The current

@@ -52,6 +52,7 @@ final class ScriptedFilePort: IOSDocumentFilePort {
     }
 
     func emit(_ event: IOSDocumentFileEvent) {
+        if case let .writePermissionChanged(writable) = event { canWrite = writable }
         handler?(event)
     }
 

@@ -169,12 +169,12 @@ public enum Frontmatter {
     public static func updating(_ text: String, key: String, value: FrontmatterValue) -> String? {
         switch scanFences(in: text) {
         case let .closed(bounds):
-            guard parseClosedBlock(bounds).error == nil else { return nil }
+            guard let original = try? ParsedMapping(yaml: bounds.rawYAML) else { return nil }
             guard let updatedYAML = try? replacing(
-                rawYAML: bounds.rawYAML, key: key, value: value, lineEnding: bounds.lineEnding
+                rawYAML: bounds.rawYAML, original: original, key: key, value: value, lineEnding: bounds.lineEnding
             ), writebackReadsBack(
                 updatedYAML,
-                originalYAML: bounds.rawYAML,
+                original: original,
                 key: key,
                 value: value
             ) else { return nil }
@@ -188,7 +188,7 @@ public enum Frontmatter {
         let lineEnding = preferredLineEnding(in: text)
         let frontmatter = [
             "---",
-            #"title: ""#,
+            "title: \"\"",
             "date: \(date)",
             "tags: []",
             "draft: false",
@@ -218,13 +218,16 @@ private extension Frontmatter {
 
     static func parseClosedBlock(_ bounds: Bounds) -> FrontmatterParseResult {
         do {
-            let mapping = try loadMapping(from: bounds.rawYAML)
-            let orderedKeys = orderedKeys(in: bounds.rawYAML, mapping: mapping)
+            let parsed = try ParsedMapping(yaml: bounds.rawYAML)
+            let mapping = parsed.values
+            let lines = yamlSourceLines(in: bounds.rawYAML).map(String.init)
+            let orderedKeys = orderedKeys(in: lines, mapping: mapping)
             let fields = orderedKeys.map { key in
-                let rawValue = rawValueSource(for: key, in: bounds.rawYAML, lineEnding: bounds.lineEnding)
+                let rawValue = rawValueSource(for: key, in: lines, lineEnding: bounds.lineEnding)
                 return FrontmatterField(
                     key: key,
-                    value: frontmatterValue(for: key, yamlValue: mapping[key], rawValue: rawValue),
+                    value: frontmatterValue(for: key, yamlValue: mapping[key],
+                                            scalar: parsed.root?[key]?.scalar?.string, rawValue: rawValue),
                     rawValue: rawValue
                 )
             }
@@ -300,11 +303,11 @@ private extension Frontmatter {
         return index
     }
 
-    static func orderedKeys(in rawYAML: String, mapping: [String: Any]) -> [String] {
+    static func orderedKeys(in lines: [String], mapping: [String: Any]) -> [String] {
         var seen: Set<String> = []
         var ordered: [String] = []
 
-        for line in linesWithoutTerminators(rawYAML) {
+        for line in lines {
             guard let key = topLevelKey(in: line), mapping.keys.contains(key), !seen.contains(key) else {
                 continue
             }
@@ -319,7 +322,9 @@ private extension Frontmatter {
         return ordered
     }
 
-    static func frontmatterValue(for key: String, yamlValue: Any?, rawValue: String?) -> FrontmatterValue {
+    static func frontmatterValue(for key: String, yamlValue: Any?, scalar: String?,
+                                 rawValue: String?) -> FrontmatterValue
+    {
         if let value = yamlValue as? Bool {
             return .bool(value)
         }
@@ -336,14 +341,11 @@ private extension Frontmatter {
         }
 
         if key == "date" {
-            return .date(rawValue ?? yamlValue.map { String(describing: $0) } ?? "")
+            return scalar.map(FrontmatterValue.date) ?? .raw(rawValue ?? "")
         }
 
         if key == "tags" {
-            if let rawValue {
-                return .stringList(splitTags(rawValue))
-            }
-            return .stringList([])
+            return scalar.map { .stringList(splitTags($0)) } ?? .raw(rawValue ?? "")
         }
 
         if key == "draft", let rawValue {

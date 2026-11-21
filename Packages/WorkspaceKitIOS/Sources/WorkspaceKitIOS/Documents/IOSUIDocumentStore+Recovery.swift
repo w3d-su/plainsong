@@ -113,15 +113,9 @@ extension IOSUIDocumentStore {
 
     func flush(_ entry: IOSDocumentEntry) async -> IOSDocumentFlushOutcome? {
         guard let session = entry.session else { return nil }
-        let needsWork = session.isDirty || entry.inFlightText != nil
-        if !needsWork {
-            return nil
-        }
-        let receipt: IOSRecoveryReceipt? = if session.isDirty {
-            try? await persistRecovery(entry, reason: .backgroundDeadline)
-        } else {
-            entry.recoveryReceipt
-        }
+        // Undo can make the live text look clean while a different snapshot is in flight.
+        guard session.isDirty || entry.inFlightText != nil else { return nil }
+        let receipt = try? await persistRecovery(entry, reason: .backgroundDeadline)
         let gate = FlushGate()
         let saveTask = Task { @MainActor in
             let outcome = await self.finishFlushSave(entry, receipt: receipt)

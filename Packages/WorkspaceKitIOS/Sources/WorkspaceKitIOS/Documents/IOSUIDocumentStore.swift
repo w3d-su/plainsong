@@ -12,6 +12,8 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
     let filePortFactory: @MainActor (URL) -> any IOSDocumentFilePort
     var byResource: [IOSDocumentResourceKey: IOSDocumentEntry] = [:]
     var byIdentity: [IOSDocumentIdentity: IOSDocumentEntry] = [:]
+    static let closedHistoryLimit = 128
+    private var recentlyClosed: [(identity: IOSDocumentIdentity, generation: UInt64)] = []
     var observations: [UUID: IOSDocumentStoreObservation] = [:]
     var grantObservations: [ObjectIdentifier: any IOSObservation] = [:]
     let cloudVersionsAtURL: @Sendable (URL) throws -> [IOSCloudFileVersion]
@@ -65,7 +67,8 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
     }
 
     public func state(for identity: IOSDocumentIdentity) -> IOSDocumentState? {
-        byIdentity[identity]?.state
+        if let entry = byIdentity[identity] { return entry.state }
+        return recentlyClosed.last { $0.identity == identity }.map { .closed(accessGeneration: $0.generation) }
     }
 
     public func snapshot(for identity: IOSDocumentIdentity) -> IOSStoredDocumentSnapshot? {
@@ -166,16 +169,8 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
                 text = decoded
                 canWrite = opened.canWrite
             }
-            try Task.checkCancellation()
-            guard guardCurrentAuthority(entry, generation: entry.accessGeneration) else {
-                throw IOSDocumentFailure.documentChanged
-            }
-            installSession(entry, text: text, canWrite: canWrite && !entry.lease.isReleased)
-            guard let handle = entry.handle() else {
-                throw IOSDocumentFailure.unavailable
-            }
-            finishOpen(entry, result: .success(handle))
-            return handle
+            return try await finishOpeningSession(entry, initialText: text, canWrite: canWrite,
+                                                  existingFile: initialText == nil)
         } catch {
             if error is CancellationError {
                 failOpen(entry, .unavailable)
@@ -185,6 +180,12 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
             failOpen(entry, failure)
             throw failure
         }
+    }
+
+    func forgetClosedEntry(_ entry: IOSDocumentEntry) {
+        if recentlyClosed.count == Self.closedHistoryLimit { recentlyClosed.removeFirst() }
+        recentlyClosed.append((entry.identity, entry.accessGeneration))
+        byIdentity[entry.identity] = nil
     }
 
     func makeEntry(
@@ -221,7 +222,7 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
         }
         entry.session = session
         entry.lastPersistedText = text
-        entry.allowsProviderWrite = canWrite
+        entry.allowsProviderWrite = canWrite && entry.allowsProviderWrite
         entry.openFinished = true
         refreshWritableState(entry)
         emitSnapshot(entry)

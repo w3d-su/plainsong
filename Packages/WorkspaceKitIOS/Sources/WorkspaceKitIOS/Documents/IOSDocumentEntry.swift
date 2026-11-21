@@ -47,6 +47,16 @@ final class IOSDocumentEntry {
     var autosaveGeneration: UInt64 = 0
     var externalToken: UUID?
     var hasDeferredExternalChange = false
+    var openingReadbackFailed = false
+
+    var isUntouchedOpeningSnapshot: Bool {
+        openingReadbackFailed && session?.version == 0 && session?.isDirty == false
+    }
+
+    var needsCloseRecovery: Bool {
+        session?.isDirty == true || (fenced && !isUntouchedOpeningSnapshot)
+    }
+
     var pendingProposal: IOSDocumentReloadProposal?
     var explicitReloadOperationID: UUID?
     var providerAvailabilityGeneration: UInt64 = 0

@@ -215,6 +215,13 @@ extension IOSUIDocumentStore {
             rejectSave(acknowledged, operation, .saveFailed)
         case .indeterminate:
             acknowledged.lastAcknowledgedSequence = operation.sequence
+            // The provider may have committed this snapshot. Until the file is reopened,
+            // even an Undo to lastPersistedText cannot prove that the session is saved.
+            if !acknowledged.fenced {
+                fenceUnavailable(acknowledged, .indeterminate)
+            }
+            acknowledged.session?.invalidateSavedText()
+            emitSnapshot(acknowledged)
             rejectSave(acknowledged, operation, .indeterminate)
         }
     }
