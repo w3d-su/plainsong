@@ -7,6 +7,7 @@ struct IOSImageInsertionView: View {
 
     @State private var showPhotos = false
     @State private var showFiles = false
+    @State private var filesPickerOperationID: UUID?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -33,9 +34,10 @@ struct IOSImageInsertionView: View {
                 showPhotos = false
             }
         }
-        .sheet(isPresented: $showFiles, onDismiss: session.pickerDismissed) {
+        .sheet(isPresented: $showFiles, onDismiss: session.filesPickerPresentationEnded) {
+            let operationID = filesPickerOperationID
             IOSImageFilePicker { urls in
-                handleFiles(urls)
+                handleFiles(urls, operationID: operationID)
                 showFiles = false
             }
         }
@@ -82,7 +84,8 @@ struct IOSImageInsertionView: View {
     }
 
     private func presentFiles() {
-        guard session.preparePicker() != nil else { return }
+        guard let context = session.preparePicker() else { return }
+        filesPickerOperationID = context.operationID
         showFiles = true
     }
 
@@ -101,9 +104,9 @@ struct IOSImageInsertionView: View {
         }
     }
 
-    private func handleFiles(_ urls: [URL]) {
-        guard let url = urls.first, let context = session.beginImport() else {
-            session.pickerDismissed()
+    private func handleFiles(_ urls: [URL], operationID: UUID?) {
+        guard let url = urls.first, let context = session.beginImport(operationID: operationID) else {
+            session.cancelFilesPicker(operationID: operationID)
             return
         }
         Task { @MainActor in
