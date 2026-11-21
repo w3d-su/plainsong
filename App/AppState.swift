@@ -246,8 +246,14 @@ final class AppState: ObservableObject {
 }
 
 extension AppState {
+    /// Debug only: a shipped build must not drop on-disk crash recovery because of an
+    /// environment variable.
     private static var isRunningUnderXCTest: Bool {
-        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        #if DEBUG
+            ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        #else
+            false
+        #endif
     }
 
     private static func makeDefaultWorkspaceMutationOperationRecoveryStore()
