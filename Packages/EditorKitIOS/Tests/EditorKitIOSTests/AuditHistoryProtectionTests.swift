@@ -23,6 +23,9 @@ final class AuditHistoryProtectionTests: XCTestCase {
         let selection = h.textView.selectedRange
         h.controller.undo()
         XCTAssertEqual(h.textView.textStorage.string, text)
+        XCTAssertTrue(h.textView.undoManager?.canUndo ?? false)
+        h.textView.undoManager?.undo()
+        XCTAssertEqual(h.textView.textStorage.string, text)
         XCTAssertEqual(h.session.text, text)
         XCTAssertEqual(h.session.version, version)
         XCTAssertEqual(h.textView.selectedRange, selection)

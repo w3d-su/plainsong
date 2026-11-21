@@ -47,6 +47,7 @@ enum IOSNativeTextMutation {
         let undoManager = textView.undoManager
         undoManager?.registerUndo(withTarget: textView) { view in
             MainActor.assumeIsolated {
+                guard view.editor?.canUseHistory() == true else { return }
                 apply(inverse, inverse: edit, in: view, actionName: actionName)
             }
         }

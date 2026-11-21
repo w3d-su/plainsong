@@ -199,8 +199,9 @@ extension IOSSourceEditorController {
         range.location >= 0 && range.length >= 0 && NSMaxRange(range) <= length
     }
 
-    private func canUseHistory() -> Bool {
-        isHostAlive && isCommandFocused && installation != nil && textView.markedTextRange == nil && !isMutating
+    func canUseHistory() -> Bool {
+        isHostAlive && isCommandFocused && installation?.canWrite == true
+            && textView.markedTextRange == nil && !isMutating && !isReconciling
     }
 
     func publishCurrentText() {
