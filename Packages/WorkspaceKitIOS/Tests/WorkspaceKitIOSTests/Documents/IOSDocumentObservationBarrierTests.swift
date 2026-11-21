@@ -36,7 +36,7 @@ final class IOSDocumentObservationBarrierTests: XCTestCase {
         let entered = expectation(description: "save entered")
         port.onSaveEntered = { entered.fulfill() }
         let first = Task { try await harness.store.save(handle.identity) }
-        await fulfillment(of: [entered], timeout: 2)
+        await assertFulfillment(of: [entered], timeout: 2)
         handle.session.replaceText("newer live source")
         let queued = Task { try await harness.store.save(handle.identity) }
         await waitUntil { harness.store.byIdentity[handle.identity]?.nextSequence == 2 }

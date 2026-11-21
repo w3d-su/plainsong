@@ -47,7 +47,7 @@ final class ScriptedFilePort: IOSDocumentFilePort {
         self.openedData = openedData
     }
 
-    func setHandler(_ handler: (@MainActor (IOSDocumentFileEvent) -> Void)?) {
+    func setHandler(_ handler: (@MainActor @Sendable (IOSDocumentFileEvent) -> Void)?) {
         self.handler = handler
     }
 
@@ -80,7 +80,7 @@ final class ScriptedFilePort: IOSDocumentFilePort {
     func save(
         snapshot: Data,
         operationID: UUID,
-        completion: @escaping @MainActor (IOSDocumentFileWriteDisposition) -> Void
+        completion: @escaping @MainActor @Sendable (IOSDocumentFileWriteDisposition) -> Void
     ) {
         inFlight += 1
         peakInFlight = max(peakInFlight, inFlight)
