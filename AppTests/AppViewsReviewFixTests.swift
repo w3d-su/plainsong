@@ -127,4 +127,62 @@ final class AppViewsReviewFixTests: XCTestCase {
         coordinator.controlTextDidChange(textDidChange(field))
         XCTAssertEqual(Array(box.value.unicodeScalars), Array(Self.decomposed.unicodeScalars))
     }
+
+    // MARK: - Find / Replace fields
+
+    private func makeFindCoordinator(_ box: TextBox) -> EditorFindQueryField.Coordinator {
+        EditorFindQueryField.Coordinator(
+            text: box.binding,
+            readFocusSnapshot: { EditorFindUIState().focusSnapshot },
+            markFocusApplied: { _ in },
+            markSelectAllApplied: { _ in },
+            onSubmit: {},
+            onEscape: {}
+        )
+    }
+
+    func testFindAndReplaceFieldsPublishCanonicallyEquivalentTextAsANewValue() {
+        let findBox = TextBox(Self.precomposed)
+        let find = makeFindCoordinator(findBox)
+        let findField = NSTextField(string: Self.decomposed)
+        find.controlTextDidChange(textDidChange(findField))
+        XCTAssertEqual(Array(findBox.value.unicodeScalars), Array(Self.decomposed.unicodeScalars))
+        find.applyExternalText(Self.precomposed, to: findField)
+        XCTAssertEqual(Array(findField.stringValue.unicodeScalars), Array(Self.precomposed.unicodeScalars))
+
+        let replaceBox = TextBox(Self.precomposed)
+        let replace = EditorReplaceField.Coordinator(text: replaceBox.binding, onSubmit: { _ in }, onEscape: {})
+        let replaceField = NSTextField(string: Self.decomposed)
+        replace.controlTextDidChange(textDidChange(replaceField))
+        XCTAssertEqual(Array(replaceBox.value.unicodeScalars), Array(Self.decomposed.unicodeScalars))
+        replace.applyExternalText(Self.precomposed, to: replaceField)
+        XCTAssertEqual(Array(replaceField.stringValue.unicodeScalars), Array(Self.precomposed.unicodeScalars))
+    }
+
+    /// A composition that ends without another text-change notification must not leave the
+    /// field refusing binding updates.
+    func testFindAndReplaceFieldsAcceptBindingUpdatesOnceCompositionEndsSilently() throws {
+        let find = makeFindCoordinator(TextBox(""))
+        let replace = EditorReplaceField.Coordinator(text: TextBox("").binding, onSubmit: { _ in }, onEscape: {})
+        try assertBindingUpdatesResume(apply: find.applyExternalText, didChange: find.controlTextDidChange)
+        try assertBindingUpdatesResume(apply: replace.applyExternalText, didChange: replace.controlTextDidChange)
+    }
+
+    private func assertBindingUpdatesResume(
+        apply: (String, NSTextField) -> Void,
+        didChange: (Notification) -> Void
+    ) throws {
+        let field = NSTextField(string: "")
+        let (window, editor) = try makeWindow(hosting: field)
+        defer { window.close() }
+        compose("ㄅ", in: editor)
+        didChange(textDidChange(field))
+        apply("kept out", field)
+        XCTAssertEqual(editor.string, "ㄅ", "the composition survives a binding update")
+
+        editor.unmarkText()
+        XCTAssertFalse(editor.hasMarkedText())
+        apply("next query", field)
+        XCTAssertEqual(field.stringValue, "next query")
+    }
 }
