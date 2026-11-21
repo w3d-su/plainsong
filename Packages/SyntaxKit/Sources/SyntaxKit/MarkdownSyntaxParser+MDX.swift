@@ -95,43 +95,8 @@ extension MarkdownSyntaxParser {
             return
         }
 
-        // An HTML block is parsed whole, so the line pass must not parse its lines again.
-        var htmlBlockRanges: [NSRange] = []
-        appendMDXHTMLBlockRanges(from: root, to: &htmlBlockRanges)
-        for range in htmlBlockRanges {
-            appendTSXTokens(
-                in: (source as NSString).substring(with: range),
-                baseLocation: range.location,
-                fallbackRange: range,
-                to: &tokens
-            )
-        }
-        let lineTSXRanges = appendMDXLineTSXTokens(
-            in: source,
-            excluding: excludedRanges.union(htmlBlockRanges),
-            to: &tokens
-        )
+        let lineTSXRanges = appendMDXLineTSXTokens(in: source, excluding: excludedRanges, to: &tokens)
         appendMDXHTMLTokens(from: root, excludingInlineRanges: MDXRangeSet(lineTSXRanges), to: &tokens)
-    }
-
-    func appendMDXHTMLBlockRanges(from node: Node, to ranges: inout [NSRange]) {
-        switch node.nodeType {
-        case "html_block":
-            ranges.append(nsRange(for: node))
-            return
-
-        case "inline", "fenced_code_block", "indented_code_block", "minus_metadata", "plus_metadata":
-            return
-
-        default:
-            break
-        }
-
-        for index in 0 ..< node.childCount {
-            if let child = node.child(at: index) {
-                appendMDXHTMLBlockRanges(from: child, to: &ranges)
-            }
-        }
     }
 
     func appendMDXHTMLTokens(
@@ -140,11 +105,19 @@ extension MarkdownSyntaxParser {
         to tokens: inout [MarkdownSyntaxToken]
     ) {
         switch node.nodeType {
+        case "html_block":
+            // The JSX lines of this block were already tokenized by the line pass, so its
+            // tokens are emitted twice. `docs/ios/evidence/lane-02/pre-move-baseline.json`
+            // pins that output byte for byte.
+            let range = nsRange(for: node)
+            appendTSXTokens(in: node.text ?? "", baseLocation: range.location, fallbackRange: range, to: &tokens)
+            return
+
         case "inline":
             appendMDXInlineHTMLTokens(from: node, excluding: excludedInlineRanges, to: &tokens)
             return
 
-        case "html_block", "fenced_code_block", "indented_code_block", "minus_metadata", "plus_metadata":
+        case "fenced_code_block", "indented_code_block", "minus_metadata", "plus_metadata":
             return
 
         default:
@@ -348,10 +321,6 @@ struct MDXRangeSet {
             }
         }
         self.ranges = merged
-    }
-
-    func union(_ other: [NSRange]) -> MDXRangeSet {
-        MDXRangeSet(ranges + other)
     }
 
     func intersects(_ range: NSRange) -> Bool {
