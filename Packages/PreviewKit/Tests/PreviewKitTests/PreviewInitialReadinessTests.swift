@@ -218,12 +218,12 @@ final class PreviewInitialReadinessTests: XCTestCase {
             initialReadinessScheduler: clock.scheduler,
             pageLoadOverrideForTesting: page.load
         )
-        weak let releasedController = controller
-        defer { releasedController?.invalidate() }
+        let releasedController = { [weak controller] in controller }
+        defer { releasedController()?.invalidate() }
 
         controller = nil
 
-        XCTAssertNil(releasedController)
+        XCTAssertNil(releasedController())
         clock.fire()
         XCTAssertEqual(page.loads.count, 1)
     }
