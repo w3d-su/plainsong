@@ -2083,3 +2083,31 @@ regenerated bundle; this change does not close owner PDF/Print or performance ga
   the existing 20-second deadline are unchanged.
 - Owner panel/Powerbox/iCloud, keyboard/VoiceOver, E5's remaining content
   assertions, and idle-machine E9 gates retain their existing status.
+
+### E9 typing isolation probe — 2026-11-18
+
+The bullet "Export work never enters the editor keystroke path; the existing < 16 ms
+typing budget remains green while export is active" stays **unchecked**. A new probe,
+`AppBackedEditorPerformanceTests/testTypingStaysIsolatedFromActiveHTMLAndPDFExport`
+(`Scripts/run-export-html-e9.sh --typing Release|Debug`), interleaves 16 rounds of typing
+with and without an active Export as HTML… or Export as PDF… of `large-1mb.md` in one
+process, compares keystrokes within burst-position strata after the same idle time, and
+records the export's main-thread work with no typing. Method, criteria fixed before the
+run, superseded runs, and results: `docs/perf/2026-11-18-export-e9-typing-isolation.md`.
+
+- No keystroke during an export changed the export's operation or task, and all 64
+  fenced exports stopped with `.documentChanged` and wrote nothing.
+- Typing during an export is not slower, for either product, in Release or Debug.
+- Release HTML passes every criterion. Release PDF fails one: the first keystroke of a
+  burst during the export has p95 31.8 ms. The no-export burst after the same idle time
+  fails it the same way: with no export, the first keystroke after about a second of
+  idle has a median of 20–33 ms. That cost is a §12 finding of its own; the §12 hosted
+  test, which types after 100 ms, cannot see it.
+- The export does up to 67 ms of main-thread CPU in one slice about 1 s in (Release), and
+  41–85 ms wall at the command; no Release slice reaches 100 ms. A keystroke due during
+  one waits for it. A Release replication with a corrected busy-slice monitor gives the
+  same verdicts.
+
+Open for the owner: whether the no-export control answers the PDF first-keystroke
+criterion or the after-idle cost must be fixed first, and whether those main-thread
+chunks are acceptable.
