@@ -13,13 +13,46 @@ M0 原型的結果都不能代替這裡的任何一項。
 
 | 欄位 | 值 |
 |---|---|
-| 來源 commit | `46212ad8cc72386d0fc864d3434a759ba3161bf9`（`main` `1d8449f8` 加上 #264） |
-| 未簽名 IPA | `PlainsongIOS-46212ad8cc72.ipa` |
-| IPA SHA-256 | `439b18fa1d725a9f7a68eda18fb934ade07dc1604854a958779ae3e0e8fd7c9e` |
+| 來源 commit | `be3587f152e6dcb0e846e4394bff246744195108`（`main` `f664c5af` 加上 #269） |
+| 未簽名 IPA | `PlainsongIOS-be3587f152e6.ipa` |
+| IPA SHA-256 | `ea4972de9ae48fa18607d046500229215c2b33bbfe10745cdb81ab8803f4bbed` |
 | 建置 | Release、arm64、Xcode 27.0、iOS SDK 27.0、最低版本 iOS 26.0 |
 
-換了 IPA 就要重新記錄這張表。#264 以 squash 合併後 `main` 上的 commit 會不同；
-這份 IPA 綁定的是上面的 commit。
+換了 IPA 就要重新記錄這張表。#269 以 squash 合併後 `main` 上的 commit 會不同；
+這份 IPA 綁定的是上面的 commit。它含 #264 的外觀修正、#267 的 Performance Probe
+（所以同一次安裝可以接著做 [效能量測](performance-probe.md)），以及 #269 修掉的七個
+問題。沒有 #269 的版本開不了任何檔案，不要拿來驗收。
+
+2026-11-15 這份表在 iOS 27.0 模擬器（iPhone 17 Pro、iPad Pro 11 吋）上走過 A3、
+B1、B5、B7、G 與 H 的入口、K 的設定名稱與量測面板的入口，控制項的名稱與位置已照
+畫面校正。模擬器沒有走的：iCloud、中文輸入、背景與終止、衝突、圖片插入、匯出、
+無障礙。它們的步驟仍是照原始碼寫的。
+
+## 控制項在哪裡
+
+多數按鈕只有圖示，下面寫的是它們的名稱。
+
+**檔案畫面（標題 Files）**，上排由左到右：Recent Files and Folders（時鐘）、
+Recovered Drafts（時鐘加箭頭）、Open File or Folder（資料夾加號）、New File（文件
+加號）、Refresh（循環箭頭）、Settings（齒輪）。還沒開任何東西時，畫面中央另有一個
+Open File or Folder 按鈕。
+
+**文件畫面**：
+
+- 上排：返回、Settings、Save、Export（分享圖示，內含 Export as HTML、Export as
+  PDF、Print）、Find（放大鏡）。iPhone 上 Search in Workspace、Frontmatter、Insert
+  Image 收在最右邊的「⋯」裡；iPad 上它們直接排在上排。
+- 檔名下方：**Source／Preview** 切換。iPad 的內容區夠寬（900 pt 以上）時改為並排，
+  這個切換不會出現。
+- 最下方（鍵盤出現時在鍵盤正上方），只在 Source 顯示：Undo、Redo、Bold（B）、
+  Italic（I）、Link（鏈條）、Heading 選單（大小 A）、Code 選單（`</>`，內含 Inline
+  Code、Code Fence）、Format 選單（Aa，內含 Strikethrough、Paragraph、Quote、Insert
+  Inline Math、Insert Display Math、Toggle Checkbox、Format Table）。軟體鍵盤出現時
+  最右邊多一個 Hide Keyboard。
+
+**Settings**：Editor 區有 Appearance、Font、Theme、Font size、Line numbers、
+Typewriter sync；Saving 區有 Autosave after；Preview 區有 Appearance、Allow remote
+images；Files 區有 New file 與圖片資料夾名稱；最下面是 Version。
 
 ## 怎麼回報
 
@@ -66,20 +99,20 @@ M0 原型的結果都不能代替這裡的任何一項。
 |---|---|---|
 | A1 | 核對 IPA 的 SHA-256 | 與上表相同 |
 | A2 | 重簽並安裝這份 IPA | 安裝成功；記下工具名稱與版本 |
-| A3 | 啟動 App | 看到開檔畫面（Open File or Folder），不是「Couldn't Start Plainsong」 |
+| A3 | 啟動 App | 看到 Files 畫面（No Workspace 與 Open File or Folder 按鈕），不是「Couldn't Start Plainsong」 |
 | A4 | 完全關閉後再啟動 | 一樣正常啟動 |
 
 ## B. 本機檔案
 
 | # | 步驟 | 通過條件 |
 |---|---|---|
-| B1 | Open Markdown File → 選本機的 `scratch.md` | 內容正確顯示 |
+| B1 | Open File or Folder → Open Markdown File → 選本機的 `scratch.md` | 直接進入文件畫面，內容正確顯示 |
 | B2 | 打幾行字，等自動儲存 | 狀態從未儲存變回已儲存 |
 | B3 | 到「檔案」App 預覽同一個檔 | 是原檔被改了，沒有多出一份拷貝 |
 | B4 | 回 App，關掉文件再開 | 內容與剛才相同 |
-| B5 | Open Folder → 選 `fixtures` 資料夾 | 列出裡面的 md／mdx；點任一檔可開啟 |
+| B5 | Open File or Folder → Open Folder → 進到 `fixtures` 資料夾裡按右上角 Open | 列出裡面的 md／mdx 與 assets；點任一檔可開啟 |
 | B6 | 在資料夾內 New File，打字 | 新檔出現在「檔案」App 的同一資料夾 |
-| B7 | 完全關閉 App 再開 → Recent Files and Folders | 剛才的檔案與資料夾都在，點了能開，不必重新選 |
+| B7 | 完全關閉 App 再開 → Recent Files and Folders → 點項目的名稱（不是 Choose Again） | 剛才的檔案與資料夾都在，點一下就開，不必重新選；那筆紀錄沒有消失 |
 | B8 | 在「檔案」App 把 `scratch.md` 改名，再從 Recent 開它 | 明確告知找不到或要求重新選擇；不會默默開別的檔 |
 
 ## C. iCloud 雲碟
@@ -128,21 +161,22 @@ M0 原型的結果都不能代替這裡的任何一項。
 | F5 | 手機開飛航模式改檔，同時 Mac 也改；手機恢復網路 | 出現 Review iCloud Versions，可以看兩個版本的內容 |
 | F6 | 在 F5 選一個版本 → Use Selected Version | 檔案變成選的那個版本；另一個沒有無聲消失 |
 | F7 | 在「檔案」App 刪掉 App 正在開的檔 | App 明確告知；手上的內容沒有丟 |
+| F8 | 資料夾模式開著 iCloud 那份 `fixtures`，不要按 Refresh；在 Mac 上往這個資料夾加一個 `from-mac.md`，再加一個子資料夾 `notes` | 幾分鐘內側欄自己出現 `from-mac.md` 與 `notes`，不必按 Refresh |
 
 ## G. 編寫工具
 
 | # | 步驟 | 通過條件 |
 |---|---|---|
-| G1 | 選一段字，Format 裡的粗體、斜體、Code、Heading 各試一次 | 加上對應語法；再按一次可取消；各是一步 Undo |
-| G2 | Insert Link，填 label 與 URL | 插入 `[label](url)` |
+| G1 | 選一段字，下方工具列的 Bold、Italic、Code 選單的 Inline Code、Heading 選單的 Heading 2 各試一次 | 加上對應語法；Bold、Italic、Inline Code 再按一次可取消；各是一步 Undo |
+| G2 | 下方工具列的 Link，填 label 與 URL | 插入 `[label](url)` |
 | G3 | 開 `kitchen-sink.md` 的 Frontmatter，改 title 與 tags | 原始碼的 frontmatter 跟著改；其他欄位不變 |
 | G4 | 對沒有 frontmatter 的檔 Add Frontmatter | 檔案開頭加上 `---` 區塊 |
 | G5 | 開 `broken-frontmatter.md` 的 Frontmatter | 顯示錯誤與原文；原始碼一個字都沒被改 |
-| G6 | Find 搜尋中文詞，Find Next／Find Previous | 計數正確，會捲到並選取該處 |
+| G6 | Find（放大鏡）開啟 Find and Replace，搜尋中文詞，Find Next／Find Previous | 計數正確，會捲到並選取該處 |
 | G7 | Replace 一次 | 只換目前那一處；一步 Undo 可還原 |
 | G8 | Replace All | 全部換掉；一步 Undo 全部還原 |
 | G9 | Insert Image → Photos，選一張照片 | 圖檔存進文件旁的資料夾，插入 `![](…)`，預覽看得到 |
-| G10 | Insert Image → Files，選一張圖 | 同 G9 |
+| G10 | Insert Image → Files，選一張圖 | 同 G9（圖片實際插入，不會在選完檔案後無聲消失） |
 | G11 | 開始插入圖片後按 Cancel | 文件沒有變，沒有留下孤兒圖檔 |
 | G12 | 只開單一檔案（不是資料夾）時插入圖片 | 要求先選資料夾，不會自己寫到別處 |
 
@@ -151,10 +185,10 @@ M0 原型的結果都不能代替這裡的任何一項。
 | # | 步驟 | 通過條件 |
 |---|---|---|
 | H1 | 開飛航模式，開 `kitchen-sink.md` 看 Preview | 表格、程式碼上色、數學式、Mermaid 圖都正常 |
-| H2 | 在 Source 打字後切到 Preview | 是最新內容 |
+| H2 | 在 Source 打字後切到 Preview | 是最新內容；鍵盤自動收起；字的大小正常，不是縮小的整頁 |
 | H3 | 開 `kitchen-sink.mdx` 看 Preview | 元件顯示為卡片，import 顯示為一行標籤；沒有空白頁 |
 | H4 | 在 mdx 裡打一個沒關的 `<Tag`，看 Preview | 顯示錯誤橫幅，下面保留上一次的畫面 |
-| H5 | 文件裡放一張 `https://` 圖片，設定保持預設 | 不載入；在 Settings 開 Allow remote images 後才載入 |
+| H5 | 文件裡放一張 `https://` 圖片，設定保持預設 | 不載入；在 Settings › Preview 開 Allow remote images 後才載入 |
 | H6 | 資料夾模式下看 `scratch.md` 的 Preview | `assets/sample.png` 顯示 |
 | H7 | 點預覽裡的勾選框 | 原始碼對應那行的 `[ ]`／`[x]` 跟著變 |
 | H8 | 點預覽裡的外部連結 | 用 Safari 開，只開一次 |
@@ -182,12 +216,12 @@ K1–K2 是 #264 修的問題，請特別看。
 
 | # | 步驟 | 通過條件 |
 |---|---|---|
-| K1 | 系統設深色；Settings → Editor appearance 選 Light | 編輯器底色、文字、行號欄全部是淺色，沒有深色殘留 |
-| K2 | 系統設淺色；Editor appearance 選 Dark | 全部是深色 |
-| K3 | Editor appearance 選 System，切換系統外觀 | 跟著系統變 |
+| K1 | 系統設深色；Settings › Editor › Appearance 選 Light | 編輯器底色、文字、行號欄全部是淺色，沒有深色殘留 |
+| K2 | 系統設淺色；Editor 的 Appearance 選 Dark | 全部是深色 |
+| K3 | Editor 的 Appearance 選 System，切換系統外觀 | 跟著系統變 |
 | K4 | 文件最後一行按 Enter 留一個空行 | 那個空行有行號 |
 | K5 | 很長、會折行的段落 | 只有第一個顯示行有行號 |
-| K6 | 改 Editor font size、Line numbers、Theme | 立刻生效；重開 App 後還在 |
+| K6 | 改 Font size、Line numbers、Theme | 立刻生效；重開 App 後還在 |
 | K7 | 開 Typewriter sync，在長文件中間打字後切到 Preview | 預覽停在打字的那一段附近 |
 
 ## L. iPad
@@ -197,9 +231,9 @@ K1–K2 是 #264 修的問題，請特別看。
 | # | 步驟 | 通過條件 |
 |---|---|---|
 | L1 | 在 iPad 上重做 A2–A3、B1–B5、D1、D4 | 同各項 |
-| L2 | 橫向全螢幕 | 原始碼與預覽並排，兩邊是同一份文件 |
+| L2 | 橫向全螢幕。若看到的是 Source／Preview 切換而不是並排，把左邊的檔案側欄收起來（並排需要內容區 900 pt 以上） | 原始碼與預覽並排，兩邊是同一份文件 |
 | L3 | 旋轉、Split View、Slide Over 之間切換 | 文字、游標、Undo 都保留；窄的時候改為切換式 |
-| L4 | 接實體鍵盤：打字、⌘Z、⌘⇧Z、⌘F | 都作用在目前的編輯器 |
+| L4 | 接實體鍵盤：打字、⌘Z、⌘⇧Z、⌘B、⌘I、⌘F | 都作用在目前的編輯器；⌘Z 一次只還原一步 |
 | L5 | 實體鍵盤下用注音選字 | 同 D1 |
 
 ## M. 無障礙（有時間再做）
