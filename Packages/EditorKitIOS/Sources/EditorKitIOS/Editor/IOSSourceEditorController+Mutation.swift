@@ -59,7 +59,7 @@ extension IOSSourceEditorController {
     }
 
     func performOutdent() {
-        guard let installation, installation.canWrite, textView.markedTextRange == nil, !isMutating else {
+        guard isHostAlive, let installation, installation.canWrite, textView.markedTextRange == nil, !isMutating else {
             return
         }
         let selection = textView.selectedRange
@@ -209,27 +209,7 @@ extension IOSSourceEditorController {
         let current = plainText()
         guard !ExactSourceFragment.matches(current, installation.session.text) else { return }
         installation.session.replaceTextFromAuthorizedEditor(current, refreshStatistics: false)
-        let version = installation.session.version
-        // Count off the main actor; drop the result if the session's version or text
-        // changed before it returns to the main actor.
-        Task.detached(priority: .utility) { [weak self] in
-            let statistics = TextStatistics(text: current)
-            await self?.republishDeferredStatistics(statistics, version: version, text: current)
-        }
-    }
-
-    private func republishDeferredStatistics(
-        _ statistics: TextStatistics,
-        version: Int,
-        text: String
-    ) {
-        guard let session = installation?.session, session.version == version, ExactSourceFragment.matches(
-            session.text,
-            text
-        ), session.statistics != statistics else { return }
-        session.applyStatistics(statistics)
-        // Chrome reads the editor snapshot, which was emitted before this count finished.
-        emitSnapshot()
+        scheduleStatisticsRefresh(for: installation.session)
     }
 
     func consumeSelectionEpoch() {

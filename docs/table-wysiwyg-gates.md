@@ -206,8 +206,8 @@ reveals a construct's raw syntax when the caret touches it. For tables v1 combin
   source mode; pasting a pipe adds a cell on the next pass.
 
 ### T5 — IME (owner-run)
-- [ ] `PLAINSONG_RUN_ACTUAL_IME=1` Zhuyin (`com.apple.inputmethod.TCIM.Zhuyin`) and
-  Pinyin – Traditional (`com.apple.inputmethod.TCIM.Pinyin`) composition in a header cell, a
+- [ ] `PLAINSONG_RUN_ACTUAL_IME=1` Zhuyin (`com.apple.inputmethod.TCIM.Zhuyin`)
+  composition in a header cell, a
   body cell's first, middle and last column, an empty cell, and a cell adjacent to a folded
   inline construct: no source corruption, no caret escape, no premature commit, table
   presentation skipped while marked text exists (the existing rule), the candidate window

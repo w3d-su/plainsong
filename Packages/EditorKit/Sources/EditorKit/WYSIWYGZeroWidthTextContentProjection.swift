@@ -86,6 +86,9 @@ final class WYSIWYGZeroWidthTextContentStorageDelegate: NSObject, NSTextContentS
                 range: NSRange(location: imageMarker.range.location, length: 1)
             )
         }
+        if !imageMarkers.isEmpty {
+            WYSIWYGImagePresentationMetrics.paintLinesWhereLaidOut(in: paragraph)
+        }
 
         for tableMarker in tableMarkers {
             tableMarker.marker.project(into: paragraph, rowLocation: tableMarker.range.location)

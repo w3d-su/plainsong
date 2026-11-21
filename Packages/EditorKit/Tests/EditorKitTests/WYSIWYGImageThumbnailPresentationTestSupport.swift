@@ -100,6 +100,7 @@ enum WYSIWYGImageThumbnailGateSupport {
         delayNanoseconds: UInt64 = 0,
         linkFoldingEnabled: Bool = true,
         refreshProxy: EditorImageThumbnailRefreshProxy? = nil,
+        lineHeightMultiple: CGFloat? = nil,
         file: StaticString = #filePath,
         line: UInt = #line
     ) throws -> WindowedEditor {
@@ -126,6 +127,13 @@ enum WYSIWYGImageThumbnailGateSupport {
         textView.isHorizontallyResizable = false
         textView.showsLineNumbers = false
         textView.font = MarkdownSyntaxHighlighter.defaultFont
+        if let lineHeightMultiple {
+            // `MarkdownTextView.makeNSView` installs this style (1.25 in the app).
+            let paragraphStyle = NSMutableParagraphStyle()
+            paragraphStyle.setParagraphStyle(.default)
+            paragraphStyle.lineHeightMultiple = lineHeightMultiple
+            textView.defaultParagraphStyle = paragraphStyle
+        }
         textView.text = source
         textView.textSelection = selection
         let coordinator = MarkdownTextViewCoordinator(

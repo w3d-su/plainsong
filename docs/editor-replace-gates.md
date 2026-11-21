@@ -111,7 +111,7 @@
 > message withdraws once its inspection settles; and a single Replace speaks
 > "Replaced 1 match". R8's in-process bullets and R6 deterministic bullets 1–4
 > close; R8 itself stays open on its owner Full Keyboard Access smoke, and R6's
-> owner Zhuyin/Pinyin bullets, R9 and R10 stay open. See
+> owner Zhuyin bullets, R9 and R10 stay open. See
 > [PR H verification](evidence/editor-replace-h-20261006.json).
 >
 > Check a gate only with named-test or owner-recorded evidence in the same
@@ -586,10 +586,11 @@ new composition invalidates the action ID and drops the plan before writer
 activation.
 
 R6 includes deterministic marked-text tests, but only the owner-run real macOS
-Zhuyin/Pinyin harness closes the boundary gate. It follows the existing
+Zhuyin harness closes the boundary gate (Pinyin is not tested,
+`decisions/2026-11-17-zhuyin-only-ime-testing.md`). It follows the existing
 opt-in TIS/CGEvent precedent and covers source mode plus Experimental WYSIWYG
 at plain text, a folded delimiter, a hidden link-destination edge, and an image
-region boundary. A skipped/non-composing Pinyin source is not passing evidence.
+region boundary. A skipped/non-composing Zhuyin source is not passing evidence.
 Proposed owner command:
 `cd Packages/EditorKit && PLAINSONG_RUN_ACTUAL_IME=1 swift test --filter EditorReplaceActualIMEGateTests`.
 
@@ -749,7 +750,7 @@ latency work or edit its shared surfaces concurrently.
 | **F — Experimental WYSIWYG** | Single-Replace raw-source reveal/suspend/reapply for folded delimiter, hidden link destination, and image region; source+preview publication. | R5 single-Replace/source-preview bullets; R5 remains open |
 | **G — Replace All pipeline** | R0-approved executor, bounded off-main cancellable plan/progress, stale-drop, output/ceiling refusal, changed/total reporting, one rescan, mapped anchor, one undo, and one batch WYSIWYG suspend/reapply. | R4, R5 batch bullet, and Replace All portions of R2/R3 |
 | **H — product UI + deterministic IME** | Expand existing bar; owned replacement field; menu/responder routing and visibility eligibility; focus-token arbitration; blocked/progress/accessibility states; deterministic marked-text tests. | R6 deterministic half and R8 |
-| **I — acceptance/performance** | XCUITest, owner-run real Zhuyin/Pinyin boundary harness, and `Fixtures/large-1mb.md` Replace All/cancellation/typing-latency measurements. | R6 owner half, R9, R10 |
+| **I — acceptance/performance** | XCUITest, owner-run real Zhuyin boundary harness, and `Fixtures/large-1mb.md` Replace All/cancellation/typing-latency measurements. | R6 owner half, R9, R10 |
 
 Before declaring an implementation PR done: relevant package/hosted tests,
 `make format`, `make lint`, `make test`, `make build`, and
@@ -1204,7 +1205,7 @@ hosted spike PR #112.
   callbacks run only after a failed explicit batch. This is structural
   typing-path evidence, not an idle-machine latency measurement; R9 stays open.
 
-### R6 — Marked text + real Zhuyin/Pinyin boundaries
+### R6 — Marked text + real Zhuyin boundaries
 
 - [x] Deterministic tests refuse Replace/Replace All while marked text exists
   in the editor, query field, or replacement field.
@@ -1215,7 +1216,7 @@ hosted spike PR #112.
 - [x] Marked text beginning in any of the three owners during Replace All
   planning invalidates the action at final pre-commit recheck, with no queued
   post-composition mutation.
-- [ ] Owner-run real macOS Zhuyin **and composition-capable Pinyin** harness
+- [ ] Owner-run real macOS Zhuyin harness
   covers source mode and Experimental WYSIWYG at plain text, folded delimiter,
   hidden link destination, and image-region boundaries.
 - [ ] Owner evidence records TIS input-source IDs, real event route, no skipped
@@ -1663,5 +1664,5 @@ writer-authority contract.
 | Role | Responsibility |
 |---|---|
 | Implementer | Start with R0; named evidence for every checked R-gate; preserve layering, authority, and exact local-versus-hosted performance claims. |
-| Owner | Decide whether to override the three §10 defaults; run real Zhuyin/Pinyin R6 evidence; decide product redesign only if R0 is NO-GO. |
+| Owner | Decide whether to override the three §10 defaults; run real Zhuyin R6 evidence; decide product redesign only if R0 is NO-GO. |
 | Maintainer | Review/squash-merge each PR after green CI. Never permit a self-merge or direct push to `main`. |

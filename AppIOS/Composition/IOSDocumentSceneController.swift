@@ -48,6 +48,7 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     var editorObservation: (any IOSObservation)?
     var previewObservation: (any IOSObservation)?
     var renderTask: Task<Void, Never>?
+    var pendingRenderRevision: IOSDocumentRevision?
     var renderedRevision: IOSDocumentRevision?
     lazy var reloadRelay = IOSDocumentReloadRelay(documents: documents, editor: editor)
     /// `md` or `mdx`. Anything else stays Markdown so a bad setting cannot invent a type.
@@ -366,6 +367,7 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
         reloadRelay.detach()
         renderTask?.cancel()
         renderTask = nil
+        pendingRenderRevision = nil
         if let handle, let bindingID {
             editor.detach(expected: handle.identity, bindingID: bindingID)
         }
