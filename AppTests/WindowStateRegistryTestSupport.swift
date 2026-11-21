@@ -90,7 +90,8 @@ struct SecondWindowRegistryFixture {
     }
 
     /// Takes `second` off window 2 by showing `third` there, so no inventory lists `second`.
-    /// (An untitled document with no ownership record would make Save Copy fail closed.)
+    /// (An untitled document that holds text and has no ownership record would make Save Copy
+    /// fail closed; an empty window's untouched document does not.)
     func hideSecond() {
         secondWindow.shownSession = third
     }

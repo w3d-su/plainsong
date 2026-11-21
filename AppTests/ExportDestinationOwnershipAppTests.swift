@@ -173,6 +173,18 @@ final class ExportDestinationOwnershipAppTests: XCTestCase {
         let untitledApp = AppState(shouldRestoreLastOpenedFile: false)
         let root = try makeTemporaryDirectory()
         let exportURL = root.appendingPathComponent("untitled.html")
+        // An empty window's untouched document owns nothing (Windows PR D2), so the walk skips
+        // it. Typing makes it an untitled document whose unavailable proof the walk must
+        // refuse unless it is the export's own source.
+        XCTAssertEqual(
+            try untitledApp.exportArtifactDestinationOwnership(
+                for: inspection(of: exportURL),
+                exportSource: nil
+            ),
+            .permitted,
+            "an empty window's untouched document is not an owner"
+        )
+        untitledApp.shownSession.replaceText("untitled draft")
 
         XCTAssertEqual(
             try untitledApp.exportArtifactDestinationOwnership(

@@ -194,11 +194,15 @@ final class WindowFacadeReopenQueueAppTests: XCTestCase {
         )
         XCTAssertEqual(ran, [2], "the expired command does not replay")
         KeyWindowRouter.shared.closeFacade(owner)
-        XCTAssertTrue(
+        XCTAssertFalse(
             owner.registry.connectedWindows.contains { $0 === owner.windowState },
-            "closing the retried owner keeps its document"
+            "a closed window, the app-owned one included, leaves every inventory (PR D2)"
         )
         _ = WindowFacadeHolder(owner: owner)
+        XCTAssertTrue(
+            owner.registry.connectedWindows.contains { $0 === owner.windowState },
+            "the next claim reconnects the app-owned window"
+        )
         WorkspaceSceneReopener.shared.performFileCommand(openScene: { opened += 1 }, action: { _ in })
         XCTAssertEqual(opened, 1, "a successful attach restores waiting for the next claimed scene")
     }

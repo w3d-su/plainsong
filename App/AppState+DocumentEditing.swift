@@ -94,7 +94,8 @@ extension AppState {
         if isWorkspaceLink {
             openWorkspaceFile(url)
         } else {
-            openExternalFile(url)
+            // A file outside this window's root follows the Open rule from this window (§5.2).
+            routeOpen(url)
         }
     }
 

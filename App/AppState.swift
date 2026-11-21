@@ -141,7 +141,7 @@ final class AppState: ObservableObject {
             wysiwygFallbackMessage: restoredLayout.fallbackMessage,
             replaceAuthority: registry.replaceAuthority
         )
-        finishConnecting(registerWindow: true, admitsFileOperations: true)
+        finishConnecting(registerWindow: true, admitsFileOperations: true, retainsShownSessionOwnership: true)
     }
 
     /// A later workspace scene on an existing registry. An admitted sibling registers its
@@ -160,21 +160,32 @@ final class AppState: ObservableObject {
             wysiwygFallbackMessage: restoredLayout.fallbackMessage,
             replaceAuthority: registry.replaceAuthority
         )
-        finishConnecting(registerWindow: admitsFileOperations, admitsFileOperations: admitsFileOperations)
+        // A sibling's untouched blank owns nothing, so it takes no ownership record: a sibling
+        // that goes away before its window closes must not leave one keyed by an address a
+        // later session can reuse (Windows PR D2).
+        finishConnecting(
+            registerWindow: admitsFileOperations,
+            admitsFileOperations: admitsFileOperations,
+            retainsShownSessionOwnership: false
+        )
     }
 
     func makeSiblingFacade(admitsFileOperations: Bool) -> AppState {
         AppState(sharing: registry, admitsFileOperations: admitsFileOperations)
     }
 
-    private func finishConnecting(registerWindow: Bool, admitsFileOperations: Bool) {
+    private func finishConnecting(
+        registerWindow: Bool,
+        admitsFileOperations: Bool,
+        retainsShownSessionOwnership: Bool
+    ) {
         connectContainers(registerWindow: registerWindow)
         WindowOpenAdmission.set(windowState, admits: admitsFileOperations)
         KeyWindowRouter.shared.track(self)
         installSharedRegistryHook()
         installPreferencesFanoutIfNeeded()
         observeCurrentDocument()
-        if admitsFileOperations {
+        if admitsFileOperations, retainsShownSessionOwnership {
             retainUnanchoredManagedSessionOwnership(for: shownSession)
         }
     }

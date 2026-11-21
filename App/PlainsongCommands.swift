@@ -1,3 +1,4 @@
+import AppKit
 import EditorKit
 import MarkdownCore
 import SwiftUI
@@ -25,6 +26,16 @@ struct PlainsongCommands: Commands {
         openWindow(id: WorkspaceSceneReopener.sceneID)
     }
 
+    /// The new scene takes the app-owned façade when no window shows it, else a new façade.
+    private func openNewWindow() {
+        WorkspaceSceneReopener.shared.installOpenScene(openWorkspaceScene)
+        guard let registry = WorkspaceSceneReopener.shared.knownOwner?.registry else {
+            openWorkspaceScene()
+            return
+        }
+        WorkspaceWindowRequests.shared.openNewWindow(on: registry, opener: openWorkspaceScene)
+    }
+
     private var snapshot: MenuBarSnapshot {
         menuBarState.snapshot
     }
@@ -35,6 +46,12 @@ struct PlainsongCommands: Commands {
                 performFileCommand { $0.newFile() }
             }
             .keyboardShortcut("n", modifiers: .command)
+
+            // WD3: ⌘N stays New File; New Window opens an empty window (§6.1).
+            Button("New Window") {
+                openNewWindow()
+            }
+            .keyboardShortcut("n", modifiers: [.command, .shift])
 
             Divider()
 
@@ -49,7 +66,7 @@ struct PlainsongCommands: Commands {
                 } else {
                     ForEach(snapshot.recentItemURLs, id: \.self) { url in
                         Button(url.lastPathComponent) {
-                            performFileCommand { $0.openExternalFile(url) }
+                            performFileCommand { $0.routeOpen(url) }
                         }
                     }
                 }
@@ -57,6 +74,14 @@ struct PlainsongCommands: Commands {
         }
 
         CommandGroup(replacing: .saveItem) {
+            // Replacing `.saveItem` also removed the system Close item, so ⌘W closed nothing.
+            // Like that item, Close reaches the key window through the responder chain: a
+            // workspace window runs its close lifecycle (§6.2), and Settings simply closes.
+            Button("Close") {
+                NSApp.sendAction(#selector(NSWindow.performClose(_:)), to: nil, from: nil)
+            }
+            .keyboardShortcut("w", modifiers: .command)
+
             Button("Save") {
                 commandTarget?.save()
             }

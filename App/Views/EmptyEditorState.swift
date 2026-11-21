@@ -26,7 +26,7 @@ struct EmptyEditorState: View {
 
                         ForEach(recentURLs, id: \.self) { url in
                             Button {
-                                appState.openExternalFile(url)
+                                appState.routeOpen(url)
                             } label: {
                                 Label(url.lastPathComponent, systemImage: url.hasDirectoryPath ? "folder" : "doc.text")
                             }
