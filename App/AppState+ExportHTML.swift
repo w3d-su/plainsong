@@ -22,8 +22,7 @@ extension AppState {
     }
 
     private var isExportHTMLFileBacked: Bool {
-        // `FileKind` owns the supported extensions, `.markdown` included.
-        shownSession.fileURL.map { FileKind(url: $0) != nil } ?? false
+        shownSession.fileURL.map { ["md", "mdx"].contains($0.pathExtension.lowercased()) } ?? false
     }
 
     static let exportHTMLWindowRegistered = Notification.Name("plainsong-export-document-window-registered")
