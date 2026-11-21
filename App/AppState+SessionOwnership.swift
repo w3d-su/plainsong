@@ -330,9 +330,11 @@ extension AppState {
             )
             detachedSessionURLs.remove(canonicalURL)
             cleanDetachedSessionRecords[sessionIdentity] = nil
-            if session === shownSession {
-                missingFilePrompt = nil
-                if changed { notifyEditorFindExternalContentDidReplace() }
+            for window in registry.connectedWindows where window.shownSession === session {
+                window.missingFilePrompt = nil
+            }
+            if session === shownSession, changed {
+                notifyEditorFindExternalContentDidReplace()
             }
         }
         recordKnownSessionDiskText(

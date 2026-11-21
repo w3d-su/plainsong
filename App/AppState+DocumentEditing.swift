@@ -107,6 +107,15 @@ extension AppState {
         if isWorkspaceLink {
             openWorkspaceFile(url)
         } else {
+            // Opening a file outside the workspace closes the workspace first. The sandbox
+            // grants no access to a file the user did not pick, so refuse before the close.
+            guard workspaceRootURL == nil || FileManager.default.isReadableFile(atPath: url.path) else {
+                present(
+                    CocoaError(.fileReadNoPermission, userInfo: [NSFilePathErrorKey: url.path]),
+                    title: "Could Not Open File"
+                )
+                return
+            }
             openExternalFile(url)
         }
     }
