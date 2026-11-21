@@ -67,6 +67,7 @@ public final class PreviewController: NSObject, ObservableObject {
     var exportPDFPageJoiner: (
         @Sendable ([Data], [CGFloat]) throws -> (data: Data, pageScales: [CGFloat])
     )?
+    var pdfPieceCapture = ExportPDFPieceCapture()
     var pendingHTMLExport: PendingHTMLExport?
     var pendingExportRender: PendingExportRender?
     private(set) var theme = "system"
@@ -329,6 +330,7 @@ public final class PreviewController: NSObject, ObservableObject {
         eventHub.invalidate()
         assetSchemeHandler.invalidateReads()
         failPendingExportWork(reason: "invalidated")
+        failPendingExportPDFPiece()
     }
 
     func shutdownForTesting() {
@@ -519,6 +521,7 @@ extension PreviewController: WKNavigationDelegate {
         resetRenderDispatch(keepingPending: !recoversFromWebContentTermination)
         viewportScrollQueue.reset()
         failPendingExportWork(reason: "web-content-process-terminated")
+        failPendingExportPDFPiece()
         scrollDeliveryState.failPendingDelivery()
         scrollDeliveryState = PreviewScrollDeliveryState()
         recoverFromWebContentTermination(resubmitting: newestRender)

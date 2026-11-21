@@ -34,6 +34,22 @@ final class ExportRenderLifecycleTests: XCTestCase {
         XCTAssertTrue(html.contains("Exact Export Render"))
     }
 
+    func testRenderedPageCapturesThroughWebKitPDF() async throws {
+        let controller = try support.makeController()
+        defer { controller.invalidate() }
+        controller.webView.frame = CGRect(x: 0, y: 0, width: 640, height: 480)
+        let result = await controller.renderForExport(change("# PDF piece\n\nBody text.\n"))
+        guard case .completed = result else {
+            return XCTFail("Expected an exact render completion, got \(result)")
+        }
+
+        let document = try await controller.captureExportPDF()
+
+        XCTAssertGreaterThanOrEqual(document.pageCount, 1)
+        XCTAssertFalse(document.data.isEmpty)
+        XCTAssertNil(controller.pdfPieceCapture.pending)
+    }
+
     func testNewerRenderSupersedesAPendingExportRender() async throws {
         try await assertPendingRenderFails(reason: "render-superseded") { controller, _ in
             _ = controller.renderForTesting(self.change("# Newer\n"))
