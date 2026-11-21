@@ -129,23 +129,25 @@ extension WorkspaceAnchoredFileSystem {
         hooks: Hooks,
         _ body: (WriteStaging) throws -> T
     ) throws -> T {
+        // Reaching here means the parent refused the sibling with EPERM/EACCES. When no
+        // separate directory can stand in, that refusal is the reason the write failed.
         let directoryURL: URL
         do {
             directoryURL = try hooks.itemReplacementDirectory(for: location.fileURL)
         } catch {
-            throw WorkspaceAnchoredFileSystemError.unreadable
+            throw WorkspaceAnchoredFileSystemError.writeNotPermitted
         }
         let authority: WorkspaceFileSystemRootAuthority
         do {
             authority = try WorkspaceFileSystemRootAuthority(rootURL: directoryURL)
         } catch {
-            throw WorkspaceAnchoredFileSystemError.unreadable
+            throw WorkspaceAnchoredFileSystemError.writeNotPermitted
         }
         // Never stage in (or later remove) the destination parent itself, the directory that
         // just refused the sibling.
         let parentIdentity = try directoryDescriptorIdentity(parentDescriptor)
         guard authority.physicalIdentity != parentIdentity else {
-            throw WorkspaceAnchoredFileSystemError.unreadable
+            throw WorkspaceAnchoredFileSystemError.writeNotPermitted
         }
         defer {
             removeEmptyStagingDirectory(
@@ -155,7 +157,7 @@ extension WorkspaceAnchoredFileSystem {
         }
         // Publication must stay one atomic rename on the destination's device, never a copy.
         guard authority.physicalIdentity.device == parentIdentity.device else {
-            throw WorkspaceAnchoredFileSystemError.unreadable
+            throw WorkspaceAnchoredFileSystemError.writeNotPermitted
         }
         let anchor = try WorkspaceFileSystemLocation(
             rootAuthority: authority,
@@ -181,7 +183,7 @@ extension WorkspaceAnchoredFileSystem {
     ) {
         guard let path = try? WorkspaceLiteralFileURL.absolutePath(of: url) else { return }
         var status = stat()
-        guard path.withCString({ Darwin.lstat($0, &status) }) == 0,
+        guard path.withCStringPreservingErrno({ Darwin.lstat($0, &status) }) == 0,
               (status.st_mode & S_IFMT) == S_IFDIR,
               WorkspaceFileSystemIdentity(
                   device: UInt64(UInt32(bitPattern: status.st_dev)),
@@ -190,7 +192,7 @@ extension WorkspaceAnchoredFileSystem {
         else {
             return
         }
-        _ = path.withCString { Darwin.rmdir($0) }
+        _ = path.withCStringPreservingErrno { Darwin.rmdir($0) }
     }
 
     /// `renameatx_np` between the staging directory and the destination parent. Sibling
@@ -202,8 +204,8 @@ extension WorkspaceAnchoredFileSystem {
         _ destination: String,
         flags: UInt32
     ) -> Int32 {
-        source.withCString { sourcePath in
-            destination.withCString { destinationPath in
+        source.withCStringPreservingErrno { sourcePath in
+            destination.withCStringPreservingErrno { destinationPath in
                 Darwin.renameatx_np(
                     sourceDescriptor,
                     sourcePath,
