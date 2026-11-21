@@ -78,6 +78,15 @@ final class IOSReplaceAllMainActorProbeTests: XCTestCase {
         return session
     }
 
+    /// Mirrors one ExactSourceFragment check in IOSSourceEditorController.refusal(for:);
+    /// apply runs it twice on the unchanged text before the native edit.
+    private func applyGuardMS(_ host: ProbeEditorHost) -> String {
+        let mark = now()
+        _ = (host.controller.textView.textStorage.string as NSString)
+            .compare(host.session.text, options: .literal) == .orderedSame
+        return ms(mark)
+    }
+
     private func measure(bytes: Int, matches: Int) async throws -> String {
         let text = fixture(bytes: bytes, matches: matches)
         let host = try ProbeEditorHost(text: text)
@@ -113,6 +122,7 @@ final class IOSReplaceAllMainActorProbeTests: XCTestCase {
             preWriteCaretUTF16: snapshot.selection.location, postWriteSource: post
         )
         let rescan = ms(mark)
+        let guardCheck = applyGuardMS(host)
 
         // The real command, end to end, synchronously on the main actor.
         timed.reset()
@@ -132,7 +142,7 @@ final class IOSReplaceAllMainActorProbeTests: XCTestCase {
         return "total=\(total) apply=\(timed.applyMS) captures=\(timed.captureMS) " +
             "captureCount=\(timed.captureCount) capture1=\(capture) " +
             "plan=\(planning) slice=\(slice) source=\(source) rescan=\(rescan) " +
-            "verify=\(verify) layoutAfter=\(layout)"
+            "verify=\(verify) applyGuard=\(guardCheck) layoutAfter=\(layout)"
     }
 }
 
