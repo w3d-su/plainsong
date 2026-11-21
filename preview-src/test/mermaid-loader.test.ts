@@ -1,3 +1,4 @@
+import { MERMAID_SECURE_KEYS } from "../src/mermaid-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BridgeMessage, RenderPayload } from "../src/bridge";
 import {
@@ -17,8 +18,9 @@ function fakeMermaid() {
   };
 }
 
-const light = { startOnLoad: false, securityLevel: "strict", suppressErrorRendering: true, theme: "default" } as const;
-const dark = { startOnLoad: false, securityLevel: "strict", suppressErrorRendering: true, theme: "dark" } as const;
+const base = { startOnLoad: false, securityLevel: "strict", suppressErrorRendering: true, secure: MERMAID_SECURE_KEYS } as const;
+const light = { ...base, theme: "default" } as const;
+const dark = { ...base, theme: "dark" } as const;
 
 function mermaidScripts(): HTMLScriptElement[] {
   return Array.from(
