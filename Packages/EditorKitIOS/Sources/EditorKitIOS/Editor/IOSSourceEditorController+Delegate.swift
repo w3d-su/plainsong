@@ -61,6 +61,9 @@ public extension IOSSourceEditorController {
             applyBaseTextStyle()
             raisePresentationFloor()
         }
+        if needsLineNumberChrome {
+            applyLineNumberChrome()
+        }
         scheduleHighlight()
     }
 }

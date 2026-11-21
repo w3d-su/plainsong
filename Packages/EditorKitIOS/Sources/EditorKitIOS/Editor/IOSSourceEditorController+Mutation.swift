@@ -84,10 +84,12 @@ extension IOSSourceEditorController {
             return false
         }
         guard isHostAlive, let installation else { return true }
+        // Before the marked-text pass-through: a composition that was in progress when
+        // access was revoked must not keep writing.
+        guard installation.canWrite else { return true }
         if textView.markedTextRange != nil {
             return false
         }
-        guard installation.canWrite else { return true }
         let fileKind = installation.session.fileKind
         guard IOSEditorBehavior.needsEvaluation(text, fileKind: fileKind),
               let command = IOSEditorBehavior.command(for: text, fileKind: fileKind),
@@ -197,12 +199,17 @@ extension IOSSourceEditorController {
     }
 
     private func canUseHistory() -> Bool {
-        isHostAlive && isCommandFocused && installation != nil && textView.markedTextRange == nil && !isMutating
+        isHostAlive && isCommandFocused && installation?.canWrite == true
+            && textView.markedTextRange == nil && !isMutating
     }
 
     func publishCurrentText() {
         guard let installation else { return }
-        let current = plainText()
+        guard installation.canWrite else {
+            restoreSessionTextAfterRefusedNativeEdit(installation.session)
+            return
+        }
+        let current = nativeSourceText()
         guard !ExactSourceFragment.matches(current, installation.session.text) else { return }
         installation.session.replaceTextFromAuthorizedEditor(current, refreshStatistics: false)
         let version = installation.session.version
