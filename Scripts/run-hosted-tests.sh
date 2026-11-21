@@ -9,7 +9,9 @@
 # the project. Unset does both here.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-args=(-project Plainsong.xcodeproj -scheme Plainsong -configuration Debug)
+# The package graph is the committed Package.resolved (Scripts/generate-project.sh):
+# a build that would resolve anything else fails here instead of in a release.
+args=(-project Plainsong.xcodeproj -scheme Plainsong -configuration Debug -onlyUsePackageVersionsFromResolvedFile)
 if [ -n "${XCODE_DERIVED_DATA:-}" ]; then
     args+=(-derivedDataPath "$XCODE_DERIVED_DATA")
 fi

@@ -39,8 +39,9 @@ bootstrap:
 	brew install xcodegen swiftformat swiftlint node
 	cd preview-src && npm ci
 
+# Also installs the committed package pins (Package.resolved) into the project.
 generate:
-	xcodegen generate
+	Scripts/generate-project.sh
 
 build: generate
 	xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug $(if $(XCODE_DERIVED_DATA),-derivedDataPath "$(XCODE_DERIVED_DATA)") build

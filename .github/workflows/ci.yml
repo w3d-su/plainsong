@@ -291,7 +291,7 @@ jobs:
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ${{ runner.temp }}/plainsong-dd/SourcePackages
-          key: xcode-spm-${{ hashFiles('project.yml', 'Packages/**/Package.swift', 'Packages/**/Package.resolved') }}
+          key: xcode-spm-${{ hashFiles('project.yml', 'Package.resolved', 'Packages/**/Package.swift', 'Packages/**/Package.resolved') }}
           restore-keys: xcode-spm-
 
       - name: Build for testing
