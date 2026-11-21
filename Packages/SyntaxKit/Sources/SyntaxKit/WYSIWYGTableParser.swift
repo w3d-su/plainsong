@@ -31,12 +31,14 @@ public extension MarkdownSyntaxParser {
     /// context is restored afterwards, so the range never starts inside fenced code.
     static func tableParseRange(in source: String, expanding range: NSRange) -> WYSIWYGTableParseRange {
         let text = source as NSString
-        guard range.length > 0, NSMaxRange(range) <= text.length else {
+        // An unvalidated caller range can be negative or have `location + length` past `Int.max`.
+        let (rangeEnd, overflow) = range.location.addingReportingOverflow(range.length)
+        guard range.location >= 0, range.length > 0, !overflow, rangeEnd <= text.length else {
             return WYSIWYGTableParseRange(range: range)
         }
         let lines = MarkdownTableLineScanner(text: text)
         var start = range.location
-        var end = NSMaxRange(range)
+        var end = rangeEnd
         var leadingCut: Int?
         var trailingCut: Int?
 
@@ -47,7 +49,7 @@ public extension MarkdownSyntaxParser {
             }
             leadingCut = block.startIsCut ? block.start : nil
         }
-        let lastLine = lines.lineStart(containing: NSMaxRange(range) - 1)
+        let lastLine = lines.lineStart(containing: rangeEnd - 1)
         if let block = lines.tableBlock(containing: lastLine) {
             let blockEnd = lines.nextLineStart(afterContentsEnd: block.contentsEnd)
             if blockEnd > end {
