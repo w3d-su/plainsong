@@ -7,7 +7,7 @@ import XCTest
 
 final class ExportRasterPixelBoundTests: XCTestCase {
     func testOrdinaryImageStillDecodes() throws {
-        XCTAssertEqual(ExportRasterSniffer.decodedMIMEType(of: try png(width: 64, height: 48)), "image/png")
+        XCTAssertEqual(try ExportRasterSniffer.decodedMIMEType(of: png(width: 64, height: 48)), "image/png")
     }
 
     func testImageAtTheBoundDecodesAndOnePastItIsRejectedBeforeDecoding() throws {
