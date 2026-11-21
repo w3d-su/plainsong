@@ -309,9 +309,15 @@ extension MarkdownSyntaxParser {
         let localSourceRange = nsRange(for: node)
         let sourceRange = nsRange(for: node, offset: baseLocation)
         let level = headingLevel(from: node)
-        let revealRange = (fragment as NSString)
-            .lineRange(for: localSourceRange)
-            .offset(by: baseLocation)
+        let storage = fragment as NSString
+        let firstLine = storage.markdownLineRange(containing: localSourceRange.location)
+        let lastLine = storage.markdownLineRange(
+            containing: max(localSourceRange.location, NSMaxRange(localSourceRange) - 1)
+        )
+        let revealRange = NSRange(
+            location: firstLine.location,
+            length: NSMaxRange(lastLine) - firstLine.location
+        ).offset(by: baseLocation)
 
         let contentRange = node.child(byFieldName: "heading_content")
             .map { headingContentRange(for: $0, fragment: fragment, baseLocation: baseLocation) }

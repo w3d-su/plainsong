@@ -166,7 +166,7 @@ extension MarkdownSyntaxParser {
         if end - start < visibleHighlightMinimumLength {
             let targetEnd = min(nsSource.length, start + visibleHighlightMinimumLength)
             let seed = min(max(targetEnd, 0), nsSource.length - 1)
-            end = max(end, NSMaxRange(nsSource.lineRange(for: NSRange(location: seed, length: 0))))
+            end = max(end, NSMaxRange(nsSource.markdownLineRange(containing: seed)))
         }
 
         let context = MarkdownFenceScanner.contextRange(
@@ -180,8 +180,8 @@ extension MarkdownSyntaxParser {
         let fallbackLocation = min(range.location, max(0, source.length - 1))
         let startLocation = min(max(fallbackLocation, 0), source.length - 1)
         let lastLocation = min(max(NSMaxRange(range) - 1, startLocation), source.length - 1)
-        let startLine = source.lineRange(for: NSRange(location: startLocation, length: 0))
-        let endLine = source.lineRange(for: NSRange(location: lastLocation, length: 0))
+        let startLine = source.markdownLineRange(containing: startLocation)
+        let endLine = source.markdownLineRange(containing: lastLocation)
         return NSRange(location: startLine.location, length: NSMaxRange(endLine) - startLine.location)
     }
 }
