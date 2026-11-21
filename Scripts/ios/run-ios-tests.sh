@@ -56,7 +56,7 @@ if ! grep -qE '^[^#[:space:]]' "$manifest"; then
 fi
 [ -s "$required_tests" ] || ios_die "required named-test manifest is missing or empty: $required_tests" 65
 
-xcodegen generate
+Scripts/generate-project.sh
 
 head="$(git rev-parse HEAD)"
 head12="${head:0:12}"
