@@ -39,15 +39,17 @@ extension AppState {
                 ?? url
             throw MarkdownFileStoreError.writeRequiresReconciliation(reconciliationURL, indeterminate)
         }
-        let hasMatchingMissingPrompt = missingFilePrompt.map {
-            exactFileURLSpellingMatches($0.fileURL, url)
-        } ?? false
+        // The session may be shown by another window; its prompt blocks this save too.
+        let promptWindows = registry.connectedWindows
+        let hasMatchingMissingPrompt = promptWindows.contains {
+            $0.missingFilePrompt.map { exactFileURLSpellingMatches($0.fileURL, url) } ?? false
+        }
         guard !detachedSessionURLs.contains(url), !hasMatchingMissingPrompt else {
             throw AppStateError.missingFile(url)
         }
-        let hasMatchingExternalChangePrompt = externalChangePrompt.map {
-            exactFileURLSpellingMatches($0.fileURL, url)
-        } ?? false
+        let hasMatchingExternalChangePrompt = promptWindows.contains {
+            $0.externalChangePrompt.map { exactFileURLSpellingMatches($0.fileURL, url) } ?? false
+        }
         guard pendingExternalTexts[url] == nil,
               pendingExternalFileVersions[url] == nil,
               !hasMatchingExternalChangePrompt,
@@ -248,13 +250,6 @@ extension AppState {
     func acknowledgeFileWriteArtifactNotice(id: FileWriteArtifactNotice.ID) {
         fileWriteArtifactNotices.removeAll { $0.id == id }
         KeyWindowRouter.shared.forgetNotice(id)
-    }
-
-    func cancelForegroundDocumentTasks() {
-        autosaveTask?.cancel()
-        autosaveTask = nil
-        statisticsTask?.cancel()
-        statisticsTask = nil
     }
 
     func moveCurrentDocumentWorkToBackgroundBeforeSwitch() {

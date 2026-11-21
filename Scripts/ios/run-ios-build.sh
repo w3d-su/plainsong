@@ -24,7 +24,7 @@ else
     destination='generic/platform=iOS Simulator'
 fi
 
-xcodegen generate
+Scripts/generate-project.sh
 
 head="$(git rev-parse HEAD)"
 head12="${head:0:12}"

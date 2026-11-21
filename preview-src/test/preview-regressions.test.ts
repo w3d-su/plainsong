@@ -100,4 +100,20 @@ describe("preview review regressions", () => {
     expect(mdx.textContent).not.toContain("payload");
     expect(mdx.textContent).not.toContain("bad()");
   });
+
+  it("keeps a remote-image setting that arrives while the render is suspended", async () => {
+    const payload: RenderPayload = {
+      renderID: 1, version: 0, text: "![](https://example.com/a.png)", fileKind: "md", assetRootID: "root-a",
+      baseDir: null, theme: "light", allowRemoteImages: true,
+    };
+    window.PlainsongBridge.receive({ name: "render", payload });
+    // The pipeline is still running: nothing is in the document yet.
+    expect(document.querySelector("img")).toBeNull();
+    window.PlainsongBridge.receive({ name: "setTheme", payload: { theme: "light", allowRemoteImages: false } });
+    await vi.waitFor(() => expect(messages.some((message) => message.name === "renderComplete")).toBe(true));
+
+    const image = document.querySelector("img")!;
+    expect(image.hasAttribute("src")).toBe(false);
+    expect(image.dataset.plainsongBlockedSrc).toBe("https://example.com/a.png");
+  });
 });

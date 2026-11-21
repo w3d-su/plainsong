@@ -143,6 +143,42 @@ final class FindHighlightRepresentableTests: XCTestCase {
         print("F8 shifted-marker close cleanup: \(cleanup)")
     }
 
+    func testScrollingPastTheMaterialisedWindowDecoratesTheMatchesThere() throws {
+        // Far enough that the first window cannot hold the last match, and no syntax
+        // highlight is involved: the viewport report alone has to re-materialise.
+        let line = "filler line of text\n"
+        let body = String(repeating: line, count: EditorFindMatchHighlight.visibleRangePadding)
+        let source = "needle\n" + body + "needle"
+        let first = NSRange(location: 0, length: 6)
+        let last = NSRange(location: (source as NSString).length - 6, length: 6)
+        let model = Model(text: source)
+        let view = findRepresentable(model: model, identity: documentA, highlight: nil)
+        let fixture = try makeRepresentableFixture(view, source: source)
+        fixture.textView.layoutSubtreeIfNeeded()
+        fixture.coordinator.reportVisibleRangeIfNeeded(in: fixture.textView)
+        let open = findRepresentable(
+            model: model,
+            identity: documentA,
+            highlight: request(matches: [first, last])
+        )
+        open.updateRepresentedTextView(fixture.scrollView, coordinator: fixture.coordinator)
+        let textStorage = try storage(of: fixture)
+        XCTAssertNotNil(marker(in: textStorage, at: first.location))
+        XCTAssertNil(marker(in: textStorage, at: last.location), "the fixture must start windowed")
+
+        fixture.textView.scrollToVisible(NSRect(
+            x: 0, y: fixture.textView.frame.maxY - 1, width: 1, height: 1
+        ))
+        fixture.textView.layoutSubtreeIfNeeded()
+        fixture.coordinator.reportVisibleRangeIfNeeded(in: fixture.textView)
+
+        XCTAssertNotNil(
+            marker(in: textStorage, at: last.location),
+            "a match scrolled into view must be decorated without waiting for a highlight"
+        )
+        XCTAssertNil(marker(in: textStorage, at: first.location))
+    }
+
     final class Model {
         var text: String
 

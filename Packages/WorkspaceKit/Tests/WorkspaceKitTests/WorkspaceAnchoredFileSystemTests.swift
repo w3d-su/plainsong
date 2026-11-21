@@ -185,7 +185,7 @@ final class WorkspaceAnchoredFileSystemTests: XCTestCase {
         let expectedParentIsCaseSensitive = try caseSensitivity(at: root)
         let fileStatus = try noFollowStatus(at: file)
         let expectedIdentity = WorkspaceFileSystemIdentity(
-            device: UInt64(fileStatus.st_dev),
+            device: UInt64(UInt32(bitPattern: fileStatus.st_dev)),
             inode: UInt64(fileStatus.st_ino)
         )
 

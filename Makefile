@@ -23,7 +23,7 @@ SWIFTFORMAT_COMPAT_FLAGS := $(shell swiftformat --rules 2>/dev/null | grep -q wr
 SWIFTFORMAT_VERSION := 0.62.1
 SWIFTLINT_VERSION := 0.65.1
 
-.PHONY: bootstrap generate build run test test-packages test-hosted test-hosted-build test-hosted-shard test-preview test-f2-tooling format lint lint-style check-preview-layering preview-bundle release clean swiftformat-version-check
+.PHONY: bootstrap generate build test test-packages test-hosted test-hosted-build test-hosted-shard test-preview test-f2-tooling format lint lint-style check-preview-layering preview-bundle release clean swiftformat-version-check
 
 swiftformat-version-check:
 	@actual="$$(swiftformat --version 2>/dev/null || echo missing)"; \
@@ -39,8 +39,9 @@ bootstrap:
 	brew install xcodegen swiftformat swiftlint node
 	cd preview-src && npm ci
 
+# Also installs the committed package pins (Package.resolved) into the project.
 generate:
-	xcodegen generate
+	Scripts/generate-project.sh
 
 build: generate
 	xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug $(if $(XCODE_DERIVED_DATA),-derivedDataPath "$(XCODE_DERIVED_DATA)") build
@@ -99,6 +100,18 @@ test-f2-tooling:
 preview-bundle:
 	cd preview-src && npm run build
 
+# The app ships the committed App/Resources/preview/, not preview-src/. Fails when a
+# rebuild from preview-src/ (after `npm ci`) differs from what is committed.
+.PHONY: check-preview-bundle
+check-preview-bundle: preview-bundle
+	@changed="$$(git status --porcelain -- App/Resources/preview)"; \
+	if [ -n "$$changed" ]; then \
+		echo "error: App/Resources/preview is not the build of preview-src; run 'make preview-bundle' and commit the result:" >&2; \
+		echo "$$changed" >&2; \
+		exit 1; \
+	fi; \
+	echo "preview bundle is current"
+
 # Signed/notarized DMG (docs/release-engineering-plan.md P1-P3).
 # Requires PLAINSONG_SIGNING_IDENTITY and notary credentials; see Scripts/release.sh.
 release:
@@ -127,7 +140,7 @@ lint-style: swiftformat-version-check
 
 clean:
 	rm -rf Plainsong.xcodeproj
-	@for pkg in $(PACKAGES); do rm -rf Packages/$$pkg/.build; done
+	rm -rf build Packages/*/.build Packages/*/build
 
 # C0-only bootstrap (kept so the PR #157 reproduction commands stay valid);
 # superseded by the fixed ios-* entries below.
@@ -184,6 +197,12 @@ test-portable-core:
 		echo "==> portable swift test: $$pkg"; \
 		(cd Packages/$$pkg && swift test); \
 	done
+
+# Workflow and release tooling checks (Scripts/ci). Needs only python3, git and
+# bash, so CI runs it on Linux in the lint job.
+.PHONY: test-ci-tooling
+test-ci-tooling:
+	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s Scripts/ci/tests -p 'test_*.py' -v
 
 .PHONY: test-ios-tooling
 test-ios-tooling:

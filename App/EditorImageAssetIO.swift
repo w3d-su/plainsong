@@ -71,7 +71,7 @@ private func editorImageAssetNamespaceEntrySnapshot(
 ) -> EditorImageAssetNamespaceEntrySnapshot {
     EditorImageAssetNamespaceEntrySnapshot(
         identity: WorkspaceFileSystemIdentity(
-            device: UInt64(status.st_dev),
+            device: UInt64(UInt32(bitPattern: status.st_dev)),
             inode: UInt64(status.st_ino)
         ),
         fileType: status.st_mode & S_IFMT
@@ -101,7 +101,7 @@ func editorImageAssetStableMetadata(
     }
     return EditorImageAssetStableMetadata(
         identity: WorkspaceFileSystemIdentity(
-            device: UInt64(status.st_dev),
+            device: UInt64(UInt32(bitPattern: status.st_dev)),
             inode: UInt64(status.st_ino)
         ),
         byteCount: Int64(status.st_size),
@@ -124,7 +124,7 @@ func validateEditorImageNamespaceEntry(
     guard result == 0,
           (status.st_mode & S_IFMT) == S_IFREG,
           WorkspaceFileSystemIdentity(
-              device: UInt64(status.st_dev),
+              device: UInt64(UInt32(bitPattern: status.st_dev)),
               inode: UInt64(status.st_ino)
           ) == expectedIdentity
     else {

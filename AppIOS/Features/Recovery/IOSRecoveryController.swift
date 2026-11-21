@@ -26,6 +26,7 @@ final class IOSRecoveryController: ObservableObject {
     @Published private(set) var pickerRequest: IOSRecoveryPickerRequest?
     var onRestored: (() -> Void)?
     var onPresent: (() -> Void)?
+    var onDismissed: (() -> Void)?
 
     private let list: @MainActor () async -> IOSRecoveryList
     private let load: @MainActor (UUID) async throws -> IOSRecoveryRecord
@@ -78,6 +79,7 @@ final class IOSRecoveryController: ObservableObject {
         if restored {
             onRestored?()
         }
+        onDismissed?()
     }
 
     func refresh() async {

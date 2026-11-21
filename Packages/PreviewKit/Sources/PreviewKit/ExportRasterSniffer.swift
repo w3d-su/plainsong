@@ -17,7 +17,8 @@ enum ExportRasterSniffer {
               let mimeType = allowlistedMIMEType(identifier),
               CGImageSourceGetStatus(source) == .statusComplete,
               CGImageSourceGetCount(source) > 0,
-              CGImageSourceGetStatusAtIndex(source, 0) == .statusComplete
+              CGImageSourceGetStatusAtIndex(source, 0) == .statusComplete,
+              hasAcceptablePixelCount(source)
         else {
             return nil
         }
@@ -37,6 +38,25 @@ enum ExportRasterSniffer {
     }
 
     private static let decodeProofMaximumPixelSize = 16
+
+    /// 16,384 x 16,384. The thumbnail bounds the decoded bitmap but not the work: ImageIO
+    /// still inflates every source pixel, so a few MiB of highly compressed pixels cost
+    /// seconds per image. The header's dimensions are checked before that decode.
+    static let maximumPixelCount = 268_435_456
+
+    private static func hasAcceptablePixelCount(_ source: CGImageSource) -> Bool {
+        let options = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, options) as? [CFString: Any],
+              let width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue,
+              let height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue,
+              width > 0,
+              height > 0
+        else {
+            return false
+        }
+        let (count, overflow) = width.multipliedReportingOverflow(by: height)
+        return !overflow && count <= maximumPixelCount
+    }
 
     private static func allowlistedMIMEType(_ identifier: String) -> String? {
         switch identifier {

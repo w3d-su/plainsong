@@ -1,3 +1,4 @@
+import { MERMAID_SECURE_KEYS } from "../src/mermaid-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BridgeMessage, RenderPayload } from "../src/bridge";
 import {
@@ -17,8 +18,9 @@ function fakeMermaid() {
   };
 }
 
-const light = { startOnLoad: false, securityLevel: "strict", suppressErrorRendering: true, theme: "default" } as const;
-const dark = { startOnLoad: false, securityLevel: "strict", suppressErrorRendering: true, theme: "dark" } as const;
+const base = { startOnLoad: false, securityLevel: "strict", suppressErrorRendering: true, secure: MERMAID_SECURE_KEYS } as const;
+const light = { ...base, theme: "default" } as const;
+const dark = { ...base, theme: "dark" } as const;
 
 function mermaidScripts(): HTMLScriptElement[] {
   return Array.from(
@@ -162,5 +164,41 @@ describe("preview entry", () => {
     expect(api.render).toHaveBeenCalledTimes(2);
     expect(document.querySelectorAll(".mermaid-rendered svg")).toHaveLength(2);
     expect(mermaidScripts()).toHaveLength(1);
+  });
+});
+
+describe("preview entry with the system theme", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("draws diagrams dark under a dark appearance and redraws when it changes", async () => {
+    let listener: (() => void) | undefined;
+    const query = {
+      matches: true,
+      addEventListener: (_: string, callback: () => void) => { listener = callback; },
+    };
+    vi.stubGlobal("matchMedia", () => query);
+    vi.resetModules();
+    const messages: BridgeMessage[] = [];
+    document.body.innerHTML = '<main id="preview-root"></main>';
+    window.webkit = { messageHandlers: { bridge: {
+      postMessage: (message: BridgeMessage) => messages.push(message),
+    } } };
+    const api = fakeMermaid();
+    window.PlainsongMermaid = { default: api };
+    await import("../src/index");
+
+    const payload: RenderPayload = {
+      renderID: 1, version: 1, text: "```mermaid\nflowchart TD\n  A --> B\n```\n", fileKind: "md",
+      baseDir: null, assetRootID: "test-root", theme: "system", allowRemoteImages: false,
+    };
+    window.PlainsongBridge.receive({ name: "render", payload });
+    await vi.waitFor(() => expect(messages.some((message) => message.name === "renderComplete")).toBe(true));
+    expect(api.initialize.mock.calls.at(-1)).toEqual([dark]);
+    expect(api.render).toHaveBeenCalledTimes(1);
+
+    query.matches = false;
+    listener!();
+    await vi.waitFor(() => expect(api.render).toHaveBeenCalledTimes(2));
+    expect(api.initialize.mock.calls.at(-1)).toEqual([light]);
   });
 });

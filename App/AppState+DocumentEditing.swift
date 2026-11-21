@@ -20,8 +20,11 @@ extension AppState {
         applyDocumentText(newText, to: session)
     }
 
+    /// Any window may cancel: the shared foreground task always belongs to the home façade's
+    /// document, as the shared autosave task does.
     func cancelStatisticsRefresh(for session: DocumentSession) {
-        if session === shownSession {
+        let home = KeyWindowRouter.shared.home(for: registry) ?? self
+        if home.shownSession === session {
             statisticsTask?.cancel()
             statisticsTask = nil
         }
@@ -104,6 +107,15 @@ extension AppState {
         if isWorkspaceLink {
             openWorkspaceFile(url)
         } else {
+            // Opening a file outside the workspace closes the workspace first. The sandbox
+            // grants no access to a file the user did not pick, so refuse before the close.
+            guard workspaceRootURL == nil || FileManager.default.isReadableFile(atPath: url.path) else {
+                present(
+                    CocoaError(.fileReadNoPermission, userInfo: [NSFilePathErrorKey: url.path]),
+                    title: "Could Not Open File"
+                )
+                return
+            }
             openExternalFile(url)
         }
     }
@@ -618,7 +630,9 @@ extension AppState {
     }
 
     func moveCurrentStatisticsToBackground(for session: DocumentSession) {
-        guard session === shownSession else { return }
+        // Only the home façade's document uses the shared task; a sibling's count already
+        // runs per session and must not cancel the home document's.
+        guard session === shownSession, KeyWindowRouter.shared.isHome(self) else { return }
         let shouldReschedule = statisticsTask != nil
         statisticsTask?.cancel()
         statisticsTask = nil
@@ -628,7 +642,7 @@ extension AppState {
 
     private func scheduleStatisticsRefresh(for session: DocumentSession) {
         let sessionIdentity = ObjectIdentifier(session)
-        if session === shownSession {
+        if session === shownSession, KeyWindowRouter.shared.isHome(self) {
             sessionStatisticsTasks[sessionIdentity]?.task.cancel()
             sessionStatisticsTasks[sessionIdentity] = nil
             statisticsTask?.cancel()

@@ -117,4 +117,36 @@ final class WYSIWYGTableParseRangeTests: XCTestCase {
         XCTAssertNil(table.rawReason)
         XCTAssertEqual(table.sourceRange.location, text.range(of: "| a |").location)
     }
+
+    func testOutOfBoundsRangesAreReturnedUnchangedInsteadOfTrapping() {
+        let source = "| a | b |\n| - | - |\n| 1 | 2 |\n\ntext\n"
+        let ranges = [
+            NSRange(location: Int.max, length: 1),
+            NSRange(location: NSNotFound, length: 5),
+            NSRange(location: Int.max - 1, length: Int.max),
+            NSRange(location: -4, length: 6),
+            NSRange(location: -4, length: 16),
+            NSRange(location: Int.min, length: 1),
+            NSRange(location: 2, length: Int.max),
+        ]
+        for range in ranges {
+            XCTAssertEqual(
+                MarkdownSyntaxParser.tableParseRange(in: source, expanding: range),
+                WYSIWYGTableParseRange(range: range),
+                "\(range)"
+            )
+        }
+    }
+}
+
+final class NSRangeClampTests: XCTestCase {
+    func testClampDoesNotTrapWhenLocationPlusLengthOverflows() {
+        XCTAssertEqual(NSRange(location: 5, length: Int.max).clamped(toLength: 10), NSRange(location: 5, length: 5))
+        XCTAssertEqual(
+            NSRange(location: Int.max - 1, length: Int.max).clamped(toLength: 10),
+            NSRange(location: 10, length: 0)
+        )
+        XCTAssertEqual(NSRange(location: -4, length: 6).clamped(toLength: 10), NSRange(location: 0, length: 2))
+        XCTAssertEqual(NSRange(location: 2, length: 3).clamped(toLength: 10), NSRange(location: 2, length: 3))
+    }
 }

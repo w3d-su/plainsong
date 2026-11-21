@@ -59,9 +59,14 @@ private extension URL {
         return candidatePath == rootPath || candidatePath.hasPrefix("\(rootPath)/")
     }
 
+    /// Both ends resolve symlinks, as `isDescendant(of:)` and the `asset://` resolver do:
+    /// a root and a file spelled through different links (`/var` and `/private/var`, a
+    /// linked project folder) otherwise share no prefix and the base directory is lost.
     func pathRelative(to rootURL: URL) -> String? {
-        let rootPath = Self.normalizedDirectoryPath(rootURL.standardizedFileURL.path(percentEncoded: false))
-        let candidatePath = standardizedFileURL.path(percentEncoded: false)
+        let rootPath = Self.normalizedDirectoryPath(
+            rootURL.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
+        )
+        let candidatePath = standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
         guard candidatePath == rootPath || candidatePath.hasPrefix("\(rootPath)/") else { return nil }
 
         var relativePath = String(candidatePath.dropFirst(rootPath.count))

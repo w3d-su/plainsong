@@ -187,6 +187,9 @@ final class MarkdownSTTextView: STTextView {
 
         if window != nil {
             windowAttachmentHandler?(self)
+            // Leaving the last window removed the selection observer; a custom color
+            // set before that would no longer repaint new selections.
+            refreshEditorSelectionColor()
         } else {
             removeEditorSelectionColorObserver()
         }
@@ -206,10 +209,12 @@ final class MarkdownSTTextView: STTextView {
                 isSuppressingIntermediateMarkedTextRemoval = false
                 markedTextReplacementRange = nil
                 isMarkedTextReplacementRangeConfirmed = false
+                let lengthBeforeInsertion = (textContentManager as? NSTextContentStorage)?.textStorage?.length
                 super.insertText(string, replacementRange: effectiveReplacementRange)
                 ensureInsertionPointAfterInsertedText(
                     string,
-                    at: effectiveReplacementRange.location
+                    replacing: effectiveReplacementRange,
+                    lengthBeforeInsertion: lengthBeforeInsertion
                 )
                 return
             }
@@ -239,14 +244,6 @@ final class MarkdownSTTextView: STTextView {
         }
 
         textSelection = NSRange(location: 0, length: 0)
-    }
-
-    private func ensureInsertionPointAfterInsertedText(_ string: Any, at insertionLocation: Int) {
-        guard let insertedLength = Self.utf16Length(ofInsertedText: string) else {
-            return
-        }
-
-        textSelection = NSRange(location: insertionLocation + insertedLength, length: 0)
     }
 
     private func markedTextSnapshot() -> MarkedTextSnapshot? {
@@ -347,17 +344,6 @@ final class MarkdownSTTextView: STTextView {
 
     private func plainText() -> String? {
         (textContentManager as? NSTextContentStorage)?.textStorage?.string
-    }
-
-    private static func utf16Length(ofInsertedText string: Any) -> Int? {
-        switch string {
-        case let string as String:
-            string.utf16.count
-        case let attributedString as NSAttributedString:
-            attributedString.length
-        default:
-            nil
-        }
     }
 
     override func moveLeft(_ sender: Any?) {

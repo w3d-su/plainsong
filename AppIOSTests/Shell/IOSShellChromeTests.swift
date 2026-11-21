@@ -27,7 +27,9 @@ final class IOSShellChromeTests: XCTestCase {
                 return token
             }, release: { ended.append($0) }))
             let expiration = try XCTUnwrap(expire)
-            if expiresFirst { expiration() }
+            if expiresFirst {
+                expiration()
+            }
             await task.value
             expiration()
             XCTAssertEqual(ended, [token])
@@ -243,7 +245,12 @@ final class IOSShellChromeTests: XCTestCase {
         // Nothing selected uses the explicit directory grant's root.
         XCTAssertEqual(scene.newFileTarget?.relativePath, "")
 
-        scene.selectedEntryID = directory.id
+        // Tapping a folder row selects it; a file row or an unavailable folder does not.
+        XCTAssertFalse(scene.selectDirectory(file))
+        XCTAssertFalse(scene.selectDirectory(ShellFixtures.entry("gone", kind: .directory, availability: .unavailable)))
+        XCTAssertNil(scene.selectedEntryID)
+        XCTAssertTrue(scene.selectDirectory(directory))
+        XCTAssertEqual(scene.selectedEntryID, directory.id)
         XCTAssertEqual(scene.newFileTarget?.relativePath, "posts")
 
         scene.selectedEntryID = file.id

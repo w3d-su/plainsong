@@ -66,6 +66,9 @@ struct IOSWorkspaceBrowserView: View {
             IOSWorkspaceEntryRow(entry: entry)
                 .contentShape(Rectangle())
                 .onTapGesture {
+                    if scene.selectDirectory(entry) {
+                        return
+                    }
                     scene.openEntry(entry)
                     scene.navigateToDocument()
                 }
@@ -75,9 +78,11 @@ struct IOSWorkspaceBrowserView: View {
     }
 
     private func isTappable(_ entry: IOSWorkspaceEntry) -> Bool {
-        guard case .document = entry.kind else { return false }
         guard case .available = entry.availability else { return false }
-        return true
+        switch entry.kind {
+        case .document, .directory: return true
+        default: return false
+        }
     }
 }
 

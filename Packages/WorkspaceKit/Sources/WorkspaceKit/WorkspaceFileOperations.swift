@@ -360,7 +360,8 @@ public final class NSWorkspaceItemRecycler: WorkspaceItemRecycling, @unchecked S
             NSURL,
             AutoreleasingUnsafeMutablePointer<NSURL?>?,
             AutoreleasingUnsafeMutablePointer<NSError?>?
-        ) -> Bool
+        ) -> ObjCBool
+        // The method returns Objective-C `BOOL`, which is `signed char` on x86_64, not Swift `Bool`.
         let implementation = unsafeBitCast(
             fileManager.method(for: selector),
             to: TrashItemImplementation.self
@@ -373,7 +374,7 @@ public final class NSWorkspaceItemRecycler: WorkspaceItemRecycling, @unchecked S
             fileReferenceURL,
             &resultingURL,
             &error
-        ) else {
+        ).boolValue else {
             throw error ?? CocoaError(.fileWriteUnknown)
         }
         guard let resultingURL else {

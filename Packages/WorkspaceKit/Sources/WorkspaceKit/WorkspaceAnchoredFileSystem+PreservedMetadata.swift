@@ -80,7 +80,9 @@ extension WorkspaceAnchoredFileSystem {
         let read = buffer.withUnsafeMutableBytes {
             Darwin.fgetattrlist(source, &attributes, $0.baseAddress, $0.count, 0)
         }
-        guard read == 0 else { return }
+        // The leading length says how much the volume returned; a short reply has no timespec.
+        let returnedLength = buffer.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+        guard read == 0, Int(returnedLength) >= buffer.count else { return }
         var creationTime = buffer.withUnsafeBytes {
             $0.loadUnaligned(fromByteOffset: lengthSize, as: timespec.self)
         }

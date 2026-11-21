@@ -1,3 +1,4 @@
+import { MERMAID_SECURE_KEYS } from "../src/mermaid-renderer";
 import { describe, expect, it, vi } from "vitest";
 import {
   patchPreviewRoot,
@@ -148,6 +149,7 @@ describe("Mermaid preview DOM patching", () => {
           startOnLoad: false,
           securityLevel: "strict",
           suppressErrorRendering: true,
+          secure: MERMAID_SECURE_KEYS,
           theme: "default",
         },
       ],
@@ -156,6 +158,7 @@ describe("Mermaid preview DOM patching", () => {
           startOnLoad: false,
           securityLevel: "strict",
           suppressErrorRendering: true,
+          secure: MERMAID_SECURE_KEYS,
           theme: "dark",
         },
       ],

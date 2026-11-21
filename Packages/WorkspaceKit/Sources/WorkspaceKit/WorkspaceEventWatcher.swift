@@ -1,5 +1,6 @@
 import CoreServices
 import Foundation
+import WorkspaceCore
 
 /// Concurrency rule behind `@unchecked Sendable`:
 /// - `stream` is owned by the caller's thread (the main thread in the app): only `start()`,
@@ -77,11 +78,23 @@ public final class WorkspaceEventWatcher: @unchecked Sendable {
     public func start() {
         guard stream == nil else { return }
 
+        // The stream owns a box that holds the watcher weakly. A callback already on `queue`
+        // while the last reference goes away then loads `nil` instead of retaining an object
+        // that is being deinitialized.
+        let box = Unmanaged.passRetained(WeakWatcherBox(self))
+        defer { box.release() }
         var context = FSEventStreamContext(
             version: 0,
-            info: UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()),
-            retain: nil,
-            release: nil,
+            info: box.toOpaque(),
+            retain: { info in
+                guard let info else { return nil }
+                _ = Unmanaged<WeakWatcherBox>.fromOpaque(info).retain()
+                return info
+            },
+            release: { info in
+                guard let info else { return }
+                Unmanaged<WeakWatcherBox>.fromOpaque(info).release()
+            },
             copyDescription: nil
         )
         let flags = UInt32(
@@ -107,7 +120,11 @@ public final class WorkspaceEventWatcher: @unchecked Sendable {
         // Accept events before the stream starts delivering so the earliest batch
         // after a `stop()`/`start()` cycle is not dropped.
         runOnQueue { stopped = false }
-        FSEventStreamStart(stream)
+        guard FSEventStreamStart(stream) else {
+            // Leave no stream behind, so a later `start()` tries again.
+            stop()
+            return
+        }
     }
 
     public func stop() {
@@ -146,7 +163,16 @@ public final class WorkspaceEventWatcher: @unchecked Sendable {
         let firstPending = pendingSince ?? now
         pendingSince = firstPending
         let deadline = firstPending &+ maximumDelayNanoseconds
-        let delay = min(debounceNanoseconds, deadline > now ? deadline - now : 0)
+        guard deadline > now else {
+            // Past the cap. A zero-length sleep would be cancelled by the next batch of a
+            // steady writer before it ran, so the handler runs in this batch's turn.
+            debounceToken &+= 1
+            debounceTask = nil
+            pendingSince = nil
+            eventHandler()
+            return
+        }
+        let delay = min(debounceNanoseconds, deadline - now)
         let generation = generation
         debounceToken &+= 1
         let token = debounceToken
@@ -182,9 +208,19 @@ public final class WorkspaceEventWatcher: @unchecked Sendable {
         }
     }
 
+    /// `@testable` seam: a batch that arrives after an unseen batch has waited this long.
+    func simulateDeliveredEventForTesting(pendingSinceNanosecondsAgo age: UInt64) {
+        queue.async { [weak self] in
+            guard let self else { return }
+            pendingSince = DispatchTime.now().uptimeNanoseconds &- age
+            handleDeliveredEvents([])
+        }
+    }
+
     private static let eventCallback: FSEventStreamCallback = { _, info, eventCount, eventPaths, eventFlags, _ in
-        guard let info else { return }
-        let watcher = Unmanaged<WorkspaceEventWatcher>.fromOpaque(info).takeUnretainedValue()
+        guard let info,
+              let watcher = Unmanaged<WeakWatcherBox>.fromOpaque(info).takeUnretainedValue().watcher
+        else { return }
         // `kFSEventStreamCreateFlagUseCFTypes`: the paths are a CFArray of CFString.
         let paths = Unmanaged<CFArray>.fromOpaque(eventPaths).takeUnretainedValue() as? [String] ?? []
         var events: [WorkspaceEventPathFilter.Event] = []
@@ -197,6 +233,14 @@ public final class WorkspaceEventWatcher: @unchecked Sendable {
         }
         // Already running on `queue`.
         watcher.handleDeliveredEvents(events)
+    }
+}
+
+private final class WeakWatcherBox {
+    weak var watcher: WorkspaceEventWatcher?
+
+    init(_ watcher: WorkspaceEventWatcher) {
+        self.watcher = watcher
     }
 }
 
@@ -235,7 +279,7 @@ public struct WorkspaceEventPathFilter: Sendable {
     public init(rootURL: URL, pruning: WorkspaceScanPruning) {
         let spellings = [rootURL.standardizedFileURL, rootURL.resolvingSymlinksInPath()]
             .map { $0.path(percentEncoded: false) }
-            .map { $0.hasSuffix("/") ? $0 : $0 + "/" }
+            .map { $0.hasTrailingPathSeparator ? $0 : $0 + "/" }
         rootPrefixes = Array(Set(spellings))
         self.pruning = pruning
     }
@@ -250,12 +294,12 @@ public struct WorkspaceEventPathFilter: Sendable {
 
     func isRelevant(path: String) -> Bool {
         guard case let .ignoredDirectories(retained) = pruning,
-              let prefix = rootPrefixes.first(where: { path.hasPrefix($0) })
+              let prefix = rootPrefixes.first(where: { path.utf8.starts(with: $0.utf8) })
         else {
             return true
         }
-        let relativePath = String(path.dropFirst(prefix.count))
-        let components = relativePath.split(separator: "/", omittingEmptySubsequences: true)
+        let relativePath = String(path.utf8.dropFirst(prefix.utf8.count)) ?? ""
+        let components = relativePath.splitOnPathSeparator(omittingEmptySubsequences: true)
         guard components.contains(where: { WorkspaceIgnoredDirectories.contains(String($0)) }) else {
             return true
         }

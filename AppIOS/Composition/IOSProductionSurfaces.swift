@@ -60,6 +60,8 @@ final class IOSProductionRuntime: ObservableObject {
     private var editorObservation: (any IOSObservation)?
     private var observedBindingID: UUID?
     private var isSceneActive = true
+    private var readOnlyYieldedFocus: IOSProductionFocus?
+    var isReviewingCloudVersions = false
     private var inactiveFocus: IOSProductionFocus?
     private var pendingFocus: IOSProductionFocus?
     private var focusTask: Task<Void, Never>?
@@ -260,6 +262,7 @@ final class IOSProductionRuntime: ObservableObject {
         isSceneActive = active
         if active {
             defer { inactiveFocus = nil }
+            restoreCommandFocusAfterReadOnlyPresentation()
             guard let focus = inactiveFocus,
                   let current = editor.captureSnapshot(),
                   current.revision.documentID == focus.identity,
@@ -374,6 +377,10 @@ extension IOSProductionRuntime {
             currentGrant: currentGrant,
             readWorkspaceDocument: readWorkspaceDocument,
             resolveConflictCopy: conflictCopy == nil ? nil : { [weak self] in self?.requestConflictCopy() },
+            cloudVersionsDidDismiss: { [weak self] in
+                self?.isReviewingCloudVersions = false
+                self?.restoreCommandFocusAfterReadOnlyPresentation()
+            },
             refreshWorkspace: { [weak self] in
                 guard let self else { return }
                 Task {
@@ -471,11 +478,36 @@ extension IOSProductionRuntime {
     /// A read-only modal owns no source command route. Retire a yielded focus
     /// claim before releasing the route, without changing native text or Undo.
     func prepareForReadOnlyPresentation() {
+        if let current = editor.captureSnapshot(), current.isFocused {
+            readOnlyYieldedFocus = IOSProductionFocus(
+                identity: current.revision.documentID,
+                bindingID: current.bindingID
+            )
+        }
         pendingFocus = nil
         focusTask?.cancel()
         focusTask = nil
         scene.releaseCommandFocus()
         retireAuthoringCapture()
+    }
+
+    /// Every read-only modal calls this from its real dismissal. The route returns to the
+    /// binding that yielded it, once no other read-only modal is up and the scene is active;
+    /// a document switch or restore installs a new binding, which claims focus by itself.
+    func restoreCommandFocusAfterReadOnlyPresentation() {
+        guard let focus = readOnlyYieldedFocus, isSceneActive, !isReadOnlyPresentationActive else { return }
+        readOnlyYieldedFocus = nil
+        guard let current = editor.captureSnapshot(),
+              current.revision.documentID == focus.identity,
+              current.bindingID == focus.bindingID
+        else { return }
+        _ = controller.setCommandFocus(true, expected: focus.identity, bindingID: focus.bindingID)
+    }
+
+    private var isReadOnlyPresentationActive: Bool {
+        recovery?.isPresented == true || recentPresentation.isActive ||
+            conflictCopy?.draft != nil || conflictCopy?.isSaving == true ||
+            isReviewingCloudVersions
     }
 
     func requestConflictCopy() {

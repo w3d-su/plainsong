@@ -83,6 +83,14 @@ public final class DocumentSession: ObservableObject {
         savedText = isDirty ? nil : text
     }
 
+    deinit {
+        // A continuation that is dropped without `finish()` leaves its consumer suspended
+        // in `for await` forever, because the consumer's iterator keeps the stream alive.
+        for continuation in textChangeContinuations.values {
+            continuation.finish()
+        }
+    }
+
     /// Explicit preview channel for high-frequency text/version changes.
     ///
     /// Consumers should debounce this stream themselves (M2 uses ~150 ms) and drop

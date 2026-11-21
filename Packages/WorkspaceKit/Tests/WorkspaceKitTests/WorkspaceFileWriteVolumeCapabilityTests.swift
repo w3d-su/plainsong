@@ -239,7 +239,10 @@ private final class VolumeCheckDescriptorRecorder: @unchecked Sendable {
         var status = stat()
         guard Darwin.fstat(descriptor, &status) == 0 else { return }
         lock.withLock {
-            storage.append(WorkspaceFileSystemIdentity(device: UInt64(status.st_dev), inode: UInt64(status.st_ino)))
+            storage.append(WorkspaceFileSystemIdentity(
+                device: UInt64(UInt32(bitPattern: status.st_dev)),
+                inode: UInt64(status.st_ino)
+            ))
         }
     }
 }

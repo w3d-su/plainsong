@@ -97,6 +97,18 @@ public actor IOSDocumentRecoveryStore: IOSRecoveryPersisting {
         }
     }
 
+    public func discardSuperseded(recordID: UUID, documentID: UUID, newerVersion: Int) async throws {
+        let record = try await load(recordID)
+        guard record.documentID == documentID, record.revisionVersion < newerVersion else {
+            throw IOSRecoveryDiscardError.newerLocalRevision
+        }
+        do {
+            try FileManager.default.removeItem(at: fileURL(recordID: recordID))
+        } catch {
+            throw IOSDocumentFailure.recoveryFailed
+        }
+    }
+
     private func fileURL(recordID: UUID) -> URL {
         directory.appendingPathComponent("\(recordID.uuidString.lowercased()).recovery.json")
     }

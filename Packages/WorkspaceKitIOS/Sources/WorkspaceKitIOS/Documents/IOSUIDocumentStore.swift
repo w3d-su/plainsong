@@ -78,6 +78,9 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
     ) -> any IOSObservation {
         let observation = IOSDocumentStoreObservation(handler: handler)
         observations[observation.token] = observation
+        observation.onCancel = { [weak self, token = observation.token] in
+            self?.observations[token] = nil
+        }
         return observation
     }
 
@@ -140,7 +143,9 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
                 if initialText != nil {
                     throw IOSDocumentFailure.access(.alreadyExists)
                 }
-                return try await existing.awaitReady()
+                let handle = try await existing.awaitReady()
+                adoptCoalescedLease(lease, into: existing)
+                return handle
             }
             try await retireForReplacement(existing)
             // Recheck after awaiting: a concurrent opener may have installed the new entry.
@@ -177,6 +182,7 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
             finishOpen(entry, result: .success(handle))
             return handle
         } catch {
+            await relinquishFailedOpen(entry)
             if error is CancellationError {
                 failOpen(entry, .unavailable)
                 throw error
@@ -235,6 +241,25 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
         for waiter in waiters {
             waiter.resume(with: result)
         }
+    }
+
+    /// A successful open hands its lease to the store. An open that joined an existing entry
+    /// brought a second lease, which the entry keeps until it closes; otherwise nobody
+    /// releases it and the security scope never stops.
+    func adoptCoalescedLease(_ lease: any IOSWorkspaceAccessLease, into entry: IOSDocumentEntry) {
+        guard lease !== entry.lease, !entry.coalescedLeases.contains(where: { $0 === lease }) else { return }
+        if entry.closed {
+            lease.release()
+        } else {
+            entry.coalescedLeases.append(lease)
+        }
+    }
+
+    /// The provider may have opened before decoding, cancellation or the authority check
+    /// failed the open. Close it, so no file presenter outlives the entry.
+    func relinquishFailedOpen(_ entry: IOSDocumentEntry) async {
+        entry.filePort.setHandler(nil)
+        try? await entry.filePort.close()
     }
 
     func failOpen(_ entry: IOSDocumentEntry, _ failure: IOSDocumentFailure) {

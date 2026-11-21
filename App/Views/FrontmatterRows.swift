@@ -225,23 +225,26 @@ private struct RawYAMLText: View {
     }
 }
 
-private enum FrontmatterDateFormatting {
-    static func string(from date: Date) -> String {
-        formatter().string(from: date)
+enum FrontmatterDateFormatting {
+    static func string(from date: Date, timeZone: TimeZone = .current) -> String {
+        formatter(dateFormat: "yyyy-MM-dd", timeZone: timeZone).string(from: date)
     }
 
-    static func date(from string: String) -> Date? {
-        formatter().date(from: string)
+    /// Noon of the calendar day. Midnight does not exist on the day daylight time starts in
+    /// zones that switch at 00:00 (Havana, Santiago, Beirut), so parsing the bare day there
+    /// failed and the picker showed today instead.
+    static func date(from string: String, timeZone: TimeZone = .current) -> Date? {
+        formatter(dateFormat: "yyyy-MM-dd HH", timeZone: timeZone).date(from: string + " 12")
     }
 
-    private static func formatter() -> DateFormatter {
+    private static func formatter(dateFormat: String, timeZone: TimeZone) -> DateFormatter {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.isLenient = false
         formatter.locale = Locale(identifier: "en_US_POSIX")
         // The picker shows and the Add button stamps the user's calendar day.
-        formatter.timeZone = .current
-        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = timeZone
+        formatter.dateFormat = dateFormat
         return formatter
     }
 }

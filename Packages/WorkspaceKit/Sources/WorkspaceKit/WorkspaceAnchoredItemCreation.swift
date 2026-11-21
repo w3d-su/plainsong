@@ -760,7 +760,7 @@ private extension WorkspaceAnchoredItemCreator {
                 guard Darwin.fstat(rootDescriptor, &rootStatus) == 0 else {
                     throw WorkspaceItemMutationFailure.unreadable
                 }
-                guard UInt64(rootStatus.st_dev) == device else {
+                guard UInt64(UInt32(bitPattern: rootStatus.st_dev)) == device else {
                     throw WorkspaceItemMutationFailure.crossDevice
                 }
 
@@ -828,7 +828,7 @@ private extension WorkspaceAnchoredItemCreator {
         }
         return WorkspaceAnchoredFileSystem.DirectoryEntryIdentity(
             identity: WorkspaceFileSystemIdentity(
-                device: UInt64(status.st_dev),
+                device: UInt64(UInt32(bitPattern: status.st_dev)),
                 inode: UInt64(status.st_ino)
             ),
             fileType: status.st_mode & S_IFMT

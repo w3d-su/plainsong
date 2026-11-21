@@ -16,6 +16,8 @@ final class IOSConflictCopyCoordinator: ObservableObject {
     @Published private(set) var lastOutcome: IOSConflictCopyOutcome?
 
     private let controller: IOSDocumentSceneController
+    /// The copy flow ended, by cancel or by a finished copy.
+    var onIdle: (() -> Void)?
     private var origin: IOSConflictCopyOrigin?
     private var activePickerID: UUID?
     private var copyTask: Task<IOSConflictCopyOutcome, Never>?
@@ -60,6 +62,7 @@ final class IOSConflictCopyCoordinator: ObservableObject {
         draft = nil
         validationNotice = nil
         lastOutcome = .cancelled
+        onIdle?()
     }
 
     func requestFolderPicker(draftID: UUID, filename: String) -> IOSConflictCopyPickerRequest? {
@@ -203,6 +206,7 @@ final class IOSConflictCopyCoordinator: ObservableObject {
         validationNotice = nil
         draft = nil
         origin = nil
+        onIdle?()
         if let id = completedDraftID, dismissedDraftID == id {
             nameSheetDidDismiss(id)
         }

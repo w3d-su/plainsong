@@ -86,6 +86,13 @@ final class GatePreviewAssetReader: PreviewAssetReading, @unchecked Sendable {
             access: waiter.0.access
         ))
     }
+
+    func failFirst(_ error: Error) {
+        lock.lock()
+        let waiter = waiters.removeFirst()
+        lock.unlock()
+        waiter.1.resume(throwing: error)
+    }
 }
 
 final class RecordingSchemeTask: PreviewAssetSchemeTask {

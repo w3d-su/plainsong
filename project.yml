@@ -242,6 +242,11 @@ targets:
       - path: App/Resources/preview
         type: folder
         buildPhase: resources
+      # GPL-3.0-or-later: the iOS app carries the license text too
+      # (docs/decisions/2026-11-06-gpl-3.0-or-later-license.md);
+      # Scripts/ios/required-app-resources.txt refuses an archive without it.
+      - path: LICENSE
+        buildPhase: resources
     dependencies:
       - package: MarkdownCore
       - package: SyntaxKit
@@ -296,6 +301,7 @@ targets:
               public.filename-extension:
                 - mdx
         CFBundleDisplayName: Plainsong
+        NSHumanReadableCopyright: "© 2026 w3d-su. Free software under the GNU GPL v3 or later, with ABSOLUTELY NO WARRANTY. License and source: https://github.com/w3d-su/plainsong"
         ITSAppUsesNonExemptEncryption: false
         UILaunchScreen:
           UIColorName: LaunchBackground
