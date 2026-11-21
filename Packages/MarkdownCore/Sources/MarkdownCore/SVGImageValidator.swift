@@ -74,7 +74,7 @@ public enum SVGImageValidator {
     ]
     /// Presentation attributes that take CSS image values. `url(#id)` stays allowed.
     private static let cssValuedAttributes: Set<String> = [
-        "clip-path", "cursor", "fill", "filter", "marker-end", "marker-mid",
+        "clip-path", "cursor", "fill", "filter", "marker", "marker-end", "marker-mid",
         "marker-start", "mask", "stroke", "style",
     ]
 

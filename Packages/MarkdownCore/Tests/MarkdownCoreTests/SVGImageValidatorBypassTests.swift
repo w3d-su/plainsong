@@ -30,6 +30,18 @@ final class SVGImageValidatorBypassTests: XCTestCase {
         ])
     }
 
+    func testCSSNewlineFormsAfterAnEscapeAreRejected() {
+        // XML character references keep CR and CRLF out of line-end normalization.
+        assertRejected(.externalStyle, [
+            "escape then CRLF in style": #"<style>@\69&#13;&#10;mport "https://x.invalid/a.css";</style>"#,
+            "escape then CR in style": #"<style>rect{fill:\75&#13;rl(https://x.invalid/a)}</style>"#,
+            "escape then CRLF in attribute": #"<rect style="fill:\75&#13;&#10;rl(https://x.invalid/a)"/>"#,
+            "marker shorthand": #"<path marker="url(https://x.invalid/a)"/>"#,
+        ])
+        XCTAssertEqual(admission(body: #"<path marker="url(#m)"/>"#), .admit)
+        XCTAssertEqual(admission(body: "<style>.a{fill:url(#g)}&#13;&#10;.b{}</style>"), .admit)
+    }
+
     func testEscapedFontNamesAndFragmentsStayAdmitted() {
         // Illustrator writes CJK font families as CSS escapes.
         XCTAssertEqual(
