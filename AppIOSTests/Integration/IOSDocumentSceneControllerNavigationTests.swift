@@ -16,9 +16,12 @@ extension IOSDocumentSceneControllerTests {
         scene.startObserving()
         defer { scene.stopObserving() }
         scene.navigateToDocument()
+        let workspace = try XCTUnwrap(fixture.controller.snapshot.workspace)
+        let provider = fixture.workspace
+        fixture.store.onOpen = { provider.emit(.snapshotChanged(workspace)) }
         let navigated = expectation(description: "Displays the linked document")
         fixture.controller.onPreviewDocumentOpened = {
-            XCTAssertTrue(scene.navigationPath.isEmpty, "Closing the first document clears its route")
+            XCTAssertTrue(scene.navigationPath.isEmpty, "A provider update can clear the route while the target opens")
             scene.navigateToDocument()
             navigated.fulfill()
         }
