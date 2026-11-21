@@ -144,7 +144,13 @@ public struct WorkspaceDirectoryScanner: Sendable {
             try Task.checkCancellation()
             entryVisitHook(url)
             try Task.checkCancellation()
-            let values = try url.resourceValues(forKeys: Set(keys))
+            let values: URLResourceValues
+            do {
+                values = try url.resourceValues(forKeys: Set(keys))
+            } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+                // Removed after the enumerator listed it (see the inspection below).
+                continue
+            }
             try Task.checkCancellation()
             if values.isHidden == true {
                 if values.isDirectory == true {
@@ -169,7 +175,15 @@ public struct WorkspaceDirectoryScanner: Sendable {
                 continue
             }
             let location = try rootAuthority.location(relativePath: relativePath)
-            let mutationExpectation = try WorkspaceNoFollowItemInspector.inspect(at: location)
+            let mutationExpectation: WorkspaceItemMutationExpectation
+            do {
+                mutationExpectation = try WorkspaceNoFollowItemInspector.inspect(at: location)
+            } catch WorkspaceAnchoredFileSystemError.missing {
+                // The entry was removed after the enumerator listed it (an editor's atomic-save
+                // temporary, a build output). It is not in the tree any more; one vanished
+                // entry must not fail the whole scan.
+                continue
+            }
 
             entries.append(
                 WorkspaceFileSnapshot.Entry(
