@@ -101,8 +101,9 @@ struct AccessHarness {
     }
 }
 
+@MainActor
 func waitUntil(
-    _ predicate: @escaping () -> Bool,
+    _ predicate: @MainActor () -> Bool,
     file: StaticString = #filePath,
     line: UInt = #line
 ) async {

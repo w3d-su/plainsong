@@ -14,7 +14,7 @@ final class IOSDocumentStoreRaceTests: XCTestCase {
         let entered = expectation(description: "v1 entered")
         port.onSaveEntered = { entered.fulfill() }
         let first = Task { try await harness.store.save(handle.identity) }
-        await fulfillment(of: [entered], timeout: 2)
+        await assertFulfillment(of: [entered], timeout: 2)
 
         handle.session.replaceText("v2 繁中 👩🏽‍💻")
         let liveVersion = handle.session.version
@@ -34,7 +34,7 @@ final class IOSDocumentStoreRaceTests: XCTestCase {
         XCTAssertTrue(handle.session.isDirty)
         XCTAssertEqual(port.written.map { String(data: $0, encoding: .utf8) }, ["v1"])
 
-        await fulfillment(of: [secondEntered], timeout: 2)
+        await assertFulfillment(of: [secondEntered], timeout: 2)
         XCTAssertEqual(port.peakInFlight, 1)
         port.releaseOne()
         let secondAck = try await second.value
@@ -54,7 +54,7 @@ final class IOSDocumentStoreRaceTests: XCTestCase {
         let entered = expectation(description: "save")
         port.onSaveEntered = { entered.fulfill() }
         let saving = Task { try await harness.store.save(handle.identity) }
-        await fulfillment(of: [entered], timeout: 2)
+        await assertFulfillment(of: [entered], timeout: 2)
         handle.session.replaceText("v2 繁中 👩🏽‍💻")
         let liveVersion = handle.session.version
         port.releaseOne()
@@ -75,7 +75,7 @@ final class IOSDocumentStoreRaceTests: XCTestCase {
         let entered = expectation(description: "first")
         port.onSaveEntered = { entered.fulfill() }
         let first = Task { try await harness.store.save(handle.identity) }
-        await fulfillment(of: [entered], timeout: 2)
+        await assertFulfillment(of: [entered], timeout: 2)
         handle.session.replaceText("three")
         let second = Task { try await harness.store.save(handle.identity) }
         await Task.yield()
@@ -84,7 +84,7 @@ final class IOSDocumentStoreRaceTests: XCTestCase {
         _ = try await first.value
         let next = expectation(description: "second")
         port.onSaveEntered = { next.fulfill() }
-        await fulfillment(of: [next], timeout: 2)
+        await assertFulfillment(of: [next], timeout: 2)
         XCTAssertEqual(port.peakInFlight, 1)
         port.releaseOne()
         _ = try await second.value
@@ -115,7 +115,7 @@ final class IOSDocumentStoreRaceTests: XCTestCase {
         let entered = expectation(description: "save")
         port.onSaveEntered = { entered.fulfill() }
         let saving = Task { try await harness.store.save(second.identity) }
-        await fulfillment(of: [entered], timeout: 2)
+        await assertFulfillment(of: [entered], timeout: 2)
         XCTAssertEqual(port.peakInFlight, 1)
         port.releaseOne()
         _ = try await saving.value
@@ -137,7 +137,7 @@ final class IOSDocumentStoreRaceTests: XCTestCase {
         let entered = expectation(description: "save")
         port.onSaveEntered = { entered.fulfill() }
         let saving = Task { try await harness.store.save(first.identity) }
-        await fulfillment(of: [entered], timeout: 2)
+        await assertFulfillment(of: [entered], timeout: 2)
         port.releaseOne()
         _ = try await saving.value
         XCTAssertEqual(second.session.text, "decomposed")
@@ -154,7 +154,7 @@ final class IOSDocumentStoreRaceTests: XCTestCase {
         let entered = expectation(description: "old save")
         oldPort.onSaveEntered = { entered.fulfill() }
         let saving = Task { try await harness.store.save(original.identity) }
-        await fulfillment(of: [entered], timeout: 2)
+        await assertFulfillment(of: [entered], timeout: 2)
         original.session.replaceText("live-v2")
         let liveVersion = original.session.version
         harness.ports.openedData = Data("fresh".utf8)
@@ -183,7 +183,7 @@ final class IOSDocumentStoreRaceTests: XCTestCase {
         let entered = expectation(description: "save")
         port.onSaveEntered = { entered.fulfill() }
         let saving = Task { try await harness.store.save(handle.identity) }
-        await fulfillment(of: [entered], timeout: 2)
+        await assertFulfillment(of: [entered], timeout: 2)
         saving.cancel()
         XCTAssertEqual(handle.session.text, "draft plus")
         XCTAssertTrue(handle.session.isDirty)
@@ -194,7 +194,7 @@ final class IOSDocumentStoreRaceTests: XCTestCase {
         let retryEntered = expectation(description: "retry")
         port.onSaveEntered = { retryEntered.fulfill() }
         let retry = Task { try await harness.store.save(handle.identity) }
-        await fulfillment(of: [retryEntered], timeout: 2)
+        await assertFulfillment(of: [retryEntered], timeout: 2)
         port.releaseOne()
         _ = try await retry.value
         XCTAssertFalse(handle.session.isDirty)

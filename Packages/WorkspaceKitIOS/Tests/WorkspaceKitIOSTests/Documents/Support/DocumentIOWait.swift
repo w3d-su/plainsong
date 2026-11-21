@@ -1,6 +1,20 @@
 import XCTest
 
 @MainActor
+func assertFulfillment(
+    of expectations: [XCTestExpectation],
+    timeout: TimeInterval,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) async {
+    let result = await XCTWaiter.fulfillment(of: expectations, timeout: timeout)
+    XCTAssertEqual(
+        result, .completed, "Waiting for \(expectations.map(\.expectationDescription)) returned \(result)",
+        file: file, line: line
+    )
+}
+
+@MainActor
 func waitUntil(
     timeout: TimeInterval = 2,
     file: StaticString = #filePath,

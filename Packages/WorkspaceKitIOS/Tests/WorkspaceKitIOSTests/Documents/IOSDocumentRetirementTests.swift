@@ -18,7 +18,7 @@ final class IOSDocumentRetirementTests: XCTestCase {
         let entered = expectation(description: "old provider write entered")
         oldPort.onSaveEntered = { entered.fulfill() }
         let oldSave = Task { try await harness.store.save(original.identity) }
-        await fulfillment(of: [entered], timeout: 2)
+        await assertFulfillment(of: [entered], timeout: 2)
         original.session.replaceText("dirty during writer drain")
         var closeContinuation: CheckedContinuation<Void, Never>?
         oldPort.closeGate = {
@@ -136,7 +136,7 @@ final class IOSDocumentRetirementTests: XCTestCase {
         let entered = expectation(description: "close snapshot entered provider")
         port.onSaveEntered = { entered.fulfill() }
         let closing = Task { try await harness.store.close(handle.identity) }
-        await fulfillment(of: [entered], timeout: 2)
+        await assertFulfillment(of: [entered], timeout: 2)
         XCTAssertEqual(harness.store.state(for: handle.identity)?.canWrite, false,
                        "the internal close save must not reopen user save admission")
         do {
