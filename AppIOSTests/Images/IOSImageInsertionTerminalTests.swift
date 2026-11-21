@@ -42,13 +42,13 @@ final class IOSImageInsertionTerminalTests: XCTestCase {
         harness.assertSourceUntouched()
     }
 
-    func testFilesPickDeliveredAfterSheetDismissesStillInserts() async throws {
+    func testMatchingFilesPickInsertsOnce() async throws {
         let harness = ImageInsertionHarness()
         let session = harness.session()
         let prepared = try XCTUnwrap(session.preparePicker())
-        session.filesPickerPresentationEnded()
         XCTAssertEqual(session.phase, .picking(prepared.operationID))
         let context = try XCTUnwrap(session.beginImport(operationID: prepared.operationID))
+        XCTAssertNil(session.beginImport(operationID: prepared.operationID))
         await session.finishImport(.success(Self.payload), context: context)
         guard case .inserted = session.phase else {
             return XCTFail("expected inserted phase, got \(session.phase)")
@@ -56,11 +56,10 @@ final class IOSImageInsertionTerminalTests: XCTestCase {
         XCTAssertEqual(harness.writer.commitCount, 1)
     }
 
-    func testFilesSheetDismissalFollowedByDelegateCancelCancelsCleanly() throws {
+    func testFilesDelegateCancelCancelsCleanly() throws {
         let harness = ImageInsertionHarness()
         let session = harness.session()
         let prepared = try XCTUnwrap(session.preparePicker())
-        session.filesPickerPresentationEnded()
         session.cancelFilesPicker(operationID: prepared.operationID)
         XCTAssertEqual(session.phase, .cancelled)
         XCTAssertNil(session.beginImport(operationID: prepared.operationID))
@@ -68,11 +67,11 @@ final class IOSImageInsertionTerminalTests: XCTestCase {
         harness.assertSourceUntouched()
     }
 
-    func testDismissedFilesPickerIsSupersededByTheNextIssuance() throws {
+    func testCancelledFilesPickerCannotCompleteOrCancelTheNextIssuance() throws {
         let harness = ImageInsertionHarness()
         let session = harness.session()
         let old = try XCTUnwrap(session.preparePicker())
-        session.filesPickerPresentationEnded()
+        session.cancelFilesPicker(operationID: old.operationID)
         let current = try XCTUnwrap(session.preparePicker())
         XCTAssertNotEqual(old.operationID, current.operationID)
         XCTAssertNil(session.beginImport(operationID: old.operationID))

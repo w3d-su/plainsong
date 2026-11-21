@@ -303,13 +303,6 @@ final class IOSShellSceneState: ObservableObject {
         workspaceSnapshot?.entries ?? []
     }
 
-    @discardableResult
-    func openSelectedURL(_ url: URL, scope: IOSWorkspaceScope) -> Task<Void, Never> {
-        perform {
-            try await self.facade.openSelectedURL(url, scope: scope)
-        }
-    }
-
     /// Open a file entry from the workspace browser.
     @discardableResult
     func openEntry(_ entry: IOSWorkspaceEntry) -> Task<Void, Never>? {
@@ -319,7 +312,13 @@ final class IOSShellSceneState: ObservableObject {
             return nil
         }
         selectedEntryID = entry.id
-        return openSelectedURL(entry.location.fileURL, scope: .singleFile)
+        return perform {
+            try await self.facade.openSelectedURL(entry.location.fileURL, scope: .singleFile)
+            guard let opened = self.facade.snapshot.document,
+                  self.sameWorkspacePath(opened.location, entry.location)
+            else { return }
+            self.navigateToDocument()
+        }
     }
 
     /// Compact stacks push `.document` when the user taps a file row (even the

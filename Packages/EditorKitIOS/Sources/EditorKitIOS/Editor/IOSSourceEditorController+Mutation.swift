@@ -13,7 +13,7 @@ extension IOSSourceEditorController {
         if let refusal = refusal(for: edit) {
             return .refused(refusal)
         }
-        guard commit(edit.result, actionName: edit.undoActionName) else {
+        guard commit(edit.result, actionName: edit.undoActionName, exact: true) else {
             return .refused(.invalidRange)
         }
         publishCurrentText()
@@ -27,8 +27,8 @@ extension IOSSourceEditorController {
     }
 
     public func reveal(_ range: NSRange, expected: IOSDocumentRevision) -> Bool {
-        guard isHostAlive, textView.isTextKit2, let installation else { return false }
-        guard installation.identity == expected.documentID,
+        guard isHostAlive, textView.isTextKit2, let installation,
+              installation.identity == expected.documentID,
               installation.session.version == expected.version,
               textView.markedTextRange == nil,
               !isMutating
@@ -109,8 +109,7 @@ extension IOSSourceEditorController {
     }
 
     func refusal(for edit: IOSAuthorizedEdit) -> IOSEditRefusal? {
-        guard isHostAlive, textView.isTextKit2 else { return .unavailable }
-        guard let installation else { return .unavailable }
+        guard isHostAlive, textView.isTextKit2, let installation else { return .unavailable }
         if let identityRefusal = identityRefusal(for: edit, installation: installation) {
             return identityRefusal
         }
@@ -164,7 +163,7 @@ extension IOSSourceEditorController {
         return nil
     }
 
-    private func commit(_ result: MarkdownEditResult, actionName: String) -> Bool {
+    private func commit(_ result: MarkdownEditResult, actionName: String, exact: Bool = false) -> Bool {
         if result.replacementString.isEmpty, result.replacementRange.length == 0 {
             guard isValidSelection(result.newSelection, length: textView.textStorage.length) else {
                 return false
@@ -177,7 +176,11 @@ extension IOSSourceEditorController {
         guard isValid(result) else { return false }
         isMutating = true
         defer { isMutating = false }
-        let applied = IOSNativeTextMutation.replace(result, in: textView, actionName: actionName)
+        let applied = if exact {
+            IOSNativeTextMutation.replaceExactly(result, in: textView, actionName: actionName)
+        } else {
+            IOSNativeTextMutation.replaceAsInput(result, in: textView, actionName: actionName)
+        }
         if applied {
             applyLineNumberChrome()
         }
@@ -196,8 +199,9 @@ extension IOSSourceEditorController {
         range.location >= 0 && range.length >= 0 && NSMaxRange(range) <= length
     }
 
-    private func canUseHistory() -> Bool {
-        isHostAlive && isCommandFocused && installation != nil && textView.markedTextRange == nil && !isMutating
+    func canUseHistory() -> Bool {
+        isHostAlive && isCommandFocused && installation?.canWrite == true
+            && textView.markedTextRange == nil && !isMutating && !isReconciling
     }
 
     func publishCurrentText() {
