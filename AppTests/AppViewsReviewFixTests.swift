@@ -219,4 +219,38 @@ final class AppViewsReviewFixTests: XCTestCase {
         }
         XCTAssertEqual(published, [1, 2])
     }
+
+    // MARK: - #38 ⇧⌘F behind a modal presentation
+
+    func testWorkspaceSearchHotKeyIsLeftAloneWhileASheetOrModalOwnsTheKeyboard() {
+        let parent = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 200),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: true
+        )
+        let sheet = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: true
+        )
+        parent.isReleasedWhenClosed = false
+        sheet.isReleasedWhenClosed = false
+        let owns = PlainsongWorkspaceSearchHotKey.modalPresentationOwnsKeyboard
+
+        XCTAssertFalse(owns(nil, nil))
+        XCTAssertFalse(owns(nil, parent))
+        XCTAssertTrue(owns(sheet, parent), "an app-modal session owns the keyboard")
+
+        parent.orderFront(nil)
+        parent.beginSheet(sheet)
+        defer {
+            parent.endSheet(sheet)
+            sheet.close()
+            parent.close()
+        }
+        XCTAssertTrue(owns(nil, sheet), "the key sheet (alert or save panel)")
+        XCTAssertTrue(owns(nil, parent), "the window behind its sheet")
+    }
 }
