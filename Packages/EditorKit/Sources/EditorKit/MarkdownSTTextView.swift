@@ -206,10 +206,12 @@ final class MarkdownSTTextView: STTextView {
                 isSuppressingIntermediateMarkedTextRemoval = false
                 markedTextReplacementRange = nil
                 isMarkedTextReplacementRangeConfirmed = false
+                let lengthBeforeInsertion = (textContentManager as? NSTextContentStorage)?.textStorage?.length
                 super.insertText(string, replacementRange: effectiveReplacementRange)
                 ensureInsertionPointAfterInsertedText(
                     string,
-                    at: effectiveReplacementRange.location
+                    replacing: effectiveReplacementRange,
+                    lengthBeforeInsertion: lengthBeforeInsertion
                 )
                 return
             }
@@ -241,12 +243,30 @@ final class MarkdownSTTextView: STTextView {
         textSelection = NSRange(location: 0, length: 0)
     }
 
-    private func ensureInsertionPointAfterInsertedText(_ string: Any, at insertionLocation: Int) {
-        guard let insertedLength = Self.utf16Length(ofInsertedText: string) else {
+    /// Moves the caret behind a committed composition, but only when the storage holds
+    /// exactly that commit. A rejected write, or an editing behavior that wrote something
+    /// else (list continuation, auto-pairing, skip-over), has already placed the caret.
+    private func ensureInsertionPointAfterInsertedText(
+        _ string: Any,
+        replacing replacedRange: NSRange,
+        lengthBeforeInsertion: Int?
+    ) {
+        guard let insertedLength = Self.utf16Length(ofInsertedText: string),
+              let lengthBeforeInsertion,
+              let text = (textContentManager as? NSTextContentStorage)?.textStorage?.mutableString,
+              text.length == lengthBeforeInsertion - replacedRange.length + insertedLength
+        else {
+            return
+        }
+        let insertedRange = NSRange(location: replacedRange.location, length: insertedLength)
+        let inserted = (string as? NSAttributedString)?.string ?? string as? String
+        guard NSMaxRange(insertedRange) <= text.length,
+              text.substring(with: insertedRange) == inserted
+        else {
             return
         }
 
-        textSelection = NSRange(location: insertionLocation + insertedLength, length: 0)
+        textSelection = NSRange(location: NSMaxRange(insertedRange), length: 0)
     }
 
     private func markedTextSnapshot() -> MarkedTextSnapshot? {
