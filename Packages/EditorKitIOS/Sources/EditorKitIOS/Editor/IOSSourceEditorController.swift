@@ -46,6 +46,7 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
     var lastSelectionViewport = NSRange(location: NSNotFound, length: 0)
     var beforeNativeMutation: (@MainActor (IOSSourceEditorController) -> Void)?
     var needsBaseStyle = false
+    var needsLineNumberChrome = false
     var lineIndex = IOSSourceLineIndex(text: "")
     var gutterDigits: Int?
     var lastViewportLine: Int?
@@ -230,7 +231,7 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
             rebuildLineIndex()
         }
         guard !ExactSourceFragment.matches(plainText(), text) else { return }
-        _ = IOSNativeTextMutation.replaceBufferWithoutUndo(text, in: textView)
+        replaceBufferClearingPresentation(text)
         textView.selectedRange = NSRange(location: 0, length: 0)
     }
 
@@ -382,6 +383,7 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
     }
 
     func applyLineNumberChrome() {
+        guard !defersLineNumberChromeForComposition() else { return }
         let metrics = showsLineNumbers
             ? IOSLineNumberLayout.width(lineCount: lineIndex.lineCount, font: theme.baseFont, digits: gutterDigits)
             : (width: CGFloat(0), digits: gutterDigits ?? IOSLineNumberDigits.minimum)
