@@ -6,6 +6,29 @@ import XCTest
 
 @MainActor
 extension IOSDocumentSceneControllerTests {
+    func testFilesRowNavigationWaitsUntilNextDocumentIsInstalled() async throws {
+        let fixture = IOSSceneControllerFixture()
+        let root = URL(fileURLWithPath: "/synthetic", isDirectory: true)
+        try await fixture.controller.openPickedURL(root, scope: .directory)
+        try await fixture.controller.openSelectedURL(root.appendingPathComponent("first.md"), scope: .singleFile)
+        let scene = IOSShellSceneState(facade: fixture.controller)
+        scene.startObserving()
+        defer { scene.stopObserving() }
+        let workspace = try XCTUnwrap(fixture.controller.snapshot.workspace)
+        let entry = try XCTUnwrap(workspace.entries.first { $0.location.relativePath == "second.md" })
+        let provider = fixture.workspace
+        fixture.store.onOpen = {
+            XCTAssertTrue(scene.navigationPath.isEmpty)
+            provider.emit(.snapshotChanged(workspace))
+        }
+
+        let activation = try XCTUnwrap(scene.openEntry(entry))
+        await activation.value
+
+        XCTAssertEqual(fixture.controller.snapshot.document?.location.relativePath, "second.md")
+        XCTAssertEqual(scene.navigationPath, [.document])
+    }
+
     func testRelativeLinkShowsTheNewDocumentAfterTheOldRouteIsCleared() async throws {
         let fixture = IOSSceneControllerFixture()
         let root = URL(fileURLWithPath: "/synthetic", isDirectory: true)
