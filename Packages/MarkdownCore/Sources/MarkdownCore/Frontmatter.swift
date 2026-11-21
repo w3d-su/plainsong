@@ -188,7 +188,7 @@ public enum Frontmatter {
         let lineEnding = preferredLineEnding(in: text)
         let frontmatter = [
             "---",
-            #"title: ""#,
+            #"title: """#,
             "date: \(date)",
             "tags: []",
             "draft: false",

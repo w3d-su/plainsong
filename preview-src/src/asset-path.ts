@@ -12,7 +12,10 @@ export function assetURLPath(relativePath: string): string {
     .replace(/%(?![0-9a-fA-F]{2})/g, "%25")
     .replaceAll(" ", "%20")
     .replaceAll("#", "%23")
-    .replaceAll("?", "%3F");
+    .replaceAll("?", "%3F")
+    // The first segment is the URL authority, where these would be parsed as userinfo,
+    // a port or an IPv6 literal (`[slug]/cover.png`, `shot@2x.png`).
+    .replace(/[@:[\]<>^|]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
 }
 
 function normalizeRelativePath(path: string): string {

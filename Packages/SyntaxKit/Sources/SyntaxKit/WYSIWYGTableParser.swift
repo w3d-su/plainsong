@@ -173,6 +173,10 @@ struct MarkdownTableLineScanner {
 
     func lineStart(containing offset: Int) -> Int {
         var index = min(max(offset, 0), text.length)
+        // The line feed of a CRLF pair belongs to the line its carriage return ends.
+        if index > 0, index < text.length, text.character(at: index) == 10, text.character(at: index - 1) == 13 {
+            index -= 1
+        }
         while index > 0 {
             let unit = text.character(at: index - 1)
             if unit == 10 || unit == 13 {

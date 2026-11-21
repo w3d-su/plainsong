@@ -7,6 +7,8 @@ export function rewriteImageSources(
   assetRootID = "",
 ): void {
   for (const image of root.querySelectorAll<HTMLImageElement>("img")) {
+    image.removeAttribute("srcset");
+    image.removeAttribute("sizes");
     const source = image.dataset.plainsongOriginalSrc ?? image.getAttribute("src");
     if (!source) continue;
 
@@ -27,4 +29,6 @@ export function rewriteImageSources(
         break;
     }
   }
+  // Only `img[src]` goes through the image policy, so no other candidate may load.
+  for (const source of root.querySelectorAll("picture > source")) source.remove();
 }

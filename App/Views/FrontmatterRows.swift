@@ -123,6 +123,9 @@ private struct TagsRow: View {
     let key: String
     let values: [String]
     let update: ([String]) -> Void
+    /// What the user is typing. Rebuilding the field from `values` on every key would
+    /// drop a trailing comma or space before the next tag can be typed.
+    @State private var draft: String?
 
     var body: some View {
         InspectorRow(key) {
@@ -130,10 +133,16 @@ private struct TagsRow: View {
                 TextField(key, text: tagsBinding, prompt: Text("Comma-separated"))
                     .labelsHidden()
                     .textFieldStyle(.roundedBorder)
+                    .onSubmit { draft = nil }
+                    .onChange(of: values) { _, newValues in
+                        if let draft, Self.splitTags(draft) != newValues {
+                            self.draft = nil
+                        }
+                    }
 
                 if !values.isEmpty {
                     TagFlowLayout {
-                        ForEach(values, id: \.self) { tag in
+                        ForEach(Array(values.enumerated()), id: \.offset) { _, tag in
                             Text(tag)
                                 .font(.caption)
                                 .lineLimit(1)
@@ -153,8 +162,14 @@ private struct TagsRow: View {
 
     private var tagsBinding: Binding<String> {
         Binding(
-            get: { values.joined(separator: ", ") },
-            set: { update(Self.splitTags($0)) }
+            get: { draft ?? values.joined(separator: ", ") },
+            set: {
+                draft = $0
+                let tags = Self.splitTags($0)
+                if tags != values {
+                    update(tags)
+                }
+            }
         )
     }
 
@@ -224,7 +239,8 @@ private enum FrontmatterDateFormatting {
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.isLenient = false
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        // The picker shows and the Add button stamps the user's calendar day.
+        formatter.timeZone = .current
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter
     }

@@ -128,11 +128,14 @@ enum FormattingEditing {
                 (existing?.range.location ?? MarkdownTextEditingSupport.leadingWhitespaceLength(in: line.text)),
             length: existing?.range.length ?? 0
         )
-        let delta = MarkdownTextEditingSupport.utf16Length(replacementPrefix) - replaceRange.length
         return MarkdownTextEditingSupport.replacement(
             range: replaceRange,
             string: replacementPrefix,
-            selection: shifted(selection, by: delta, afterOrAt: replaceRange.location)
+            selection: mapped(
+                selection,
+                replacing: replaceRange,
+                withLength: MarkdownTextEditingSupport.utf16Length(replacementPrefix)
+            )
         )
     }
 
@@ -144,7 +147,7 @@ enum FormattingEditing {
         return MarkdownTextEditingSupport.replacement(
             range: range,
             string: "",
-            selection: shifted(selection, by: -range.length, afterOrAt: range.location)
+            selection: mapped(selection, replacing: range, withLength: 0)
         )
     }
 
@@ -252,6 +255,18 @@ enum FormattingEditing {
         let hasFollowingSpace = index + 1 < storage.length && storage.character(at: index + 1) == 32
         let length = hasFollowingSpace ? 2 : 1
         return NSRange(location: index, length: length)
+    }
+
+    /// Carries both ends of `selection` across a replacement, so a selection that
+    /// covers the replaced prefix shrinks with it instead of running past the text.
+    private static func mapped(_ selection: NSRange, replacing range: NSRange, withLength newLength: Int) -> NSRange {
+        func map(_ offset: Int) -> Int {
+            if offset < range.location { return offset }
+            if offset >= NSMaxRange(range) { return offset + newLength - range.length }
+            return range.location + newLength
+        }
+        let start = map(selection.location)
+        return NSRange(location: start, length: max(0, map(NSMaxRange(selection)) - start))
     }
 
     private static func shifted(_ selection: NSRange, by delta: Int, afterOrAt location: Int) -> NSRange {
