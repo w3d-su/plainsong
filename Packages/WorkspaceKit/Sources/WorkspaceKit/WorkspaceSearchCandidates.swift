@@ -193,6 +193,9 @@ enum WorkspaceSearchCandidatePlanner {
             .symlinkEscape
         case WorkspaceAnchoredFileSystemError.notRegularFile:
             .unsupportedPhysicalFileKind
+        case WorkspaceAnchoredFileSystemError.unreadable:
+            // A permission or I/O failure (a `chmod 000` ancestor) is not a containment error.
+            .unreadable
         default:
             .pathTraversal
         }
