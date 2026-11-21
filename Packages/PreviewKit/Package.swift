@@ -19,14 +19,14 @@ let package = Package(
                 "PreviewKitContracts",
             ],
             exclude: ["PreviewAssetReading.swift", "PreviewContracts.swift"],
-            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .target(
             name: "PreviewKitContracts",
             dependencies: [.product(name: "MarkdownCore", package: "MarkdownCore")],
             path: "Sources/PreviewKit",
             sources: ["PreviewAssetReading.swift", "PreviewContracts.swift"],
-            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(name: "PreviewKitTests", dependencies: ["PreviewKit"]),
     ],
