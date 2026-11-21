@@ -144,6 +144,15 @@ final class WYSIWYGImagePresentationController {
         beginNewSource(source, in: textView)
     }
 
+    /// The text view removed marker attributes in `range` itself (a click or a single
+    /// Replace revealing the raw image). Forget them, so the next plan that still covers
+    /// the image writes its marker instead of matching one that is no longer stored.
+    func markersWereRemoved(in range: NSRange) {
+        appliedMarkers = appliedMarkers.filter { _, marker in
+            NSIntersectionRange(marker.sourceRange, range).length == 0
+        }
+    }
+
     func detach(from textView: MarkdownSTTextView) {
         if hasPresentationState {
             teardown(in: textView, removeAllMarkers: true)
