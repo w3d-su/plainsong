@@ -15,15 +15,11 @@ final class GrantMatchingAssetReader: PreviewAssetReading, @unchecked Sendable {
     }
 
     var recorded: [PreviewAssetReadRequest] {
-        lock.lock()
-        defer { lock.unlock() }
-        return requests
+        lock.withLock { requests }
     }
 
     func read(_ request: PreviewAssetReadRequest) async throws -> PreviewAssetReadResult {
-        lock.lock()
-        requests.append(request)
-        lock.unlock()
+        lock.withLock { requests.append(request) }
         guard AssetAuthority.matches(request.access, expected) else {
             throw PreviewAssetReadFailure.accessChanged
         }
