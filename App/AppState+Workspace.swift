@@ -273,11 +273,9 @@ extension AppState {
         }
 
         if !preserveWorkspace {
-            // A file this window cannot read (outside the sandbox grant, or unreadable) must
-            // fail before the workspace it replaces is closed.
-            try SecurityScopedAccess.withAccess(to: url) {
-                try FileHandle(forReadingFrom: url).close()
-            }
+            // A file this window cannot load (outside the sandbox grant, not a regular file,
+            // or not UTF-8) must fail before the workspace it replaces is closed.
+            _ = try fileStore.load(url: url)
             try closeWorkspaceForReplacement()
         }
         try activateFileSession(url: url)
