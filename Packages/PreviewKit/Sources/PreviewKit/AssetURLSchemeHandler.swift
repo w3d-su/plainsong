@@ -312,16 +312,15 @@ final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler, @unchecked Send
         onCurrentFailure?(failure)
     }
 
+    /// Runs before the read returns: once it has, the stop record for `taskID` is gone.
+    @MainActor
     private func failMapped(
         _ task: any PreviewAssetSchemeTask,
         error: Error,
         capture: AssetReadCapture,
         taskID: ObjectIdentifier
     ) {
-        let failure = PreviewAssetReadFailure.mapped(from: error)
-        Task { @MainActor in
-            self.failCurrentSync(task, failure: failure, capture: capture, taskID: taskID)
-        }
+        failCurrentSync(task, failure: .mapped(from: error), capture: capture, taskID: taskID)
     }
 
     private func report(_ failure: PreviewAssetReadFailure, capture: AssetReadCapture?, taskID: ObjectIdentifier) {

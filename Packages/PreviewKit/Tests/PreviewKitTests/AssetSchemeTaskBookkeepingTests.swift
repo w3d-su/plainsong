@@ -44,6 +44,18 @@ final class AssetSchemeTaskBookkeepingTests: XCTestCase {
         XCTAssertEqual(task.finished + task.failures + task.responseCount, 0)
     }
 
+    func testStoppedReadThatFailsLateNeverCallsTheStoppedTask() async {
+        let task = await startRead()
+        handler.stop(task)
+        reader.failFirst(CocoaError(.fileReadNoPermission))
+
+        await waitUntilNothingIsTracked()
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
+        XCTAssertEqual(task.finished + task.failures + task.responseCount, 0)
+    }
+
     func testStopForATaskWithNoReadIsNotRecorded() {
         handler.stop(RecordingSchemeTask(url: PreviewAssetTestSupport.assetURL(token: token)))
         let stale = RecordingSchemeTask(url: PreviewAssetTestSupport.assetURL(token: "stale"))
