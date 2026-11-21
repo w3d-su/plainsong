@@ -118,6 +118,24 @@ final class PreviewLinkOpeningTests: XCTestCase {
         XCTAssertEqual(appState.shownSession.fileURL?.lastPathComponent, "index.md")
     }
 
+    func testUndecodableOutsideLinkKeepsTheWorkspace() async throws {
+        let parent = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let root = parent.appendingPathComponent("workspace", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let index = root.appendingPathComponent("index.md")
+        try "[Outside](../binary.md)".write(to: index, atomically: true, encoding: .utf8)
+        try Data([0xFF, 0xFE, 0x00, 0xC3]).write(to: parent.appendingPathComponent("binary.md"))
+        let appState = try await openWorkspace(root, showing: index)
+        let workspaceRoot = appState.workspaceRootURL
+
+        appState.openPreviewLink("../binary.md")
+
+        XCTAssertNotNil(appState.presentedError)
+        XCTAssertEqual(appState.workspaceRootURL, workspaceRoot)
+        XCTAssertEqual(appState.shownSession.fileURL?.lastPathComponent, "index.md")
+    }
+
     private func makeDirectory() throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("PreviewLinkOpeningTests-\(UUID().uuidString)", isDirectory: true)
@@ -132,6 +150,7 @@ final class PreviewLinkOpeningTests: XCTestCase {
             shouldRestoreLastOpenedFile: false
         )
         addTeardownBlock { @MainActor in appState.closeWorkspace() }
+        _ = WorkspaceFixtureEventSettle.settle(root: root)
         appState.openExternalFile(root)
         let deadline = Date().addingTimeInterval(5)
         while appState.workspaceTree == nil
