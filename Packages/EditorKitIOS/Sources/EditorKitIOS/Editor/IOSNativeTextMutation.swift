@@ -4,7 +4,23 @@ import UIKit
 /// Exact source mutations integrated with the editor's native undo stack.
 enum IOSNativeTextMutation {
     @MainActor
-    static func replace(_ edit: MarkdownEditResult, in textView: IOSMarkdownTextView, actionName: String) -> Bool {
+    static func replaceAsInput(_ edit: MarkdownEditResult, in textView: UITextView, actionName: String) -> Bool {
+        guard let range = IOSTextRanges.textRange(for: edit.replacementRange, in: textView) else { return false }
+        let undoManager = textView.undoManager
+        undoManager?.beginUndoGrouping()
+        textView.replace(range, withText: edit.replacementString)
+        if let selection = IOSTextRanges.textRange(for: edit.newSelection, in: textView) {
+            textView.selectedTextRange = selection
+        }
+        undoManager?.setActionName(actionName)
+        undoManager?.endUndoGrouping()
+        return true
+    }
+
+    @MainActor
+    static func replaceExactly(_ edit: MarkdownEditResult, in textView: IOSMarkdownTextView,
+                               actionName: String) -> Bool
+    {
         guard let original = IOSTextRanges.substring(textView.textStorage.string, range: edit.replacementRange) else {
             return false
         }
