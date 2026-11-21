@@ -163,6 +163,19 @@ public enum Frontmatter {
         }
     }
 
+    /// The first body position after a closed YAML or TOML block, without parsing its fields.
+    public static func bodyStart(in text: String) -> (utf16Offset: Int, lineEnding: String, needsLineEnding: Bool)? {
+        let storage = text as NSString
+        switch scanFences(in: text) {
+        case let .closed(bounds), let .toml(bounds):
+            let ending = lineEnding(at: bounds.closingDelimiterEnd, in: storage)
+            let length = lineEndingLength(at: bounds.closingDelimiterEnd, in: storage) ?? 0
+            return (bounds.closingDelimiterEnd + length, ending ?? bounds.lineEnding, ending == nil)
+        case .absent, .missingClosing:
+            return nil
+        }
+    }
+
     /// Rewrites one key of a closed YAML block, or returns `nil` when the block cannot be
     /// parsed or the edit would not read back as `value` (a duplicate key, a lost key, or
     /// a value YAML would load as another type or structure).
@@ -177,7 +190,8 @@ public enum Frontmatter {
                 key: key,
                 value: value
             ) else { return nil }
-            return "---" + bounds.lineEnding + updatedYAML + "---" + bounds.afterClosingDelimiter
+            let suffix = (text as NSString).substring(from: bounds.closingDelimiterEnd)
+            return "---" + bounds.lineEnding + updatedYAML + "---" + suffix
         case .absent, .missingClosing, .toml:
             return nil
         }
@@ -205,7 +219,7 @@ private extension Frontmatter {
     struct Bounds {
         let rawYAML: String
         let lineEnding: String
-        let afterClosingDelimiter: String
+        let closingDelimiterEnd: Int
     }
 
     enum FenceScan {
@@ -264,7 +278,7 @@ private extension Frontmatter {
                 let bounds = Bounds(
                     rawYAML: storage.substring(with: NSRange(location: rawStart, length: lineStart - rawStart)),
                     lineEnding: openingEnding,
-                    afterClosingDelimiter: storage.substring(from: lineEnd)
+                    closingDelimiterEnd: lineEnd
                 )
                 return isTOML ? .toml(bounds) : .closed(bounds)
             }
