@@ -66,6 +66,8 @@ const scrollAnchorOffset = 12;
 let renderer: SegmentedRenderer | undefined;
 const mermaid = new LazyMermaid(() => loadMermaidScript(document));
 const mermaidRenderer = new MermaidRenderCoordinator(mermaid.render, mermaid.initialize);
+const systemColorScheme: Pick<MediaQueryList, "matches"> & Partial<Pick<MediaQueryList, "addEventListener">> =
+  globalThis.matchMedia?.("(prefers-color-scheme: dark)") ?? { matches: false };
 
 registerHighlightLanguages();
 initializeMermaid("system");
@@ -149,6 +151,12 @@ previewRoot.addEventListener("click", (event) => {
 postBridgeMessage({
   name: "ready",
   payload: { protocolVersion: PROTOCOL_VERSION },
+});
+
+systemColorScheme.addEventListener?.("change", () => {
+  if (initializeMermaid(document.documentElement.dataset.theme ?? "system")) {
+    void rerenderVisibleMermaidBlocks(previewRoot, mermaidRenderer);
+  }
 });
 
 async function receive(message: BridgeMessage): Promise<void> {
@@ -346,5 +354,8 @@ function requirePreviewRoot(): HTMLElement {
 }
 
 function initializeMermaid(theme: string): boolean {
-  return mermaidRenderer.initializeTheme(theme);
+  // "system" (the default) follows the appearance, as the stylesheet does.
+  return mermaidRenderer.initializeTheme(
+    theme === "dark" || theme === "light" ? theme : systemColorScheme.matches ? "dark" : "light",
+  );
 }
