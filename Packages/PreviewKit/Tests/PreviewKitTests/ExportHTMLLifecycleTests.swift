@@ -169,9 +169,9 @@ final class ExportHTMLLifecycleTests: XCTestCase {
         trigger: (PreviewController, Task<PreviewHTMLExportResult, Never>) -> Void
     ) async throws {
         var controller: PreviewController? = try support.makeController()
-        weak var releasedController = controller
+        weak let releasedController = controller
         defer { releasedController?.invalidate() }
-        weak var releasedWebView = controller?.webView
+        weak let releasedWebView = controller?.webView
         let renderID = try await support.render(controller!, text: "# Lifecycle", fileKind: .markdown, version: 1)
         controller!.exportTimeoutNanoseconds = timeout
         try await suspendExports(controller!)

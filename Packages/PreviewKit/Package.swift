@@ -28,7 +28,11 @@ let package = Package(
             sources: ["PreviewAssetReading.swift", "PreviewContracts.swift"],
             swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
         ),
-        .testTarget(name: "PreviewKitTests", dependencies: ["PreviewKit"]),
+        .testTarget(
+            name: "PreviewKitTests",
+            dependencies: ["PreviewKit"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
     ],
     swiftLanguageModes: [.v5]
 )

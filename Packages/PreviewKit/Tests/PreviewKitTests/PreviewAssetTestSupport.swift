@@ -33,10 +33,11 @@ enum PreviewAssetTestSupport {
         return URL(string: "asset://\(path)?plainsong-root=\(encoded)")!
     }
 
+    @MainActor
     static func waitUntil(
         _ description: String,
         timeoutNanoseconds: UInt64 = 2_000_000_000,
-        condition: @escaping () -> Bool
+        condition: @MainActor () -> Bool
     ) async {
         let start = DispatchTime.now().uptimeNanoseconds
         while DispatchTime.now().uptimeNanoseconds - start < timeoutNanoseconds {

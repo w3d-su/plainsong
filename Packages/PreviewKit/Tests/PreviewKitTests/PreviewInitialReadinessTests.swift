@@ -215,10 +215,10 @@ final class PreviewInitialReadinessTests: XCTestCase {
         var controller: PreviewController? = PreviewController(
             previewIndexURL: nil,
             retriesSilentInitialLoad: true,
-            initialReadinessScheduler: clock.schedule,
+            initialReadinessScheduler: clock.scheduler,
             pageLoadOverrideForTesting: page.load
         )
-        weak var releasedController = controller
+        weak let releasedController = controller
         defer { releasedController?.invalidate() }
 
         controller = nil
@@ -236,7 +236,7 @@ final class PreviewInitialReadinessTests: XCTestCase {
             previewIndexURL: nil,
             retriesSilentInitialLoad: true,
             initialReadinessScheduler: { _, fire in
-                captured = fire
+                captured = { fire() }
                 fire()
                 return { cancellations += 1 }
             },

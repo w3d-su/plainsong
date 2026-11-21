@@ -270,7 +270,7 @@ final class RenderDispatchHarness {
             case let .scrollToLine(payload):
                 sentScrollLines.append(payload.line)
                 if let completion {
-                    heldScrollCompletions.append(completion)
+                    heldScrollCompletions.append { completion($0) }
                 }
             case .setTheme:
                 settingsMessageCount += 1
