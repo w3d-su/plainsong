@@ -43,12 +43,33 @@ enum AssetURLPolicy {
 
     static func loadAsset(at fileURL: URL) throws -> AssetURLPolicyResult {
         let mimeType = try mimeType(for: fileURL)
-        try validateSize(for: fileURL)
-
-        let data = try Data(contentsOf: fileURL)
-        try validateSize(Int64(data.count))
-
+        let data = try boundedRegularFileBytes(at: fileURL)
         return AssetURLPolicyResult(mimeType: mimeType, data: data)
+    }
+
+    /// The raster read, bounded the way the SVG read is. The open never blocks
+    /// (`O_NONBLOCK`, so a FIFO named `x.png` cannot stall the read) and does not follow a
+    /// link swapped in after containment resolved the path. Size and file type come from
+    /// the opened descriptor, and at most one byte past the cap is read, so a file that
+    /// grows after the size check stays bounded.
+    private static func boundedRegularFileBytes(at fileURL: URL) throws -> Data {
+        let descriptor = fileURL.withUnsafeFileSystemRepresentation { path -> Int32 in
+            guard let path else { return -1 }
+            return open(path, O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC)
+        }
+        guard descriptor >= 0 else {
+            throw CocoaError(errno == ENOENT ? .fileReadNoSuchFile : .fileReadUnknown)
+        }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        var status = stat()
+        guard fstat(descriptor, &status) == 0 else { throw AssetURLPolicyError.missingFileSize }
+        guard status.st_mode & S_IFMT == S_IFREG else {
+            throw AssetURLPolicyError.unsupportedType(fileURL.pathExtension.lowercased())
+        }
+        try validateSize(Int64(status.st_size))
+        let data = try handle.read(upToCount: Int(maxAssetBytes) + 1) ?? Data()
+        try validateSize(Int64(data.count))
+        return data
     }
 
     /// Policy for bytes a reader already returned. The reader cannot skip the
@@ -66,15 +87,6 @@ enum AssetURLPolicy {
         }
 
         return mimeType
-    }
-
-    private static func validateSize(for fileURL: URL) throws {
-        let values = try fileURL.resourceValues(forKeys: [.fileSizeKey])
-        guard let fileSize = values.fileSize else {
-            throw AssetURLPolicyError.missingFileSize
-        }
-
-        try validateSize(Int64(fileSize))
     }
 
     private static func validateSize(_ byteCount: Int64) throws {
@@ -134,6 +146,10 @@ final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler, @unchecked Send
         state.invalidate()
     }
 
+    var trackedTaskCount: Int {
+        state.trackedTaskCount
+    }
+
     func webView(_: WKWebView, start urlSchemeTask: any WKURLSchemeTask) {
         start(WKAssetSchemeTask(urlSchemeTask), taskID: ObjectIdentifier(urlSchemeTask as AnyObject))
     }
@@ -170,7 +186,8 @@ final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler, @unchecked Send
         guard let requestURL = task.requestURL else { return }
         let reader = readers.current()
         let box = SchemeTaskBox(task)
-        let readTask = Task.detached { [weak self] in
+        let readTask = Task.detached { [weak self, state] in
+            defer { state.finish(taskID) }
             let resolved: URL
             do {
                 resolved = try AssetFilesystemPreparation.resolvedAssetURL(
