@@ -92,7 +92,7 @@ extension MarkdownSyntaxParser {
         case "code_span":
             codeSpanCandidate(from: node, baseLocation: baseLocation)
         case "inline_link":
-            inlineLinkCandidate(from: node, inlineSource: inlineSource, baseLocation: baseLocation)
+            inlineLinkCandidate(from: node, baseLocation: baseLocation)
         default:
             nil
         }
@@ -157,7 +157,6 @@ extension MarkdownSyntaxParser {
 
     func inlineLinkCandidate(
         from node: Node,
-        inlineSource: String,
         baseLocation: Int
     ) -> WYSIWYGFoldCandidate? {
         guard let linkTextNode = firstChild(named: "link_text", in: node) else {
@@ -165,9 +164,8 @@ extension MarkdownSyntaxParser {
         }
 
         let sourceRange = nsRange(for: node, offset: baseLocation)
-        let linkTextRange = nsRange(for: linkTextNode)
-        let contentRange = linkContentRange(from: linkTextRange, inlineSource: inlineSource)
-            .offset(by: baseLocation)
+        // `link_text` excludes the enclosing brackets; a bracket at its edge is link text.
+        let contentRange = nsRange(for: linkTextNode, offset: baseLocation)
         let foldRanges = foldRanges(around: contentRange, in: sourceRange)
         guard !foldRanges.isEmpty else {
             return nil
@@ -209,21 +207,6 @@ extension MarkdownSyntaxParser {
             sourcePathRange: nsRange(for: sourcePathNode),
             titleRange: titleRange
         )?.offset(by: baseLocation)
-    }
-
-    func linkContentRange(from linkTextRange: NSRange, inlineSource: String) -> NSRange {
-        let storage = inlineSource as NSString
-        var location = linkTextRange.location
-        var end = NSMaxRange(linkTextRange)
-
-        if location < end, storage.character(at: location) == 91 {
-            location += 1
-        }
-        if end > location, storage.character(at: end - 1) == 93 {
-            end -= 1
-        }
-
-        return NSRange(location: location, length: max(0, end - location))
     }
 
     func foldRanges(around contentRange: NSRange, in sourceRange: NSRange) -> [NSRange] {
