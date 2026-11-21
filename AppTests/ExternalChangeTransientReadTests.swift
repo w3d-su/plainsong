@@ -118,6 +118,28 @@ final class ExternalChangeTransientReadTests: XCTestCase {
         }
     }
 
+    func testDeletedOrSymlinkedFileDetachesOnTheFirstReadWithoutTransientRetries() async throws {
+        for replacesWithSymbolicLink in [false, true] {
+            let fixture = try AnchoredSessionFixture(text: "disk A")
+            defer { fixture.cleanUp() }
+            let (appState, session, post) = (fixture.appState, fixture.session, fixture.post)
+
+            try FileManager.default.removeItem(at: post)
+            if replacesWithSymbolicLink {
+                try FileManager.default.createSymbolicLink(at: post, withDestinationURL: fixture.otherLocation.fileURL)
+            }
+            fixture.reader.arm([])
+            appState.handleExternalChange(for: session)
+            try await waitUntil("the first read detaches", timeout: 0.15) {
+                appState.detachedSessionURLs.contains(post)
+            }
+
+            XCTAssertEqual(fixture.reader.callCount, 1, "symlink: \(replacesWithSymbolicLink)")
+            XCTAssertEqual(appState.missingFilePrompt?.fileURL, post)
+            XCTAssertNil(appState.externalDiskInspectionTasks[ObjectIdentifier(session)])
+        }
+    }
+
     func testTransientOutcomesDetachOnceTheRetriesRunOut() async throws {
         let fixture = try AnchoredSessionFixture(text: "disk A")
         defer { fixture.cleanUp() }
