@@ -237,7 +237,9 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
   const nextRoot = parsingDocument.createElement("main");
   nextRoot.id = "preview-root";
   nextRoot.innerHTML = html;
-  rewriteImageSources(nextRoot, payload.baseDir, payload.allowRemoteImages, payload.assetRootID);
+  // Not `payload.allowRemoteImages`: a `setTheme` received while the pipeline was suspended
+  // carries the newer setting.
+  rewriteImageSources(nextRoot, payload.baseDir, currentAllowRemoteImages, payload.assetRootID);
 
   clearMdxErrorBanner();
   const mermaidPatch = patchPreviewRoot(previewRoot, nextRoot, mermaidRenderer);
