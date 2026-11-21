@@ -58,11 +58,6 @@ public enum EditorSelectionProbe {
             {
                 return document.selectedRange()
             }
-            if textView.accessibilityIdentifier() == EditorAccessibility.textViewIdentifier,
-               let st = textView as? STTextView
-            {
-                return st.selectedRange()
-            }
         }
 
         return nil
