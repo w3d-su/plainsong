@@ -119,6 +119,41 @@ final class WYSIWYGImageMarkerOwnershipTests: XCTestCase {
         XCTAssertEqual(strandedRanges, [], "markers of an earlier source must not outlive the next highlight")
     }
 
+    func testOutcomesOfImagesNoLongerInTheDocumentAreNotRetainedWithoutBound() async throws {
+        let fixture = try Support.makeWindowedEditor(outcomes: [:])
+        let controller = fixture.coordinator.imageThumbnailPresentationController
+        let limit = WYSIWYGImagePresentationController.retainedOutcomeLimit
+        let storage = try XCTUnwrap(MarkdownTextView.textStorage(of: fixture.textView))
+
+        for index in 0 ..< limit + 12 {
+            let source = "Top line\n![alt](image-\(index).png)\nBottom line\n"
+            storage.replaceCharacters(in: NSRange(location: 0, length: storage.length), with: source)
+            applyUnforcedPresentation(
+                source: source,
+                selection: NSRange(location: 0, length: 0),
+                coordinator: fixture.coordinator,
+                textView: fixture.textView
+            )
+            for _ in 0 ..< 200 {
+                let requested = await fixture.loader.recordedRequests().contains { $0.source == "image-\(index).png" }
+                if requested {
+                    break
+                }
+                try await Task.sleep(nanoseconds: 2_000_000)
+            }
+            // Let the finished load hand its outcome to the controller.
+            try await Task.sleep(nanoseconds: 5_000_000)
+        }
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        XCTAssertGreaterThan(controller.retainedOutcomeCount, 0)
+        XCTAssertLessThanOrEqual(
+            controller.retainedOutcomeCount,
+            limit,
+            "outcomes of images the document no longer contains must not accumulate"
+        )
+    }
+
     private func applyUnforcedPresentation(
         source: String,
         selection: NSRange,

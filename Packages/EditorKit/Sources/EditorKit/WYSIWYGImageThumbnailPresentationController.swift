@@ -58,6 +58,10 @@ final class WYSIWYGImagePresentationController {
     private var generation: UInt64 = 0
     private var activePlan: ActivePlan?
     private var outcomes: [LoadKey: EditorImageThumbnailOutcome] = [:]
+    static let retainedOutcomeLimit = 64
+    var retainedOutcomeCount: Int {
+        outcomes.count
+    }
     private var inFlight: [LoadKey: InFlightRequest] = [:]
     private var appliedMarkers: [RegionKey: WYSIWYGImagePresentationMarker] = [:]
     private weak var textView: MarkdownSTTextView?
@@ -421,7 +425,24 @@ private extension WYSIWYGImagePresentationController {
         }
 
         outcomes[key] = outcome
+        trimOutcomes()
         rebuildPresentation(forceReapply: false, in: textView)
+    }
+
+    /// Outcomes hold the thumbnail PNG. Sources the plan no longer shows (a deleted image, each
+    /// partial path typed on the way to a full one) are dropped once enough have piled up;
+    /// a few stay so scrolling back does not load again.
+    private func trimOutcomes() {
+        guard outcomes.count > Self.retainedOutcomeLimit else {
+            return
+        }
+        let planned = Set(activePlan?.regions.map(\.loadKey) ?? [])
+        for key in outcomes.keys where !planned.contains(key) {
+            outcomes[key] = nil
+            if outcomes.count <= Self.retainedOutcomeLimit {
+                break
+            }
+        }
     }
 
     func cancelAllRequests() {
