@@ -103,7 +103,8 @@ final class IOSSourceEditorInputTests: XCTestCase {
         defer { observation.cancel() }
         harness.placeCaret(at: iosUTF16("hello"))
         harness.textView.insertText("!")
-        await fulfillment(of: [republished], timeout: 2)
+        // The session counts after its 300 ms pause, at utility priority.
+        await fulfillment(of: [republished], timeout: 5)
         XCTAssertEqual(harness.session.statistics, TextStatistics(text: "hello!"))
     }
 }

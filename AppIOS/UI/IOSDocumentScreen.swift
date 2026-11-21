@@ -1,7 +1,8 @@
 import SwiftUI
+import UIKit
 
-/// The document column: status chrome + banners + the dual-pane container +
-/// authoring toolbar + sheets. Mounted as the compact NavigationStack's pushed
+/// The document column: status chrome + banners + pane toggle + the dual-pane
+/// container + keyboard bar + toolbar + sheets. Mounted as the compact NavigationStack's pushed
 /// destination or the regular-width split view's detail.
 struct IOSDocumentScreen: View {
     @ObservedObject var scene: IOSShellSceneState
@@ -29,7 +30,18 @@ struct IOSDocumentScreen: View {
                     .background(.thinMaterial)
                 }
                 IOSDocumentStateBanner(chrome: scene.chrome, scene: scene)
+                // In the navigation bar's principal slot an iPhone dropped the
+                // toggle, leaving no way to reach the preview.
+                IOSPaneToggle(scene: scene)
                 contentArea
+                    .background {
+                        // Every layout: the Find button stays in the navigation
+                        // bar while the preview shows, so ⌘G, ⇧⌘G and ⌘E must too.
+                        IOSAuthoringShortcutHosts(scene: scene, router: router, group: .find)
+                    }
+                if scene.layout != .single(.preview) {
+                    IOSAuthoringKeyboardBar(scene: scene, router: router)
+                }
             } else {
                 IOSEmptyDocumentView(hasWorkspace: scene.chrome.hasWorkspace)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -37,9 +49,6 @@ struct IOSDocumentScreen: View {
         }
         .toolbar {
             if scene.chrome.hasDocument {
-                ToolbarItem(placement: .principal) {
-                    IOSPaneToggle(scene: scene)
-                }
                 IOSAuthoringToolbarItems(scene: scene, router: router)
                 ToolbarItem(placement: .topBarLeading) {
                     IOSSettingsLink()
@@ -57,6 +66,14 @@ struct IOSDocumentScreen: View {
             }
         )) { presentation in
             sheetContent(for: presentation)
+        }
+        .onChange(of: scene.layout) { _, layout in
+            // The hidden editor would keep the keyboard, and the bar with Hide
+            // Keyboard is gone while the preview shows. Resign only this scene's
+            // editor view so background scenes on iPad cannot dismiss the key scene.
+            if layout == .single(.preview) {
+                scene.editorHostView?.endEditing(true)
+            }
         }
         .onAppear {
             // The document column claims the scene command route so toolbar and

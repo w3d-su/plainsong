@@ -7,7 +7,10 @@ public struct DocumentSnapshot: Sendable, Equatable {
     public let fileKind: FileKind
     public let fileURL: URL?
     public let isDirty: Bool
-    public let statistics: TextStatistics
+    public let availableStatistics: TextStatistics?
+    public var statistics: TextStatistics {
+        availableStatistics ?? TextStatistics(text: text)
+    }
 
     public init(
         text: String,
@@ -15,13 +18,13 @@ public struct DocumentSnapshot: Sendable, Equatable {
         fileKind: FileKind,
         fileURL: URL?,
         isDirty: Bool,
-        statistics: TextStatistics
+        statistics: TextStatistics?
     ) {
         self.text = text
         self.version = version
         self.fileKind = fileKind
         self.fileURL = fileURL
         self.isDirty = isDirty
-        self.statistics = statistics
+        availableStatistics = statistics
     }
 }

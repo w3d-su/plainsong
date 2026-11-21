@@ -58,6 +58,7 @@ final class IOSImageInsertionSession: ObservableObject {
     private let grant: IOSWorkspaceGrant
     private let onRequestDirectoryGrant: () -> Void
     private var inFlight: IOSImageInsertionContext?
+    private var filesSheetDismissed = false
     private var importing = false
     private var finishing = false
 
@@ -76,7 +77,12 @@ final class IOSImageInsertionSession: ObservableObject {
     }
 
     func preparePicker() -> IOSImageInsertionContext? {
-        guard !importing, inFlight == nil else { return nil }
+        guard !importing else { return nil }
+        if filesSheetDismissed, case .picking = phase {
+            abandonPicking()
+        }
+        guard inFlight == nil else { return nil }
+        filesSheetDismissed = false
         guard let snapshot = editor.captureSnapshot() else {
             phase = .failed(.unavailable)
             return nil
@@ -99,14 +105,33 @@ final class IOSImageInsertionSession: ObservableObject {
         onRequestDirectoryGrant()
     }
 
-    func beginImport() -> IOSImageInsertionContext? {
+    func beginImport(operationID: UUID? = nil) -> IOSImageInsertionContext? {
         guard !importing, let inFlight, case .picking = phase else { return nil }
+        if let operationID, inFlight.operationID != operationID {
+            return nil
+        }
+        filesSheetDismissed = false
         importing = true
         phase = .importing(inFlight.operationID)
         return inFlight
     }
 
+    /// SwiftUI dismisses the Files sheet before UIKit's document-picker delegate
+    /// delivers the picked URL or cancel. Keep the issuance alive for that single
+    /// terminal result while letting a fresh tap replace an unconsumed dismissal.
+    func filesPickerPresentationEnded() {
+        guard !importing, inFlight != nil, case .picking = phase else { return }
+        filesSheetDismissed = true
+    }
+
     func pickerDismissed() {
+        abandonPicking()
+    }
+
+    func cancelFilesPicker(operationID: UUID?) {
+        if let operationID, inFlight?.operationID != operationID {
+            return
+        }
         abandonPicking()
     }
 
@@ -125,6 +150,7 @@ final class IOSImageInsertionSession: ObservableObject {
         defer {
             finishing = false
             importing = false
+            filesSheetDismissed = false
             if inFlight?.operationID == context.operationID {
                 inFlight = nil
             }
@@ -147,6 +173,7 @@ final class IOSImageInsertionSession: ObservableObject {
     }
 
     private func abandonPicking() {
+        filesSheetDismissed = false
         guard let inFlight, case .picking = phase else { return }
         controller.discardUnstaged(operationID: inFlight.operationID)
         self.inFlight = nil

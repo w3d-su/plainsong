@@ -16,7 +16,10 @@ Lane 12 交付（`docs/ios/handoffs/12-build-and-ipa.md`）。本檔描述固定
 - 共享鎖固定為 `/private/tmp/plainsong-xcodebuild-test.lock`；
   `PLAINSONG_XCODEBUILD_LOCK` 設成其他路徑會被明示拒絕（exit 64）。外層已持鎖時
   不要呼叫這些 runner。`--locked` 公開旗標會被拒絕；runner 建立的 lockf
-  ancestor context 才能執行合法 nested archive。未取得鎖回報排程等待（exit 75）。
+  ancestor context 才能執行合法 nested archive。未取得鎖回報排程等待（exit 75）；
+  只有 lockf 回 75 且 payload 尚未開始才算鎖被占用。lockf 其他失敗（例如鎖檔
+  打不開，exit 73）會立即以 lockf 的 exit code 結束，不會等待。已持鎖的 payload
+  原樣回傳自己的 exit code（包括 1 與 75）。
 
 ## 固定命令
 
