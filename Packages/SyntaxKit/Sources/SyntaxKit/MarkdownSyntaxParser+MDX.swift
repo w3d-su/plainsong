@@ -276,6 +276,29 @@ extension MarkdownSyntaxParser {
         line.hasPrefix("import ") || line.hasPrefix("export ")
     }
 
+    /// MDX reads a top-level block whose first line starts with `import ` or `export ` at
+    /// column 0 as JavaScript up to the next blank line. Markdown parses it as a paragraph,
+    /// so its `*`, `_` and backticks would fold as inline markup.
+    func isMDXESMBlock(_ paragraph: Node, fragment: String) -> Bool {
+        guard let parentType = paragraph.parent?.nodeType, parentType == "document" || parentType == "section"
+        else {
+            return false
+        }
+        let storage = fragment as NSString
+        let location = nsRange(for: paragraph).location
+        let keywordLength = 7
+        guard location + keywordLength <= storage.length else {
+            return false
+        }
+        if location > 0 {
+            let previous = storage.character(at: location - 1)
+            guard previous == 10 || previous == 13 else {
+                return false
+            }
+        }
+        return isMDXESMLine(storage.substring(with: NSRange(location: location, length: keywordLength)))
+    }
+
     func isMDXJSXLine(_ line: String) -> Bool {
         guard line.hasPrefix("<") else {
             return false
