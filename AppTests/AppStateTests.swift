@@ -10400,7 +10400,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             workspaceA.standardizedFileURL
         )
         XCTAssertFalse(retirementAfterRepeatedFailure.awaitingInstallations.isEmpty)
-        XCTAssertNil(appState.workspaceRootURL)
+        XCTAssertEqual(appState.workspaceRootURL?.standardizedFileURL, workspaceB.standardizedFileURL)
 
         editorFixture.textView.insertText("臺", replacementRange: .notFound)
         XCTAssertEqual(sessionA.text, sourceA + "臺")
@@ -15902,7 +15902,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertEqual(sessionB.text, sourceB)
     }
 
-    func testFailedStandaloneDestinationOpenKeepsMarkedSourceWritableUntilFinalRevoke() throws {
+    func testFailedStandaloneDestinationOpenLeavesMarkedSourceInstalled() async throws {
         let rootURL = try makeTemporaryDirectory()
         let documentAURL = rootURL.appendingPathComponent("a.md")
         let invalidBURL = rootURL.appendingPathComponent("b.md")
@@ -15943,16 +15943,17 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertThrowsError(
             try appState.open(url: invalidBURL, rememberAsLastOpened: false, preserveWorkspace: false)
         )
+        // The destination is refused before the current document is touched.
         let canonicalA = documentAURL.standardizedFileURL.resolvingSymlinksInPath()
         XCTAssertTrue(appState.shownSession === sessionA)
-        XCTAssertNotNil(appState.retiredEditorDocumentSessions[canonicalA])
+        XCTAssertNil(appState.retiredEditorDocumentSessions[canonicalA])
+        XCTAssertTrue(appState.isEditorDocumentBindingInstalled(binding.id, session: sessionA))
         fixture.textView.insertText("臺", replacementRange: .notFound)
         let committedA = sourceA + "臺"
-        XCTAssertEqual(sessionA.text, committedA)
-
-        MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
-        XCTAssertNil(appState.retiredEditorDocumentSessions[canonicalA])
-        XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), committedA)
+        try await waitUntil("the composition commits to the still-current document") {
+            sessionA.text == committedA
+        }
+        XCTAssertTrue(sessionA.isDirty)
     }
 
     func testSaveCopySourceRetirementMismatchIsSideEffectFreeBeforeDestinationWrite() throws {

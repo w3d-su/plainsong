@@ -69,4 +69,101 @@ final class PreviewLinkOpeningTests: XCTestCase {
         )
         XCTAssertNil(AppState.workspaceFileURL(for: URL(fileURLWithPath: "/usr/bin/true"), under: root))
     }
+
+    func testWorkspaceLinkSelectsAndRevealsTheTargetInTheSidebar() async throws {
+        let root = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let index = root.appendingPathComponent("index.md")
+        try FileManager.default.createDirectory(
+            at: root.appendingPathComponent("sub", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        try "[Other](sub/Other.md)".write(to: index, atomically: true, encoding: .utf8)
+        try "# Other".write(to: root.appendingPathComponent("sub/Other.md"), atomically: true, encoding: .utf8)
+        let appState = try await openWorkspace(root, showing: index)
+
+        appState.openPreviewLink("sub/Other.md")
+
+        XCTAssertNil(appState.presentedError)
+        XCTAssertEqual(appState.shownSession.text, "# Other")
+        let tree = try XCTUnwrap(appState.workspaceTree)
+        XCTAssertEqual(tree.selectedNode?.relativePath, "sub/Other.md")
+        let folder = try XCTUnwrap(appState.firstNode(in: tree.root, relativePath: "sub"))
+        XCTAssertTrue(tree.isExpanded(folder.id))
+    }
+
+    /// The sandbox refuses a file outside the workspace grant. The link used to close the
+    /// workspace first and then fail to read the file, leaving "No Folder Open".
+    func testUnreadableOutsideLinkKeepsTheWorkspace() async throws {
+        let parent = try makeDirectory()
+        defer {
+            try? FileManager.default.removeItem(at: parent)
+        }
+        let root = parent.appendingPathComponent("workspace", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let index = root.appendingPathComponent("index.md")
+        let outside = parent.appendingPathComponent("outside.md")
+        try "[Outside](../outside.md)".write(to: index, atomically: true, encoding: .utf8)
+        try "# Outside".write(to: outside, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: outside.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: outside.path) }
+        let appState = try await openWorkspace(root, showing: index)
+        let workspaceRoot = appState.workspaceRootURL
+
+        appState.openPreviewLink("../outside.md")
+
+        XCTAssertNotNil(appState.presentedError)
+        XCTAssertEqual(appState.workspaceRootURL, workspaceRoot)
+        XCTAssertNotNil(appState.workspaceTree)
+        XCTAssertEqual(appState.shownSession.fileURL?.lastPathComponent, "index.md")
+    }
+
+    func testUndecodableOutsideLinkKeepsTheWorkspace() async throws {
+        let parent = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let root = parent.appendingPathComponent("workspace", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let index = root.appendingPathComponent("index.md")
+        try "[Outside](../binary.md)".write(to: index, atomically: true, encoding: .utf8)
+        try Data([0xFF, 0xFE, 0x00, 0xC3]).write(to: parent.appendingPathComponent("binary.md"))
+        let appState = try await openWorkspace(root, showing: index)
+        let workspaceRoot = appState.workspaceRootURL
+
+        appState.openPreviewLink("../binary.md")
+
+        XCTAssertNotNil(appState.presentedError)
+        XCTAssertEqual(appState.workspaceRootURL, workspaceRoot)
+        XCTAssertEqual(appState.shownSession.fileURL?.lastPathComponent, "index.md")
+    }
+
+    private func makeDirectory() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PreviewLinkOpeningTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
+    private func openWorkspace(_ root: URL, showing file: URL) async throws -> AppState {
+        let appState = AppState(
+            lastOpenedFileStore: MemoryLastOpenedFileStore(),
+            recentItemStore: MemoryRecentItemStore(),
+            shouldRestoreLastOpenedFile: false
+        )
+        addTeardownBlock { @MainActor in appState.closeWorkspace() }
+        _ = WorkspaceFixtureEventSettle.settle(root: root)
+        appState.openExternalFile(root)
+        let deadline = Date().addingTimeInterval(5)
+        while appState.workspaceTree == nil
+            || appState.workspaceInstalledCaptureGeneration != appState.workspaceGeneration
+        {
+            guard Date() < deadline else {
+                XCTFail("Timed out waiting for the workspace capture")
+                break
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        appState.openWorkspaceFile(file.standardizedFileURL)
+        XCTAssertEqual(appState.shownSession.fileURL?.lastPathComponent, file.lastPathComponent)
+        return appState
+    }
 }

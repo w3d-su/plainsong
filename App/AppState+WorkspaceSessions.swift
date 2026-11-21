@@ -23,7 +23,12 @@ extension AppState {
         return resolvedURL
     }
 
-    func synchronizeWorkspaceTreeSelection(for session: DocumentSession) {
+    /// `revealingAncestors` also expands the folders above the row, as a sidebar click on it
+    /// would have needed.
+    func synchronizeWorkspaceTreeSelection(
+        for session: DocumentSession,
+        revealingAncestors: Bool = false
+    ) {
         guard let rootAuthority = workspaceSearchRootAuthority,
               workspaceInstalledCaptureGeneration == workspaceGeneration,
               let location = retainedManagedSessionLocation(for: session),
@@ -39,6 +44,15 @@ extension AppState {
         }
 
         tree.selectNode(id: node.id)
+        if revealingAncestors {
+            var ancestorPath = ""
+            for component in node.relativePath.split(separator: "/").dropLast() {
+                ancestorPath = ancestorPath.isEmpty ? String(component) : "\(ancestorPath)/\(component)"
+                if let ancestor = firstNode(in: tree.root, relativePath: ancestorPath) {
+                    tree.setExpanded(true, for: ancestor.id)
+                }
+            }
+        }
         workspaceTree = tree
     }
 

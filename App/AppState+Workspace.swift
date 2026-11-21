@@ -273,6 +273,9 @@ extension AppState {
         }
 
         if !preserveWorkspace {
+            // A file this window cannot load (outside the sandbox grant, not a regular file,
+            // or not UTF-8) must fail before the workspace it replaces is closed.
+            _ = try fileStore.load(url: url)
             try closeWorkspaceForReplacement()
         }
         try activateFileSession(url: url)
@@ -295,6 +298,7 @@ extension AppState {
                 }
                 let location = try rootAuthority.canonicalizedLocation(forFileURL: url)
                 try activateAnchoredFileSession(at: location)
+                synchronizeWorkspaceTreeSelection(for: shownSession, revealingAncestors: true)
             } else {
                 try activateFileSession(url: url)
             }
