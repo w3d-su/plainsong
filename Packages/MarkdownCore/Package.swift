@@ -16,7 +16,7 @@ let package = Package(
             dependencies: [
                 .product(name: "Yams", package: "Yams"),
             ],
-            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(name: "MarkdownCoreTests", dependencies: ["MarkdownCore"]),
     ],
