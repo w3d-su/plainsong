@@ -5,6 +5,24 @@ import XCTest
 
 final class IOSAuthorizedEditTests: XCTestCase {
     @MainActor
+    func testFrontmatterInsertionKeepsLiteralMarkdownPunctuation() throws {
+        let harness = IOSEditorHarness(text: "body")
+        let frontmatter = "---\ntitle: \"\"\ndraft: false\n---\n"
+        let edit = MarkdownEditResult(
+            replacementRange: NSRange(location: 0, length: 0),
+            replacementString: frontmatter,
+            newSelection: NSRange(location: iosUTF16(frontmatter), length: 0)
+        )
+        XCTAssertEqual(try harness.controller.apply(harness.edit(edit, name: "Frontmatter")), .applied(
+            IOSDocumentRevision(documentID: harness.identity, version: harness.session.version)
+        ))
+        XCTAssertEqual(harness.textView.textStorage.string, frontmatter + "body")
+        XCTAssertEqual(harness.session.text, frontmatter + "body")
+        harness.controller.undo()
+        XCTAssertEqual(harness.session.text, "body")
+    }
+
+    @MainActor
     func testFormatAndSingleReplaceAreOneNativeUndo() throws {
         let harness = IOSEditorHarness(text: "hello")
         harness.textView.selectedRange = NSRange(location: 0, length: 5)

@@ -128,10 +128,8 @@ final class IOSImageInsertionSession: ObservableObject {
         abandonPicking()
     }
 
-    func cancelFilesPicker(operationID: UUID?) {
-        if let operationID, inFlight?.operationID != operationID {
-            return
-        }
+    func cancelFilesPicker(operationID: UUID) {
+        guard inFlight?.operationID == operationID else { return }
         abandonPicking()
     }
 

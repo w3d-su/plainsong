@@ -3,11 +3,14 @@ import SwiftUI
 
 /// Entry points for one image. Lane 10 places this view; lane 13 supplies the real writer and editor.
 struct IOSImageInsertionView: View {
+    private struct FilesPick: Identifiable {
+        let id: UUID
+    }
+
     @ObservedObject var session: IOSImageInsertionSession
 
     @State private var showPhotos = false
-    @State private var showFiles = false
-    @State private var filesPickerOperationID: UUID?
+    @State private var filesPick: FilesPick?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -34,14 +37,14 @@ struct IOSImageInsertionView: View {
                 showPhotos = false
             }
         }
-        .sheet(isPresented: $showFiles, onDismiss: session.filesPickerPresentationEnded) {
-            let operationID = filesPickerOperationID
+        .sheet(item: $filesPick, onDismiss: session.filesPickerPresentationEnded) { request in
             IOSImageFilePicker { urls in
-                handleFiles(urls, operationID: operationID)
-                showFiles = false
+                handleFiles(urls, operationID: request.id)
+                if filesPick?.id == request.id {
+                    filesPick = nil
+                }
             }
         }
-        .onDisappear(perform: session.teardown)
     }
 
     @ViewBuilder private var status: some View {
@@ -85,8 +88,7 @@ struct IOSImageInsertionView: View {
 
     private func presentFiles() {
         guard let context = session.preparePicker() else { return }
-        filesPickerOperationID = context.operationID
-        showFiles = true
+        filesPick = FilesPick(id: context.operationID)
     }
 
     private func chooseFolder() {
@@ -104,7 +106,7 @@ struct IOSImageInsertionView: View {
         }
     }
 
-    private func handleFiles(_ urls: [URL], operationID: UUID?) {
+    private func handleFiles(_ urls: [URL], operationID: UUID) {
         guard let url = urls.first, let context = session.beginImport(operationID: operationID) else {
             session.cancelFilesPicker(operationID: operationID)
             return

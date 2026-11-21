@@ -4,8 +4,33 @@ import Foundation
 import WorkspaceKitIOS
 import XCTest
 
+@MainActor
 extension IOSDocumentSceneControllerTests {
-    @MainActor
+    func testRelativeLinkShowsTheNewDocumentAfterTheOldRouteIsCleared() async throws {
+        let fixture = IOSSceneControllerFixture()
+        let root = URL(fileURLWithPath: "/synthetic", isDirectory: true)
+        try await fixture.controller.openPickedURL(root, scope: .directory)
+        try await fixture.controller.openSelectedURL(root.appendingPathComponent("first.md"), scope: .singleFile)
+        let handle = try XCTUnwrap(fixture.controller.handle)
+        let scene = IOSShellSceneState(facade: fixture.controller)
+        scene.startObserving()
+        defer { scene.stopObserving() }
+        scene.navigateToDocument()
+        let navigated = expectation(description: "Displays the linked document")
+        fixture.controller.onPreviewDocumentOpened = {
+            XCTAssertTrue(scene.navigationPath.isEmpty, "Closing the first document clears its route")
+            scene.navigateToDocument()
+            navigated.fulfill()
+        }
+
+        fixture.preview.emit(.relativeLinkRequested(documentID: handle.identity, href: "second.md"))
+        await fulfillment(of: [navigated], timeout: 2)
+
+        XCTAssertEqual(fixture.controller.snapshot.document?.location.relativePath, "second.md")
+        XCTAssertEqual(scene.navigationPath, [.document])
+        XCTAssertEqual(fixture.store.closed, [handle.identity])
+    }
+
     func testScheduledRelativeLinkCannotLeaveItsOriginBindingForANewerInstallation() async throws {
         let fixture = IOSSceneControllerFixture()
         let root = URL(fileURLWithPath: "/synthetic", isDirectory: true)
@@ -37,7 +62,6 @@ extension IOSDocumentSceneControllerTests {
         XCTAssertFalse(fixture.controller.transitioning)
     }
 
-    @MainActor
     func testMissingRelativeLinkReportsAnErrorWithoutMakingTheCurrentDocumentUnavailable() async throws {
         let fixture = IOSSceneControllerFixture()
         let root = URL(fileURLWithPath: "/synthetic", isDirectory: true)
@@ -74,7 +98,6 @@ extension IOSDocumentSceneControllerTests {
         XCTAssertTrue(fixture.store.closed.isEmpty)
     }
 
-    @MainActor
     func testRelativeLinkRefusedDuringATransitionPreservesTheCurrentDocumentAndTransition() async throws {
         let fixture = IOSSceneControllerFixture()
         let root = URL(fileURLWithPath: "/synthetic", isDirectory: true)
@@ -100,7 +123,6 @@ extension IOSDocumentSceneControllerTests {
         XCTAssertTrue(fixture.store.closed.isEmpty)
     }
 
-    @MainActor
     func testRelativeLinkFailureCannotReplaceAGrantRevocationErrorOrRestoreWriteAccess() async throws {
         let fixture = IOSSceneControllerFixture()
         try await fixture.controller.openPickedURL(fixture.selectedURL, scope: .singleFile)

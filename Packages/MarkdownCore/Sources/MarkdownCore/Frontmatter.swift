@@ -169,8 +169,7 @@ public enum Frontmatter {
     public static func updating(_ text: String, key: String, value: FrontmatterValue) -> String? {
         switch scanFences(in: text) {
         case let .closed(bounds):
-            guard parseClosedBlock(bounds).error == nil else { return nil }
-            guard let updatedYAML = try? replacing(
+            guard parseClosedBlock(bounds).error == nil, let updatedYAML = try? replacing(
                 rawYAML: bounds.rawYAML, key: key, value: value, lineEnding: bounds.lineEnding
             ), writebackReadsBack(
                 updatedYAML,
@@ -188,7 +187,7 @@ public enum Frontmatter {
         let lineEnding = preferredLineEnding(in: text)
         let frontmatter = [
             "---",
-            #"title: ""#,
+            "title: \"\"",
             "date: \(date)",
             "tags: []",
             "draft: false",
@@ -293,7 +292,9 @@ private extension Frontmatter {
         var index = start + 3
         while index < storage.length {
             let character = storage.character(at: index)
-            if isNewline(character) { return index }
+            if isNewline(character) {
+                return index
+            }
             guard character == 32 || character == 9 else { return nil }
             index += 1
         }

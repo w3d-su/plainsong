@@ -113,7 +113,14 @@ extension IOSDocumentSceneController {
                   let originBinding = bindingID else { return }
             Task { @MainActor [weak self] in
                 guard let self, handle?.identity == identity, bindingID == originBinding else { return }
-                do { try await openSelectedURL(url, scope: .singleFile) } catch {
+                do {
+                    try await openSelectedURL(url, scope: .singleFile)
+                    guard let handle, let location = documentLocation(for: url),
+                          Self.sameLocation(handle.location, location) else { return }
+                    onPreviewDocumentOpened?()
+                } catch is CancellationError {
+                    return
+                } catch {
                     // Navigation failure is a presentation error. It cannot
                     // revoke the current writer or overwrite a real access error.
                     guard handle == nil || (handle?.identity == identity && bindingID == originBinding) else { return }

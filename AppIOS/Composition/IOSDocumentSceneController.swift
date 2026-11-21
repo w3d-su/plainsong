@@ -19,6 +19,7 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     /// may use ordinary open without extending the frozen access contract.
     let openDestinationFolder: @MainActor (URL) async throws -> IOSWorkspaceGrant
     var openExternalURL: ((URL) -> Void)?
+    var onPreviewDocumentOpened: (() -> Void)?
     var onNavigationFailure: ((String) -> Void)?
     var onPreviewUnavailable: ((String) -> Void)? {
         didSet { deliverPendingPreviewUnavailable() }
