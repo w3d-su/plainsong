@@ -176,10 +176,10 @@ private final class RecordingFilePort: IOSWorkspaceFilePort, @unchecked Sendable
     }
 
     func list(url: URL, relativePath: String, root: URL) async throws -> [IOSWorkspaceFileItem] {
-        lock.lock()
-        listed.append(url.path(percentEncoded: false))
-        let count = listed.count
-        lock.unlock()
+        let count = lock.withLock {
+            listed.append(url.path(percentEncoded: false))
+            return listed.count
+        }
         if count > 8 {
             throw IOSWorkspaceFailure.coordinationFailed
         }
