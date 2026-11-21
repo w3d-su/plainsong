@@ -62,6 +62,7 @@ final class WYSIWYGImagePresentationController {
     var retainedOutcomeCount: Int {
         outcomes.count
     }
+
     private var inFlight: [LoadKey: InFlightRequest] = [:]
     private var appliedMarkers: [RegionKey: WYSIWYGImagePresentationMarker] = [:]
     private weak var textView: MarkdownSTTextView?
