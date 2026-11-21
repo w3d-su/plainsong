@@ -193,6 +193,9 @@ fi
 
 echo "==> Package DMG"
 Scripts/make-dmg.sh "$APP_PATH" "$DMG_PATH"
+if [[ "$UNSIGNED" != "1" ]]; then
+    Scripts/sign-dmg.sh "$DMG_PATH"
+fi
 
 echo "==> Checksum"
 # Compute inside the output dir so the .sha256 records only the filename;
