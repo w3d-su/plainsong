@@ -146,6 +146,10 @@ final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler, @unchecked Send
         state.invalidate()
     }
 
+    var trackedTaskCount: Int {
+        state.trackedTaskCount
+    }
+
     func webView(_: WKWebView, start urlSchemeTask: any WKURLSchemeTask) {
         start(WKAssetSchemeTask(urlSchemeTask), taskID: ObjectIdentifier(urlSchemeTask as AnyObject))
     }
@@ -182,7 +186,8 @@ final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler, @unchecked Send
         guard let requestURL = task.requestURL else { return }
         let reader = readers.current()
         let box = SchemeTaskBox(task)
-        let readTask = Task.detached { [weak self] in
+        let readTask = Task.detached { [weak self, state] in
+            defer { state.finish(taskID) }
             let resolved: URL
             do {
                 resolved = try AssetFilesystemPreparation.resolvedAssetURL(
