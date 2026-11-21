@@ -185,4 +185,38 @@ final class AppViewsReviewFixTests: XCTestCase {
         apply("next query", field)
         XCTAssertEqual(field.stringValue, "next query")
     }
+
+    // MARK: - #37 window key tracker
+
+    func testWindowKeyStateTrackerAttachPublishesOnTheNextMainActorTurn() async {
+        let tracker = WindowKeyStateTracker()
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: true
+        )
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        var published: [UInt64] = []
+        let subscription = tracker.$keyEpoch.dropFirst().sink { published.append($0) }
+        defer { subscription.cancel() }
+
+        // `attach` is called from `updateNSView`; publishing there is a SwiftUI fault.
+        tracker.attach(to: window)
+        XCTAssertTrue(tracker.window === window)
+        XCTAssertEqual(published, [], "no @Published change inside the caller's turn")
+
+        for _ in 0 ..< 20 where published.isEmpty {
+            await Task.yield()
+        }
+        XCTAssertEqual(published, [1])
+
+        tracker.attach(to: nil)
+        XCTAssertEqual(published, [1])
+        for _ in 0 ..< 20 where published.count < 2 {
+            await Task.yield()
+        }
+        XCTAssertEqual(published, [1, 2])
+    }
 }
