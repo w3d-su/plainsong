@@ -78,6 +78,9 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
     ) -> any IOSObservation {
         let observation = IOSDocumentStoreObservation(handler: handler)
         observations[observation.token] = observation
+        observation.onCancel = { [weak self, token = observation.token] in
+            self?.observations[token] = nil
+        }
         return observation
     }
 
