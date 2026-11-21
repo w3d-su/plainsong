@@ -30,7 +30,6 @@ struct WorkspaceSearchIgnorePolicy {
                     continue
                 }
 
-                reads += 1
                 let data: Data
                 do {
                     data = try await reader.readFile(
@@ -39,9 +38,15 @@ struct WorkspaceSearchIgnorePolicy {
                     )
                 } catch let error as CancellationError {
                     throw error
+                } catch WorkspaceSearchFileReadError.disappeared {
+                    // Most directories have no ignore file. A probe that finds none reads
+                    // nothing, so it does not count toward `maximumIgnoreFiles`.
+                    continue
                 } catch {
+                    reads += 1
                     continue
                 }
+                reads += 1
                 guard data.count <= limits.maximumIgnoreFileSizeBytes,
                       let contents = String(data: data, encoding: .utf8)
                 else {
@@ -123,7 +128,9 @@ private struct WorkspaceSearchIgnoreRule {
     func matches(relativePath: String) -> Bool {
         guard let localPath = pathRelativeToBase(relativePath) else { return false }
 
-        if !isDirectoryOnly, matchesTarget(localPath) { return true }
+        if !isDirectoryOnly, matchesTarget(localPath) {
+            return true
+        }
         // A matching directory excludes its descendants even without a trailing slash.
         return directoryPrefixes(of: localPath).contains { matchesTarget($0) }
     }
@@ -132,7 +139,8 @@ private struct WorkspaceSearchIgnoreRule {
         guard !baseDirectory.isEmpty else { return relativePath }
         let prefix = "\(baseDirectory)/"
         guard relativePath.utf8.starts(with: prefix.utf8) else { return nil }
-        return String(relativePath.dropFirst(prefix.count))
+        // Drop bytes, not `Character`s: the separator can merge with a following combining mark.
+        return String(decoding: relativePath.utf8.dropFirst(prefix.utf8.count), as: UTF8.self)
     }
 
     private func directoryPrefixes(of path: String) -> [String] {
@@ -167,7 +175,9 @@ private enum WorkspaceSearchGlob {
 
         func match(_ patternIndex: Int, _ pathIndex: Int) -> Bool {
             let key = "\(patternIndex):\(pathIndex)"
-            if let cached = cache[key] { return cached }
+            if let cached = cache[key] {
+                return cached
+            }
 
             let value: Bool = if patternIndex == patternComponents.count {
                 pathIndex == pathComponents.count

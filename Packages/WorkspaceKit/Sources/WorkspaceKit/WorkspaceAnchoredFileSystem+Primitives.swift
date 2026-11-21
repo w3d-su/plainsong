@@ -111,17 +111,18 @@ extension WorkspaceAnchoredFileSystem {
             // `checkCancellation` around mutation boundaries, and cleanup after a
             // cancelled write must still revalidate open-fd namespace state.
             let path = try WorkspaceLiteralFileURL.absolutePath(of: rootBindingURL)
-            let descriptor = path.withCString {
+            let descriptor = path.withCStringPreservingErrno {
                 Darwin.open($0, O_SEARCH | O_CLOEXEC | O_NOFOLLOW)
             }
             guard descriptor >= 0 else {
-                // ENOENT/ENOTDIR: lexical root is gone or no longer a directory → binding lost.
+                // ENOENT/ENOTDIR/ELOOP: lexical root is gone, no longer a directory, or now a
+                // symlink (`O_NOFOLLOW`) → binding lost.
                 // EACCES/EPERM/other: skip lexical re-proof (e.g. chmod'd cleanup race) and
                 // rely on open root-fd identity checks so an earlier fault is not masked as
                 // namespaceChanged. Sandbox EPERM on absolute ancestors is avoided because
                 // this opens the granted root spelling, not "/".
                 let openError = errno
-                if openError == ENOENT || openError == ENOTDIR {
+                if openError == ENOENT || openError == ENOTDIR || openError == ELOOP {
                     throw WorkspaceAnchoredFileSystemError.namespaceChanged
                 }
                 return
@@ -260,7 +261,7 @@ extension WorkspaceAnchoredFileSystem {
     ) throws -> DirectoryEntryIdentity {
         try requireSingleComponent(component)
         var status = stat()
-        let result = component.withCString {
+        let result = component.withCStringPreservingErrno {
             Darwin.fstatat(parentDescriptor, $0, &status, AT_SYMLINK_NOFOLLOW)
         }
         guard result == 0 else {
@@ -325,7 +326,7 @@ extension WorkspaceAnchoredFileSystem {
 
     static func openDirectory(parentDescriptor: Int32, component: String) throws -> Int32 {
         try requireSingleComponent(component)
-        let descriptor = component.withCString {
+        let descriptor = component.withCStringPreservingErrno {
             Darwin.openat(
                 parentDescriptor,
                 $0,
@@ -340,7 +341,7 @@ extension WorkspaceAnchoredFileSystem {
 
     static func openFile(parentDescriptor: Int32, leaf: String, flags: Int32) throws -> Int32 {
         try requireSingleComponent(leaf)
-        let descriptor = leaf.withCString { Darwin.openat(parentDescriptor, $0, flags) }
+        let descriptor = leaf.withCStringPreservingErrno { Darwin.openat(parentDescriptor, $0, flags) }
         guard descriptor >= 0 else {
             throw errorForFailedOpen(parentDescriptor: parentDescriptor, component: leaf)
         }
@@ -353,10 +354,12 @@ extension WorkspaceAnchoredFileSystem {
     ) -> WorkspaceAnchoredFileSystemError {
         let openError = errno
         var status = stat()
-        let result = component.withCString {
+        let result = component.withCStringPreservingErrno {
             Darwin.fstatat(parentDescriptor, $0, &status, AT_SYMLINK_NOFOLLOW)
         }
-        if result == 0, (status.st_mode & S_IFMT) == S_IFLNK { return .symbolicLink }
+        if result == 0, (status.st_mode & S_IFMT) == S_IFLNK {
+            return .symbolicLink
+        }
         return switch openError {
         case ENOENT, ENOTDIR: .missing
         case ELOOP: .symbolicLink
@@ -383,9 +386,13 @@ extension WorkspaceAnchoredFileSystem {
             let count = buffer.withUnsafeMutableBytes {
                 Darwin.read(descriptor, $0.baseAddress, requested)
             }
-            if count == 0 { return data }
+            if count == 0 {
+                return data
+            }
             if count < 0 {
-                if errno == EINTR { continue }
+                if errno == EINTR {
+                    continue
+                }
                 throw WorkspaceAnchoredFileSystemError.unreadable
             }
             data.append(contentsOf: buffer.prefix(count))
@@ -405,7 +412,9 @@ extension WorkspaceAnchoredFileSystem {
                 let count = Darwin.write(descriptor, base.advanced(by: offset), bytes.count - offset)
                 if count < 0 {
                     let code = errno
-                    if code == EINTR { continue }
+                    if code == EINTR {
+                        continue
+                    }
                     throw writeFailure(errorNumber: code, otherwise: .unreadable)
                 }
                 guard count > 0 else { throw WorkspaceAnchoredFileSystemError.unreadable }
@@ -423,12 +432,18 @@ extension WorkspaceAnchoredFileSystem {
             let count = buffer.withUnsafeMutableBytes {
                 Darwin.pread(descriptor, $0.baseAddress, $0.count, offset)
             }
-            if count == 0 { break }
+            if count == 0 {
+                break
+            }
             if count < 0 {
-                if errno == EINTR { continue }
+                if errno == EINTR {
+                    continue
+                }
                 throw WorkspaceAnchoredFileSystemError.unreadable
             }
-            hasher.update(data: Data(buffer.prefix(count)))
+            buffer.withUnsafeBytes {
+                hasher.update(bufferPointer: UnsafeRawBufferPointer(rebasing: $0.prefix(count)))
+            }
             offset += off_t(count)
         }
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
@@ -442,5 +457,20 @@ extension WorkspaceAnchoredFileSystem {
 
     static func normalizedError(_ error: Error) -> WorkspaceAnchoredFileSystemError {
         error as? WorkspaceAnchoredFileSystemError ?? .unreadable
+    }
+}
+
+extension String {
+    /// `withCString` may release a temporary buffer after `body` returns, and that release may
+    /// change `errno`. This restores the `errno` that `body` left, so the caller can read it.
+    func withCStringPreservingErrno<Result>(
+        _ body: (UnsafePointer<CChar>) throws -> Result
+    ) rethrows -> Result {
+        var bodyErrno = errno
+        defer { errno = bodyErrno }
+        return try withCString { pointer in
+            defer { bodyErrno = errno }
+            return try body(pointer)
+        }
     }
 }

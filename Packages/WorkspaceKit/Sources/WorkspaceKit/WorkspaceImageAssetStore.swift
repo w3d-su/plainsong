@@ -72,10 +72,12 @@ public struct WorkspaceImageAssetStore: Sendable {
         rootURL: URL,
         currentFileURL: URL
     ) throws -> [String] {
+        // A security scope belongs to the URL the caller resolved; a standardized copy does not carry it.
+        let scopedRootURL = rootURL
         let rootURL = rootURL.standardizedFileURL
         let currentFileURL = currentFileURL.standardizedFileURL
 
-        return try SecurityScopedAccess.withAccess(to: rootURL) {
+        return try SecurityScopedAccess.withAccess(to: scopedRootURL) {
             guard Self.isContained(currentFileURL, in: rootURL) else {
                 throw WorkspaceImageAssetStoreError.currentFileOutsideWorkspace(currentFileURL)
             }
@@ -93,28 +95,23 @@ public struct WorkspaceImageAssetStore: Sendable {
                     try validateImageData(data, suggestedFilename: suggestedFilename)
 
                     let filename = sanitizedFilename(suggestedFilename)
-                    let destinationURL = try uniqueDestinationURL(
-                        named: filename,
-                        in: assetDirectoryURL
-                    )
                     try FileManager.default.createDirectory(
                         at: assetDirectoryURL,
                         withIntermediateDirectories: true
                     )
-                    guard FileManager.default.createFile(
-                        atPath: destinationURL.path(percentEncoded: false),
+                    let destinationURL = try createUniqueFile(
+                        named: filename,
+                        in: assetDirectoryURL,
                         contents: data
-                    ) else {
-                        throw WorkspaceImageAssetStoreError.couldNotCreateAssetFile(destinationURL.lastPathComponent)
-                    }
+                    )
                     try insertedPaths.append(copiedAssetRelativePath(
                         from: currentDirectoryURL,
                         to: destinationURL,
                         rootURL: rootURL
                     ))
 
-                case let .file(sourceURL):
-                    let sourceURL = sourceURL.standardizedFileURL
+                case let .file(scopedSourceURL):
+                    let sourceURL = scopedSourceURL.standardizedFileURL
                     let resolvedSourceURL = sourceURL.resolvingSymlinksInPath()
 
                     if Self.isContained(sourceURL, in: rootURL) {
@@ -123,7 +120,7 @@ public struct WorkspaceImageAssetStore: Sendable {
                         continue
                     }
 
-                    try SecurityScopedAccess.withAccess(to: sourceURL) {
+                    try SecurityScopedAccess.withAccess(to: scopedSourceURL) {
                         try validateImageFile(at: resolvedSourceURL)
                         try FileManager.default.createDirectory(
                             at: assetDirectoryURL,
@@ -172,26 +169,62 @@ private extension WorkspaceImageAssetStore {
     }
 
     func uniqueDestinationURL(named filename: String, in directoryURL: URL) throws -> URL {
-        let proposedURL = directoryURL.appendingPathComponent(filename, isDirectory: false)
-        guard FileManager.default.fileExists(atPath: proposedURL.path(percentEncoded: false)) else {
-            return proposedURL
+        for candidateName in Self.candidateFilenames(for: filename) {
+            let candidateURL = directoryURL.appendingPathComponent(candidateName, isDirectory: false)
+            if !Self.entryExists(at: candidateURL) {
+                return candidateURL
+            }
         }
+        throw WorkspaceImageAssetStoreError.couldNotCreateAssetFile(filename)
+    }
 
+    /// Creates the file with `O_EXCL | O_NOFOLLOW`, so a symlink planted at the
+    /// chosen name, dangling or not, is a taken name and never a write target.
+    func createUniqueFile(named filename: String, in directoryURL: URL, contents: Data) throws -> URL {
+        for candidateName in Self.candidateFilenames(for: filename) {
+            let candidateURL = directoryURL.appendingPathComponent(candidateName, isDirectory: false)
+            let descriptor = Darwin.open(
+                candidateURL.path(percentEncoded: false),
+                O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
+                0o644
+            )
+            guard descriptor >= 0 else {
+                if errno == EEXIST {
+                    continue
+                }
+                throw WorkspaceImageAssetStoreError.couldNotCreateAssetFile(candidateName)
+            }
+            let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+            do {
+                try handle.write(contentsOf: contents)
+                try handle.close()
+            } catch {
+                try? FileManager.default.removeItem(at: candidateURL)
+                throw WorkspaceImageAssetStoreError.couldNotCreateAssetFile(candidateName)
+            }
+            return candidateURL
+        }
+        throw WorkspaceImageAssetStoreError.couldNotCreateAssetFile(filename)
+    }
+
+    static func candidateFilenames(for filename: String) -> some Sequence<String> {
         let baseName = (filename as NSString).deletingPathExtension
         let pathExtension = (filename as NSString).pathExtension
-        for index in 1 ..< Int.max {
-            let candidateName = if pathExtension.isEmpty {
+        return sequence(first: 0) { $0 + 1 }.lazy.map { index in
+            if index == 0 {
+                filename
+            } else if pathExtension.isEmpty {
                 "\(baseName)-\(index)"
             } else {
                 "\(baseName)-\(index).\(pathExtension)"
             }
-            let candidateURL = directoryURL.appendingPathComponent(candidateName, isDirectory: false)
-            if !FileManager.default.fileExists(atPath: candidateURL.path(percentEncoded: false)) {
-                return candidateURL
-            }
         }
+    }
 
-        throw WorkspaceImageAssetStoreError.couldNotCreateAssetFile(filename)
+    /// `lstat`, unlike `fileExists`, also reports a dangling symlink as an existing entry.
+    static func entryExists(at url: URL) -> Bool {
+        var status = stat()
+        return Darwin.lstat(url.path(percentEncoded: false), &status) == 0 || errno != ENOENT
     }
 
     func sanitizedFilename(_ filename: String) -> String {
