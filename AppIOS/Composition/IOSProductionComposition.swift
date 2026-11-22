@@ -138,6 +138,7 @@ struct IOSProductionComposition {
         )
         recoveryUI.onRestored = { [weak scene = runtime.scene] in scene?.navigateToDocument() }
         recoveryUI.onPresent = { [weak runtime] in runtime?.prepareForReadOnlyPresentation() }
+        controller.onPreviewDocumentOpened = { [weak scene = runtime.scene] in scene?.navigateToDocument() }
         controller.onNavigationFailure = { [weak scene = runtime.scene] message in
             scene?.presentedError = IOSShellError(title: "Link Could Not Be Opened", message: message)
         }

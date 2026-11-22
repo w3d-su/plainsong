@@ -101,11 +101,6 @@ extension AppState {
         _modify { yield &registry.autosaveTask }
     }
 
-    var statisticsTask: Task<Void, Never>? {
-        get { registry.statisticsTask }
-        _modify { yield &registry.statisticsTask }
-    }
-
     var anchoredFileSaveOverride: (@MainActor (
         String,
         WorkspaceFileSystemLocation,
@@ -118,11 +113,6 @@ extension AppState {
     var sessionAutosaveTasks: [ObjectIdentifier: SessionBackgroundTask] {
         get { registry.sessionAutosaveTasks }
         _modify { yield &registry.sessionAutosaveTasks }
-    }
-
-    var sessionStatisticsTasks: [ObjectIdentifier: SessionBackgroundTask] {
-        get { registry.sessionStatisticsTasks }
-        _modify { yield &registry.sessionStatisticsTasks }
     }
 
     var shouldRestoreLastOpenedFile: Bool {

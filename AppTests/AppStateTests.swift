@@ -4,7 +4,7 @@
 import AppKit
 import Darwin
 @testable import EditorKit
-import MarkdownCore
+@testable import MarkdownCore
 @testable import Plainsong
 import SwiftUI
 import WorkspaceKit
@@ -3482,7 +3482,7 @@ final class AppStateTests: XCTestCase {
         let appState = AppState(shouldRestoreLastOpenedFile: false)
         defer {
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
         }
 
@@ -3524,7 +3524,7 @@ final class AppStateTests: XCTestCase {
         defer {
             appState.workspaceReloadTask?.cancel()
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
         }
         appState.openExternalFile(root)
@@ -7891,7 +7891,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertEqual(session.version, 1)
         XCTAssertTrue(session.isDirty)
         appState.completionWorkspaceTask?.cancel()
-        appState.statisticsTask?.cancel()
+        appState.shownSession.statisticsTask?.cancel()
     }
 
     // swiftlint:disable:next function_body_length
@@ -7945,12 +7945,9 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         defer {
             fixture.window.orderOut(nil)
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             for task in appState.sessionAutosaveTasks.values {
-                task.task.cancel()
-            }
-            for task in appState.sessionStatisticsTasks.values {
                 task.task.cancel()
             }
             try? FileManager.default.removeItem(at: rootURL)
@@ -8021,7 +8018,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let dirtySourceB = "# B Unique\nB dirty body"
         appState.replaceDocumentText(dirtySourceB, in: sessionB)
         let pendingDocumentBAutosave = try XCTUnwrap(appState.autosaveTask)
-        let pendingDocumentBStatistics = try XCTUnwrap(appState.statisticsTask)
+        let pendingDocumentBStatistics = try XCTUnwrap(appState.shownSession.statisticsTask)
         let pendingDocumentBCompletion = try XCTUnwrap(appState.completionWorkspaceTask)
         let bindingB = appState.editorDocumentBinding(for: sessionB)
         let documentBView = MarkdownTextView(
@@ -8061,7 +8058,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertFalse(pendingDocumentBStatistics.isCancelled)
         XCTAssertFalse(pendingDocumentBCompletion.isCancelled)
         XCTAssertNotNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionA)])
-        XCTAssertNotNil(appState.sessionStatisticsTasks[ObjectIdentifier(sessionA)])
+        XCTAssertNotNil(sessionA.statisticsTask)
         XCTAssertEqual(Data(sessionB.text.utf8), Data(dirtySourceB.utf8))
         XCTAssertEqual(sessionB.version, 1)
         XCTAssertEqual(selectionB, NSRange(location: 2, length: 0))
@@ -8110,8 +8107,8 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
 
         appState.flushAutosaveIfNeeded()
         try await Task.sleep(nanoseconds: 750_000_000)
-        XCTAssertEqual(sessionA.statistics, TextStatistics(text: committedSourceA))
-        XCTAssertEqual(sessionB.statistics, TextStatistics(text: finalSourceB))
+        XCTAssertEqual(sessionA.availableStatistics, TextStatistics(text: committedSourceA))
+        XCTAssertEqual(sessionB.availableStatistics, TextStatistics(text: finalSourceB))
         XCTAssertEqual(appState.completionWorkspace.currentFileHeadingAnchors, ["#b-unique"])
         XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), committedSourceA)
         XCTAssertEqual(try String(contentsOf: documentBURL, encoding: .utf8), finalSourceB)
@@ -8175,12 +8172,9 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
                 coordinator: editorFixture.coordinator
             )
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             for task in appState.sessionAutosaveTasks.values {
-                task.task.cancel()
-            }
-            for task in appState.sessionStatisticsTasks.values {
                 task.task.cancel()
             }
             defaults.removePersistentDomain(forName: defaultsSuiteName)
@@ -8200,7 +8194,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let dirtySourceB = "# B Unique\nB dirty body"
         appState.replaceDocumentText(dirtySourceB, in: sessionB)
         let documentBAutosave = try XCTUnwrap(appState.autosaveTask)
-        let documentBStatistics = try XCTUnwrap(appState.statisticsTask)
+        let documentBStatistics = try XCTUnwrap(appState.shownSession.statisticsTask)
         let documentBCompletion = try XCTUnwrap(appState.completionWorkspaceTask)
         let bindingB = appState.editorDocumentBinding(for: sessionB)
         let documentBView = MarkdownTextView(
@@ -8262,7 +8256,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertEqual(sessionB.text, dirtySourceB)
         XCTAssertNil(appState.presentedError, appState.presentedError?.message ?? "")
         XCTAssertFalse(sessionB.isDirty)
-        XCTAssertEqual(sessionB.statistics, TextStatistics(text: dirtySourceB))
+        XCTAssertEqual(sessionB.availableStatistics, TextStatistics(text: dirtySourceB))
         XCTAssertEqual(appState.completionWorkspace.currentFileHeadingAnchors, ["#b-unique"])
         XCTAssertEqual(try String(contentsOf: documentBURL, encoding: .utf8), dirtySourceB)
         XCTAssertNil(appState.externalChangePrompt)
@@ -8324,7 +8318,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let originalIdentity = try regularIdentity(at: documentAURL)
         defer {
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             appState.workspaceReloadTask?.cancel()
             for task in appState.sessionAutosaveTasks.values {
@@ -8392,7 +8386,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         appState.recordKnownDiskText(originalA, for: canonicalA)
         defer {
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             appState.workspaceReloadTask?.cancel()
             for task in appState.sessionAutosaveTasks.values {
@@ -8450,7 +8444,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let canonicalURL = try XCTUnwrap(appState.sessionStateURL(for: session))
         defer {
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             try? FileManager.default.removeItem(at: rootURL)
         }
@@ -8929,7 +8923,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         )
         defer {
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             fixture1.window.orderOut(nil)
             fixture2.window.orderOut(nil)
@@ -9072,7 +9066,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         )
         defer {
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             fixture1.window.orderOut(nil)
             fixture2.window.orderOut(nil)
@@ -9897,7 +9891,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             )
         defer {
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             try? FileManager.default.removeItem(at: rootURL)
         }
@@ -10129,7 +10123,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
                 coordinator: editorFixture.coordinator
             )
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             try? FileManager.default.removeItem(at: workspaceRoot)
             try? FileManager.default.removeItem(at: standaloneRoot)
@@ -10483,7 +10477,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
                 coordinator: fixture2.coordinator
             )
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             try? FileManager.default.removeItem(at: rootURL)
         }
@@ -10616,9 +10610,6 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             for task in appState.sessionAutosaveTasks.values {
                 task.task.cancel()
             }
-            for task in appState.sessionStatisticsTasks.values {
-                task.task.cancel()
-            }
             try? FileManager.default.removeItem(at: rootURL)
         }
 
@@ -10711,12 +10702,9 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
                 coordinator: fixtureA.coordinator
             )
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             for task in appState.sessionAutosaveTasks.values {
-                task.task.cancel()
-            }
-            for task in appState.sessionStatisticsTasks.values {
                 task.task.cancel()
             }
             defaults.removePersistentDomain(forName: defaultsSuiteName)
@@ -10740,7 +10728,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertTrue(retirement.session === sessionA)
         XCTAssertTrue(appState.shownSession === sessionB)
         XCTAssertNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionA)])
-        XCTAssertNotNil(appState.sessionStatisticsTasks[ObjectIdentifier(sessionA)])
+        XCTAssertNotNil(sessionA.statisticsTask)
         XCTAssertTrue(fixtureA.textView.hasMarkedText())
 
         try appState.open(
@@ -10752,7 +10740,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertTrue(appState.registry.sessionCache[canonicalA] === sessionA)
         XCTAssertTrue(appState.retiredEditorDocumentSessions[canonicalA]?.session === sessionA)
         XCTAssertNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionA)])
-        XCTAssertNotNil(appState.sessionStatisticsTasks[ObjectIdentifier(sessionA)])
+        XCTAssertNotNil(sessionA.statisticsTask)
         XCTAssertTrue(appState.isEditorDocumentBindingInstalled(bindingA.id, session: sessionA))
         XCTAssertEqual(
             appState.editorDocumentBindingIDs[ObjectIdentifier(sessionA)],
@@ -10825,7 +10813,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
                 coordinator: fixture.coordinator
             )
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             try? FileManager.default.removeItem(at: rootURL)
         }
@@ -11000,7 +10988,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         appState.replaceDocumentText(localSource)
         defer {
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             try? FileManager.default.removeItem(at: rootURL)
         }
@@ -11067,12 +11055,9 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         appState.replaceDocumentText(localSourceA)
         defer {
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             for task in appState.sessionAutosaveTasks.values {
-                task.task.cancel()
-            }
-            for task in appState.sessionStatisticsTasks.values {
                 task.task.cancel()
             }
             try? FileManager.default.removeItem(at: rootURL)
@@ -11167,7 +11152,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         appState.handleExternalChange(for: session)
         defer {
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             try? FileManager.default.removeItem(at: rootURL)
         }
@@ -11289,7 +11274,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         binding.onLifecycle(.installed(installation))
         defer {
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             for task in appState.sessionAutosaveTasks.values {
                 task.task.cancel()
@@ -11357,12 +11342,9 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         appState.recordKnownDiskText(sourceA, for: documentAURL)
         defer {
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             for task in appState.sessionAutosaveTasks.values {
-                task.task.cancel()
-            }
-            for task in appState.sessionStatisticsTasks.values {
                 task.task.cancel()
             }
             defaults.removePersistentDomain(forName: defaultsSuiteName)
@@ -11371,7 +11353,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
 
         appState.replaceDocumentText(dirtySourceA)
         XCTAssertNotNil(appState.autosaveTask)
-        XCTAssertNotNil(appState.statisticsTask)
+        XCTAssertNotNil(appState.shownSession.statisticsTask)
         let tree = try XCTUnwrap(appState.workspaceTree)
         let nodeB = try XCTUnwrap(
             appState.firstNode(in: tree.root, relativePath: "b.md")
@@ -11383,20 +11365,20 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertEqual(sessionB.fileURL?.standardizedFileURL, documentBURL.standardizedFileURL)
         XCTAssertEqual(sessionB.text, sourceB)
         XCTAssertNotNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionA)])
-        XCTAssertNotNil(appState.sessionStatisticsTasks[ObjectIdentifier(sessionA)])
+        XCTAssertNotNil(sessionA.statisticsTask)
         XCTAssertNil(appState.autosaveTask)
-        XCTAssertNil(appState.statisticsTask)
+        XCTAssertNil(appState.shownSession.statisticsTask)
         XCTAssertNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionB)])
-        XCTAssertNil(appState.sessionStatisticsTasks[ObjectIdentifier(sessionB)])
+        XCTAssertNil(sessionB.statisticsTask)
 
         try await waitUntil("tree-switch A autosave and statistics finish") {
             !sessionA.isDirty &&
-                sessionA.statistics == TextStatistics(text: dirtySourceA) &&
+                sessionA.availableStatistics == TextStatistics(text: dirtySourceA) &&
                 (try? String(contentsOf: documentAURL, encoding: .utf8)) == dirtySourceA
         }
         XCTAssertEqual(sessionB.text, sourceB)
         XCTAssertNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionA)])
-        XCTAssertNil(appState.sessionStatisticsTasks[ObjectIdentifier(sessionA)])
+        XCTAssertNil(sessionA.statisticsTask)
 
         let terminationSourceA = dirtySourceA + "\ntermination flush"
         appState.applyDocumentText(terminationSourceA, to: sessionA)
@@ -11462,25 +11444,25 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertEqual(sessionB.fileURL?.standardizedFileURL, documentBURL.standardizedFileURL)
         XCTAssertEqual(sessionB.text, sourceB)
         XCTAssertNotNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionA)])
-        XCTAssertNotNil(appState.sessionStatisticsTasks[ObjectIdentifier(sessionA)])
+        XCTAssertNotNil(sessionA.statisticsTask)
         XCTAssertNil(appState.autosaveTask)
-        XCTAssertNil(appState.statisticsTask)
+        XCTAssertNil(appState.shownSession.statisticsTask)
         let navigation = try navigationRequest(from: appState.editorNavigationCommand)
         XCTAssertEqual(navigation.documentIdentity, AppState.editorDocumentIdentity(for: documentBURL))
         XCTAssertEqual(navigation.selection, match.range)
 
         try await waitUntil("search-switch A work and B completion finish") {
             !sessionA.isDirty &&
-                sessionA.statistics == TextStatistics(text: dirtySourceA) &&
+                sessionA.availableStatistics == TextStatistics(text: dirtySourceA) &&
                 appState.completionWorkspace.currentFilePath == "b.md" &&
                 (try? String(contentsOf: documentAURL, encoding: .utf8)) == dirtySourceA
         }
         XCTAssertEqual(appState.completionWorkspace.currentFileHeadingAnchors, ["#b"])
         XCTAssertEqual(sessionB.text, sourceB)
         XCTAssertNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionB)])
-        XCTAssertNil(appState.sessionStatisticsTasks[ObjectIdentifier(sessionB)])
+        XCTAssertNil(sessionB.statisticsTask)
         XCTAssertNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionA)])
-        XCTAssertNil(appState.sessionStatisticsTasks[ObjectIdentifier(sessionA)])
+        XCTAssertNil(sessionA.statisticsTask)
     }
 
     func testDebounceStartsOnlyLatestQueryWithIncreasingGeneration() async throws {
@@ -13794,7 +13776,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         )
         defer {
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             appState.teardownWorkspaceSearch()
             try? FileManager.default.removeItem(at: rootURL)
@@ -14671,7 +14653,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         appState.replaceDocumentText("alpha dirty", in: previousSession)
         let olderNavigation = seedOlderPendingNavigation(in: appState)
         let autosave = try XCTUnwrap(appState.autosaveTask)
-        let statistics = try XCTUnwrap(appState.statisticsTask)
+        let statistics = try XCTUnwrap(appState.shownSession.statisticsTask)
         let completion = try XCTUnwrap(appState.completionWorkspaceTask)
         let search = try XCTUnwrap(appState.workspaceSearchTask)
         let searchToken = appState.workspaceSearchTaskToken
@@ -14686,7 +14668,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertTrue(appState.shownSession === previousSession)
         XCTAssertEqual(appState.workspaceTree, previousTree)
         XCTAssertNotNil(appState.autosaveTask)
-        XCTAssertNotNil(appState.statisticsTask)
+        XCTAssertNotNil(appState.shownSession.statisticsTask)
         XCTAssertNotNil(appState.completionWorkspaceTask)
         XCTAssertNotNil(appState.workspaceSearchTask)
         XCTAssertEqual(appState.workspaceSearchTaskToken, searchToken)
@@ -14724,7 +14706,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         appState.replaceDocumentText("alpha dirty", in: previousSession)
         let olderNavigation = seedOlderPendingNavigation(in: appState)
         let autosave = try XCTUnwrap(appState.autosaveTask)
-        let statistics = try XCTUnwrap(appState.statisticsTask)
+        let statistics = try XCTUnwrap(appState.shownSession.statisticsTask)
         let completion = try XCTUnwrap(appState.completionWorkspaceTask)
         let search = try XCTUnwrap(appState.workspaceSearchTask)
         let searchToken = appState.workspaceSearchTaskToken
@@ -14808,7 +14790,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         appState.replaceDocumentText("alpha dirty", in: previousSession)
         let olderNavigation = seedOlderPendingNavigation(in: appState)
         let autosave = try XCTUnwrap(appState.autosaveTask)
-        let statistics = try XCTUnwrap(appState.statisticsTask)
+        let statistics = try XCTUnwrap(appState.shownSession.statisticsTask)
         let completion = try XCTUnwrap(appState.completionWorkspaceTask)
         let search = try XCTUnwrap(appState.workspaceSearchTask)
         let searchToken = appState.workspaceSearchTaskToken
@@ -14878,7 +14860,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         appState.replaceDocumentText("charlie dirty", in: previousSession)
         let olderNavigation = seedOlderPendingNavigation(in: appState)
         let autosave = try XCTUnwrap(appState.autosaveTask)
-        let statistics = try XCTUnwrap(appState.statisticsTask)
+        let statistics = try XCTUnwrap(appState.shownSession.statisticsTask)
         let completion = try XCTUnwrap(appState.completionWorkspaceTask)
         let search = try XCTUnwrap(appState.workspaceSearchTask)
         let searchToken = appState.workspaceSearchTaskToken
@@ -14913,7 +14895,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         appState.replaceDocumentText("alpha dirty", in: previousSession)
         let olderNavigation = seedOlderPendingNavigation(in: appState)
         let autosave = try XCTUnwrap(appState.autosaveTask)
-        let statistics = try XCTUnwrap(appState.statisticsTask)
+        let statistics = try XCTUnwrap(appState.shownSession.statisticsTask)
         let completion = try XCTUnwrap(appState.completionWorkspaceTask)
         let search = try XCTUnwrap(appState.workspaceSearchTask)
         let searchToken = appState.workspaceSearchTaskToken
@@ -14938,7 +14920,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertTrue(appState.shownSession === previousSession)
         XCTAssertEqual(appState.workspaceTree, previousTree)
         XCTAssertNotNil(appState.autosaveTask)
-        XCTAssertNotNil(appState.statisticsTask)
+        XCTAssertNotNil(appState.shownSession.statisticsTask)
         XCTAssertNotNil(appState.completionWorkspaceTask)
         XCTAssertNotNil(appState.workspaceSearchTask)
         XCTAssertEqual(appState.workspaceSearchTaskToken, searchToken)
@@ -14956,7 +14938,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let currentURL = try XCTUnwrap(currentSession.fileURL?.standardizedFileURL)
         appState.replaceDocumentText("alpha current work", in: currentSession)
         let autosave = try XCTUnwrap(appState.autosaveTask)
-        let statistics = try XCTUnwrap(appState.statisticsTask)
+        let statistics = try XCTUnwrap(appState.shownSession.statisticsTask)
         let completion = try XCTUnwrap(appState.completionWorkspaceTask)
         let currentPrompt = AppState.ExternalChangePrompt(fileURL: currentURL)
         appState.externalChangePrompt = currentPrompt
@@ -14978,7 +14960,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertFalse(statistics.isCancelled)
         XCTAssertFalse(completion.isCancelled)
         XCTAssertNotNil(appState.autosaveTask)
-        XCTAssertNotNil(appState.statisticsTask)
+        XCTAssertNotNil(appState.shownSession.statisticsTask)
         XCTAssertNotNil(appState.completionWorkspaceTask)
         XCTAssertEqual(appState.externalChangePrompt, currentPrompt)
         XCTAssertNil(appState.missingFilePrompt)
@@ -14999,7 +14981,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let dirtyText = "alpha current work"
         appState.replaceDocumentText(dirtyText, in: session)
         let autosave = try XCTUnwrap(appState.autosaveTask)
-        let statistics = try XCTUnwrap(appState.statisticsTask)
+        let statistics = try XCTUnwrap(appState.shownSession.statisticsTask)
         let completion = try XCTUnwrap(appState.completionWorkspaceTask)
         let currentPrompt = AppState.ExternalChangePrompt(fileURL: currentURL)
         appState.externalChangePrompt = currentPrompt
@@ -15154,7 +15136,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             MarkdownTextView.dismantleNSView(fixture1.scrollView, coordinator: fixture1.coordinator)
             MarkdownTextView.dismantleNSView(fixture2.scrollView, coordinator: fixture2.coordinator)
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             try? FileManager.default.removeItem(at: rootURL)
         }
@@ -15245,7 +15227,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             fixture.window.orderOut(nil)
             MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             try? FileManager.default.removeItem(at: rootURL)
         }
@@ -15335,7 +15317,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             MarkdownTextView.dismantleNSView(fixture1.scrollView, coordinator: fixture1.coordinator)
             MarkdownTextView.dismantleNSView(fixture2.scrollView, coordinator: fixture2.coordinator)
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             try? FileManager.default.removeItem(at: rootURL)
         }
 
@@ -15445,7 +15427,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             fixture.window.orderOut(nil)
             MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             try? FileManager.default.removeItem(at: rootURL)
         }
 
@@ -15577,7 +15559,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         defer {
             binding.onLifecycle(.revoked(installation))
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             try? FileManager.default.removeItem(at: rootURL)
         }
 
@@ -15637,7 +15619,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             fixture.window.orderOut(nil)
             MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             try? FileManager.default.removeItem(at: rootURL)
         }
 
@@ -15707,11 +15689,8 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         defer {
             bindingA.onLifecycle(.revoked(installationA))
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             for task in appState.sessionAutosaveTasks.values {
-                task.task.cancel()
-            }
-            for task in appState.sessionStatisticsTasks.values {
                 task.task.cancel()
             }
             try? FileManager.default.removeItem(at: rootURL)
@@ -15826,7 +15805,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             MarkdownTextView.dismantleNSView(fixtureA1.scrollView, coordinator: fixtureA1.coordinator)
             MarkdownTextView.dismantleNSView(fixtureA2.scrollView, coordinator: fixtureA2.coordinator)
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             try? FileManager.default.removeItem(at: rootURL)
         }
 
@@ -15929,7 +15908,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             fixture.window.orderOut(nil)
             MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             try? FileManager.default.removeItem(at: rootURL)
         }
 
@@ -16932,12 +16911,9 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
 
     private func cleanUp(_ fixture: Fixture) {
         fixture.appState.autosaveTask?.cancel()
-        fixture.appState.statisticsTask?.cancel()
+        fixture.appState.shownSession.statisticsTask?.cancel()
         fixture.appState.completionWorkspaceTask?.cancel()
         for task in fixture.appState.sessionAutosaveTasks.values {
-            task.task.cancel()
-        }
-        for task in fixture.appState.sessionStatisticsTasks.values {
             task.task.cancel()
         }
         fixture.appState.teardownWorkspaceSearch()

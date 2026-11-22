@@ -214,6 +214,16 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 
 ## 5. File & Workspace Handling
 
+Opening a Markdown or MDX file of 64 KiB or more (decoded UTF-8 size) installs its editable
+source immediately. The status bar shows “Counting…” until the first counts arrive. Smaller
+files open with counts available. In the macOS and iOS editors the document session owns its
+pending count, including the 300 ms pause after editing. Switching windows or files, renaming,
+and Save As keep that count with the source; on iOS so do detaching and closing the editor.
+The iOS editor emits a snapshot when the counts land only if it still shows that session, and
+counts an edit made while text is marked (a Zhuyin composition) once the composition ends.
+On iOS a statistics-only snapshot preserves a pending preview render for the same document
+revision.
+
 - **App Sandbox: ON.** All file access via user-selected URLs; persist
   security-scoped bookmarks for recents/workspaces; always wrap access in
   `startAccessingSecurityScopedResource()` pairs (helper in WorkspaceKit). Each recent item
@@ -800,6 +810,10 @@ attempt without a Decision Log entry.
 | File open (500 KB md) | < 300 ms to first paint, highlight may stream in |
 | Memory (app host RSS) | < 400 MB in the Plainsong host process with 8 warm sessions + 2 settled live WKWebViews |
 
+The 500 KB first-paint budget includes opening the editable document with counts pending.
+The opening probe also checks that typing immediately and switching documents preserve the
+edited source and eventually publish its counts.
+
 Techniques: tree-sitter incremental edits (`InputEdit`), visible-range-first
 highlighting, a line-number gutter that draws only the visible viewport fragments from an
 incrementally edited line index, segment-cached preview renders, morphdom patching,
@@ -815,7 +829,11 @@ SVG children only as non-authoritative pending content, avoiding a temporary col
 Editor main-thread rules (profiled 2026-10-18; evidence in `docs/perf-log.md`): no
 O(document) work per keystroke on the main thread. Publish native UTF-8 source strings,
 never the bridged `NSTextStorage` string: SwiftUI compares published text with `==`,
-which normalizes a bridged string from its first character. Edit derived indexes in
+which normalizes a bridged string from its first character. That native copy is the one
+O(document) step left per keystroke: one CoreFoundation pass (`ExactSourceText.nativeCopy`,
+~24 main-thread instructions per byte, ~1.5 ms per MiB of ASCII in Release; measuring the
+length with a second pass doubled it and made the first keystroke after an idle pause
+slow on cold caches, `docs/perf/2026-11-18-keystroke-native-copy.md`). Edit derived indexes in
 place. Release TextKit 2's cached text elements below the viewport once scrolling
 settles (`EditorTextElementCacheTrimmer`): each edit rewrites the range of every cached
 element after it, so typing above a once-viewed document end cost ~50 ms per keystroke.

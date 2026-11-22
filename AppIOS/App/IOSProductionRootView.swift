@@ -79,7 +79,11 @@ private struct IOSProductionSceneView: View {
                 Button("Open Folder") { runtime.requestPicker(scope: .directory) }
                 Button("Cancel", role: .cancel) {}
             }
-            .sheet(item: $runtime.pickerRequest) { request in
+            .sheet(item: Binding(get: { runtime.pickerRequest }, set: { value in
+                if value == nil, let request = runtime.pickerRequest {
+                    runtime.pickerPresentationEnded(request.id)
+                }
+            })) { request in
                 IOSProductionDocumentPicker(request: request) { urls in
                     runtime.completePicker(request, urls: urls)
                 }
