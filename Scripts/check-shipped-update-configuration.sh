@@ -1,21 +1,27 @@
 #!/bin/bash
 # Shipped Info.plist guard for auto-update.
 # PLAINSONG_UPDATES_ENABLED=NO is the U1 default and passes.
-# Any other value must have a 32-byte EdDSA key, the expected HTTPS feed,
-# and both SURequireSignedFeed and SUVerifyUpdateBeforeExtraction.
+# Any other value must have the pinned EdDSA public key, the expected HTTPS
+# feed, and both SURequireSignedFeed and SUVerifyUpdateBeforeExtraction.
+# --self-test also requires project.yml to carry the same key and feed, so a
+# mistaken edit there fails make test-packages before any tag is pushed.
 # This script never signs. --deep is not used here.
 set -euo pipefail
 
 EXPECTED_FEED_URL="https://w3d-su.github.io/plainsong/appcast.xml"
+# The public half of the owner's EdDSA key (docs/auto-update-plan.md §3.5).
+# Every installed copy verifies updates with this key; changing it strands
+# them. Change it here and in project.yml only for a planned key rotation.
+EXPECTED_PUBLIC_ED_KEY="o17cpeoCIVbE1EiIUAdc2YgYUjui2UCPtclAHB/7oN4="
 
 check_plist() {
-    python3 - "$1" "$EXPECTED_FEED_URL" << 'PY'
+    python3 - "$1" "$EXPECTED_FEED_URL" "$EXPECTED_PUBLIC_ED_KEY" << 'PY'
 import base64
 import plistlib
 import sys
 from urllib.parse import urlparse
 
-path, expected = sys.argv[1], sys.argv[2]
+path, expected, expected_key = sys.argv[1], sys.argv[2], sys.argv[3]
 try:
     with open(path, "rb") as handle:
         info = plistlib.load(handle)
@@ -40,7 +46,7 @@ SPARKLE_WHITESPACE = (
 def sparkle_trim(value):
     return value.strip(SPARKLE_WHITESPACE)
 
-def decoded_length(value):
+def decoded_key(value):
     # Sparkle 2.10.0 decode(): trim ends only, then
     # initWithBase64EncodedString:options:0. Missing padding and interior
     # whitespace are invalid. Do not repair either. Non-zero trailing bits
@@ -54,7 +60,7 @@ def decoded_length(value):
         raw = base64.b64decode(stripped, validate=True)
     except Exception:
         return None
-    return len(raw)
+    return raw
 
 def is_yes(value):
     if value is True:
@@ -68,9 +74,17 @@ parsed = urlparse(expected)
 if parsed.scheme != "https" or parsed.hostname != "w3d-su.github.io":
     errors.append("expected feed constant must be https on w3d-su.github.io")
 
-key_length = decoded_length(info.get("SUPublicEDKey"))
-if key_length != 32:
+pinned_key = decoded_key(expected_key)
+if pinned_key is None or len(pinned_key) != 32:
+    errors.append("expected public key constant must decode to 32 bytes")
+
+# Compare decoded bytes, as Sparkle uses them: surrounding whitespace and
+# non-zero trailing bits decode to the same key and are accepted.
+key = decoded_key(info.get("SUPublicEDKey"))
+if key is None or len(key) != 32:
     errors.append("SUPublicEDKey must be base64 that decodes to 32 bytes")
+elif key != pinned_key:
+    errors.append(f"SUPublicEDKey must be the pinned key {expected_key}")
 
 feed = info.get("SUFeedURL")
 # Sparkle strips quotes only. Surrounding whitespace stays and will not parse.
@@ -90,18 +104,48 @@ if errors:
 PY
 }
 
+# project.yml is the source of the shipped Info.plist. A text check keeps this
+# script free of a YAML parser; the two keys are single-line quoted scalars.
+check_project_yml() {
+    local project
+    project="$(cd "$(dirname "$0")/.." && pwd)/project.yml"
+    python3 - "$project" "$EXPECTED_FEED_URL" "$EXPECTED_PUBLIC_ED_KEY" << 'PY'
+import re
+import sys
+
+path, expected_feed, expected_key = sys.argv[1], sys.argv[2], sys.argv[3]
+try:
+    text = open(path, encoding="utf-8").read()
+except Exception as error:
+    print(f"error: cannot read {path}: {error}", file=sys.stderr)
+    sys.exit(1)
+
+errors = []
+for name, expected in (("SUFeedURL", expected_feed), ("SUPublicEDKey", expected_key)):
+    values = re.findall(rf"^\s*{name}:\s*(.*?)\s*$", text, re.MULTILINE)
+    values = [value.strip("\"'") for value in values]
+    if values != [expected]:
+        errors.append(f"project.yml must set {name} exactly once to {expected}; found {values}")
+
+if errors:
+    for item in errors:
+        print(f"error: {item}", file=sys.stderr)
+    sys.exit(1)
+PY
+}
+
 self_test() {
     local tmp name expect failed
     tmp="$(mktemp -d "${TMPDIR:-/tmp}/plainsong-update-plist.XXXXXX")"
-    python3 - "$tmp" "$EXPECTED_FEED_URL" << 'PY'
+    python3 - "$tmp" "$EXPECTED_FEED_URL" "$EXPECTED_PUBLIC_ED_KEY" << 'PY'
 import base64
 import os
 import plistlib
 import sys
 
-root, expected = sys.argv[1], sys.argv[2]
-good_key = base64.b64encode(b"\x11" * 32).decode("ascii")
-short_key = base64.b64encode(b"\x11" * 31).decode("ascii")
+root, expected, good_key = sys.argv[1], sys.argv[2], sys.argv[3]
+other_key = base64.b64encode(b"\x11" * 32).decode("ascii")
+short_key = base64.b64encode(base64.b64decode(good_key)[:31]).decode("ascii")
 
 def write(name, payload):
     with open(os.path.join(root, name), "wb") as handle:
@@ -212,8 +256,19 @@ write("zero-width-space-key.plist", {
     "SURequireSignedFeed": True,
     "SUVerifyUpdateBeforeExtraction": True,
 })
+# The last data character of a 32-byte key carries 4 key bits and 2 unused
+# bits. Setting an unused bit gives a different string with the same key.
+alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 noncanonical = list(good_key)
-noncanonical[42] = "F"
+noncanonical[42] = alphabet[alphabet.index(good_key[42]) | 1]
+assert "".join(noncanonical) != good_key
+write("other-key.plist", {
+    "PLAINSONG_UPDATES_ENABLED": "YES",
+    "SUFeedURL": expected,
+    "SUPublicEDKey": other_key,
+    "SURequireSignedFeed": True,
+    "SUVerifyUpdateBeforeExtraction": True,
+})
 write("nonzero-tail-key.plist", {
     "PLAINSONG_UPDATES_ENABLED": "YES",
     "SUFeedURL": expected,
@@ -256,8 +311,12 @@ quoted-feed.plist	pass
 unit-separator-key.plist	fail
 zero-width-space-key.plist	pass
 nonzero-tail-key.plist	pass
+other-key.plist	fail
 CASES
     rm -rf "$tmp"
+    if ! check_project_yml; then
+        failed=1
+    fi
     if [[ "$failed" -ne 0 ]]; then
         exit 1
     fi

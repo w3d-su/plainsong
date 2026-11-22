@@ -75,12 +75,15 @@ extension IOSSourceEditorController {
         guard let expected = IOSTextRanges.substring(context.request.source, range: result.coveredRange) else {
             return
         }
-        _ = IOSHighlightPresenter.apply(
+        let painted = IOSHighlightPresenter.apply(
             tokens: result.tokens,
             coveredRange: result.coveredRange,
             expectedFragment: expected,
             theme: theme,
             to: textView
         )
+        if painted {
+            onHighlightApplied?(result.version)
+        }
     }
 }

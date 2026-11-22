@@ -5,6 +5,47 @@ import XCTest
 
 final class IOSAuthorizedEditTests: XCTestCase {
     @MainActor
+    func testFrontmatterInsertionKeepsLiteralMarkdownPunctuation() throws {
+        let harness = IOSEditorHarness(text: "body")
+        let frontmatter = "---\ntitle: \"\"\ndraft: false\n---\n"
+        let edit = MarkdownEditResult(
+            replacementRange: NSRange(location: 0, length: 0),
+            replacementString: frontmatter,
+            newSelection: NSRange(location: iosUTF16(frontmatter), length: 0)
+        )
+        XCTAssertEqual(try harness.controller.apply(harness.edit(edit, name: "Frontmatter")), .applied(
+            IOSDocumentRevision(documentID: harness.identity, version: harness.session.version)
+        ))
+        XCTAssertEqual(harness.textView.textStorage.string, frontmatter + "body")
+        XCTAssertEqual(harness.session.text, frontmatter + "body")
+        harness.controller.undo()
+        XCTAssertEqual(harness.session.text, "body")
+    }
+
+    @MainActor
+    func testFrontmatterReplacementWithoutKeyboardKeepsPunctuationOutsideEdit() throws {
+        let original = "---\ntitle: \"\" # title\ndraft: true # status\n---\nbody\n"
+        let harness = IOSEditorHarness(text: original)
+        XCTAssertTrue(harness.textView.resignFirstResponder())
+        let range = (original as NSString).range(of: "true # status")
+        let selection = NSRange(location: range.location + iosUTF16("false"), length: 0)
+        let edit = MarkdownEditResult(replacementRange: range, replacementString: "false", newSelection: selection)
+        let authorized = try harness.edit(edit, name: "Frontmatter")
+        let expected = original.replacingOccurrences(of: "true # status", with: "false")
+
+        guard case .applied = harness.controller.apply(authorized) else {
+            return XCTFail("The inspector edit should apply without the keyboard.")
+        }
+        XCTAssertEqual(harness.session.text, expected)
+        XCTAssertEqual(harness.textView.selectedRange, selection)
+        harness.controller.undo()
+        XCTAssertEqual(harness.session.text, original)
+        harness.controller.redo()
+        XCTAssertEqual(harness.session.text, expected)
+        XCTAssertEqual(harness.textView.selectedRange, selection)
+    }
+
+    @MainActor
     func testFormatAndSingleReplaceAreOneNativeUndo() throws {
         let harness = IOSEditorHarness(text: "hello")
         harness.textView.selectedRange = NSRange(location: 0, length: 5)

@@ -2,6 +2,8 @@
 
 [Evidence index and historical archive](evidence/README.md).
 
+目前的收尾入口：[iOS 1.0 實機驗收檢查表](device-pass.md)（2026-11-15）。以下的 12 條開發線分工是 2026-10-08 的歷史規劃。
+
 日期：2026-10-08。規格版本：IOS-C0-v1。
 
 本包將核准的 iPhone／iPad、iOS／iPadOS 26 首版拆為 **12 條開發線 + 1 個整合角色**。每份 handoff 都可交給不同 LLM；[啟動提示詞](launch-prompts.md) 可直接複製。C0 另以整合 PR 提供唯一契約與 unavailable scaffold；[台帳](integration-ledger.md) 分列編譯／測試執行／CI／真機狀態，沒有宣稱完整 iOS 功能、真機關卡或 IPA 已完成。
@@ -133,7 +135,7 @@ flowchart TD
 
 寫程式可同步；**Xcode build、simulator、XCUITest、真機、perf／wall-clock 工作序列化**。共用 `PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock`，重用目前 lock wrapper／`lockf -k`。不要在外層已持鎖時再呼叫持同一鎖的 script。
 
-12 建立穩定入口後，各線使用它，不私自改測試目的地／resource wiring。重型 Swift／JS builds 也不能與宣稱 idle 的效能驗收重疊。CI rerun 綠燈不能代替 race 根因；模擬器 marked-text 測試不能代替真機注音／拼音。
+12 建立穩定入口後，各線使用它，不私自改測試目的地／resource wiring。重型 Swift／JS builds 也不能與宣稱 idle 的效能驗收重疊。CI rerun 綠燈不能代替 race 根因；模擬器 marked-text 測試不能代替真機注音（拼音不測，見 [2026-11-17 的決策](../decisions/2026-11-17-zhuyin-only-ime-testing.md)）。
 
 ## 每線固定交付格式
 

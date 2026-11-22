@@ -163,10 +163,20 @@ final class EditorFindHostedGateTests: XCTestCase {
         try await waitUntil("first match scroll ownership decays") {
             scrollCoordinator.scrollOwner == .none
         }
-        // Drive the live callback installed by `WorkspaceWindow`, then navigate before
-        // its 100 ms preview-owner token can decay. The forced navigation intent must
-        // reach the same live WebView without letting the queued editor echo undo it.
+        // Drive the live callback installed by `WorkspaceWindow`, then navigate while its
+        // preview-owner token is live. The forced navigation intent must reach the same
+        // live WebView without letting the queued editor echo undo it.
+        //
+        // The token decays 100 ms after the claim by the wall clock, and the navigation
+        // is dispatched some main-actor turns after the Find step. On a preempted runner
+        // more than 100 ms passed in between, so the bypass under test never ran (CI run
+        // 39845572138: "dispatched under none"). Hold the coordinator's clock at the
+        // claim until the delivery receipt arrives: the token then cannot decay before
+        // the dispatch, however late the main actor runs. The decay arithmetic itself is
+        // covered by `EditorPreviewScrollCoordinatorTests` through the same clock seam.
         let previewController = try XCTUnwrap(webView.navigationDelegate as? PreviewController)
+        let claimTime = DispatchTime.now().uptimeNanoseconds
+        scrollCoordinator.installClockForTesting { claimTime }
         previewController.onPreviewScrolled?(1)
         XCTAssertEqual(scrollCoordinator.scrollOwner, .preview)
         let previousDeliveryID = scrollCoordinator.previewScrollDeliveryReceipt?.requestID ?? 0
@@ -200,6 +210,7 @@ final class EditorFindHostedGateTests: XCTestCase {
             }
             return true
         }
+        scrollCoordinator.installClockForTesting { DispatchTime.now().uptimeNanoseconds }
         try await waitUntil("second match becomes visible after preview-owned handoff") {
             let value = try await webView.evaluateJavaScript(
                 """

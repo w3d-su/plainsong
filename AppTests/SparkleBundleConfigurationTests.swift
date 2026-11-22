@@ -4,7 +4,9 @@ import Security
 import XCTest
 
 /// U-G2: the built app's Sparkle keys and entitlements match the sandboxing
-/// plan, and the default build never starts an updater.
+/// plan, and the default build never starts an updater. Release builds turn the
+/// flag on in `Scripts/release.sh`; the feed, key and signed-feed keys are the
+/// same in every build.
 @MainActor
 final class SparkleBundleConfigurationTests: XCTestCase {
     func testBuiltAppDisablesUpdatesAndMatchesSandboxKeys() throws {
@@ -17,11 +19,16 @@ final class SparkleBundleConfigurationTests: XCTestCase {
                 "SUEnableInstallerLauncherService",
                 "SUFeedURL",
                 "SUPublicEDKey",
+                "SURequireSignedFeed",
+                "SUVerifyUpdateBeforeExtraction",
             ]
         )
         XCTAssertEqual(plistBool(info["SUEnableInstallerLauncherService"]), true)
-        XCTAssertEqual(info["SUFeedURL"] as? String, "")
-        XCTAssertEqual(info["SUPublicEDKey"] as? String, "")
+        XCTAssertEqual(info["SUFeedURL"] as? String, "https://w3d-su.github.io/plainsong/appcast.xml")
+        let publicKey = try XCTUnwrap(info["SUPublicEDKey"] as? String)
+        XCTAssertEqual(Data(base64Encoded: publicKey)?.count, 32)
+        XCTAssertEqual(plistBool(info["SURequireSignedFeed"]), true)
+        XCTAssertEqual(plistBool(info["SUVerifyUpdateBeforeExtraction"]), true)
         XCTAssertNil(info["SUEnableDownloaderService"])
         XCTAssertNil(info["SUEnableSystemProfiling"])
         let updatesFlag = info[PlainsongUpdateConfiguration.enabledKey]

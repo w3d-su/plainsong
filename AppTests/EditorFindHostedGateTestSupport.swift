@@ -1,6 +1,7 @@
 import AppKit
 @testable import EditorKit
 import Foundation
+@testable import MarkdownCore
 @testable import Plainsong
 @testable import PreviewKit
 import SwiftUI
@@ -45,12 +46,12 @@ extension EditorFindHostedGateTests {
     }
 
     func activeTasks(in appState: AppState) -> [Task<Void, Never>] {
-        [appState.autosaveTask, appState.statisticsTask, appState.workspaceReloadTask,
+        [appState.autosaveTask, appState.shownSession.statisticsTask, appState.workspaceReloadTask,
          appState.workspaceSearchTask, appState.completionWorkspaceTask].compactMap { $0 }
             + appState.externalReloadTasks.values.map(\.task)
             + appState.externalDiskInspectionTasks.values.map(\.task)
             + appState.sessionAutosaveTasks.values.map(\.task)
-            + appState.sessionStatisticsTasks.values.map(\.task)
+            + appState.registry.warmSessionEntries.compactMap(\.session.statisticsTask)
             + Array(appState.workspaceMutationTextRecoveryTasks.values)
     }
 
@@ -186,6 +187,7 @@ extension EditorFindHostedGateTests {
             )
             try text.write(to: url, atomically: true, encoding: .utf8)
         }
+        settleFixtureFileSystemEvents(at: root)
 
         let suiteName = "EditorFindHostedGateTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -207,6 +209,18 @@ extension EditorFindHostedGateTests {
             defaults: defaults,
             defaultsSuiteName: suiteName
         )
+    }
+
+    /// Call after the last write a fixture makes before it opens `root` as a workspace, so
+    /// the watcher started by that open cannot receive the fixture's own events
+    /// (`WorkspaceFixtureEventSettle`). A settle that times out leaves the fixture usable
+    /// and is named in a later timeout report.
+    func settleFixtureFileSystemEvents(at root: URL) {
+        guard !WorkspaceFixtureEventSettle.settle(root: root) else { return }
+        hostedTimeoutDiagnostics.append {
+            "Fixture FSEvents settle timed out for \(root.lastPathComponent): "
+                + "a late creation event may have refreshed the workspace"
+        }
     }
 
     func makeLongPreviewDocument() -> LongPreviewDocument {

@@ -180,7 +180,9 @@ Re-verified against `282a798` for B1: every stored property `AppState` had there
 forwards each under its old name and access level. `WindowStatePartitionInventory`
 (`AppTests/WindowStatePartitionAppTestSupport.swift`) pins this table, and
 `WindowStatePartitionAppTests/testAppStateStoresOnlyItsContainers` fails if a stored property
-is added to `AppState` itself.
+is added to `AppState` itself. Following the large-document opening change, 119 of
+the original properties remain in these containers. The original foreground and
+background statistics slots are now one task on each `DocumentSession`.
 
 | Properties | Scope | Reason |
 |---|---|---|
@@ -930,7 +932,7 @@ scheduling root cause remains unknown. This is an additional gate, not closure b
 - [ ] Two windows opened with New Window, real key activation, menus act on the frontmost window, and every selector is scoped to a window. *Named XCUITest.*
 - [ ] VoiceOver reads distinct window titles, and Full Keyboard Access reaches each window's Find chrome. *Owner smoke.*
 - [ ] The existing UI tests use window-scoped queries and still pass. *Named XCUITests.*
-- [ ] Zhuyin and Pinyin composition in window 2 while window 1 holds marked text corrupts neither (`agent.md` §13). *Owner smoke.*
+- [ ] Zhuyin composition in window 2 while window 1 holds marked text corrupts neither (`agent.md` §13). *Owner smoke.*
 - Evidence: _open_
 
 ## 12. Risks and `agent.md` edits for implementation

@@ -86,10 +86,9 @@ extension AppState {
             file: file,
             binding: binding,
             session: DocumentSession(
-                text: file.text,
+                opening: file.text,
                 url: file.url,
-                fileKind: file.fileKind,
-                isDirty: false
+                fileKind: file.fileKind
             ),
             source: .loaded,
             preparedImageAssetAuthority: preparedImageAssetAuthority
@@ -134,7 +133,8 @@ extension AppState {
         switch activation.source {
         case .cached:
             if session !== shownSession {
-                cancelForegroundDocumentTasks()
+                autosaveTask?.cancel()
+                autosaveTask = nil
                 setCurrentDocument(session, synchronizingWorkspaceTree: false)
             }
             guard reconcileObservedRetainedFileVersion(
@@ -307,9 +307,7 @@ extension AppState {
         _ destinationSession: DocumentSession
     ) {
         guard shownSession !== destinationSession else { return }
-        let previousSession = shownSession
-        moveCurrentAutosaveToBackground(for: previousSession)
-        moveCurrentStatisticsToBackground(for: previousSession)
+        moveCurrentAutosaveToBackground(for: shownSession)
     }
 
     private func clearMissingFileActivationFence(at key: URL) {

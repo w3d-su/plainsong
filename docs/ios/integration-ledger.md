@@ -4,6 +4,74 @@ Created 2026-10-08. Contract: **IOS-C0-v1 declarations implemented**. Live main:
 
 The C0 tag preserves declarations and an unavailable scaffold. **The current branch contains the production composition candidate described below; full v1 acceptance remains OPEN. Older dated sections retain their original source and acceptance boundaries.**
 
+## I0 baseline re-check — 2026-11-15
+
+This section records the state of `main` three weeks after the section below. It closes
+no device gate, and **full v1 acceptance remains OPEN**.
+
+Merged since 2026-10-26 and not listed below: #221 (access, close and replacement review
+repairs), #228 (source chrome, folder search, Replace All, HTML/PDF export and print),
+#243 (recovery protection, background save assertion, in-place iCloud version
+resolution) and #255 (asset-path regex, iOS workflow token). Shared-package changes in
+that period include #233 (remote-load content rules in PreviewKit).
+
+Local runs on an iPhone 17 Pro / iOS 27.0 simulator with Xcode 27.0 (27A5194q), under
+the canonical lock:
+
+| Entry | Head | Result |
+|---|---|---|
+| `make test-ios-tooling` | `1d8449f8` | 44 run, 44 passed |
+| `make ios-test` | `1d8449f8` | 700 run, 700 passed, 0 skipped |
+| `make ios-test` | `46212ad8` (#264) | 703 run, 703 passed, 0 skipped |
+| `make ios-preview` | `46212ad8` (#264) | 214 run, 214 passed, 0 skipped |
+
+`make ios-preview` was not run locally on `1d8449f8` itself; #264 changes only
+`EditorKitIOS` and one `AppIOS` file. `ios-acceptance` was not run locally. No iOS 26
+simulator runtime is installed on this Mac. Local evidence directories were under
+`/private/tmp/plainsong-ios-i0-out` and `/private/tmp/plainsong-ios-i0-fix-out` and are
+not retained in the repository.
+
+Hosted `ios.yml`, dispatched on `main` `1d8449f8`
+([run 43629938430](https://github.com/w3d-su/plainsong/actions/runs/43629938430)),
+image `macos26`, Xcode 26.6, iOS SDK 26.5. The image carries iOS 26.2, 26.4.1 and 26.5
+simulator runtimes; which one the selected device used was not confirmed.
+
+| Attempt | Result |
+|---|---|
+| 1 | **Failed.** Tooling, build and `ios-test` passed. `ios-preview` failed one case, `PreviewIOSHostedTests/testBundledKitchenSinkAndMDXStayVisible`; acceptance, archive and IPA were skipped |
+| 2 (rerun of the failed job, same head) | Passed. `ios-test` 700/700, `ios-preview` 214/214, acceptance components 29/29, launch smoke 3/3, unsigned archive and IPA |
+
+In attempt 1 the WebKit GPU process relaunched after an idle exit and took 8.16 s (its
+earlier launches in that session took 1.1–1.7 s), one JavaScript reply then missed the
+harness's 2 s deadline, and XCTest reported `InvalidTransition`. A local probe showed
+that this name is what XCTest reports when a test throws after its preview controller
+is torn down; the thrown error was the reply timeout. The slow relaunch itself is
+unexplained and is one occurrence, so the green rerun does not close it. Details and
+the limits of the probe are in
+[the decision entry](../decisions/2026-11-15-ios-preview-invalid-transition-is-a-masked-timeout.md).
+The failed attempt's evidence artifact is `plainsong-ios-43629938430-1`.
+
+The three failed `ios.yml` runs on 2026-10-29 had other causes, on in-progress commits
+of `codex/ios-editor-parity`: a required case missing from the inventory (`77f6b97e`),
+an acceptance-component failure (`5c1f2979`) and
+`IOSSourceEditorInputTests/testDeferredStatisticsRepublishTheEditorSnapshot`
+(`86e7d2cd`). None was this preview case.
+
+Unmerged iOS work found:
+
+- `f00d44ff` on `codex/ios-editor-parity` (forced light/dark editor appearance, line
+  number for the blank line after a trailing newline) was pushed after #228 merged and
+  never reached `main`. It is #264.
+- `wip/ios-local-rescue-20261029` holds one commit of local work rescued on 2026-10-29.
+  Its export-retention regression test and the files it shares with #228 and #243 are on
+  `main` in their merged form; the only content found missing was the perf record
+  `docs/perf/2026-10-29-leased-export-payload-retention.md`, added with this section.
+  The comparison was by file and by the named fix, not a line-by-line audit of all 86
+  files.
+
+Still OPEN, unchanged: every Must row in `docs/release-1.0-scope.md` §3, including
+export and print on a physical device, which the sections below do not list.
+
 ## Main completion candidate — 2026-10-26
 
 This section supersedes current-status claims below and preserves their historical receipts.
@@ -256,7 +324,7 @@ C0 architecture inventory `EditorReplaceLayeringTests.swift`, WorkspaceKitIOS Co
 ## M0 owner-only evidence
 
 - [ ] iPhone/iPad models, OS, app/source head and fixture hashes recorded.
-- [ ] Actual Traditional Chinese Zhuyin/Pinyin composition, candidate confirmation, selection and native Undo/Redo.
+- [ ] Actual Traditional Chinese Zhuyin composition, candidate confirmation, selection and native Undo/Redo.
 - [ ] Local Files and iCloud Drive file/folder in-place open/save, placeholders/offline, external changes and permission reselect.
 - [ ] Background save/recovery and relaunch; older completion cannot erase newer source.
 - [ ] Owner-re-signed unsigned IPA launches and opens/saves selected Files resources.

@@ -23,6 +23,8 @@ struct PreviewRenderDispatch {
     /// The newest render handed to JavaScript, kept after it completes: the page shows it,
     /// so a reloaded page after a WebContent termination needs it again.
     var lastSent: PreviewRenderRequest?
+    /// When the in-flight render was handed to JavaScript (`ProcessInfo.systemUptime`).
+    var inFlightSentUptime: TimeInterval?
 }
 
 /// The presentation a session render last submitted. A repeat with the same key is
@@ -88,6 +90,7 @@ extension PreviewController {
         renderDispatch.pending = nil
         renderDispatch.inFlightRenderID = request.renderID
         renderDispatch.lastSent = request
+        renderDispatch.inFlightSentUptime = renderTimingObserver.map { _ in ProcessInfo.processInfo.systemUptime }
         startRenderWatchdog(for: request.renderID)
 
         let payload = RenderPayload(
@@ -105,6 +108,20 @@ extension PreviewController {
         }
     }
 
+    /// Reports the in-flight render's time in JavaScript. A completion for any other render
+    /// (a stale one, or one sent before the observer was set) reports nothing.
+    func reportRenderTiming(_ payload: RenderCompletePayload) {
+        guard let renderTimingObserver, let sent = renderDispatch.inFlightSentUptime,
+              renderDispatch.inFlightRenderID == payload.renderID
+        else { return }
+        renderTimingObserver(PreviewRenderTiming(
+            renderID: payload.renderID,
+            version: payload.version,
+            sentUptime: sent,
+            completedUptime: ProcessInfo.processInfo.systemUptime
+        ))
+    }
+
     /// Releases the in-flight slot for `renderID` (or anything older still marked in
     /// flight) and sends the pending render, if any.
     func renderDidSettle(_ renderID: Int) {
@@ -112,6 +129,7 @@ extension PreviewController {
               renderID >= inFlightRenderID
         else { return }
         renderDispatch.inFlightRenderID = nil
+        renderDispatch.inFlightSentUptime = nil
         renderDispatch.watchdogTask?.cancel()
         renderDispatch.watchdogTask = nil
         dispatchPendingRenderIfIdle()

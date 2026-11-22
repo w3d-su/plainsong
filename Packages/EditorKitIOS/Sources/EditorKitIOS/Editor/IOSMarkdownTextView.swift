@@ -33,6 +33,20 @@ public final class IOSMarkdownTextView: UITextView {
         }
     }
 
+    func installInterfaceStyle(_ style: UIUserInterfaceStyle) {
+        apply(style, to: self)
+        apply(style, to: lineNumberGutter)
+    }
+
+    private func apply(_ style: UIUserInterfaceStyle, to view: UIView) {
+        view.overrideUserInterfaceStyle = style
+        if style == .unspecified {
+            view.traitOverrides.remove(UITraitUserInterfaceStyle.self)
+        } else {
+            view.traitOverrides.userInterfaceStyle = style
+        }
+    }
+
     @available(*, unavailable)
     required init?(coder _: NSCoder) {
         fatalError("IOSMarkdownTextView is created in code")

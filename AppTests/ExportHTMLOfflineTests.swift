@@ -102,7 +102,7 @@ final class ExportHTMLOfflineTests: XCTestCase {
     }
 }
 
-private final class ExportOfflineNavigationWaiter: NSObject, WKNavigationDelegate {
+final class ExportOfflineNavigationWaiter: NSObject, WKNavigationDelegate {
     var didFinish = false
     var error: String?
     func webView(_: WKWebView, didFinish _: WKNavigation!) {

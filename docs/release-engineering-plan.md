@@ -50,8 +50,9 @@ and its entitlements carry no `com.apple.security.get-task-allow`. Before the fi
 at `1428bf1` (build 178). That run produced a 9,583,665-byte DMG (alpha.4: 12,797,391), a
 19,831,696-byte universal executable (32.2 MiB before #192), and an 18.5 MB dSYM zip whose
 per-architecture UUIDs matched the executable. Its entitlements no longer carried
-`com.apple.security.get-task-allow`, which alpha.4's did. `MARKETING_VERSION` stays `0.1.0` and the build number stays the commit count
-(P0.5): the prerelease label lives only in the tag name. Alpha.3 was already published, so
+`com.apple.security.get-task-allow`, which alpha.4's did. Through alpha.5 `MARKETING_VERSION` was fixed at `0.1.0`. Since 2026-11-12 a
+tagged build takes it from the tag (`v0.9.0-beta.1` builds as `0.9.0`); the build number stays the commit count
+(P0.5) and the prerelease label still lives only in the tag name. Alpha.3 was already published, so
 alpha.4's auto-generated changelog compares against alpha.3, and alpha.5's against alpha.4. Per-DMG
 clean-machine spot-checking remains good practice and is not a release blocker after R14/P5
 closed with alpha.1. Developer ID signing and notarization remain deferred with P1/P2. The
@@ -69,7 +70,7 @@ date). P1 pipeline work is unblocked.
 | P0.2 | Distribution channel for alpha | **Direct download** (DMG via GitHub Releases or site). App Store is deliberately left as a future decision — not scheduled, to be re-evaluated later; sandbox-on keeps it possible. |
 | P0.3 | Update mechanism | **None for alpha** (manual downloads). Sparkle or any updater needs its own Decision Log entry; revisit at beta. |
 | P0.4 | Crash/feedback channel | **No telemetry**; feedback via GitHub Issues. Any crash reporter is a new dependency → Decision Log. |
-| P0.5 | Version scheme | **`0.x` marketing version + monotonically increasing build number** stamped by the release script. |
+| P0.5 | Version scheme | **`0.x` marketing version + monotonically increasing build number** stamped by the release script. **Extended 2026-11-12 (V6: `1.0.0`, with `0.9.x` betas before it):** a tagged build's marketing version is the `X.Y.Z` of its tag, `vX.Y.Z` or `vX.Y.Z-<prerelease>`; the prerelease suffix is not in the app. A build without a tag keeps `0.1.0`. The build number is unchanged (`docs/decisions/2026-11-12-release-marketing-version-from-tag.md`). |
 
 **License obligations for every published build (since 2026-11-06).** The app bundle must
 contain `Contents/Resources/LICENSE` (`project.yml` copies it), and the release notes must
@@ -119,6 +120,13 @@ hdiutil still works and stays until compatibility needs force a change.
   app-plus-Applications-symlink layout.
 - `make release`: clean Release build → sign → notarize → staple → DMG → checksum
   (`shasum -a 256`), stamping P0.5 version/build numbers.
+- Marketing version (since 2026-11-12): `Scripts/release-version.sh` resolves it before
+  the build. An explicit `PLAINSONG_MARKETING_VERSION` wins. Otherwise it is the `X.Y.Z`
+  of the release tag: `PLAINSONG_RELEASE_TAG` locally, or `GITHUB_REF_NAME` on a tag run.
+  Otherwise it is `0.1.0`. A tag that is not `vX.Y.Z` or `vX.Y.Z-<prerelease>` stops the
+  run before anything is built. `make test-packages` runs the script's self-test.
+  Verified locally on 2026-11-12 with a simulated tag; no real tag has run through
+  `release.yml` with this change yet.
 - [x] Gate: `make release` is reproducible on a dev machine from a clean checkout with only
   documented env (unsigned path verified 2026-07-05, build 56). The signed-path run
   re-verifies this gate when P1/P2 resume.
@@ -158,8 +166,11 @@ so the owner still authors the notes and presses publish. Dispatch runs attach t
 a workflow artifact for pipeline verification without touching Releases. Every run (tag or
 dispatch) also uploads the zipped dSYM as the `plainsong-dsym` workflow artifact, kept 90
 days and never attached to a Release; download it for any build that gets published, since
-crash reports from that DMG can only be symbolicated with it. No secrets are
-required on the unsigned path, and public-repo macOS minutes are free.
+crash reports from that DMG can only be symbolicated with it. Public-repo macOS minutes
+are free. Since auto-update U2 the tag job reads one secret, `SPARKLE_ED_PRIVATE_KEY`, to
+sign the update feed it attaches to the draft release
+(`docs/decisions/2026-11-10-auto-update-u2-feed-pipeline.md`); without it, or without
+a `SUPublicEDKey` in the app, the job builds no feed.
 
 - Secrets (Developer ID cert keychain import + notary API key) become repo secrets only
   when the signed path resumes with P1/P2.

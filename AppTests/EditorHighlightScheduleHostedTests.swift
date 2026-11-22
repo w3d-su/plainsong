@@ -82,6 +82,9 @@ extension EditorFindHostedGateTests {
         for (name, data) in assets {
             try data.write(to: fixture.root.appendingPathComponent(name))
         }
+        if !assets.isEmpty {
+            settleFixtureFileSystemEvents(at: fixture.root)
+        }
         let appState = fixture.appState
         if layoutMode == .wysiwyg {
             appState.preferences.setExperimentalWYSIWYGEnabled(true)

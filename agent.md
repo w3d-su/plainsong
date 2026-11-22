@@ -66,7 +66,7 @@ projects such as Astro/Next.js content directories).
 | Persistence of prefs | `UserDefaults` + built-in and imported editor color themes; user CSS deferred | |
 | Project generation | **XcodeGen** (`project.yml` committed; `.xcodeproj` is generated, never hand-edited) | pbxproj diffs are hostile to LLM collaboration. |
 | Lint/format | SwiftFormat + SwiftLint (configs committed) | |
-| Updates | [Sparkle](https://github.com/sparkle-project/Sparkle) 2.10.0, App target only | Pinned to revision `eef1a539a373c1f1a320624b1130fc5de7b2e100` (tag 2.10.0). `PLAINSONG_UPDATES_ENABLED` defaults to NO, so the app does not create or start `SPUUpdater` and makes no update request. Packages must not import Sparkle. |
+| Updates | [Sparkle](https://github.com/sparkle-project/Sparkle) 2.10.0, App target only | Pinned to revision `eef1a539a373c1f1a320624b1130fc5de7b2e100` (tag 2.10.0). `PLAINSONG_UPDATES_ENABLED` defaults to NO, so a development or test build does not create or start `SPUUpdater` and makes no update request. `Scripts/release.sh` builds with YES; the feed URL, public EdDSA key and signed-feed keys are in every build's Info.plist. Packages must not import Sparkle. |
 | JS tooling | Node 20+, npm, esbuild, vitest (preview pipeline unit tests) | |
 
 **Dependency policy:** keep the dependency list short. Adding any new Swift package or npm
@@ -113,7 +113,7 @@ blogeditor/
 │   ├── src/pipeline.ts       # unified pipeline (md and mdx variants)
 │   ├── src/styles/           # preview CSS (Apple system palette, Xcode-style syntax colors)
 │   └── test/                 # vitest specs
-└── .github/workflows/ci.yml  # parallel jobs: preview (Linux npm), packages (lint + swift test), hosted XCTest shards; `build-and-test` gate; docs-only PRs skip the test jobs (`changes`)
+└── .github/workflows/ci.yml  # parallel jobs: preview and lint (Linux), packages (swift test), one hosted build plus four XCTest shards; `build-and-test` gate; docs-only PRs skip the test jobs (`changes`)
 ```
 
 Build artifacts: `preview-src` builds to `App/Resources/preview/` (`index.html`, `bundle.js`,
@@ -213,6 +213,16 @@ Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-
 ---
 
 ## 5. File & Workspace Handling
+
+Opening a Markdown or MDX file of 64 KiB or more (decoded UTF-8 size) installs its editable
+source immediately. The status bar shows “Counting…” until the first counts arrive. Smaller
+files open with counts available. In the macOS and iOS editors the document session owns its
+pending count, including the 300 ms pause after editing. Switching windows or files, renaming,
+and Save As keep that count with the source; on iOS so do detaching and closing the editor.
+The iOS editor emits a snapshot when the counts land only if it still shows that session, and
+counts an edit made while text is marked (a Zhuyin composition) once the composition ends.
+On iOS a statistics-only snapshot preserves a pending preview render for the same document
+revision.
 
 - **App Sandbox: ON.** All file access via user-selected URLs; persist
   security-scoped bookmarks for recents/workspaces; always wrap access in
@@ -396,7 +406,9 @@ gutter only draws: the laid-out viewport fragments it shows, numbered from the s
 `EditorScrollLineIndex` (only `\n` starts a line), on the painted baseline of each source
 line's first visual line (STTextView raises lines by half their line-height multiple's
 extra height). Its width follows the line count's digits with hysteresis and never
-changes while marked text is composed.
+changes while marked text is composed. It clips to its bounds and fills only the dirty
+rect inside them: since macOS 14 `draw(_:)` can get a wider rect, and the opaque fill
+then hid the whole text column (2026-11-17).
 
 **Abstraction rule:** App/ and MarkdownCore/ must never import STTextView types. Only
 EditorKit knows the concrete editor. This keeps the Phase-2 WYSIWYG swap and any library
@@ -831,6 +843,10 @@ attempt without a Decision Log entry.
 | File open (500 KB md) | < 300 ms to first paint, highlight may stream in |
 | Memory (app host RSS) | < 400 MB in the Plainsong host process with 8 warm sessions + 2 settled live WKWebViews |
 
+The 500 KB first-paint budget includes opening the editable document with counts pending.
+The opening probe also checks that typing immediately and switching documents preserve the
+edited source and eventually publish its counts.
+
 Techniques: tree-sitter incremental edits (`InputEdit`), visible-range-first
 highlighting, a line-number gutter that draws only the visible viewport fragments from an
 incrementally edited line index, segment-cached preview renders, morphdom patching,
@@ -846,7 +862,11 @@ SVG children only as non-authoritative pending content, avoiding a temporary col
 Editor main-thread rules (profiled 2026-10-18; evidence in `docs/perf-log.md`): no
 O(document) work per keystroke on the main thread. Publish native UTF-8 source strings,
 never the bridged `NSTextStorage` string: SwiftUI compares published text with `==`,
-which normalizes a bridged string from its first character. Edit derived indexes in
+which normalizes a bridged string from its first character. That native copy is the one
+O(document) step left per keystroke: one CoreFoundation pass (`ExactSourceText.nativeCopy`,
+~24 main-thread instructions per byte, ~1.5 ms per MiB of ASCII in Release; measuring the
+length with a second pass doubled it and made the first keystroke after an idle pause
+slow on cold caches, `docs/perf/2026-11-18-keystroke-native-copy.md`). Edit derived indexes in
 place. Release TextKit 2's cached text elements below the viewport once scrolling
 settles (`EditorTextElementCacheTrimmer`): each edit rewrites the range of every cached
 element after it, so typing above a once-viewed document end cost ~50 ms per keystroke.
@@ -863,6 +883,12 @@ highlighting instrumentation, not from the historical 250 KB full-document inlin
 parsing cutoff. The memory budget is scoped to deterministic app host-process RSS.
 OS-managed WebKit helper processes should be recorded as diagnostic/informational
 data because helper reuse and process-pool ownership vary across runs and CI hosts.
+
+iOS device numbers come from the in-app Performance Probe (Settings, five taps on the
+Version row; `docs/ios/performance-probe.md`). It reports the app's side of a keystroke
+(insert, run loop commit, next display refresh), the visible highlight, and the preview
+render without its debounce, with raw samples as JSON. Its commit time alone does not
+close the keystroke-to-screen budget, and it does not exercise marked text.
 
 Record a new measurement as `docs/perf/YYYY-MM-DD-<slug>.md`, one file per entry.
 `docs/perf-log.md` is the archive and takes no new sections; its header has the file
@@ -884,6 +910,14 @@ editor *folds* markdown tokens via rendering, not text mutation:
 - A projected U+200B that ends a line (fold or image padding) lays out at x = 0, so the
   projection turns it into a 0.01 pt space with a negative kern that cancels its advance.
   The content before it keeps its segment, caret and IME rects (`WYSIWYGLineEndHangingSpace`).
+- An image's line is reserved by a run-local font as tall as its canvas; the attachment
+  hangs from that font's descender so it fills the line. STTextView paints each line raised
+  by half the height its line-height multiple adds, and highlighting strips the paragraph
+  style that layout would apply, so a projected paragraph holding an image carries no
+  multiple (`lineHeightMultiple = 0`, which STTextView reads as 1). Together these keep a
+  thumbnail or missing-file placeholder inside its own line instead of over the lines above
+  it. Text beside an inline image sits on the line's baseline, about 18% of the canvas
+  height above the image's bottom edge, not on it as in Typora.
 - When the cursor enters a node's range → reveal raw markdown for that node only
   (Typora's behavior).
 - Tables in WYSIWYG: the paragraph projection turns cell-starting pipes into `\t` with
@@ -892,7 +926,8 @@ editor *folds* markdown tokens via rendering, not text mutation:
   and T1 passed; tables stay raw with the table helper (§6.3) until T2–T11 pass. Mermaid stays raw.
 - Undo, IME composition (Chinese input!), and selection across folded tokens are the risk
   areas — write exploratory tests early. **IME correctness is non-negotiable: test with
-  Traditional Chinese (Zhuyin/Pinyin) marked text at every change.**
+  Traditional Chinese Zhuyin marked text at every change.** Pinyin is not tested
+  (`docs/decisions/2026-11-17-zhuyin-only-ime-testing.md`).
 - Experimental single Replace edits raw UTF-16 source only. When the current match is
   not the selection, the action only selects it and synchronously removes any image
   marker over it; folded owners reveal later through the existing debounced
@@ -1021,18 +1056,26 @@ make generate         # xcodegen generate  (run after editing project.yml)
 make preview-bundle   # build preview-src → App/Resources/preview/ (commit the output)
 make build            # xcodebuild -scheme Plainsong build
 make test             # test-packages (swift test) + test-hosted (xcodebuild test) + test-preview (npm test)
-make test-hosted XCODE_TEST_TARGETS=PlainsongTests  # one hosted bundle subset, as a CI shard runs it
+make test-hosted XCODE_TEST_TARGETS=PlainsongTests  # one hosted bundle subset
 make release          # DMG pipeline (Scripts/release.sh); PLAINSONG_UNSIGNED=1 for the alpha path
 cd preview-src && npm run typecheck  # preview TypeScript check; CI runs this separately
 make format           # swiftformat . && swiftlint --fix
 ```
 
-- CI installs **SwiftFormat 0.62.1** as a SHA-256-verified release binary
-  (`.github/workflows/ci.yml`, mirrored by `SWIFTFORMAT_VERSION` in the Makefile), not via
-  Homebrew, so lint results cannot drift with the runner image. Local `make lint` warns when
-  the Homebrew version differs; CI is authoritative. Bumping the pin means updating the
-  version + SHA-256 in `ci.yml`, the Makefile constant, and reformatting the tree in the
-  same PR if rule behavior changed.
+- CI installs **SwiftFormat 0.62.1** and **SwiftLint 0.65.1** as SHA-256-verified Linux
+  release binaries in the Ubuntu `lint` job (`.github/workflows/ci.yml`, mirrored by
+  `SWIFTFORMAT_VERSION` and `SWIFTLINT_VERSION` in the Makefile), not via Homebrew, so lint
+  results cannot drift with the runner image. Local `make lint` warns when the Homebrew
+  versions differ; CI is authoritative. Bumping a pin means updating the version + SHA-256
+  in `ci.yml`, the Makefile constant, and reformatting the tree in the same PR if rule
+  behavior changed. `make check-preview-layering` runs on macOS because it needs xcodegen.
+- CI builds the hosted test bundles once (`make test-hosted-build`) and four shards run
+  those products (`make test-hosted-shard`). A shard that names a class also skips it in
+  its bundle's catch-all shard, so a new or renamed class still runs. `make test` is unchanged.
+- Pull requests cancel their older run and run the four shards at once. Every non-docs
+  commit on `main` runs in full, never cancelled or queued out, and seeds the caches pull
+  requests restore; it runs its shards one at a time, so each such run holds at most two
+  of the five macOS runners. `workflow_dispatch` does the same when `serial_hosted` is set.
 - The preview CI job verifies every pinned acceptance resource against the committed
   bytes before installing preview dependencies. Regenerated resources must update
   `IOSAcceptanceTests/Resources/acceptance-resource-manifest.txt` in the same PR.
@@ -1040,18 +1083,36 @@ make format           # swiftformat . && swiftlint --fix
   conflicts; edit `project.yml`.**
 - Code signing: "Sign to Run Locally" for dev; hardened runtime + notarization scripted
   later (Phase 3, direct distribution first, App Store optional).
+- Update feed (`docs/auto-update-plan.md` §3.4): on a tag run `release.yml` passes the
+  `SPARKLE_ED_PRIVATE_KEY` secret, on standard input only, to `Scripts/make-appcast.sh`,
+  which adds the new DMG to the published `appcast.xml` and signs it. The feed is
+  attached to the draft release. The owner publishes the release and then runs the
+  **Publish appcast** workflow, which copies the feed to `gh-pages` and holds no key.
+  No workflow with a `pull_request` trigger may read that secret. Without it, or
+  without a `SUPublicEDKey` in the app, the tag job builds no feed, and fails if the
+  build has updates on. The script fails if the new download comes out unsigned (the
+  secret does not match the app's key). The publish check compares the newest build per
+  channel, so publish each release's feed before pushing the next tag. `make test-appcast` runs
+  the script's self-test with a throwaway key.
+- Release versions: `Scripts/release-version.sh` gives `Scripts/release.sh` its marketing
+  version. An explicit `PLAINSONG_MARKETING_VERSION` wins; otherwise a tag (`PLAINSONG_RELEASE_TAG`,
+  or `GITHUB_REF_NAME` on a tag run) `vX.Y.Z` or `vX.Y.Z-<prerelease>` gives `X.Y.Z`;
+  otherwise `0.1.0`, the `project.yml` value. The prerelease suffix stays in the tag, and a
+  hyphen in the tag selects Sparkle's beta channel. A malformed tag fails before the build.
+  The build number is always `git rev-list --count HEAD`: Sparkle compares it.
 - `Scripts/release.sh` re-signs Sparkle innermost first: `Installer.xpc`,
   `Downloader.xpc` (`--preserve-metadata=entitlements`), `Autoupdate`, `Updater.app`,
   and `Sparkle.framework`, then the app. Signing never uses `--deep`. The Developer ID
   path adds `-o runtime --timestamp`. Both paths then run `codesign --verify --strict`
   on each nested item and `codesign --verify --deep --strict` on the finished app
   (verification only). A shipped plist whose `PLAINSONG_UPDATES_ENABLED` is not `NO`
-  must have a 32-byte EdDSA key, the expected HTTPS feed, `SURequireSignedFeed`, and
-  `SUVerifyUpdateBeforeExtraction`. The key check matches Sparkle 2.10.0: trim
+  must have the pinned EdDSA public key (compared as decoded bytes), the expected HTTPS
+  feed, `SURequireSignedFeed`, and `SUVerifyUpdateBeforeExtraction`; the script's
+  `--self-test` also requires `project.yml` to carry that key and feed. The key check matches Sparkle 2.10.0: trim
   Foundation's whitespace set only, require padding, and reject interior
   whitespace. Non-zero trailing base64 bits are accepted. The feed check strips
-  quotes only. CI runs the guard on the Debug Info.plist after the ui-performance
-  `make build`.
+  quotes only. CI runs the guard on the Debug Info.plist in
+  the `hosted (build)` job.
 
 ---
 
@@ -1073,6 +1134,10 @@ make format           # swiftformat . && swiftlint --fix
   `Fixtures/perf-500kb.md`.
 - UI tests: minimal smoke (launch, open fixture, type, preview updates). Don't invest in
   brittle full UI automation.
+- Hosted fixtures: `makeWorkspaceFixture(files:)` waits for FSEvents to record the
+  fixture's own writes (`WorkspaceFixtureEventSettle`) so the watcher started by opening
+  the workspace cannot receive them. A test that writes more files before it opens the
+  workspace calls `settleFixtureFileSystemEvents(at:)` after its last write.
 
 ---
 

@@ -1,0 +1,53 @@
+name: CodeQL
+
+# Advanced setup, replacing CodeQL default setup
+# (docs/decisions/2026-11-10-codeql-advanced-setup-swift-weekly.md). These four
+# languages need no build and run on Ubuntu for every pull request and every commit
+# on main, as default setup did. Swift needs a macOS runner and a traced build, so
+# it has its own weekly workflow (codeql-swift.yml).
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # Sunday 18:23 UTC (Monday 02:23 in Taipei). Default setup also ran weekly.
+    - cron: "23 18 * * 0"
+  workflow_dispatch:
+
+# A newer push to a pull request replaces its running analysis. Every other run
+# gets its own group, so no main commit is dropped.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('codeql-pr-{0}', github.event.pull_request.number) || format('codeql-run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      # Uploads the results to code scanning.
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        # The languages default setup analyzed, all with build mode `none`.
+        language: [actions, c-cpp, javascript-typescript, python]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          # The category default setup used, so existing alerts keep their history.
+          category: "/language:${{ matrix.language }}"

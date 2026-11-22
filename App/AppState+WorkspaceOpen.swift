@@ -136,10 +136,9 @@ extension AppState {
         let loaded = preparedRead.result
         let file = loaded.file
         let session = DocumentSession(
-            text: file.text,
+            opening: file.text,
             url: file.url,
-            fileKind: file.fileKind,
-            isDirty: false
+            fileKind: file.fileKind
         )
         moveCurrentDocumentWorkToBackgroundBeforeSwitch()
         retainUnanchoredManagedSessionOwnership(

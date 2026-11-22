@@ -2,6 +2,7 @@ import XCTest
 
 /// Hosted production launch smoke. A pass means Files and its Open control are visible.
 /// It is not a file-access, editing, preview, save/reopen, or device acceptance result.
+@MainActor
 final class IOSAcceptanceLaunchSmokeTests: XCTestCase {
     func testLaunchShowsFilesAndOpenControl() {
         let app = XCUIApplication()

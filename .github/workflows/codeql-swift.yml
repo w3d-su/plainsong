@@ -1,0 +1,57 @@
+name: CodeQL (Swift)
+
+# Swift analysis needs a macOS runner and a traced build of the app. GitHub caps the
+# repository at five concurrent macOS runners, and CI's test jobs need them, so this
+# runs weekly and on demand instead of on every push
+# (docs/decisions/2026-11-10-codeql-advanced-setup-swift-weekly.md). A pull request
+# that changes this file also runs it, so a change here is tested before it merges.
+on:
+  schedule:
+    # Sunday 19:23 UTC (Monday 03:23 in Taipei).
+    - cron: "23 19 * * 0"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/codeql-swift.yml"
+
+concurrency:
+  group: codeql-swift-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (swift)
+    runs-on: macos-15
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      # Uploads the results to code scanning.
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # Before CodeQL starts tracing, so Homebrew is not traced.
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: swift
+          build-mode: manual
+
+      # The app scheme compiles the App target and every macOS package it links.
+      # Autobuild picked one Swift package and compiled only MarkdownCore,
+      # WorkspaceCore and an iOS test harness. DerivedData sits outside the checkout,
+      # so third-party package sources are not reported.
+      - name: Build the macOS app
+        run: make build XCODE_DERIVED_DATA="$RUNNER_TEMP/codeql-derived-data"
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          # The category default setup used, so existing alerts keep their history.
+          category: "/language:swift"
