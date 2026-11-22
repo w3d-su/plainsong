@@ -45,6 +45,10 @@ struct IOSDocumentStatusChrome: View {
                         .minimumScaleFactor(0.85)
                         .accessibilityLabel(IOSDocumentStatisticsPresentation.accessibilitySummary(statistics))
                         .accessibilityIdentifier("plainsong.ios.editor.statistics")
+                } else if chrome.status == .ready {
+                    Text("Counting…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 

@@ -55,7 +55,6 @@ final class AppDocumentRegistry: ObservableObject {
     let userDefaults: UserDefaults
     let editorImageThumbnailAdapter: WorkspaceEditorImageThumbnailAdapter
     var autosaveTask: Task<Void, Never>?
-    var statisticsTask: Task<Void, Never>?
     /// Deterministic test seam for typed anchored-save outcomes.
     var anchoredFileSaveOverride: (@MainActor (
         String,
@@ -108,7 +107,6 @@ final class AppDocumentRegistry: ObservableObject {
         EditorDocumentBindingInstallation: EditorDocumentSourceSynchronizer
     ] = [:]
     var sessionAutosaveTasks: [ObjectIdentifier: SessionBackgroundTask] = [:]
-    var sessionStatisticsTasks: [ObjectIdentifier: SessionBackgroundTask] = [:]
     let shouldRestoreLastOpenedFile: Bool
     var didAttemptRestore = false
     /// Warm sessions by state URL. Read and written only through the registry's session API
@@ -295,9 +293,6 @@ final class AppDocumentRegistry: ObservableObject {
             inspection.task.cancel()
         }
         for task in sessionAutosaveTasks.values {
-            task.task.cancel()
-        }
-        for task in sessionStatisticsTasks.values {
             task.task.cancel()
         }
         for task in workspaceMutationTextRecoveryTasks.values {

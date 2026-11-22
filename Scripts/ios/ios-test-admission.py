@@ -4,12 +4,14 @@
 An enabled .xctestrun with zero TestConfigurations, a disabled plan, or only
 library products (.a, .swiftmodule, a framework without an xctest executable)
 is not tests compiled. The report records compiled_test_images and never
-counts those library products.
+counts those library products. Every failure, including a damaged plist,
+writes a report with its reason.
 """
 import argparse
 import json
 import os
 import plistlib
+import re
 import sys
 
 
@@ -17,6 +19,8 @@ MACH_O = {
     b"\xfe\xed\xfa\xcf", b"\xcf\xfa\xed\xfe", b"\xfe\xed\xfa\xce", b"\xce\xfa\xed\xfe",
     b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca", b"\xca\xfe\xba\xbf",
 }
+# Xcode's xctestrun path tokens, such as __TESTROOT__ and __PLATFORMS__.
+PLACEHOLDER = re.compile(r"__[A-Z][A-Z0-9_]*__")
 
 
 def fail(report_path, report):
@@ -53,21 +57,45 @@ def enabled(node):
     return node.get("IsEnabled", True) is not False and node.get("Skipped", False) is not True
 
 
-def resolve(raw, test_root, test_host):
+def dictionary(value):
+    return value if isinstance(value, dict) else {}
+
+
+def read_plist(path, what):
+    """Load a dictionary plist. A damaged or non-dictionary file is a ValueError."""
+    try:
+        with open(path, "rb") as stream:
+            value = plistlib.load(stream)
+    except Exception as error:  # plistlib raises ExpatError, InvalidFileException, ValueError, ...
+        raise ValueError("%s is not a readable plist: %s (%s: %s)"
+                         % (what, os.path.basename(path), type(error).__name__, error)) from error
+    if not isinstance(value, dict):
+        raise ValueError("%s is not a dictionary plist: %s" % (what, os.path.basename(path)))
+    return value
+
+
+def resolve(raw, test_root, test_host, field):
+    """Substitute the known tokens. Only the xctestrun's own text is checked
+    for unresolved tokens, so an output root such as /tmp/a__b still resolves."""
     if not isinstance(raw, str) or not raw:
         return None
-    path = raw.replace("__TESTROOT__", test_root)
+    known = {"__TESTROOT__": test_root}
     if test_host:
-        path = path.replace("__TESTHOST__", test_host)
-    if "__" in path:
-        return None
-    return path
+        known["__TESTHOST__"] = test_host
+    unresolved = sorted(set(PLACEHOLDER.findall(raw)) - set(known))
+    if unresolved:
+        raise ValueError("%s has an unresolved xctestrun placeholder %s: %s"
+                         % (field, ", ".join(unresolved), raw))
+    for token, value in known.items():
+        raw = raw.replace(token, value)
+    return raw
 
 
 def xctestruns(products):
     found = []
     for dirpath, dirnames, filenames in os.walk(products):
-        dirnames[:] = [name for name in dirnames if not name.endswith((".app", ".xctest", ".framework", ".appex"))]
+        dirnames[:] = [name for name in dirnames
+                       if not name.endswith((".app", ".xctest", ".framework", ".appex", ".swiftmodule"))]
         for name in sorted(filenames):
             path = os.path.join(dirpath, name)
             if name.endswith(".xctestrun") and os.path.isfile(path) and not os.path.islink(path):
@@ -79,8 +107,7 @@ def bundle_executable(bundle):
     info_path = os.path.join(bundle, "Info.plist")
     if not os.path.isfile(info_path) or os.path.islink(info_path):
         return None
-    with open(info_path, "rb") as stream:
-        info = plistlib.load(stream)
+    info = read_plist(info_path, "bundle Info.plist")
     name = info.get("CFBundleExecutable") or os.path.splitext(os.path.basename(bundle))[0]
     if not isinstance(name, str) or not name or "/" in name or name.startswith("."):
         return None
@@ -88,10 +115,9 @@ def bundle_executable(bundle):
 
 
 def scheme_name(plist):
-    container = plist.get("ContainerInfo") or {}
+    container = dictionary(plist.get("ContainerInfo"))
     if not container.get("SchemeName"):
-        metadata = plist.get("__xctestrun_metadata__") or {}
-        container = metadata.get("ContainerInfo") or {}
+        container = dictionary(dictionary(plist.get("__xctestrun_metadata__")).get("ContainerInfo"))
     return container.get("SchemeName")
 
 
@@ -123,7 +149,7 @@ def image_for_target(target, test_root, derived, require_app_host=False):
     raw_host = target.get("TestHostPath") or ""
     host = None
     if isinstance(raw_host, str) and raw_host.endswith(".app"):
-        host = resolve(raw_host, test_root, None)
+        host = resolve(raw_host, test_root, None, "TestHostPath")
         if host is None or not inside(derived, host) or not os.path.isdir(host):
             raise ValueError("enabled test host app was not built: " + str(target.get("BlueprintName")))
         host_executable = bundle_executable(host)
@@ -134,13 +160,13 @@ def image_for_target(target, test_root, derived, require_app_host=False):
         raise ValueError("preview suite requires an app-hosted unit-test bundle with a built Mach-O host")
     app = target.get("UITargetAppPath")
     if isinstance(app, str) and app.endswith(".app"):
-        app_path = resolve(app, test_root, host)
+        app_path = resolve(app, test_root, host, "UITargetAppPath")
         if app_path is None or not inside(derived, app_path) or not os.path.isdir(app_path):
             raise ValueError("UI target app was not built: " + str(target.get("BlueprintName")))
         app_executable = bundle_executable(app_path)
         if app_executable is None or not is_macho(app_executable):
             raise ValueError("UI target app has no Mach-O image: " + os.path.basename(app_path))
-    bundle = resolve(target.get("TestBundlePath"), test_root, host)
+    bundle = resolve(target.get("TestBundlePath"), test_root, host, "TestBundlePath")
     if bundle is None or not bundle.endswith(".xctest") or not inside(derived, bundle):
         raise ValueError("enabled test bundle is missing or escapes DerivedData: " + str(target.get("BlueprintName")))
     if not os.path.isdir(bundle) or os.path.islink(bundle):
@@ -162,19 +188,32 @@ def admit(derived_data, scheme, require_app_host=False):
     if not os.path.isdir(products):
         report["reason"] = "build products directory is missing"
         return report
+    ignored = report["library_products_ignored"]
     for dirpath, dirnames, filenames in os.walk(products):
-        dirnames[:] = [name for name in dirnames if not name.endswith((".app", ".xctest", ".framework", ".appex"))]
-        for name in sorted(filenames):
-            if name.endswith((".a", ".swiftmodule")):
-                report["library_products_ignored"].append(name)
-    plans = []
+        # A .swiftmodule directory is one product; the files inside it are
+        # per-architecture slices such as arm64-apple-ios-simulator.swiftmodule.
+        ignored.extend(name for name in dirnames if name.endswith(".swiftmodule"))
+        dirnames[:] = [name for name in dirnames
+                       if not name.endswith((".app", ".xctest", ".framework", ".appex", ".swiftmodule"))]
+        ignored.extend(name for name in filenames if name.endswith((".a", ".swiftmodule")))
+    ignored.sort()
+    plans, unreadable = [], []
     for path in xctestruns(products):
-        with open(path, "rb") as stream:
-            plist = plistlib.load(stream)
+        try:
+            plist = read_plist(path, "xctestrun")
+        except ValueError as error:
+            # Its scheme is unknown, so it cannot decide another scheme's
+            # admission; a damaged plan of this scheme still leaves none.
+            unreadable.append({"xctestrun": os.path.basename(path), "reason": str(error)})
+            continue
         if scheme_name(plist) == scheme:
             plans.append((path, plist))
+    if unreadable:
+        report["unreadable_xctestruns"] = unreadable
     if len(plans) != 1:
         report["reason"] = "expected one enabled %s xctestrun, found %d" % (scheme, len(plans))
+        if unreadable:
+            report["reason"] += " (%d unreadable xctestrun skipped)" % len(unreadable)
         return report
     path, plist = plans[0]
     report["xctestrun"] = os.path.basename(path)
@@ -200,8 +239,12 @@ def main():
     args = parser.parse_args()
     try:
         report = admit(args.derived_data, args.scheme, args.require_app_host)
-    except (OSError, plistlib.InvalidFileException, ValueError) as error:
+    except (OSError, ValueError) as error:
         return fail(args.report, {"scheme": args.scheme, "images": [], "reason": str(error)})
+    except Exception as error:
+        # Still fail closed with a report rather than a bare traceback.
+        return fail(args.report, {"scheme": args.scheme, "images": [],
+                                  "reason": "admission error: %s: %s" % (type(error).__name__, error)})
     if not report["tests_compiled"]:
         return fail(args.report, report)
     write_report(args.report, report)

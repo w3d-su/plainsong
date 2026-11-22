@@ -56,29 +56,31 @@ extension IOSWorkspaceAccessService: PreviewAssetReading {
         guard let record = matchingRecord(request.access) else {
             throw PreviewAssetReadFailure.accessChanged
         }
-        let relative = relativePreviewPath(root: record.rootURL, file: request.resolvedURL)
+        // PreviewKit's AssetURLResolver resolves symlinks in its root and in the candidate, so on
+        // a device `request.resolvedURL` starts `/var/mobile/...` while the picker's
+        // `record.rootURL` keeps `/private/var/mobile/...`. Only when the plain spelling fails,
+        // compare against the root resolved the same way; the candidate is already resolved.
+        // This runs on the main actor, so the file-system walk stays off the common path.
+        // `location.fileURL` is rebuilt under `record.rootURL` so `authorize` still matches.
+        let relative = IOSWorkspacePathAuthority.relativeSpelling(root: record.rootURL, file: request.resolvedURL)
+            ?? IOSWorkspacePathAuthority.relativeSpelling(
+                root: IOSWorkspacePathAuthority.resolvedDirectory(record.rootURL),
+                file: request.resolvedURL
+            )
         guard let relative else { throw PreviewAssetReadFailure.outsideRoot }
+        let fileURL = IOSWorkspacePathAuthority.fileURL(
+            path: IOSWorkspacePathAuthority.joined(root: record.rootURL, relativePath: relative)
+        )
         let location = IOSFileLocation(
             workspaceID: record.workspaceID,
             accessGeneration: record.generation,
             relativePath: relative,
-            fileURL: request.resolvedURL,
+            fileURL: fileURL,
             resourceID: nil
         )
         try authorize(location, record: record)
         _ = lease
         return location
-    }
-
-    fileprivate func relativePreviewPath(root: URL, file: URL) -> String? {
-        let rootBytes = IOSWorkspacePathAuthority.pathBytes(root)
-        let fileBytes = IOSWorkspacePathAuthority.pathBytes(file)
-        guard fileBytes.count > rootBytes.count + 1 else { return nil }
-        guard Array(fileBytes.prefix(rootBytes.count)) == rootBytes else { return nil }
-        guard fileBytes[rootBytes.count] == UInt8(ascii: "/") else { return nil }
-        let remainder = String(decoding: fileBytes.dropFirst(rootBytes.count + 1), as: UTF8.self)
-        guard WorkspaceRelativePath(spelling: remainder) != nil else { return nil }
-        return remainder
     }
 
     fileprivate nonisolated static func previewFailure(_ failure: IOSWorkspaceFailure) -> PreviewAssetReadFailure {
