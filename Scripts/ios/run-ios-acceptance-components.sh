@@ -25,8 +25,9 @@ captured_required="$evidence/required-tests.txt"
 cp "$required" "$captured_required"
 chmod 0444 "$captured_required"
 /usr/bin/python3 Scripts/ios/ios-provenance.py capture "$evidence/source.json"
-if ! /usr/bin/python3 Scripts/ios/ios-provenance.py verify-required-copy \
-    "$evidence/source.json" --copy "$captured_required" --required-relative "$required"; then
+# The captured digest goes to the result gate, which checks the bytes it parses.
+if ! required_sha256="$(/usr/bin/python3 Scripts/ios/ios-provenance.py verify-required-copy \
+    "$evidence/source.json" --copy "$captured_required" --required-relative "$required")"; then
     echo "ios-acceptance-components: required-name copy does not match captured source; refusing to start tests" >&2
     exit 65
 fi
@@ -34,23 +35,17 @@ fi
 echo "ios-acceptance-components: build_path=$build_path"
 set +e
 swift test --package-path IOSAcceptanceTests \
-    --build-path "$build_path" \
     --scratch-path "$build_path" \
     > "$evidence/swift-test.log" 2>&1
 result=$?
 set -e
 tail -15 "$evidence/swift-test.log" >&2 || true
 
-if ! /usr/bin/python3 Scripts/ios/ios-provenance.py verify-required-copy \
-    "$evidence/source.json" --copy "$captured_required" --required-relative "$required"; then
-    [ "$result" != 0 ] || result=65
-elif ! /usr/bin/python3 Scripts/ios/ios-component-results.py "$evidence/swift-test.log" \
+if ! /usr/bin/python3 Scripts/ios/ios-component-results.py "$evidence/swift-test.log" \
     --required "$captured_required" \
+    --required-sha256 "$required_sha256" \
     --report "$evidence/component-gate.json" \
     --names "$evidence/named-tests.txt"; then
-    [ "$result" != 0 ] || result=65
-elif ! /usr/bin/python3 Scripts/ios/ios-provenance.py verify-required-copy \
-    "$evidence/source.json" --copy "$captured_required" --required-relative "$required"; then
     [ "$result" != 0 ] || result=65
 fi
 if ! /usr/bin/python3 Scripts/ios/ios-provenance.py verify-source "$evidence/source.json"; then

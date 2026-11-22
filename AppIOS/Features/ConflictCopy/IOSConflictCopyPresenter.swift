@@ -105,7 +105,7 @@ private struct IOSConflictCopyNameSheet: View {
     private var pickerBinding: Binding<IOSConflictCopyPickerRequest?> {
         Binding(get: { coordinator.pickerRequest }, set: { value in
             if value == nil, let request = coordinator.pickerRequest {
-                coordinator.cancelPicker(request.id)
+                coordinator.pickerPresentationEnded(request.id)
             }
         })
     }

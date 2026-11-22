@@ -12,6 +12,9 @@ public final class PreviewController: NSObject, ObservableObject {
     public var onLinkClicked: ((String) -> Void)?
     public var onCheckboxToggled: ((Int, Bool, Int, DocumentSession) -> Void)?
     var renderCompletionObserver: ((RenderCompletePayload) -> Void)?
+    /// Diagnostics only: reports each render JavaScript completed, with the time it was
+    /// handed to JavaScript. Nil outside a measurement, so a render pays one comparison.
+    public var renderTimingObserver: (@MainActor (PreviewRenderTiming) -> Void)?
     var externalURLOpenerOverrideForTesting: (@MainActor (URL) -> Void)?
     var onNavigationDecisionForTesting: (@MainActor (URL?, WKNavigationActionPolicy) -> Void)?
 
@@ -382,6 +385,7 @@ extension PreviewController {
             markReadyAndFlushPendingRender()
 
         case let .renderComplete(payload):
+            reportRenderTiming(payload)
             if scrollDeliveryState.recordRenderCompletion(payload.renderID) {
                 renderCompletionObserver?(payload)
                 if let iosDocumentIdentity {

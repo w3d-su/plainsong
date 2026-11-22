@@ -139,6 +139,48 @@ final class EditorLineNumberGutterViewTests: XCTestCase {
         XCTAssertTrue(editor.gutter.needsDisplay, "dynamic colors resolve again for the new appearance")
     }
 
+    /// Since macOS 14 a view does not clip to its bounds by default, and AppKit may hand
+    /// `draw(_:)` a dirty rect wider than the gutter. Filling that rect with the background
+    /// painted over the whole text column beside the gutter, so only the numbers showed.
+    func testGutterNeverPaintsOutsideItsColumn() throws {
+        let editor = try makeEditor("one\ntwo\n")
+        XCTAssertTrue(editor.gutter.clipsToBounds)
+
+        var opaque = Support.style
+        opaque.backgroundColor = NSColor(srgbRed: 1, green: 0, blue: 0, alpha: 1)
+        editor.gutter.update(style: opaque)
+        // The first pixel column wholly outside the gutter, even if its width is fractional.
+        let gutterWidth = Int(editor.gutter.bounds.width.rounded(.up))
+        let width = gutterWidth + 40
+        let height = Int(editor.gutter.bounds.height)
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: width,
+            pixelsHigh: height,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        ))
+        let context = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: bitmap))
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        editor.gutter.draw(NSRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
+        NSGraphicsContext.restoreGraphicsState()
+
+        XCTAssertGreaterThan(try XCTUnwrap(bitmap.colorAt(x: 1, y: height / 2)).alphaComponent, 0.9)
+        for column in gutterWidth ..< width {
+            XCTAssertEqual(
+                try XCTUnwrap(bitmap.colorAt(x: column, y: height / 2)).alphaComponent,
+                0,
+                "the gutter painted x = \(column), outside its \(gutterWidth) pt column"
+            )
+        }
+    }
+
     private func makeEditor(_ text: String) throws -> Support.Editor {
         let editor = try Support.makeEditor(text)
         windows.append(editor.window)

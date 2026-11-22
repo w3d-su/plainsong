@@ -11,6 +11,10 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
         didSet { applyThemeChrome() }
     }
 
+    /// `.unspecified` follows the host. Light and dark are explicit so dynamic
+    /// colors cannot inherit the opposite system appearance.
+    var forcedInterfaceStyle: UIUserInterfaceStyle = .unspecified
+
     /// Line numbers are presentation only. Source, selection, and statistics ignore them.
     public var showsLineNumbers = true {
         didSet {
@@ -21,6 +25,9 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
 
     /// Top visible source line after a real scroll. Typewriter sync listens; the editor does not.
     public var onViewportLine: ((Int) -> Void)?
+    /// Diagnostics only: the document version whose visible-range highlight was just
+    /// painted. Nil outside a measurement.
+    public var onHighlightApplied: ((Int) -> Void)?
 
     let scheduler: IOSHighlightScheduler
     let syntaxTokenizer: (any MarkdownSyntaxTokenizing)?
@@ -34,6 +41,7 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
     var isAdjustingSelection = false
     var isHostAlive = true
     var hadMarkedText = false
+    var hasUncountedComposition = false
     var presentationGeneration: UInt64 = 0
     var presentationFloor: UInt64 = 0
     var lastSelectionViewport = NSRange(location: NSNotFound, length: 0)
@@ -190,30 +198,12 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
     /// SwiftUI `updateUIView` must not push text back into the native view.
     public func acceptInterfaceUpdate() {}
 
-    func invalidateHost() {
-        isHostAlive = false
-        scheduler.cancel()
-        presentationGeneration &+= 1
-        presentationFloor = presentationGeneration
-        observations.forEach { $0.cancel() }
-        observations.removeAll()
-    }
-
     func plainText() -> String {
         textView.textStorage.string
     }
 
     func noteViewportChanged() {
         scheduleHighlight()
-    }
-
-    private func fenceInstallation() {
-        scheduler.cancel()
-        scheduler.activate()
-        presentationGeneration &+= 1
-        presentationFloor = presentationGeneration
-        textView.undoManager?.removeAllActions()
-        hadMarkedText = false
     }
 
     private func installInitialText(_ text: String) {
@@ -238,19 +228,6 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
 
     func emit(_ event: IOSSourceEditorEvent) {
         observations.forEach { $0.emit(event) }
-    }
-
-    private func applyThemeChrome() {
-        textView.backgroundColor = theme.background
-        applyLineNumberChrome()
-        if textView.markedTextRange != nil {
-            needsBaseStyle = true
-            raisePresentationFloor()
-            return
-        }
-        applyBaseTextStyle()
-        raisePresentationFloor()
-        scheduleHighlight()
     }
 
     /// Plain paragraphs and new typing use the theme. Syntax paint runs after
@@ -284,18 +261,19 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
                 storage.addAttributes(
                     [
                         .font: theme.baseFont,
-                        .foregroundColor: theme.baseColor,
+                        .foregroundColor: resolvedAppearanceColor(theme.baseColor),
                     ],
                     range: range
                 )
             }
             storage.endEditing()
         }
+        let baseColor = resolvedAppearanceColor(theme.baseColor)
         textView.font = theme.baseFont
-        textView.textColor = theme.baseColor
+        textView.textColor = baseColor
         var typing = textView.typingAttributes
         typing[.font] = theme.baseFont
-        typing[.foregroundColor] = theme.baseColor
+        typing[.foregroundColor] = baseColor
         textView.typingAttributes = typing
     }
 
@@ -395,6 +373,9 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
         }
         isAdjustingSelection = true
         defer { isAdjustingSelection = false }
-        textView.applyLineNumberGutter(width: metrics.width, background: theme.background)
+        textView.applyLineNumberGutter(
+            width: metrics.width,
+            background: resolvedAppearanceColor(theme.background)
+        )
     }
 }

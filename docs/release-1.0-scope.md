@@ -29,7 +29,7 @@ Tiers used below:
 |---|---|---|---|
 | V1 | Do macOS and iOS ship 1.0 together? | **Decided 2026-11-10: no.** macOS 1.0 first; iOS follows as its own 1.0 | iOS still has every device gate open; tying them blocks macOS on hardware evidence |
 | V2 | Is multi-window (Windows PR C–G) in macOS 1.0? | **Decided 2026-11-10: yes, through D2**; native tabs (F), restoration (E) and residency (G) are Should | Without D2 a user cannot work in a second window: New Window is not offered, and a second scene refuses file and root opens and closes itself (agent.md §5). D2 is draft #246 |
-| V3 | WYSIWYG at 1.0? | **Decided 2026-11-11: promoted.** WYSIWYG leaves Experimental for 1.0 through #213: on by default and a stop in the layout cycle, not the first-launch layout, with the Settings switch kept as the kill switch | The owner chose promotion over shipping it Experimental and off by default (the draft default). The decision sets the target; it does not close the gate. #213 still merges only after the `docs/wysiwyg-release-checklist.md` §D.4 gate: the owner's Zhuyin/Pinyin and pointer dogfood, since the last real IME runs predate STTextView 2.4.1 (R9), and a Decision Log entry |
+| V3 | WYSIWYG at 1.0? | **Decided 2026-11-11: promoted.** WYSIWYG leaves Experimental for 1.0 through #213: on by default and a stop in the layout cycle, not the first-launch layout, with the Settings switch kept as the kill switch | The owner chose promotion over shipping it Experimental and off by default (the draft default). The decision sets the target; it does not close the gate. #213 still merges only after the `docs/wysiwyg-release-checklist.md` §D.4 gate: the owner's Zhuyin and pointer dogfood, since the last real IME runs predate STTextView 2.4.1 (R9), and a Decision Log entry |
 | V4 | Distribution channel | **Decided 2026-11-10: unsigned direct DMG** (ad-hoc signature, README Gatekeeper bypass on first install). The Apple Developer Program membership is not planned in the short term; Developer ID signing, notarization and a Mac App Store build wait for it | agent.md §15 locks direct distribution first. The draft default was a signed, notarized DMG |
 | V5 | Updates | **Decided 2026-11-10: in-app updates are Must.** Sparkle 2 is integrated and off (U1, #232); turning it on needs U2 and U3 (`docs/auto-update-plan.md` §4). With V4 this means updating unsigned builds (U-D2) | An owner-run probe on 2026-11-10 updated an unsigned build with no second Gatekeeper prompt (`docs/auto-update-plan.md` §5). U-D4–U-D7 were adopted the same day (U-D6 reverses the 2026-07-02 no-secrets rule). README keeps "no auto-update" until U3 |
 | V6 | Version and channel naming | **Decided 2026-11-10: `1.0.0`**, with `0.9.x` betas before it; all unsigned, per V4 | `MARKETING_VERSION` is still `0.1.0` (release plan P0.5) |
@@ -41,7 +41,7 @@ Tiers used below:
 | Item | Remaining work | Source of truth |
 |---|---|---|
 | Independent windows | C (#230), D1-0 (#236), D1a (#238), D1b (#239) and D1c (#252) are merged. D2 is draft #246, up to date with `main` and green; it waits on the owner smoke for W0 bullets 1–4, W7 bullet 3 and W8 bullet 1 | `docs/window-state-gates.md` §10, §11 |
-| Export acceptance | HTML/PDF/Print shipped (PR F #138, PR G #147). Open: E3 kitchen-sink output; E5 shared snapshot for PDF and Print; E6 fresh-panel URL and leaf-grant owner smoke; E7 PDF panel defaults, the real HTML panel, PDF failure/Print cancel feedback, and the keyboard/VoiceOver owner smoke; E9 keyboard-only HTML and PDF/Print accessibility, typing-path isolation while exporting, and the regression bullet | `docs/export-gates.md` §8 |
+| Export acceptance | HTML/PDF/Print shipped (PR F #138, PR G #147). E3 kitchen-sink output, E5 shared snapshot and the E9 regression bullet are checked (2026-11-17). Open: E6 fresh-panel URL and leaf-grant owner smoke; E7 PDF panel defaults, the real HTML panel, PDF failure/Print cancel feedback, and the keyboard/VoiceOver owner smoke; E9 keyboard-only HTML and PDF/Print accessibility, and typing-path isolation while exporting | `docs/export-gates.md` §8 |
 | R17 sidebar stability | macOS 15 exact-head CI and owner macOS 27 F9/WS4A UI re-verification | `docs/risk-register.md` R17 |
 | Release §12 budgets | Re-run all budgets on the Release configuration at the 1.0 candidate commit; new `docs/perf/` entry | `agent.md` §12, release plan P5 |
 | In-app updates | U2 and U2b are merged (#257, #258): the tag job signs the feed, release builds have updates on, and the key pair and CI secret exist. Open: U3's end-to-end gates U-G4–U-G8 on unsigned builds, starting with the first tagged release | `docs/auto-update-plan.md` §4, §5 |
@@ -85,7 +85,7 @@ items need the owner with physical hardware.
 |---|---|
 | Signed install | Sign the Release IPA and install it on a real device (needs the same Developer Program membership as macOS P1) |
 | Files / iCloud | Open, edit, save and reopen in place through Files and iCloud Drive, including offline/downloading documents |
-| Chinese IME and Undo | Physical Zhuyin and Pinyin composition plus Undo/Redo in the native editor (agent.md §13 treats IME as non-negotiable) |
+| Chinese IME and Undo | Physical Zhuyin composition plus Undo/Redo in the native editor (agent.md §13 treats IME as non-negotiable) |
 | Recovery, conflict, background | Real recovery list, conflict Save a Copy, and backgrounding/termination without data loss |
 | Export and print | HTML/PDF export and printing on a physical device (#228 left these to owner validation; not yet in the ledger) |
 | Minimum OS and iPad | Physical iPad and an iOS 26.0 device |
@@ -106,7 +106,7 @@ items need the owner with physical hardware.
 
 ## 4. Proposed order
 
-1. Owner runs the Zhuyin/Pinyin and pointer dogfood on #213 (V3 is decided: promote);
+1. Owner runs the Zhuyin and pointer dogfood on #213 (V3 is decided: promote);
    #213 merges when it passes.
 2. Owner smoke for D2 (#246), then merge it. C, D1-0 and D1a–D1c are already merged.
 3. First `0.9.0` beta with updates on (U2 and U2b are merged; the key and secret exist)

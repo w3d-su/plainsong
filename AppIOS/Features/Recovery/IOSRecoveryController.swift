@@ -150,6 +150,12 @@ final class IOSRecoveryController: ObservableObject {
         pickerRequest = nil
     }
 
+    /// SwiftUI dismisses the sheet before UIKit's delegate reports the folder.
+    /// The issuance (`activeRestoreID`) stays for that one terminal result.
+    func pickerPresentationEnded() {
+        pickerRequest = nil
+    }
+
     /// External navigation/disposal cancels a pending completion. A visible
     /// sheet keeps its issuance until UIKit reports actual dismissal.
     func dismiss() {
@@ -165,8 +171,7 @@ final class IOSRecoveryController: ObservableObject {
 
     @discardableResult
     func completePicker(_ request: IOSRecoveryPickerRequest, urls: [URL]) -> Task<Void, Never>? {
-        guard pickerRequest?.id == request.id, activeRestoreID == request.id,
-              presentationID == request.presentationID else { return nil }
+        guard activeRestoreID == request.id, presentationID == request.presentationID, !isRestoring else { return nil }
         pickerRequest = nil
         guard urls.count == 1, let folder = urls.first else {
             activeRestoreID = nil

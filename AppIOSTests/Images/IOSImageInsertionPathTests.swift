@@ -84,6 +84,53 @@ final class IOSImageInsertionPathTests: XCTestCase {
         XCTAssertEqual(edit.result.newSelection.length, 0)
     }
 
+    func testCaretAtDocumentStartInsertsBelowYAMLFrontmatter() async throws {
+        let metadata = "---\ntitle: \"\" # keep\ndraft: true\n---\n"
+        let original = metadata + "# Body"
+        let harness = ImageInsertionHarness(text: original, selection: NSRange(location: 0, length: 0))
+        let context = try harness.capture()
+
+        _ = await assertInserted(harness.insert(context))
+
+        XCTAssertEqual(harness.editor.text, metadata + "![](assets/photo-2.png)\n\n# Body")
+        XCTAssertEqual(Frontmatter.parse(harness.editor.text), Frontmatter.parse(original))
+    }
+
+    func testSelectionCrossingTOMLFenceDoesNotDeleteMetadataOrBody() async throws {
+        let metadata = "+++\r\ntitle = \"😀\"\r\n+++\r\n"
+        let original = metadata + "# Body"
+        let harness = ImageInsertionHarness(text: original, selection: NSRange(location: 4, length: 21))
+        let context = try harness.capture()
+
+        _ = await assertInserted(harness.insert(context))
+
+        XCTAssertEqual(harness.editor.text, metadata + "![](assets/photo-2.png)\r\n\r\n# Body")
+    }
+
+    func testCaretAtClosingFenceWithoutNewlinePreservesTheFence() async throws {
+        let original = "---\ndraft: true\n---"
+        let harness = ImageInsertionHarness(text: original)
+        let context = try harness.capture()
+
+        _ = await assertInserted(harness.insert(context))
+
+        XCTAssertEqual(harness.editor.text, original + "\n![](assets/photo-2.png)\n\n")
+        XCTAssertEqual(Frontmatter.parse(harness.editor.text), Frontmatter.parse(original))
+    }
+
+    func testSelectionInBodyStillReplacesSelectedSource() async throws {
+        let metadata = "---\ntitle: \"\"\n---\n"
+        let harness = ImageInsertionHarness(
+            text: metadata + "replace me",
+            selection: NSRange(location: (metadata as NSString).length, length: 7)
+        )
+        let context = try harness.capture()
+
+        _ = await assertInserted(harness.insert(context))
+
+        XCTAssertEqual(harness.editor.text, metadata + "![](assets/photo-2.png) me")
+    }
+
     func testPickedFileBytesAreNotTheMarkdownPath() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             UUID().uuidString,

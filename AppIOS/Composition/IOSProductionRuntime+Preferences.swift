@@ -10,16 +10,24 @@ extension IOSProductionRuntime {
     func apply(_ preferences: IOSAppPreferences, colorScheme: ColorScheme) {
         previewThemeName = preferences.previewAppearance.rawValue
         systemAppearanceIsDark = colorScheme == .dark
-        let style: UIUserInterfaceStyle = switch preferences.editorAppearance {
+        // System follows the environment. Light and dark force the editor's
+        // traits so dynamic system colors cannot inherit the opposite appearance.
+        let interfaceStyle: UIUserInterfaceStyle
+        let themeStyle: UIUserInterfaceStyle
+        switch preferences.editorAppearance {
         case .system:
-            colorScheme == .dark ? .dark : .light
+            interfaceStyle = .unspecified
+            themeStyle = colorScheme == .dark ? .dark : .light
         case .light:
-            .light
+            interfaceStyle = .light
+            themeStyle = .light
         case .dark:
-            .dark
+            interfaceStyle = .dark
+            themeStyle = .dark
         }
+        editor.applyInterfaceStyle(interfaceStyle)
         let theme = IOSEditorTheme.reading(
-            appearance: style,
+            appearance: themeStyle,
             pointSize: CGFloat(preferences.editorFontSize),
             fontName: preferences.editorFontName,
             palette: preferences.editorPalette
@@ -100,6 +108,26 @@ extension IOSProductionRuntime {
             isCurrent: { [weak self] in
                 self?.controller.snapshot.document?.revision.documentID == documentID
             }
+        )
+    }
+}
+
+extension IOSProductionRuntime {
+    /// The installed document as the performance probe sees it. Nil with no document.
+    func performanceProbeTarget() -> IOSPerformanceProbeTarget? {
+        guard let snapshot = editor.captureSnapshot() else { return nil }
+        let editor = editor
+        let preview = preview
+        return IOSPerformanceProbeTarget(
+            textView: editor.textView,
+            documentName: snapshot.document.fileURL?.lastPathComponent ?? "Untitled",
+            fileKind: String(describing: snapshot.document.fileKind),
+            canWrite: snapshot.canWrite,
+            setHighlightObserver: { observer in
+                editor.onHighlightApplied = observer.map { painted in { _ in painted() } }
+            },
+            setRenderObserver: { preview.renderTimingObserver = $0 },
+            previewIsVisible: { preview.webView.window != nil }
         )
     }
 }
