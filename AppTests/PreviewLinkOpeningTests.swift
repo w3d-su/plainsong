@@ -81,6 +81,7 @@ final class PreviewLinkOpeningTests: XCTestCase {
         try "[Other](sub/Other.md)".write(to: index, atomically: true, encoding: .utf8)
         try "# Other".write(to: root.appendingPathComponent("sub/Other.md"), atomically: true, encoding: .utf8)
         let appState = try await openWorkspace(root, showing: index)
+        let revealRequest = appState.workspaceTreeRevealRequest
 
         appState.openPreviewLink("sub/Other.md")
 
@@ -90,6 +91,11 @@ final class PreviewLinkOpeningTests: XCTestCase {
         XCTAssertEqual(tree.selectedNode?.relativePath, "sub/Other.md")
         let folder = try XCTUnwrap(appState.firstNode(in: tree.root, relativePath: "sub"))
         XCTAssertTrue(tree.isExpanded(folder.id))
+        XCTAssertEqual(appState.workspaceTreeRevealRequest, revealRequest &+ 1)
+
+        // A link to the file already shown still asks the sidebar to reveal it.
+        appState.openPreviewLink("Other.md")
+        XCTAssertEqual(appState.workspaceTreeRevealRequest, revealRequest &+ 2)
     }
 
     /// The sandbox refuses a file outside the workspace grant. The link used to close the

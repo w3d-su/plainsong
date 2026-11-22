@@ -52,6 +52,7 @@ extension AppState {
                     tree.setExpanded(true, for: ancestor.id)
                 }
             }
+            workspaceTreeRevealRequest &+= 1
         }
         workspaceTree = tree
     }
