@@ -1,7 +1,7 @@
 import AppKit
 @testable import EditorKit
 import Foundation
-import MarkdownCore
+@testable import MarkdownCore
 @testable import Plainsong
 import SwiftUI
 import WorkspaceKit
@@ -45,8 +45,7 @@ enum EditorFindPerformanceSupport {
         func cancelScheduledAppWork() {
             appState.autosaveTask?.cancel()
             appState.autosaveTask = nil
-            appState.statisticsTask?.cancel()
-            appState.statisticsTask = nil
+            appState.shownSession.statisticsTask?.cancel()
             appState.completionWorkspaceTask?.cancel()
             appState.completionWorkspaceTask = nil
         }

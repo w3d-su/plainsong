@@ -99,14 +99,22 @@ final class IOSImageInsertionSession: ObservableObject {
         onRequestDirectoryGrant()
     }
 
-    func beginImport() -> IOSImageInsertionContext? {
+    func beginImport(operationID: UUID? = nil) -> IOSImageInsertionContext? {
         guard !importing, let inFlight, case .picking = phase else { return nil }
+        if let operationID, inFlight.operationID != operationID {
+            return nil
+        }
         importing = true
         phase = .importing(inFlight.operationID)
         return inFlight
     }
 
     func pickerDismissed() {
+        abandonPicking()
+    }
+
+    func cancelFilesPicker(operationID: UUID) {
+        guard inFlight?.operationID == operationID else { return }
         abandonPicking()
     }
 

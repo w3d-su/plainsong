@@ -9,6 +9,35 @@ import XCTest
 
 final class IOSDocumentSceneControllerTests: XCTestCase {
     @MainActor
+    func testSameRevisionSnapshotKeepsPendingImmediatePreview() async throws {
+        let fixture = IOSSceneControllerFixture()
+        try await fixture.controller.openPickedURL(fixture.selectedURL, scope: .singleFile)
+        // A ready event can request an immediate replay for an already attached document.
+        await fixture.controller.renderTask?.value
+        let handle = try XCTUnwrap(fixture.controller.handle)
+        let snapshot = try XCTUnwrap(fixture.store.snapshot(for: handle.identity))
+        let before = fixture.preview.renders.count
+        fixture.controller.renderedRevision = nil
+        fixture.controller.requestRender(immediate: true)
+        let immediate = try XCTUnwrap(fixture.controller.renderTask)
+        fixture.store.emit(.snapshotChanged(snapshot))
+        XCTAssertFalse(immediate.isCancelled)
+        await immediate.value
+        XCTAssertEqual(fixture.preview.renders.count, before + 1)
+        fixture.store.emit(.snapshotChanged(snapshot))
+        XCTAssertNil(fixture.controller.renderTask)
+
+        handle.session.replaceText("new revision")
+        fixture.controller.requestRender()
+        let first = try XCTUnwrap(fixture.controller.renderTask)
+        handle.session.replaceText("latest revision")
+        fixture.controller.requestRender()
+        XCTAssertTrue(first.isCancelled)
+        await fixture.controller.renderTask?.value
+        XCTAssertEqual(fixture.preview.renders.last?.1, handle.session.version)
+    }
+
+    @MainActor
     func testConcurrentOpenWhileProviderIsParkedDoesNotMintASecondGrantOrWriter() async throws {
         let fixture = IOSSceneControllerFixture()
         let latch = IOSSceneControllerLatch()

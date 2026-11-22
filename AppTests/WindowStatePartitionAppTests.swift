@@ -51,8 +51,8 @@ final class WindowStatePartitionAppTests: XCTestCase {
         XCTAssertEqual(
             WindowStatePartitionInventory.window.count + WindowStatePartitionInventory.root.count
                 + WindowStatePartitionInventory.registry.count,
-            121,
-            "Every pre-B1 AppState stored property has exactly one home"
+            119,
+            "Of the original 121 properties, the two statistics task slots moved to DocumentSession"
         )
         XCTAssertTrue(WindowStatePartitionInventory.window.isDisjoint(with: WindowStatePartitionInventory.root))
         XCTAssertTrue(WindowStatePartitionInventory.window.isDisjoint(with: WindowStatePartitionInventory.registry))

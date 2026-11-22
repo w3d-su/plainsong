@@ -83,7 +83,6 @@ extension AppState {
             handleExternalChange(for: session, advancingDiskEvent: false)
         }
         moveCurrentAutosaveToBackground(for: session)
-        moveCurrentStatisticsToBackground(for: session)
     }
 
     func retiredEditorDocumentSession(
@@ -185,13 +184,6 @@ extension AppState {
         }
         for identity in autosaveIdentities {
             sessionAutosaveTasks.removeValue(forKey: identity)?.task.cancel()
-        }
-
-        let statisticsIdentities = sessionStatisticsTasks.keys.filter {
-            !retainedIdentities.contains($0)
-        }
-        for identity in statisticsIdentities {
-            sessionStatisticsTasks.removeValue(forKey: identity)?.task.cancel()
         }
     }
 

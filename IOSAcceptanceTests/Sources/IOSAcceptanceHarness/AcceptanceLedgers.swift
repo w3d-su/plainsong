@@ -59,7 +59,7 @@ public enum ProductGateLedger {
         ),
         ProductGate(id: "voiceover", status: .open, evidence: "No owner VoiceOver pass."),
         ProductGate(id: "hardware-keyboard", status: .open, evidence: "No owner hardware-keyboard pass."),
-        ProductGate(id: "ime-device", status: .open, evidence: "No owner Zhuyin or Pinyin pass."),
+        ProductGate(id: "ime-device", status: .open, evidence: "No owner Zhuyin pass."),
         ProductGate(id: "performance-input-to-screen", status: .open, evidence: "No visible-presentation samples."),
         ProductGate(id: "performance-visible-highlight", status: .open, evidence: "No visible-highlight samples."),
         ProductGate(id: "performance-render-completion", status: .open, evidence: "No render-completion samples."),

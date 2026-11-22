@@ -6,7 +6,7 @@ struct IOSImageInsertionView: View {
     @ObservedObject var session: IOSImageInsertionSession
 
     @State private var showPhotos = false
-    @State private var showFiles = false
+    @State private var filesPick: UUID?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -33,13 +33,16 @@ struct IOSImageInsertionView: View {
                 showPhotos = false
             }
         }
-        .sheet(isPresented: $showFiles, onDismiss: session.pickerDismissed) {
-            IOSImageFilePicker { urls in
-                handleFiles(urls)
-                showFiles = false
+        .background {
+            IOSImageFilePicker(operationID: filesPick) { operationID, urls in
+                if filesPick == operationID {
+                    filesPick = nil
+                }
+                handleFiles(urls, operationID: operationID)
             }
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
         }
-        .onDisappear(perform: session.teardown)
     }
 
     @ViewBuilder private var status: some View {
@@ -70,6 +73,9 @@ struct IOSImageInsertionView: View {
     }
 
     private var isBusy: Bool {
+        if filesPick != nil {
+            return true
+        }
         if case .importing = session.phase {
             return true
         }
@@ -82,8 +88,8 @@ struct IOSImageInsertionView: View {
     }
 
     private func presentFiles() {
-        guard session.preparePicker() != nil else { return }
-        showFiles = true
+        guard let context = session.preparePicker() else { return }
+        filesPick = context.operationID
     }
 
     private func chooseFolder() {
@@ -101,9 +107,9 @@ struct IOSImageInsertionView: View {
         }
     }
 
-    private func handleFiles(_ urls: [URL]) {
-        guard let url = urls.first, let context = session.beginImport() else {
-            session.pickerDismissed()
+    private func handleFiles(_ urls: [URL], operationID: UUID) {
+        guard let url = urls.first, let context = session.beginImport(operationID: operationID) else {
+            session.cancelFilesPicker(operationID: operationID)
             return
         }
         Task { @MainActor in

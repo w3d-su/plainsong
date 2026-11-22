@@ -59,6 +59,9 @@ final class EditorLineNumberGutterView: NSView {
         self.style = style
         super.init(frame: .zero)
         layerContentsRedrawPolicy = .onSetNeedsDisplay
+        // Views stopped clipping by default in macOS 14, and `draw(_:)` can then get a dirty
+        // rect wider than the gutter: its opaque fill hid the text column beside it.
+        clipsToBounds = true
         digitWidth = Self.digitWidth(of: style.font)
         updateThickness(tile: false)
         observe(textView, scrollView: scrollView)
@@ -171,6 +174,8 @@ final class EditorLineNumberGutterView: NSView {
             totalDrawMilliseconds += lastDrawMilliseconds
         }
         guard let textView else { return }
+        let dirtyRect = dirtyRect.intersection(bounds)
+        guard !dirtyRect.isEmpty else { return }
 
         if let backgroundColor = style.backgroundColor ?? textView.backgroundColor {
             backgroundColor.setFill()

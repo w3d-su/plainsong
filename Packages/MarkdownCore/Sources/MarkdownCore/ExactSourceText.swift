@@ -33,18 +33,26 @@ public enum ExactSourceText {
     /// `characterAtIndex:` at a time (tens of milliseconds to seconds for 1 MiB). Native
     /// strings compare with a byte prefix scan. Returns `nil` when `text` contains an
     /// unpaired surrogate, which a native string cannot represent exactly.
+    ///
+    /// The editor calls this on every keystroke, so it converts in one CoreFoundation pass
+    /// into a scratch buffer sized for the worst case (3 UTF-8 bytes per UTF-16 unit), then
+    /// copies the bytes into an exact-size string. Measuring the length with a separate
+    /// conversion pass first cost twice as much.
     public static func nativeCopy(of text: NSString) -> String? {
         let string = text as CFString
         let range = CFRange(location: 0, length: CFStringGetLength(string))
-        let encoding = CFStringBuiltInEncodings.UTF8.rawValue
-        var byteCount = 0
+        guard range.length > 0 else { return "" }
+        let capacity = range.length * 3
+        let scratch = UnsafeMutablePointer<UInt8>.allocate(capacity: capacity)
+        defer { scratch.deallocate() }
+        var written = 0
         // A loss byte of 0 stops at the first character UTF-8 cannot encode.
-        guard CFStringGetBytes(string, range, encoding, 0, false, nil, 0, &byteCount) == range.length else {
-            return nil
-        }
-        return String(unsafeUninitializedCapacity: byteCount) { buffer in
-            var written = 0
-            CFStringGetBytes(string, range, encoding, 0, false, buffer.baseAddress, byteCount, &written)
+        let converted = CFStringGetBytes(
+            string, range, CFStringBuiltInEncodings.UTF8.rawValue, 0, false, scratch, capacity, &written
+        )
+        guard converted == range.length else { return nil }
+        return String(unsafeUninitializedCapacity: written) { buffer in
+            buffer.baseAddress?.update(from: scratch, count: written)
             return written
         }
     }

@@ -42,6 +42,44 @@ final class IOSImageInsertionTerminalTests: XCTestCase {
         harness.assertSourceUntouched()
     }
 
+    func testMatchingFilesPickInsertsOnce() async throws {
+        let harness = ImageInsertionHarness()
+        let session = harness.session()
+        let prepared = try XCTUnwrap(session.preparePicker())
+        XCTAssertEqual(session.phase, .picking(prepared.operationID))
+        let context = try XCTUnwrap(session.beginImport(operationID: prepared.operationID))
+        XCTAssertNil(session.beginImport(operationID: prepared.operationID))
+        await session.finishImport(.success(Self.payload), context: context)
+        guard case .inserted = session.phase else {
+            return XCTFail("expected inserted phase, got \(session.phase)")
+        }
+        XCTAssertEqual(harness.writer.commitCount, 1)
+    }
+
+    func testFilesDelegateCancelCancelsCleanly() throws {
+        let harness = ImageInsertionHarness()
+        let session = harness.session()
+        let prepared = try XCTUnwrap(session.preparePicker())
+        session.cancelFilesPicker(operationID: prepared.operationID)
+        XCTAssertEqual(session.phase, .cancelled)
+        XCTAssertNil(session.beginImport(operationID: prepared.operationID))
+        XCTAssertEqual(harness.writer.calls, [])
+        harness.assertSourceUntouched()
+    }
+
+    func testCancelledFilesPickerCannotCompleteOrCancelTheNextIssuance() throws {
+        let harness = ImageInsertionHarness()
+        let session = harness.session()
+        let old = try XCTUnwrap(session.preparePicker())
+        session.cancelFilesPicker(operationID: old.operationID)
+        let current = try XCTUnwrap(session.preparePicker())
+        XCTAssertNotEqual(old.operationID, current.operationID)
+        XCTAssertNil(session.beginImport(operationID: old.operationID))
+        session.cancelFilesPicker(operationID: old.operationID)
+        XCTAssertEqual(session.phase, .picking(current.operationID))
+        XCTAssertNotNil(session.beginImport(operationID: current.operationID))
+    }
+
     func testTeardownDuringStageRollsBackOnce() async throws {
         let harness = ImageInsertionHarness()
         let session = harness.session()

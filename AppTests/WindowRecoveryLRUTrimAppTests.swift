@@ -1,5 +1,5 @@
 import Foundation
-import MarkdownCore
+@testable import MarkdownCore
 @testable import Plainsong
 import WorkspaceKit
 import XCTest
@@ -29,7 +29,7 @@ final class WindowRecoveryLRUTrimAppTests: XCTestCase {
         let appState = AppState(shouldRestoreLastOpenedFile: false, userDefaults: defaults)
         defer {
             appState.autosaveTask?.cancel()
-            appState.statisticsTask?.cancel()
+            appState.shownSession.statisticsTask?.cancel()
             KeyWindowRouter.shared.resetForTesting()
             WindowOpenAdmission.resetForTesting()
             defaults.removePersistentDomain(forName: suiteName)

@@ -7,7 +7,8 @@ These boxes are open. Simulator tests do not check them. Lane 01 has not accepte
 Record the device model, OS, app build, source SHA, and fixture hashes before any box can be checked.
 
 - [ ] Traditional Chinese Zhuyin: composition, candidate confirmation, caret, and native Undo/Redo on the hardware and software keyboards.
-- [ ] Traditional Chinese Pinyin: the same sequence.
+- ~~Traditional Chinese Pinyin: the same sequence.~~ Superseded: Pinyin is not tested
+  ([decision 2026-11-17](../../../decisions/2026-11-17-zhuyin-only-ime-testing.md)).
 - [ ] Switch away and back, and background the app, while a candidate is marked. The mark is not committed or cleared by the editor, and a late highlight does not land inside it.
 - [ ] Undo after confirming a candidate restores the pre-candidate source in one step. Redo restores it.
 - [ ] A format or image command during an open candidate does nothing to the source and does not close the candidate.
