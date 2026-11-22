@@ -115,11 +115,18 @@ enum IOSImageInsertionGuard {
         relativePath: String
     ) -> MarkdownEditResult? {
         guard let path = insertionPath(relativePath) else { return nil }
-        let replacement = SmartPaste.imageInsertion(relativePath: path)
+        var replacement = SmartPaste.imageInsertion(relativePath: path)
         guard !replacement.isEmpty, replacement != "![]()" else { return nil }
-        let source = context.editor.document.text as NSString
-        let range = context.editor.selection
-        guard fits(range, length: source.length) else { return nil }
+        let text = context.editor.document.text
+        var range = context.editor.selection
+        guard fits(range, length: (text as NSString).length) else { return nil }
+        if let body = Frontmatter.bodyStart(in: text),
+           range.location < body.utf16Offset || body.needsLineEnding
+        {
+            range = NSRange(location: body.utf16Offset, length: 0)
+            let prefix = body.needsLineEnding ? body.lineEnding : ""
+            replacement = prefix + replacement + body.lineEnding + body.lineEnding
+        }
         let inserted = (replacement as NSString).length
         let (location, overflow) = range.location.addingReportingOverflow(inserted)
         guard !overflow else { return nil }
