@@ -15,7 +15,7 @@ extension SVGImageValidator {
         while let range = remainder.range(of: "url(") {
             let after = range.upperBound
             guard let close = remainder[after...].firstIndex(of: ")") else { return true }
-            let raw = remainder[after ..< close].trimmingCharacters(in: .whitespacesAndNewlines)
+            let raw = remainder[after ..< close].trimmingCharacters(in: urlEdgeSpaces)
             guard let reference = unquotedCSSReference(raw), isFragmentToken(reference) else {
                 return true
             }
@@ -93,6 +93,11 @@ extension SVGImageValidator {
             return String(raw)
         }
         guard raw.last == first, raw.count >= 2 else { return nil }
-        return String(raw.dropFirst().dropLast().trimmingCharacters(in: .whitespacesAndNewlines))
+        return String(raw.dropFirst().dropLast().trimmingCharacters(in: urlEdgeSpaces))
     }
+
+    /// WHATWG URL parsing strips only C0 controls and space from either end. Foundation's
+    /// whitespace set also trims NBSP and other Unicode spaces, so `&#160;#a` passed as a
+    /// fragment while WebKit resolves it as a sibling path (`%C2%A0#a`).
+    static let urlEdgeSpaces = CharacterSet(charactersIn: "\u{0}" ... "\u{20}")
 }

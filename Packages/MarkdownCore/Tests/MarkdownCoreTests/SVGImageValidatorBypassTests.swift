@@ -42,6 +42,26 @@ final class SVGImageValidatorBypassTests: XCTestCase {
         XCTAssertEqual(admission(body: "<style>.a{fill:url(#g)}&#13;&#10;.b{}</style>"), .admit)
     }
 
+    /// URL parsing trims only C0 controls and space, so a fragment preceded by NBSP or
+    /// another Unicode space is a relative path to WebKit, not a same-document reference.
+    func testUnicodeSpacesBeforeAFragmentAreNotTrimmed() {
+        assertRejected(.externalStyle, [
+            "NBSP in url()": #"<rect fill="url(&#160;#a)"/>"#,
+            "ideographic space in quoted url()": #"<style>rect{fill:url("&#12288;#a")}</style>"#,
+            "escaped NBSP in url()": #"<rect style="fill:url(\a0 #a)"/>"#,
+        ])
+        XCTAssertEqual(
+            admission(body: #"<use href="&#160;#a"/>"#),
+            .reject(.externalReference("href"))
+        )
+        XCTAssertEqual(
+            admission(body: #"<use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="&#8195;#a"/>"#),
+            .reject(.externalReference("href"))
+        )
+        XCTAssertEqual(admission(body: #"<rect fill="url( #a )"/><use href=" #a "/>"#), .admit)
+        XCTAssertEqual(admission(body: "<style>rect{fill:url(&#9;'#a'&#10;)}</style>"), .admit)
+    }
+
     func testEscapedFontNamesAndFragmentsStayAdmitted() {
         // Illustrator writes CJK font families as CSS escapes.
         XCTAssertEqual(

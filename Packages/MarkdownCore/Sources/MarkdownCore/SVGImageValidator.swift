@@ -129,7 +129,7 @@ public enum SVGImageValidator {
     }
 
     private static func isSameDocumentFragment(_ value: String) -> Bool {
-        isFragmentToken(value.trimmingCharacters(in: .whitespacesAndNewlines))
+        isFragmentToken(value.trimmingCharacters(in: urlEdgeSpaces))
     }
 
     static func isFragmentToken(_ value: some StringProtocol) -> Bool {

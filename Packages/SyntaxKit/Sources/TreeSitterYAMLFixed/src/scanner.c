@@ -198,7 +198,8 @@ static void deserialize(Scanner *scanner, const char *buffer, unsigned length) {
     array_push(&scanner->ind_typ_stk, IND_ROT);
     array_delete(&scanner->ind_len_stk);
     array_push(&scanner->ind_len_stk, -1);
-    // Plainsong: a state shorter than the fixed header is not read.
+    // Plainsong: a state shorter than the fixed header is not read, and the loop
+    // below stops before a trailing half entry instead of reading past `length`.
     if (length >= 5 * sizeof(int16_t)) {
         size_t size = 0;
         scanner->row = *(int16_t *)&buffer[size];
