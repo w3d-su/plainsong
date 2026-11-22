@@ -128,8 +128,11 @@ extension EditorFindHostedGateTests {
 
     /// QA on `2ab88a3`: Open Recent after the last window closed opened the file in a second
     /// new window and left the reopened one blank, so the reopened window was not an empty WD7
-    /// target. A closed window keeps only a blank document, before and after SwiftUI tears its
-    /// views down, and stays empty when its façade's next scene reconnects it (W0 bullet 3, W8).
+    /// target. The closing window's editor bound the blank document once more before SwiftUI
+    /// dropped it, which also left the blank in `.editorBindings`, where the Save Copy and
+    /// export ownership walks refuse a document without a file. A closed window keeps only a
+    /// blank document, before and after SwiftUI tears its views down, and stays empty when its
+    /// façade's next scene reconnects it (W0 bullet 3, W8).
     func testClosedMountedWindowsStayEmptyTargetsForTheNextOpen() async throws {
         let fixture = try makeWorkspaceFixture(files: ["A.md": "# Alpha\n", "B.md": "# Beta\n"])
         let primary = fixture.appState
@@ -154,6 +157,7 @@ extension EditorFindHostedGateTests {
             mounted.window.contentView = nil
             try await Task.sleep(nanoseconds: 300_000_000)
             XCTAssertEqual(facade.emptyWorkspaceWindowObstructions(), [], "\(name) after teardown")
+            XCTAssertNil(primary.exportHTMLOwnershipStopReason(), "\(name)'s close left an unowned document")
             facade.reconnectReclaimedWindow()
             XCTAssertEqual(facade.emptyWorkspaceWindowObstructions(), [], "\(name) after its reconnect")
         }
