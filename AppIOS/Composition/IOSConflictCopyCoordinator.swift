@@ -18,6 +18,9 @@ final class IOSConflictCopyCoordinator: ObservableObject {
     private let controller: IOSDocumentSceneController
     private var origin: IOSConflictCopyOrigin?
     private var activePickerID: UUID?
+    /// The issuance one terminal delegate result may still consume. It outlives
+    /// `pickerRequest`, which SwiftUI clears when the sheet dismisses.
+    private var issuedPicker: IOSConflictCopyPickerRequest?
     private var copyTask: Task<IOSConflictCopyOutcome, Never>?
     private var awaitingDismissalID: UUID?
     private var dismissedDraftID: UUID?
@@ -56,6 +59,7 @@ final class IOSConflictCopyCoordinator: ObservableObject {
     func cancelDraft(_ id: UUID) {
         guard draft?.id == id, !isSaving else { return }
         pickerRequest = nil
+        issuedPicker = nil
         origin = nil
         draft = nil
         validationNotice = nil
@@ -69,6 +73,7 @@ final class IOSConflictCopyCoordinator: ObservableObject {
             let request = try IOSConflictCopyPickerRequest(
                 id: UUID(), draftID: draftID, filename: IOSConflictCopyFilename.validate(filename)
             )
+            issuedPicker = request
             pickerRequest = request
             validationNotice = nil
             return request
@@ -84,6 +89,13 @@ final class IOSConflictCopyCoordinator: ObservableObject {
     }
 
     func cancelPicker(_ id: UUID) {
+        guard issuedPicker?.id == id else { return }
+        pickerRequest = nil
+        issuedPicker = nil
+    }
+
+    /// The sheet is gone; the delegate's pick or cancel has not arrived yet.
+    func pickerPresentationEnded(_ id: UUID) {
         guard pickerRequest?.id == id else { return }
         pickerRequest = nil
     }
@@ -92,10 +104,11 @@ final class IOSConflictCopyCoordinator: ObservableObject {
     /// create two copies or attach a folder to a newer source capture.
     @discardableResult
     func completePicker(_ request: IOSConflictCopyPickerRequest, urls: [URL]) -> Task<IOSConflictCopyOutcome, Never>? {
-        guard let issued = pickerRequest, issued.id == request.id, issued.draftID == request.draftID,
+        guard let issued = issuedPicker, issued.id == request.id, issued.draftID == request.draftID,
               IOSConflictCopyOrigin.exact(issued.filename, request.filename), request.draftID == draft?.id,
               let capture = origin, capture.draftID == request.draftID, !isSaving else { return nil }
         pickerRequest = nil
+        issuedPicker = nil
         guard urls.count == 1, let url = urls.first, url.isFileURL else { return nil }
         isSaving = true
         activePickerID = request.id
@@ -198,6 +211,7 @@ final class IOSConflictCopyCoordinator: ObservableObject {
         copyTask = nil
         isSaving = false
         pickerRequest = nil
+        issuedPicker = nil
         awaitingDismissalID = draft?.id
         let completedDraftID = draft?.id
         validationNotice = nil

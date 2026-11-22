@@ -1,6 +1,7 @@
 import AppKit
 @testable import EditorKit
 import Foundation
+@testable import MarkdownCore
 @testable import Plainsong
 @testable import PreviewKit
 import SwiftUI
@@ -45,12 +46,12 @@ extension EditorFindHostedGateTests {
     }
 
     func activeTasks(in appState: AppState) -> [Task<Void, Never>] {
-        [appState.autosaveTask, appState.statisticsTask, appState.workspaceReloadTask,
+        [appState.autosaveTask, appState.shownSession.statisticsTask, appState.workspaceReloadTask,
          appState.workspaceSearchTask, appState.completionWorkspaceTask].compactMap { $0 }
             + appState.externalReloadTasks.values.map(\.task)
             + appState.externalDiskInspectionTasks.values.map(\.task)
             + appState.sessionAutosaveTasks.values.map(\.task)
-            + appState.sessionStatisticsTasks.values.map(\.task)
+            + appState.registry.warmSessionEntries.compactMap(\.session.statisticsTask)
             + Array(appState.workspaceMutationTextRecoveryTasks.values)
     }
 
