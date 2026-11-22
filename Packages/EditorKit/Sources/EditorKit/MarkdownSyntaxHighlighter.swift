@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 import MarkdownCore
-@preconcurrency import SyntaxKit
+import SyntaxKit
 
 struct MarkdownHighlightResult: Equatable, Sendable {
     let range: NSRange

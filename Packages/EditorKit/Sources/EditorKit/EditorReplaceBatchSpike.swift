@@ -171,11 +171,11 @@ extension MarkdownTextViewCoordinator {
         if let postSelection = request.postSelection {
             textView.textSelection = postSelection
             // Last so redo reapplies the planned caret after STTextView redo.
-            undoManager?.registerUndo(withTarget: textView) { view in
+            undoManager?.registerUndo(withTarget: textView) { _ in
                 MainActor.assumeIsolated {
-                    view.undoManager?.registerUndo(withTarget: view) { redoView in
+                    textView.undoManager?.registerUndo(withTarget: textView) { _ in
                         MainActor.assumeIsolated {
-                            redoView.textSelection = postSelection
+                            textView.textSelection = postSelection
                         }
                     }
                 }
