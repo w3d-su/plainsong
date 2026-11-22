@@ -83,7 +83,10 @@ final class ExportRenderLifecycleTests: XCTestCase {
         controller.exportTimeoutNanoseconds = timeout
         try await support.waitUntil("preview bridge ready") { controller.isReady }
         // Swallow bridge messages so the submitted render can never complete on its own.
-        _ = try await controller.webView.evaluateJavaScript("window.PlainsongBridge.receive = () => {}; null")
+        _ = try await PreviewHostedTestWait.javascript(
+            "window.PlainsongBridge.receive = () => {}; null",
+            in: controller.webView
+        )
 
         let task = Task { await controller.renderForExport(change("# Pending\n")) }
         if reason != "timeout" {
