@@ -42,7 +42,7 @@ Mac 現有 `EditorImageAssetInsertion` 使用 validate／commit／discard，`Mar
 2. **觸發 picker 前**捕捉 current editor snapshot、document identity/revision、selectionGeneration／accessGeneration、替換 range 和 06 destination authority。UI dismissed／async import 後仍使用這個 context；不能改成最新文件 context 來「幫使用者完成」。
 3. Photos source 使用系統 picker 的資料傳輸，無需掃描整個相簿。PNG／JPEG／GIF／WebP 符合共用 policy；Photos 的 HEIC representation 轉成 PNG，再按產物實際 bytes 驗證，不能只改副檔名。其他不支援 representation 拒絕；Files 中 SVG／可執行或不支援格式拒絕，內容與 type 必須符合，不以 filename 單獨判定。
 4. 在 off-main 工作取資料／必要 raster conversion，不堵住 UIKit。傳入 06 writer 後由其負責 `assets/` 相對目錄、唯一檔名、不覆寫既有檔、scope retention、destination containment 和 namespace 驗證。本 lane 不重做这些 I/O 策略。
-5. 取得 `IOSStagedImageAsset` 後，把它的已保存相對路徑經 `SmartPaste.imageInsertion` 轉為插入字串；使用 capture 的 range 產生 `MarkdownEditResult`，selection 落在插入尾端。空／非法結果不能插空語法。
+5. 取得 `IOSStagedImageAsset` 後，把它的已保存相對路徑經 `SmartPaste.imageInsertion` 轉為插入字串；使用 capture 的 range 產生 `MarkdownEditResult`，selection 落在插入尾端。若 selection 起點在已閉合的 YAML／TOML Frontmatter 內，則改在分隔線後獨立插入且不取代原文。空／非法結果不能插空語法。
 6. 06 先 final validate staged asset 的 captured destination grant／generation／owned leaf；await 返回後再在 MainActor 檢查當初 document/revision/selectionGeneration/accessGeneration、`canWrite` 和 composing 狀態。以 capture 的 proposal 同步提交 guarded edit，不可 await 後先 `session.text +=`。04 executor 同步重驗，不能只依 UI 按鈕 enabled 狀態；final apply 之前的 root/access 變化必須先使 generation 失效。
 7. **Editor accepted：** 只此時 terminal commit staged asset；native source edit 為一次 Undo，Redo 能重新顯示圖片。Undo 不刪圖片，避免 Redo 引用失效。**拒絕／cancel／error：** terminal rollback staged asset，由 06 對確定自己擁有的檔案協調 disposal。
 8. 重複 callback／task cancellation／view teardown 都只走一次 terminal action。rollback 失敗或 ownership 不明時保留 recovery state 與相對路徑，提示圖片已保存但未插入，不能用 URL 猜測後 delete。既有 file／他人 namespace occupant 不删除。
