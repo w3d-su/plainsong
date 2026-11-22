@@ -893,12 +893,13 @@ extension MarkdownTextViewCoordinator {
             return false
         }
 
-        // Publish a native copy (~3 ms per MiB in CoreFoundation). The lazily bridged
-        // storage string is foreign to Swift, and SwiftUI compares the published text
-        // with `==` in bindings, `onChange` and view inputs: each foreign comparison
-        // normalized the whole document, stalling the main thread for seconds per
-        // keystroke in a 1 MiB document. An unpaired surrogate keeps the bridged string,
-        // since a native string would replace it.
+        // Publish a native copy: one CoreFoundation pass over the whole document on every
+        // keystroke, about 1.5 ms per MiB of ASCII and 3.7 ms per MiB of CJK in Release. The
+        // lazily bridged storage string is foreign to Swift, and SwiftUI compares the
+        // published text with `==` in bindings, `onChange` and view inputs: each foreign
+        // comparison normalized the whole document, stalling the main thread for seconds
+        // per keystroke in a 1 MiB document. An unpaired surrogate keeps the bridged
+        // string, since a native string would replace it.
         let storage = MarkdownTextView.textStorage(of: textView)
         let newText = storage.flatMap { ExactSourceText.nativeCopy(of: $0.mutableString) }
             ?? storage?.string ?? textView.text ?? ""

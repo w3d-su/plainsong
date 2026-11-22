@@ -3,7 +3,9 @@
 # Sourced, never executed directly. Exit codes follow the C0 bootstrap convention
 # (Scripts/ios/c0.sh): 64 usage/config, 65 data error, 69 unavailable tool/SDK,
 # 75 admission still pending on the shared lock. A payload that already holds
-# the lock keeps its own exit code, including 75. Codes >= 3 are step-specific.
+# the lock keeps its own exit code, including 1 and 75. A lockf failure before
+# the payload starts that is not a busy lock (73: the lock file cannot be
+# opened) exits at once with lockf's code. Codes >= 3 are step-specific.
 #
 # Lock discipline (docs/ios/README.md "同一台 Mac 的測試排程"): only the outermost
 # public runner acquires the shared lock; verified nested helpers never
@@ -64,18 +66,24 @@ ios_lock_or_exec() {
         set +e
         # The assignment is only on lockf. The marker is created after lockf
         # starts the payload, so a busy lock cannot look like a payload exit.
+        # The payload never runs without the marker.
         IOS_RUNNER_LOCK_STARTED="$started" /usr/bin/lockf -k -t 0 "$lock_path" /bin/bash -c '
             export IOS_RUNNER_LOCK_OWNER=$$
             export IOS_RUNNER_LOCK_HOLDER=$PPID
-            : > "$IOS_RUNNER_LOCK_STARTED"
-            "$@"; child=$?
-            if [ "$child" = 1 ]; then exit 2; fi
-            exit "$child"
+            : > "$IOS_RUNNER_LOCK_STARTED" || exit 70
+            "$@"
         ' ios-runner "$script" "$@"
         local result=$?
         set -e
         if [ -f "$started" ]; then
             rm -f "$started"
+            exit "$result"
+        fi
+        # Only 75 without the marker is another lane holding the lock. Waiting
+        # on anything else (73 when lockf cannot open the lock file, a signal)
+        # would report a configuration error as a busy lock.
+        if [ "$result" != 75 ]; then
+            echo "ios: error: lockf could not run the payload under $lock_path (exit $result); not waiting" >&2
             exit "$result"
         fi
         if [ "$SECONDS" -ge "$deadline" ]; then

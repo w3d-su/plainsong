@@ -98,6 +98,19 @@ final class IOSFrontmatterPanelTests: XCTestCase {
         XCTAssertEqual(harness.editor.applyCount, 1)
         XCTAssertTrue(ExactSourceText.matches(harness.editor.text, updated))
         XCTAssertEqual(harness.editor.undoCount, 1)
+        let parse = Frontmatter.parse(harness.editor.text)
+        XCTAssertNil(parse.error)
+        XCTAssertEqual(parse.block?.fieldValues["title"], .string(""))
+    }
+
+    @MainActor
+    func testTogglingDraftPreservesFenceAndQuotedTitle() {
+        let source = "---\ntitle: \"\" # Keep this title\ndraft: true\n---\n# Body\n"
+        let harness = AuthoringHarness(text: source)
+        harness.controller.toggleFrontmatterBool(key: "draft", using: harness.editor)
+        let expected = source.replacingOccurrences(of: "draft: true", with: "draft: false")
+        XCTAssertTrue(ExactSourceText.matches(harness.editor.text, expected))
+        XCTAssertEqual(harness.controller.frontmatter.acceptedParse.block?.fieldValues["draft"], .bool(false))
     }
 
     @MainActor

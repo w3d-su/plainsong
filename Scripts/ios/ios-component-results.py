@@ -44,13 +44,13 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("log")
     parser.add_argument("--required", required=True)
+    parser.add_argument("--required-sha256")
     parser.add_argument("--report", required=True)
     parser.add_argument("--names", required=True)
     args = parser.parse_args()
     results = load_results()
     try:
-        required = {line.strip() for line in Path(args.required).read_text().splitlines()
-                    if line.strip() and not line.lstrip().startswith("#")}
+        required = results.required_names(args.required, args.required_sha256)
         report = results.validate_results(cases_from_log(Path(args.log).read_text()), required)
         report["result_format"] = "swift-test-xctest-log"
         Path(args.names).write_text("\n".join(sorted(report["cases"])) + "\n")

@@ -2,6 +2,26 @@ import MarkdownCore
 import UIKit
 
 extension IOSSourceEditorController {
+    func invalidateHost() {
+        isHostAlive = false
+        countStatisticsAfterComposition()
+        scheduler.cancel()
+        presentationGeneration &+= 1
+        presentationFloor = presentationGeneration
+        observations.forEach { $0.cancel() }
+        observations.removeAll()
+    }
+
+    func fenceInstallation() {
+        countStatisticsAfterComposition()
+        scheduler.cancel()
+        scheduler.activate()
+        presentationGeneration &+= 1
+        presentationFloor = presentationGeneration
+        textView.undoManager?.removeAllActions()
+        hadMarkedText = false
+    }
+
     public func installExternalReload(_ proposal: IOSDocumentReloadProposal) -> IOSDocumentReloadOutcome {
         guard let installation = reloadInstallation(matching: proposal) else {
             return reloadRefusal(for: proposal)
