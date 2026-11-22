@@ -130,6 +130,11 @@ public final class DocumentSession: ObservableObject {
 
     deinit {
         statisticsTask?.cancel()
+        // A continuation that is dropped without `finish()` leaves its consumer suspended
+        // in `for await` forever, because the consumer's iterator keeps the stream alive.
+        for continuation in textChangeContinuations.values {
+            continuation.finish()
+        }
     }
 
     private init(text: String, url: URL?, fileKind: FileKind?, isDirty: Bool, statistics: TextStatistics?) {
@@ -140,14 +145,6 @@ public final class DocumentSession: ObservableObject {
         self.isDirty = isDirty
         availableStatistics = statistics
         savedText = isDirty ? nil : text
-    }
-
-    deinit {
-        // A continuation that is dropped without `finish()` leaves its consumer suspended
-        // in `for await` forever, because the consumer's iterator keeps the stream alive.
-        for continuation in textChangeContinuations.values {
-            continuation.finish()
-        }
     }
 
     /// Explicit preview channel for high-frequency text/version changes.
