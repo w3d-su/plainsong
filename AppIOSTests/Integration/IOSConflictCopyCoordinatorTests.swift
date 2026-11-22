@@ -23,6 +23,31 @@ final class IOSConflictCopyCoordinatorTests: XCTestCase {
         XCTAssertEqual(fixture.copy.lastOutcome, .cancelled)
     }
 
+    /// SwiftUI dismisses the folder sheet before UIKit's delegate reports the pick.
+    func testFolderPickedAfterTheSheetDismissesStillSavesTheCopy() async throws {
+        let fixture = IOSConflictCopyFixture()
+        defer { fixture.stop() }
+        _ = try await fixture.openConflict()
+        let request = try fixture.prepare()
+        fixture.copy.pickerPresentationEnded(request.id)
+        XCTAssertNil(fixture.copy.pickerRequest)
+        let task = try XCTUnwrap(fixture.copy.completePicker(request, urls: [fixture.workspace.destinationURL]))
+        let outcome = await task.value
+        XCTAssertEqual(outcome, .saved(filename: request.filename))
+        XCTAssertEqual(fixture.documents.createdCopies.count, 1)
+    }
+
+    func testDismissedFolderSheetThenCancelNeverMintsADestinationGrant() async throws {
+        let fixture = IOSConflictCopyFixture()
+        defer { fixture.stop() }
+        _ = try await fixture.openConflict()
+        let request = try fixture.prepare()
+        fixture.copy.pickerPresentationEnded(request.id)
+        fixture.copy.cancelPicker(request.id)
+        XCTAssertNil(fixture.copy.completePicker(request, urls: [fixture.workspace.destinationURL]))
+        XCTAssertTrue(fixture.documents.copyRequests.isEmpty)
+    }
+
     func testDuplicatePickerCallbackCreatesOnlyOneCopy() async throws {
         let fixture = IOSConflictCopyFixture()
         defer { fixture.stop() }

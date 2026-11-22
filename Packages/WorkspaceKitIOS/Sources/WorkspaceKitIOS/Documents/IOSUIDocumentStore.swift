@@ -211,11 +211,14 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
     func installSession(_ entry: IOSDocumentEntry, text: String, canWrite: Bool) {
         let fileKind = FileKind(url: entry.location.fileURL) ?? .markdown
         let session = DocumentSession(
-            text: text,
+            opening: text,
             url: entry.location.fileURL,
-            fileKind: fileKind,
-            isDirty: false
-        )
+            fileKind: fileKind
+        ) { [weak self, weak entry] session in
+            guard let self, let entry, byIdentity[entry.identity] === entry, entry.session === session,
+                  !entry.closed else { return }
+            emitSnapshot(entry)
+        }
         entry.session = session
         entry.lastPersistedText = text
         entry.allowsProviderWrite = canWrite && entry.allowsProviderWrite

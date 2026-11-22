@@ -75,7 +75,7 @@ struct EditorWorkspace: View {
 
             Divider()
 
-            WorkspaceStatusBar(statistics: appState.shownSession.statistics)
+            WorkspaceStatusBar(statistics: appState.shownSession.availableStatistics)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

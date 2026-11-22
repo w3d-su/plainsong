@@ -1,4 +1,5 @@
 """Positive and negative fixtures for acceptance admission. No product providers."""
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -198,6 +199,68 @@ class AdmissionFixtures(unittest.TestCase):
         self.assertEqual(body["compiled_test_images"], 1)
         self.assertEqual(body["xctestrun"], "IOSAcceptance_iphonesimulator.xctestrun")
 
+    def acceptance_fixture(self):
+        self.bundle("IOSAcceptanceUITests")
+        app = self.products / "Debug-iphonesimulator" / "PlainsongIOS.app"
+        self.macho(app / "PlainsongIOS")
+        (app / "Info.plist").write_bytes(plistlib.dumps({"CFBundleExecutable": "PlainsongIOS"}))
+        return self.target("IOSAcceptanceUITests", "IOSAcceptanceUITests.xctest")
+
+    def testOutputRootWithDoubleUnderscoreIsAdmitted(self):
+        self.derived = Path(self.temporary.name) / "a__b" / "dd"
+        self.products = self.derived / "Build" / "Products"
+        self.products.mkdir(parents=True)
+        self.plan("IOSAcceptance", [self.acceptance_fixture()])
+        result, body = self.admit("IOSAcceptance")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(body["compiled_test_images"], 1)
+
+    def testUnresolvedPlaceholderIsNamedAsTheReason(self):
+        target = self.acceptance_fixture()
+        target["TestBundlePath"] = "__UNKNOWNROOT__/Debug-iphonesimulator/IOSAcceptanceUITests.xctest"
+        self.plan("IOSAcceptance", [target])
+        result, body = self.admit("IOSAcceptance")
+        self.assertEqual(result.returncode, 65, result.stderr)
+        self.assertIn("unresolved xctestrun placeholder __UNKNOWNROOT__", body["reason"])
+
+    def testDamagedPlanFailsWithAReportInsteadOfATraceback(self):
+        self.acceptance_fixture()
+        plan = self.products / "IOSAcceptance.xctestrun"
+        for damaged in (b'<?xml version="1.0"?><plist version="1.0"><dict><key>Container',
+                        plistlib.dumps(["not", "a", "dictionary"])):
+            with self.subTest(damaged=damaged[:16]):
+                plan.write_bytes(damaged)
+                result, body = self.admit("IOSAcceptance")
+                self.assertEqual(result.returncode, 65, result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+                self.assertIn("found 0", body["reason"])
+                self.assertEqual(body["unreadable_xctestruns"][0]["xctestrun"], "IOSAcceptance.xctestrun")
+
+    def testUnrelatedDamagedPlanDoesNotDecideAdmission(self):
+        self.plan("IOSAcceptance", [self.acceptance_fixture()])
+        (self.products / "Unrelated.xctestrun").write_bytes(b"<?xml version")
+        result, body = self.admit("IOSAcceptance")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([entry["xctestrun"] for entry in body["unreadable_xctestruns"]], ["Unrelated.xctestrun"])
+
+    def testDamagedBundleInfoPlistFailsWithAReport(self):
+        target = self.acceptance_fixture()
+        (self.products / "Debug-iphonesimulator" / "IOSAcceptanceUITests.xctest" / "Info.plist").write_bytes(b"<plist")
+        self.plan("IOSAcceptance", [target])
+        result, body = self.admit("IOSAcceptance")
+        self.assertEqual(result.returncode, 65, result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+        self.assertIn("bundle Info.plist is not a readable plist", body["reason"])
+
+    def testSwiftModuleIsRecordedByProductNameNotItsSlices(self):
+        module = self.products / "Debug-iphonesimulator" / "PreviewKit.swiftmodule"
+        module.mkdir(parents=True)
+        (module / "arm64-apple-ios-simulator.swiftmodule").write_bytes(b"module slice")
+        self.plan("IOSAcceptance", [self.acceptance_fixture()])
+        result, body = self.admit("IOSAcceptance")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(body["library_products_ignored"], ["PreviewKit.swiftmodule"])
+
     def testOtherSchemeDoesNotSatisfyTheRequestedPlan(self):
         self.bundle("PreviewKitTests")
         self.plan("PreviewKit-Package", [{
@@ -285,6 +348,32 @@ class ResourceAndComponentFixtures(unittest.TestCase):
         ], text=True, capture_output=True)
         self.assertEqual(result.returncode, 65, result.stderr)
         self.assertEqual(json.loads(report.read_text())["status"], "FAILED")
+
+    def testComponentGateParsesOnlyBytesMatchingTheCapturedDigest(self):
+        temporary = tempfile.TemporaryDirectory(prefix="plainsong-ios-components-")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        required = root / "required.txt"
+        required.write_text("BoundedWaitTests/testTimeoutStaysFailed\n")
+        log = root / "swift-test.log"
+        log.write_text("Test Case '-[IOSAcceptanceHarnessTests.BoundedWaitTests testTimeoutStaysFailed]' passed (0.001 seconds).\n")
+        report = root / "gate.json"
+        digest = hashlib.sha256(required.read_bytes()).hexdigest()
+        for expected, code in ((digest, 0), ("0" * 64, 65)):
+            result = subprocess.run([
+                sys.executable, str(SCRIPTS / "ios-component-results.py"), str(log),
+                "--required", str(required), "--required-sha256", expected,
+                "--report", str(report), "--names", str(root / "names.txt"),
+            ], text=True, capture_output=True)
+            self.assertEqual(result.returncode, code, result.stderr)
+        self.assertIn("does not match captured source", json.loads(report.read_text())["reason"])
+
+    def testMakeIOSTestPinsItsSchemeOverTheEnvironment(self):
+        env = dict(os.environ, IOS_SCHEME="IOSAcceptance")
+        result = subprocess.run(["make", "-n", "-C", str(SCRIPTS.parents[1]), "ios-test"], env=env,
+                                text=True, capture_output=True, timeout=60)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("IOS_SCHEME=PlainsongIOS Scripts/ios/run-ios-tests.sh", result.stdout)
 
     def testPreviewSchemeIsRejectedBeforeLock(self):
         env = dict(os.environ)

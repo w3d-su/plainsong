@@ -190,6 +190,14 @@ final class EditorReplaceLayeringTests: XCTestCase {
         let addedDependencies = Set(addedPackages.map { "package: \($0)" })
         XCTAssertEqual(project.dependencies.subtracting(baselineDependencies), addedDependencies)
         XCTAssertEqual(addedDependencies, Set(["package: " + updaterPackage]))
+        // The flattened set above cannot see a package added to the preview
+        // test host, since PreviewKit and MarkdownCore already appear on other
+        // targets. The host links nothing, so those packages load once, from
+        // IOSPreviewTests, and the host holds no duplicate package classes.
+        XCTAssertEqual(project.targetDependencies["IOSPreviewTestHost"], [])
+        XCTAssertEqual(project.targetDependencies["IOSPreviewTests"], [
+            "target: IOSPreviewTestHost", "package: PreviewKit", "package: MarkdownCore",
+        ])
 
         let npm = try npmDependencyNames()
         XCTAssertEqual(npm.runtime, [
@@ -244,18 +252,23 @@ final class EditorReplaceLayeringTests: XCTestCase {
         var packages: Set<String> = []
         var targets: Set<String> = []
         var dependencies: Set<String> = []
+        /// The same dependency lines, grouped by the target that declares them.
+        var targetDependencies: [String: Set<String>] = [:]
     }
 
     /// Reads the keys of the top-level XcodeGen `packages:` and `targets:` maps
-    /// plus every `- package:` / `- target:` / `- sdk:` dependency line.
+    /// plus every `- package:` / `- target:` / `- sdk:` dependency line, also
+    /// grouped under its target.
     /// Settings, sources, and Info.plist values are deliberately not pinned.
     private func projectManifest() throws -> ProjectManifest {
         var manifest = ProjectManifest()
         var section: String?
+        var target: String?
         for rawLine in try source("project.yml").split(separator: "\n") {
             let line = String(rawLine)
             if !line.hasPrefix(" "), !line.hasPrefix("#") {
                 section = line.hasSuffix(":") ? String(line.dropLast()) : nil
+                target = nil
                 continue
             }
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -265,10 +278,16 @@ final class EditorReplaceLayeringTests: XCTestCase {
                     manifest.packages.insert(key)
                 } else if section == "targets" {
                     manifest.targets.insert(key)
+                    manifest.targetDependencies[key] = []
+                    target = key
                 }
             }
             for kind in ["package", "target", "sdk"] where trimmed.hasPrefix("- \(kind): ") {
-                manifest.dependencies.insert(String(trimmed.dropFirst(2)))
+                let dependency = String(trimmed.dropFirst(2))
+                manifest.dependencies.insert(dependency)
+                if let target {
+                    manifest.targetDependencies[target, default: []].insert(dependency)
+                }
             }
         }
         return manifest
