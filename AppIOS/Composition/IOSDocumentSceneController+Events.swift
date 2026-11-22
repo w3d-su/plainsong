@@ -88,14 +88,21 @@ extension IOSDocumentSceneController {
     func requestRender(immediate: Bool = false) {
         guard let handle, let bindingID else { return }
         let revision = IOSDocumentRevision(documentID: handle.identity, version: handle.session.version)
-        guard renderedRevision != revision || immediate else { return }
+        if !immediate {
+            if renderedRevision == revision { return }
+            if pendingRenderRevision == revision, renderTask?.isCancelled == false { return }
+        }
+        pendingRenderRevision = revision
         renderTask?.cancel()
         renderTask = Task { @MainActor [weak self] in
             if !immediate {
                 do { try await Task.sleep(nanoseconds: 150_000_000) } catch { return }
             }
-            guard !Task.isCancelled, let self, self.handle?.identity == handle.identity,
-                  self.bindingID == bindingID, handle.session.version == revision.version else { return }
+            guard !Task.isCancelled, let self else { return }
+            pendingRenderRevision = nil
+            renderTask = nil
+            guard self.handle?.identity == handle.identity, self.bindingID == bindingID,
+                  handle.session.version == revision.version else { return }
             let context = grantIsCurrent ? currentGrant
                 .flatMap { $0.scope == .directory ? self.assetContext($0) : nil } : nil
             renderedRevision = revision
@@ -113,7 +120,14 @@ extension IOSDocumentSceneController {
                   let originBinding = bindingID else { return }
             Task { @MainActor [weak self] in
                 guard let self, handle?.identity == identity, bindingID == originBinding else { return }
-                do { try await openSelectedURL(url, scope: .singleFile) } catch {
+                do {
+                    try await openSelectedURL(url, scope: .singleFile)
+                    guard let handle, let location = documentLocation(for: url),
+                          Self.sameLocation(handle.location, location) else { return }
+                    onPreviewDocumentOpened?()
+                } catch is CancellationError {
+                    return
+                } catch {
                     // Navigation failure is a presentation error. It cannot
                     // revoke the current writer or overwrite a real access error.
                     guard handle == nil || (handle?.identity == identity && bindingID == originBinding) else { return }

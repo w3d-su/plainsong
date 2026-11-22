@@ -17,6 +17,8 @@ struct IOSRecentAccessList: View {
                         presenter.open(recordID: row.id)
                     } label: {
                         Label(row.displayName, systemImage: row.scope == .directory ? "folder" : "doc.text")
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
                     }
                     .disabled(presenter.isBusy || row.status != .available)
                     .accessibilityIdentifier("plainsong.ios.recent.open.\(row.id.uuidString)")
@@ -36,6 +38,9 @@ struct IOSRecentAccessList: View {
                     }
                 }
                 .padding(.vertical, 4)
+                // A List row with default-style buttons runs every button's
+                // action on one tap: open, Choose Again and Remove Record.
+                .buttonStyle(.borderless)
                 .accessibilityElement(children: .contain)
             }
         }
@@ -45,15 +50,25 @@ struct IOSRecentAccessList: View {
     }
 
     private func chooseAgainButton(_ row: IOSRecentAccessRow) -> some View {
-        Button("Choose Again") { presenter.chooseAgain(recordID: row.id) }
-            .disabled(presenter.isBusy)
-            .frame(minHeight: 44)
-            .accessibilityLabel("Choose \(row.displayName) again")
+        Button {
+            presenter.chooseAgain(recordID: row.id)
+        } label: {
+            Text("Choose Again")
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .disabled(presenter.isBusy)
+        .accessibilityLabel("Choose \(row.displayName) again")
     }
 
     private func removeRecordButton(_ row: IOSRecentAccessRow) -> some View {
-        Button("Remove Record", role: .destructive) { presenter.removeRecord(recordID: row.id) }
-            .frame(minHeight: 44)
-            .accessibilityHint("Remove this recent item from the list. The file or folder is kept.")
+        Button(role: .destructive) {
+            presenter.removeRecord(recordID: row.id)
+        } label: {
+            Text("Remove Record")
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .accessibilityHint("Remove this recent item from the list. The file or folder is kept.")
     }
 }

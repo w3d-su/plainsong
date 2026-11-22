@@ -5,6 +5,28 @@ import XCTest
 
 @MainActor
 final class IOSDocumentObservationBarrierTests: XCTestCase {
+    func testLargeOpenPublishesPendingThenReadyCountsForTheSameRevision() async throws {
+        let harness = DocumentIOHarness()
+        let source = String(repeating: "繁體中文 Markdown\n", count: 8000)
+        let ready = expectation(description: "counted snapshot published")
+        var snapshots: [IOSStoredDocumentSnapshot] = []
+        let observation = harness.store.observe { event in
+            guard case let .snapshotChanged(snapshot) = event else { return }
+            snapshots.append(snapshot)
+            if snapshot.document.availableStatistics != nil { ready.fulfill() }
+        }
+        defer { observation.cancel() }
+        let handle = try await harness.openNote(text: source)
+        await fulfillment(of: [ready], timeout: 5)
+        let first = try XCTUnwrap(snapshots.first)
+        let last = try XCTUnwrap(snapshots.last)
+        XCTAssertEqual(first.revision, last.revision)
+        XCTAssertEqual(first.revision.documentID, handle.identity)
+        XCTAssertNil(first.document.availableStatistics)
+        XCTAssertEqual(last.document.availableStatistics, TextStatistics(text: source))
+        XCTAssertFalse(last.document.isDirty)
+    }
+
     func testOwnNoticeDrainsInFlightAndRejectsQueuedWritesBeforeRestoringAutosave() async throws {
         let harness = DocumentIOHarness()
         let handle = try await harness.openNote(text: "baseline")
