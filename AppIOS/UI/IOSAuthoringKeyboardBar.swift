@@ -1,23 +1,65 @@
 import SwiftUI
 import UIKit
 
-/// Keyboard accessory driven by 08's `IOSAuthoringAction` descriptors: undo/redo,
-/// frequent actions, Heading and Code menus, and a "Format" overflow menu rather
-/// than shrinking below 44 pt targets. Shortcuts are installed by
-/// `IOSAuthoringToolbarItems`, which stays mounted without the keyboard.
-struct IOSKeyboardAccessoryBar: View {
+/// Undo/redo, the frequent formatting commands and the Format menus, at the
+/// bottom of the document column while the source pane shows. The software
+/// keyboard pushes it up, so it sits directly above the keys.
+///
+/// This is an ordinary view at the bottom of the document column, not
+/// `ToolbarItemGroup(placement: .keyboard)`: SwiftUI attaches that placement
+/// only to its own text inputs, so with the UIKit editor the group never
+/// appeared and its shortcuts were never installed.
+struct IOSAuthoringKeyboardBar: View {
     @ObservedObject var scene: IOSShellSceneState
     @ObservedObject var router: IOSShellActionRouter
 
+    @State private var keyboardIsUp = false
+
     var body: some View {
+        HStack(spacing: 0) {
+            commands
+            if keyboardIsUp {
+                Divider().frame(height: 24)
+                Button {
+                    if let editorView = scene.editorHostView {
+                        editorView.endEditing(true)
+                    } else {
+                        UIApplication.shared.sendAction(
+                            #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil
+                        )
+                    }
+                } label: {
+                    Label("Hide Keyboard", systemImage: "keyboard.chevron.compact.down")
+                }
+                .accessibilityIdentifier("plainsong.ios.toolbar.hideKeyboard")
+            }
+        }
+        .labelStyle(.iconOnly)
+        .buttonStyle(IOSKeyboardBarButtonStyle())
+        .frame(height: 44)
+        .background(.bar)
+        .overlay(alignment: .top) { Divider() }
+        .background {
+            IOSAuthoringShortcutHosts(scene: scene, router: router, group: .formatting)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            keyboardIsUp = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            keyboardIsUp = false
+        }
+    }
+
+    private var commands: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 4) {
+            HStack(spacing: 2) {
                 Button {
                     _ = router.undo()
                 } label: {
                     Label("Undo", systemImage: "arrow.uturn.backward")
                 }
                 .disabled(!scene.chrome.editorFocused || !scene.chrome.editorCanWrite)
+                .keyboardShortcut("z", modifiers: .command)
                 .accessibilityIdentifier("plainsong.ios.toolbar.undo")
 
                 Button {
@@ -26,6 +68,7 @@ struct IOSKeyboardAccessoryBar: View {
                     Label("Redo", systemImage: "arrow.uturn.forward")
                 }
                 .disabled(!scene.chrome.editorFocused || !scene.chrome.editorCanWrite)
+                .keyboardShortcut("z", modifiers: [.command, .shift])
                 .accessibilityIdentifier("plainsong.ios.toolbar.redo")
 
                 ForEach(primaryActions, id: \.id) { action in
@@ -54,11 +97,9 @@ struct IOSKeyboardAccessoryBar: View {
                     .accessibilityIdentifier("plainsong.ios.toolbar.formatMenu")
                 }
             }
-            .labelStyle(.iconOnly)
-            .buttonStyle(IOSKeyboardAccessoryButtonStyle())
+            .menuStyle(.button)
             .padding(.horizontal, 8)
         }
-        .frame(height: IOSKeyboardAccessoryInputView.barHeight)
     }
 
     private struct ToolbarGroup: Identifiable {
@@ -70,7 +111,7 @@ struct IOSKeyboardAccessoryBar: View {
     }
 
     /// Frequent commands stay as 44 pt icon buttons. Heading and code commands
-    /// stay in menus so the keyboard accessory does not overflow on iPhone.
+    /// stay in menus so the bar does not overflow on iPhone.
     private var primaryActions: [IOSAuthoringAction] {
         router.actions.filter { action in
             if case .toolbar = action.placement {
@@ -93,16 +134,16 @@ struct IOSKeyboardAccessoryBar: View {
         return order.map { ToolbarGroup(name: $0, actions: grouped[$0] ?? []) }
     }
 
-    private var overflowActions: [IOSAuthoringAction] {
-        router.actions.filter { $0.placement == .formatMenu }
-    }
-
     private func groupSymbol(_ name: String) -> String {
         switch name {
         case "Heading": "textformat.size"
         case "Code": "chevron.left.forwardslash.chevron.right"
         default: "textformat"
         }
+    }
+
+    private var overflowActions: [IOSAuthoringAction] {
+        router.actions.filter { $0.placement == .formatMenu }
     }
 
     private func authoringButton(_ action: IOSAuthoringAction) -> some View {
@@ -113,6 +154,7 @@ struct IOSKeyboardAccessoryBar: View {
         }
         .disabled(!router.isEnabled(action.id))
         .accessibilityLabel(action.accessibilityLabel)
+        .modifier(AuthoringShortcutModifier(action: action))
     }
 
     private func symbol(for id: IOSAuthoringActionID) -> String {
@@ -133,69 +175,16 @@ struct IOSKeyboardAccessoryBar: View {
     }
 }
 
-private struct IOSKeyboardAccessoryButtonStyle: ButtonStyle {
+/// A 44 pt target per control without the bordered chrome of a toolbar.
+private struct IOSKeyboardBarButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .font(.body.weight(.medium))
             .frame(minWidth: 44, minHeight: 44)
+            .foregroundStyle(isEnabled ? AnyShapeStyle(.tint) : AnyShapeStyle(.tertiary))
+            .opacity(configuration.isPressed ? 0.5 : 1)
             .contentShape(Rectangle())
-            .opacity(isEnabled ? (configuration.isPressed ? 0.5 : 1) : 0.35)
-    }
-}
-
-/// SwiftUI's `.keyboard` toolbar placement reaches only SwiftUI text inputs. The
-/// source editor is a `UITextView`, so the bar is its `inputAccessoryView`.
-final class IOSKeyboardAccessoryInputView: UIInputView {
-    static let barHeight: CGFloat = 44
-
-    private let host: UIHostingController<IOSKeyboardAccessoryBar>
-    private weak var router: IOSShellActionRouter?
-
-    init(scene: IOSShellSceneState, router: IOSShellActionRouter) {
-        host = UIHostingController(rootView: IOSKeyboardAccessoryBar(scene: scene, router: router))
-        self.router = router
-        super.init(
-            frame: CGRect(x: 0, y: 0, width: 0, height: Self.barHeight),
-            inputViewStyle: .keyboard
-        )
-        autoresizingMask = .flexibleWidth
-        host.safeAreaRegions = []
-        host.view.backgroundColor = .clear
-        host.view.frame = bounds
-        host.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        addSubview(host.view)
-    }
-
-    @available(*, unavailable)
-    required init?(coder _: NSCoder) {
-        fatalError("init(coder:) is unavailable")
-    }
-
-    /// Installs one bar per (text view, router). Any other hosted editor view is
-    /// left alone.
-    static func install(on editorView: UIView?, scene: IOSShellSceneState, router: IOSShellActionRouter) {
-        guard let textView = editorView as? UITextView else { return }
-        if let installed = textView.inputAccessoryView as? IOSKeyboardAccessoryInputView,
-           installed.router === router
-        {
-            return
-        }
-        textView.inputAccessoryView = IOSKeyboardAccessoryInputView(scene: scene, router: router)
-        if textView.isFirstResponder {
-            textView.reloadInputViews()
-        }
-    }
-
-    /// The hosted bar keeps its scene alive, and the scene retains the text view.
-    /// Removing the bar breaks that cycle when the editor leaves the screen or
-    /// its scene shuts down.
-    static func uninstall(from editorView: UIView?) {
-        guard let textView = editorView as? UITextView,
-              textView.inputAccessoryView is IOSKeyboardAccessoryInputView else { return }
-        textView.inputAccessoryView = nil
-        if textView.isFirstResponder {
-            textView.reloadInputViews()
-        }
     }
 }

@@ -96,7 +96,6 @@ extension AppState {
 
         if !isManagedEditorSession(session) {
             cancelAutosave(for: session)
-            cancelStatisticsRefresh(for: session)
             removeEditorDocumentBindingRegistration(for: session)
         }
         clearRetiredSessionMetadataIfUnreferenced(

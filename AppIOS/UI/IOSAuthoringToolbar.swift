@@ -44,10 +44,10 @@ struct AuthoringShortcutModifier: ViewModifier {
     }
 }
 
-/// Navigation-bar toolbar content. It also installs the shortcuts declared by
-/// 08's `IOSAuthoringAction` descriptors; every tap routes through the
-/// scene-scoped `IOSShellActionRouter`. The authoring buttons themselves are
-/// in `IOSKeyboardAccessoryBar`.
+/// Navigation-bar content driven by 08's `IOSAuthoringAction` descriptors:
+/// save, export, find, frontmatter and image insertion. Every tap routes
+/// through the scene-scoped `IOSShellActionRouter`. Undo/redo, the formatting
+/// commands and the hosts for menu-only shortcuts are in `IOSAuthoringKeyboardBar`.
 struct IOSAuthoringToolbarItems: ToolbarContent {
     let scene: IOSShellSceneState
     let router: IOSShellActionRouter
@@ -145,39 +145,11 @@ struct IOSPaneToggle: View {
                 Text("Preview").tag(IOSEditorPane.preview)
             }
             .pickerStyle(.segmented)
-            .frame(maxWidth: 220)
+            .frame(maxWidth: 320)
             .accessibilityIdentifier("plainsong.ios.paneToggle")
-        }
-    }
-}
-
-/// The keyboard accessory is a UIKit input accessory view and menus are not a
-/// reliable key-command source, so every authoring shortcut except Cmd-F (on
-/// the visible Find button) is installed here. Mounted as a background of the
-/// document column: toolbar items would show up in the navigation overflow.
-struct IOSAuthoringShortcutHosts: View {
-    @ObservedObject var scene: IOSShellSceneState
-    @ObservedObject var router: IOSShellActionRouter
-
-    var body: some View {
-        ZStack {
-            ForEach(shortcutActions, id: \.id) { action in
-                Button(action.title) {
-                    _ = router.perform(action.id)
-                }
-                .disabled(!router.isEnabled(action.id))
-                .modifier(AuthoringShortcutModifier(action: action))
-            }
-        }
-        .frame(width: 0, height: 0)
-        .opacity(0)
-        .accessibilityHidden(true)
-    }
-
-    private var shortcutActions: [IOSAuthoringAction] {
-        router.actions.filter { action in
-            guard action.keyEquivalent != nil else { return false }
-            return action.id != .find
+            .padding(.horizontal, 14)
+            .padding(.bottom, 8)
+            .frame(maxWidth: .infinity)
         }
     }
 }

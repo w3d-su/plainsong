@@ -59,9 +59,9 @@ struct IOSShellChromeSnapshot: Equatable {
             statistics = nil
             return
         }
-        statistics = stored.document.statistics
+        statistics = stored.document.availableStatistics
         if let editor, editor.revision.documentID == stored.revision.documentID {
-            statistics = editor.document.statistics
+            statistics = editor.document.availableStatistics ?? (editor.revision == stored.revision ? statistics : nil)
         }
         documentIdentity = stored.revision.documentID
         documentKind = stored.document.fileKind

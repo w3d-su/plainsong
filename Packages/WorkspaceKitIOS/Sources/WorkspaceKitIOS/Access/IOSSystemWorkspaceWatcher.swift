@@ -34,11 +34,15 @@ final class IOSSystemWorkspaceWatcher: IOSWorkspaceChangeWatching, @unchecked Se
 
 final class IOSRootFilePresenter: NSObject, NSFilePresenter {
     let root: URL
+    /// `root` with its symlinks resolved, once. Callbacks may spell child URLs through
+    /// either form of a symlinked prefix, such as `/private/var/mobile/…` on a device.
+    let resolvedRoot: URL
     let sink: @Sendable (IOSExternalWorkspaceNotice) -> Void
     let operationQueue: OperationQueue
 
     init(root: URL, sink: @escaping @Sendable (IOSExternalWorkspaceNotice) -> Void) {
         self.root = root
+        resolvedRoot = IOSWorkspacePathAuthority.resolvedDirectory(root)
         self.sink = sink
         let queue = OperationQueue()
         queue.name = "Plainsong.IOSWorkspaceChange"
@@ -90,7 +94,7 @@ final class IOSRootFilePresenter: NSObject, NSFilePresenter {
     func presentedSubitem(at oldURL: URL, didMoveTo newURL: URL) {
         guard let from = relativePath(for: oldURL) else { return }
         let destination = relativePath(for: newURL) ?? IOSWorkspacePathAuthority.lastComponent(
-            newURL.path(percentEncoded: false)
+            IOSWorkspacePathAuthority.pathWithoutTrailingSlash(newURL)
         )
         emit(.moved(from: from, to: destination))
     }
@@ -106,14 +110,8 @@ final class IOSRootFilePresenter: NSObject, NSFilePresenter {
         sink(notice)
     }
 
+    /// Runs on `operationQueue`, so the fallback's file-system walk is off the main actor.
     private func relativePath(for url: URL) -> String? {
-        let rootBytes = IOSWorkspacePathAuthority.pathBytes(root)
-        let fileBytes = IOSWorkspacePathAuthority.pathBytes(url)
-        guard fileBytes.count > rootBytes.count + 1 else { return nil }
-        guard Array(fileBytes.prefix(rootBytes.count)) == rootBytes else { return nil }
-        guard fileBytes[rootBytes.count] == UInt8(ascii: "/") else { return nil }
-        let remainder = String(decoding: fileBytes.dropFirst(rootBytes.count + 1), as: UTF8.self)
-        guard WorkspaceRelativePath(spelling: remainder) != nil else { return nil }
-        return remainder
+        IOSWorkspacePathAuthority.relativeSpelling(root: root, resolvedRoot: resolvedRoot, file: url)
     }
 }

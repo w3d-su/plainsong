@@ -49,7 +49,11 @@ final class IOSProductionRuntime: ObservableObject {
     var typewriterRequested = false
 
     @Published var showOpenChoices = false
-    @Published var pickerRequest: IOSProductionPickerRequest?
+    /// The presented picker sheet. SwiftUI clears it on dismissal, which
+    /// happens before UIKit's delegate reports the pick.
+    @Published private(set) var pickerRequest: IOSProductionPickerRequest?
+    /// The issuance one terminal delegate result may still consume.
+    private var issuedPickerID: UUID?
     @Published private(set) var isOpening = false
 
     private let currentGrant: () -> IOSWorkspaceGrant?
@@ -193,7 +197,7 @@ final class IOSProductionRuntime: ObservableObject {
     func shutdown() async -> Bool {
         exporter.cancel()
         pendingOpen = nil
-        pickerRequest = nil
+        retirePicker()
         recentPresentation.cancel()
         recovery?.dismiss()
         if isShutDown {
@@ -210,7 +214,6 @@ final class IOSProductionRuntime: ObservableObject {
         isShuttingDown = false
         if closed {
             isShutDown = true
-            IOSKeyboardAccessoryInputView.uninstall(from: editor.textView)
             stopObserving()
             disconnectObserver?.stop()
             disconnectObserver = nil
@@ -226,13 +229,27 @@ final class IOSProductionRuntime: ObservableObject {
         }
         scene.dismissPresentation()
         authoring.linkDraft = nil
-        pickerRequest = IOSProductionPickerRequest(scope: scope)
+        let request = IOSProductionPickerRequest(scope: scope)
+        issuedPickerID = request.id
+        pickerRequest = request
+    }
+
+    /// The sheet is gone; its issuance stays for the delegate's result. A
+    /// newer request or a retirement replaces it.
+    func pickerPresentationEnded(_ id: UUID) {
+        guard pickerRequest?.id == id else { return }
+        pickerRequest = nil
+    }
+
+    private func retirePicker() {
+        pickerRequest = nil
+        issuedPickerID = nil
     }
 
     @discardableResult
     func completePicker(_ request: IOSProductionPickerRequest, urls: [URL]) -> Task<Void, Never>? {
-        guard !isShuttingDown, pickerRequest?.id == request.id else { return nil }
-        pickerRequest = nil
+        guard !isShuttingDown, issuedPickerID == request.id else { return nil }
+        retirePicker()
         guard urls.count == 1, let url = urls.first, !isOpening else { return nil }
         // Reserve synchronously before creating the task. The access provider
         // starts/retains the security scope; UI never mints a second grant.
@@ -244,7 +261,7 @@ final class IOSProductionRuntime: ObservableObject {
         recovery?.dismiss()
         // An OS delivery supersedes a still-presented picker. Retire its
         // issuance before any await so its delayed delegate cannot replace it.
-        pickerRequest = nil
+        retirePicker()
         showOpenChoices = false
         recentPresentation.cancel()
         retireAuthoringCapture()
@@ -299,7 +316,7 @@ final class IOSProductionRuntime: ObservableObject {
 
     /// The route is released for read-only modals and while inactive, and not
     /// every dismissal path claims it back. The user putting the caret in the
-    /// source is the claim: the keyboard accessory acts on that text view.
+    /// source is the claim: the keyboard bar acts on that text view.
     private func observeEditingBegan() {
         guard editingObserver == nil else { return }
         editingObserver = NotificationCenter.default.addObserver(
