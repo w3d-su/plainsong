@@ -18,8 +18,12 @@ M0 原型的結果都不能代替這裡的任何一項。
 | IPA SHA-256 | `ea4972de9ae48fa18607d046500229215c2b33bbfe10745cdb81ab8803f4bbed` |
 | 建置 | Release、arm64、Xcode 27.0、iOS SDK 27.0、最低版本 iOS 26.0 |
 
-換了 IPA 就要重新記錄這張表。#269 以 squash 合併後 `main` 上的 commit 會不同；
-這份 IPA 綁定的是上面的 commit。它含 #264 的外觀修正、#267 的 Performance Probe
+換了 IPA 就要重新記錄這張表。#269 以 squash 合併為 `main` 的 `162b7932`；其間合併的
+其他 PR 只改了 macOS 的 EditorKit 與測試，iOS App 的原始碼與上面的 commit 相同。這份
+IPA 綁定的是上面的 commit。之後 `main` 又合併了 #278（打字時延後計算全文統計）與
+#285（Insert Image → Files 的挑選、從 Files 或 Preview 連結開檔後顯示文件、空
+frontmatter 的 title），這份 IPA 都不含。要驗收這些就從 `main` 重建 IPA，並更新
+這張表。它含 #264 的外觀修正、#267 的 Performance Probe
 （所以同一次安裝可以接著做 [效能量測](performance-probe.md)），以及 #269 修掉的七個
 問題。沒有 #269 的版本開不了任何檔案，不要拿來驗收。
 

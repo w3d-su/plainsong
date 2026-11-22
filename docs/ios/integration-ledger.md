@@ -16,9 +16,9 @@ unsigned Release IPA from that commit (`f2a5e60a…82e1`) is **not usable**: ope
 file or a folder through the picker did nothing.
 
 Seven defects were found and are fixed in
-[#269](https://github.com/w3d-su/plainsong/pull/269); the causes, the fixes and what was
-not verified are in that PR's decision entry,
-`docs/decisions/2026-11-15-ios-first-real-ui-walk-fixes.md`:
+[#269](https://github.com/w3d-su/plainsong/pull/269), squash-merged to `main` as
+`162b7932`; the causes, the fixes and what was not verified are in that PR's
+[decision entry](../decisions/2026-11-15-ios-first-real-ui-walk-fixes.md):
 
 1. picker results dropped (file, folder, recovery restore, conflict copy);
 2. one tap on a Recent row ran Open, Choose Again and Remove Record;
@@ -35,7 +35,7 @@ earlier, none of them in PreviewKit or `index.html`. The exact-head Mac CI passe
 `0c0e8f28`. The walk was repeated after the fixes on the iPhone simulator and, for the
 layout and the bars, on an iPad Pro 11-inch simulator.
 
-On #269's current head `2175bfe3` (adding the `/private` preview-root symlink resolution
+On #269's later head `2175bfe3` (adding the `/private` preview-root symlink resolution
 fallback, the Files image-picker dismissal/delegate split, Recent row hit-target framing,
 scene-local resign on preview switch, and `IOSDocumentScreen` shortcut test hosting),
 local, Xcode 27.0, iOS 27.0 simulator (`59CB04BD-26CC-4841-8D06-E75A2EDEBC66`):
@@ -47,7 +47,7 @@ device pass is their first UI check: G10 for Insert Image → Files, D7 for the 
 switch during Zhuyin composition, and H6 for the `/private` spelling of a picked
 folder. Hosted `ios.yml` was not dispatched for this head.
 
-On #269's head `be3587f1` (after `416da03f`, which resolves the preview root only when
+On #269's final head `be3587f1` (after `416da03f`, which resolves the preview root only when
 the plain spelling fails and maps workspace-watcher callbacks across a symlinked root,
 and `be3587f1`, which maps folder callbacks spelled with a trailing slash and keeps the
 find shortcuts installed while a single pane shows the preview), #269 records `make
@@ -62,7 +62,8 @@ The device-pass kit is rebuilt from `be3587f1` with `make ios-ipa` (clean source
 `ea4972de9ae48fa18607d046500229215c2b33bbfe10745cdb81ab8803f4bbed`. It replaces the
 `2175bfe3` kit (`892e35dd…87211`), which lacks the watcher and find-shortcut fixes.
 `docs/ios/device-pass.md` names it and now says where each control is. The kit is
-local and not committed.
+local and not committed. It predates #278 and #285, which changed the iOS app on `main`
+after #269; #285 changes how Insert Image → Files (G10) delivers its pick.
 
 Not walked in the simulator: iCloud Drive, Chinese input, backgrounding and termination,
 external change and conflict, image insertion, the frontmatter panel, export and print,
