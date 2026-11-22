@@ -241,6 +241,37 @@ final class WindowSameFileFocusAppTests: SharedRootAppTestCase {
         }
     }
 
+    /// QA on `2ab88a3` saw a hard link made after a save open a third window. The atomic save
+    /// gives the file a new inode; a link made afterwards shares it, so it is still the file
+    /// window 1 shows.
+    func testAHardLinkMadeAfterAnAtomicSaveFocusesTheWindowShowingTheFile() throws {
+        let folder = directory.appendingPathComponent("saved", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let original = folder.appendingPathComponent("atlas.md")
+        try Data("atlas".utf8).write(to: original)
+        try primary.open(url: original, rememberAsLastOpened: false, preserveWorkspace: false)
+        let link = try saveThenLink(original, as: "atlas-link.md")
+        let before = second.shownSession
+        firstWindow.orderFront(nil)
+        secondWindow.orderFront(nil)
+
+        second.openExternalFile(link)
+
+        assertFocusedPrimary(leaving: before)
+    }
+
+    func testAHardLinkMadeAfterAnAtomicSaveInASharedRootFocusesTheWindowShowingTheFile() async throws {
+        let root = try await showSharedA()
+        let link = try saveThenLink(root.appendingPathComponent("a.md"), as: "after-save.md")
+        let before = second.shownSession
+        firstWindow.orderFront(nil)
+        secondWindow.orderFront(nil)
+
+        second.openExternalFile(link)
+
+        assertFocusedPrimary(leaving: before)
+    }
+
     // MARK: - Controls
 
     /// Warm sessions belong to no window: after window 1 switches away, window 2 adopts it.
@@ -284,6 +315,25 @@ final class WindowSameFileFocusAppTests: SharedRootAppTestCase {
         }
         XCTAssertNil(primary.presentedError)
         return root
+    }
+
+    /// Edits and saves window 1's document, checks that the save replaced the file's inode,
+    /// then hard-links the saved file as `name` beside it.
+    private func saveThenLink(_ url: URL, as name: String) throws -> URL {
+        let inodeBefore = try fileNumber(url)
+        primary.replaceDocumentText("edited before the link", in: primary.shownSession)
+        try primary.save(session: primary.shownSession)
+        XCTAssertNotEqual(try fileNumber(url), inodeBefore, "the save replaced the file atomically")
+        let link = url.deletingLastPathComponent().appendingPathComponent(name)
+        try FileManager.default.linkItem(at: url, to: link)
+        XCTAssertEqual(try fileNumber(link), try fileNumber(url))
+        return link
+    }
+
+    private func fileNumber(_ url: URL) throws -> Int {
+        try XCTUnwrap(
+            FileManager.default.attributesOfItem(atPath: url.path(percentEncoded: false))[.systemFileNumber] as? Int
+        )
     }
 
     private func assertFocusedPrimary(

@@ -126,6 +126,39 @@ extension EditorFindHostedGateTests {
         try await waitUntil("the closed window's preview is released") { controller == nil }
     }
 
+    /// QA on `2ab88a3`: Open Recent after the last window closed opened the file in a second
+    /// new window and left the reopened one blank, so the reopened window was not an empty WD7
+    /// target. A closed window keeps only a blank document, before and after SwiftUI tears its
+    /// views down, and stays empty when its façade's next scene reconnects it (W0 bullet 3, W8).
+    func testClosedMountedWindowsStayEmptyTargetsForTheNextOpen() async throws {
+        let fixture = try makeWorkspaceFixture(files: ["A.md": "# Alpha\n", "B.md": "# Beta\n"])
+        let primary = fixture.appState
+        let second = primary.makeSiblingFacade(admitsFileOperations: true)
+        registerSiblingTeardown(second)
+        try await openRoot(fixture.root, in: primary)
+        try second.openWorkspace(url: fixture.root, rememberAsLastOpened: false)
+        try await waitUntil("window 2 shares the root") { second.workspaceTree != nil }
+        try await show("A.md", in: primary, root: fixture.root)
+        try await show("B.md", in: second, root: fixture.root)
+        let (first, other) = try await mountPair(primary: primary, second: second, fixture: fixture)
+
+        // Window 2 leaves the shared root (D1c detach); window 1 then releases it (D1b).
+        for (mounted, facade, name) in [(other, second, "window 2"), (first, primary, "window 1")] {
+            mounted.window.performClose(nil)
+            XCTAssertFalse(KeyWindowRouter.shared.hasAttachedWindow(facade), "\(name) closed")
+            // SwiftUI keeps updating the closed window's views until they are torn down.
+            try await Task.sleep(nanoseconds: 300_000_000)
+            XCTAssertEqual(facade.emptyWorkspaceWindowObstructions(), [], "\(name) after its close")
+            mounted.host.hostingView.rootView = AnyView(EmptyView())
+            mounted.host.hostingView.layoutSubtreeIfNeeded()
+            mounted.window.contentView = nil
+            try await Task.sleep(nanoseconds: 300_000_000)
+            XCTAssertEqual(facade.emptyWorkspaceWindowObstructions(), [], "\(name) after teardown")
+            facade.reconnectReclaimedWindow()
+            XCTAssertEqual(facade.emptyWorkspaceWindowObstructions(), [], "\(name) after its reconnect")
+        }
+    }
+
     // MARK: - Helpers
 
     @MainActor
