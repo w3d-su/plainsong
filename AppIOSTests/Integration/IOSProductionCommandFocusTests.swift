@@ -51,9 +51,11 @@ final class IOSProductionCommandFocusTests: XCTestCase {
         defer { harness.runtime.scene.stopObserving() }
         harness.runtime.startObserving()
         try await waitUntil { Self.claims(in: harness.facade, bindingID) > 0 }
+        // Release first: `prepareForReadOnlyPresentation` dismisses a scene sheet.
+        harness.runtime.prepareForReadOnlyPresentation()
         harness.runtime.scene.present(.workspaceSearch)
         defer { harness.runtime.scene.dismissPresentation() }
-        harness.runtime.prepareForReadOnlyPresentation()
+        XCTAssertNotNil(harness.runtime.scene.presentation)
         let before = Self.claims(in: harness.facade, bindingID)
 
         Self.postBeginEditing(harness.runtime.editor.textView)
