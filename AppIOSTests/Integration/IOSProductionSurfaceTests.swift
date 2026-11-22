@@ -81,6 +81,35 @@ final class IOSProductionSurfaceTests: XCTestCase {
         )
     }
 
+    /// SwiftUI clears the sheet's item before UIKit's delegate reports the
+    /// pick. Seen in the iOS 27 simulator: the pick was dropped without a message.
+    func testPickDeliveredAfterTheSheetDismissesStillOpens() async throws {
+        var opened: [URL] = []
+        let harness = try makeHarness { url, _ in opened.append(url) }
+        harness.runtime.requestPicker(scope: .directory)
+        let request = try XCTUnwrap(harness.runtime.pickerRequest)
+        harness.runtime.pickerPresentationEnded(request.id)
+        XCTAssertNil(harness.runtime.pickerRequest)
+        let picked = URL(fileURLWithPath: "/tmp/picked-folder")
+        let task = try XCTUnwrap(harness.runtime.completePicker(request, urls: [picked]))
+        await task.value
+        XCTAssertEqual(opened, [picked])
+        XCTAssertNil(harness.runtime.completePicker(request, urls: [picked]), "one terminal result per issuance")
+    }
+
+    func testDismissedPickerIsSupersededByTheNextIssuance() throws {
+        var opened = false
+        let harness = try makeHarness { _, _ in opened = true }
+        harness.runtime.requestPicker(scope: .singleFile)
+        let old = try XCTUnwrap(harness.runtime.pickerRequest)
+        harness.runtime.pickerPresentationEnded(old.id)
+        harness.runtime.requestPicker(scope: .directory)
+        let current = try XCTUnwrap(harness.runtime.pickerRequest)
+        XCTAssertNil(harness.runtime.completePicker(old, urls: [URL(fileURLWithPath: "/tmp/old.md")]))
+        XCTAssertEqual(harness.runtime.pickerRequest?.id, current.id)
+        XCTAssertFalse(opened)
+    }
+
     func testFailedOpenDoesNotNavigateAndReportsUsefulError() async throws {
         let harness = try makeHarness { _, _ in throw IOSWorkspaceFailure.permissionDenied }
         harness.runtime.requestPicker(scope: .singleFile)

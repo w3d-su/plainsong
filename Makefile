@@ -174,7 +174,7 @@ ios-build:
 	Scripts/ios/run-ios-build.sh "$(IOS_OUTPUT_ROOT)"
 
 ios-test:
-	Scripts/ios/run-ios-tests.sh "$(IOS_OUTPUT_ROOT)"
+	IOS_SCHEME=PlainsongIOS Scripts/ios/run-ios-tests.sh "$(IOS_OUTPUT_ROOT)"
 
 ios-preview:
 	IOS_SCHEME=IOSPreview Scripts/ios/run-ios-tests.sh "$(IOS_OUTPUT_ROOT)"

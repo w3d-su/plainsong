@@ -20,19 +20,6 @@ extension AppState {
         applyDocumentText(newText, to: session)
     }
 
-    /// Any window may cancel: the shared foreground task always belongs to the home façade's
-    /// document, as the shared autosave task does.
-    func cancelStatisticsRefresh(for session: DocumentSession) {
-        let home = KeyWindowRouter.shared.home(for: registry) ?? self
-        if home.shownSession === session {
-            statisticsTask?.cancel()
-            statisticsTask = nil
-        }
-        let sessionIdentity = ObjectIdentifier(session)
-        sessionStatisticsTasks[sessionIdentity]?.task.cancel()
-        sessionStatisticsTasks[sessionIdentity] = nil
-    }
-
     func applyDocumentText(_ newText: String, to session: DocumentSession) {
         let previousVersion = session.version
         session.replaceText(newText, refreshStatistics: false)
@@ -59,7 +46,7 @@ extension AppState {
             sessionPolicy.updateDirtyState(for: url, isDirty: session.isDirty)
         }
         scheduleWorkspaceMutationTextRecovery(for: session)
-        scheduleStatisticsRefresh(for: session)
+        session.scheduleStatisticsRefreshAfterEdit()
         if session === shownSession {
             scheduleCompletionWorkspaceRefresh(debounceNanoseconds: 250_000_000)
             scheduleAutosave()
@@ -447,9 +434,7 @@ extension AppState {
     }
 
     private func moveCurrentDocumentWorkToBackgroundForSearchActivation() {
-        let previousSession = shownSession
-        moveCurrentAutosaveToBackground(for: previousSession)
-        moveCurrentStatisticsToBackground(for: previousSession)
+        moveCurrentAutosaveToBackground(for: shownSession)
     }
 
     private func isAcceptedWorkspaceSearchActivation(
@@ -627,74 +612,6 @@ extension AppState {
         }
 
         return range.length <= textUTF16Length - range.location
-    }
-
-    func moveCurrentStatisticsToBackground(for session: DocumentSession) {
-        // Only the home façade's document uses the shared task; a sibling's count already
-        // runs per session and must not cancel the home document's.
-        guard session === shownSession, KeyWindowRouter.shared.isHome(self) else { return }
-        let shouldReschedule = statisticsTask != nil
-        statisticsTask?.cancel()
-        statisticsTask = nil
-        guard shouldReschedule else { return }
-        scheduleBackgroundStatisticsRefresh(for: session)
-    }
-
-    private func scheduleStatisticsRefresh(for session: DocumentSession) {
-        let sessionIdentity = ObjectIdentifier(session)
-        if session === shownSession, KeyWindowRouter.shared.isHome(self) {
-            sessionStatisticsTasks[sessionIdentity]?.task.cancel()
-            sessionStatisticsTasks[sessionIdentity] = nil
-            statisticsTask?.cancel()
-            statisticsTask = makeStatisticsTask(for: session)
-            return
-        }
-
-        scheduleBackgroundStatisticsRefresh(for: session)
-    }
-
-    private func scheduleBackgroundStatisticsRefresh(for session: DocumentSession) {
-        let sessionIdentity = ObjectIdentifier(session)
-        sessionStatisticsTasks[sessionIdentity]?.task.cancel()
-        let token = UUID()
-        let task = makeStatisticsTask(for: session) { [weak self] in
-            guard let self,
-                  sessionStatisticsTasks[sessionIdentity]?.token == token
-            else {
-                return
-            }
-            sessionStatisticsTasks[sessionIdentity] = nil
-        }
-        sessionStatisticsTasks[sessionIdentity] = SessionBackgroundTask(token: token, task: task)
-    }
-
-    private func makeStatisticsTask(
-        for session: DocumentSession,
-        onCompletion: (@MainActor () -> Void)? = nil
-    ) -> Task<Void, Never> {
-        Task { @MainActor [weak session] in
-            defer { onCompletion?() }
-            do {
-                try await Task.sleep(nanoseconds: 300_000_000)
-            } catch {
-                return
-            }
-            guard let session, !Task.isCancelled else { return }
-
-            // Counting a large document is O(n); keep it off the main thread.
-            let text = session.text
-            let revision = session.version
-            let statistics = await Task.detached(priority: .utility) {
-                TextStatistics(text: text)
-            }.value
-
-            guard !Task.isCancelled,
-                  session.version == revision
-            else {
-                return
-            }
-            session.applyStatistics(statistics)
-        }
     }
 
     private static func taskCheckboxStateRange(in line: String) -> Range<String.Index>? {

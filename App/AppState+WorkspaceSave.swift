@@ -253,8 +253,6 @@ extension AppState {
     }
 
     func moveCurrentDocumentWorkToBackgroundBeforeSwitch() {
-        let previousSession = shownSession
-        moveCurrentAutosaveToBackground(for: previousSession)
-        moveCurrentStatisticsToBackground(for: previousSession)
+        moveCurrentAutosaveToBackground(for: shownSession)
     }
 }

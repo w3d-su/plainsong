@@ -259,7 +259,6 @@ extension AppState {
         externalReloadTasks.removeValue(forKey: sessionIdentity)?.task.cancel()
         pendingExternalReloadApplications[sessionIdentity] = nil
         cancelAutosave(for: session)
-        cancelStatisticsRefresh(for: session)
         if removesEditorBindingRegistration {
             removeEditorDocumentBindingRegistration(for: session)
         }

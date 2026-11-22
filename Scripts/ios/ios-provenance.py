@@ -87,7 +87,11 @@ def verify_source(receipt, repository):
 
 
 def verify_required_copy(source_manifest, required_copy, relative_path):
-    """Ensure a run-local required-name copy matches the captured source input."""
+    """Ensure a run-local required-name copy matches the captured source input.
+
+    Returns the captured digest. A result gate takes it and checks the bytes it
+    parses, so the copy cannot change between this check and the parse.
+    """
     source = json.loads(Path(source_manifest).read_text())
     record = source.get("files", {}).get(relative_path)
     if not isinstance(record, dict) or record.get("kind") != "file" or not record.get("sha256"):
@@ -98,6 +102,7 @@ def verify_required_copy(source_manifest, required_copy, relative_path):
     digest = file_record(copied)["sha256"]
     if digest != record["sha256"]:
         raise ValueError("required-name copy does not match captured source: " + relative_path)
+    return record["sha256"]
 
 
 def tree_digest(directory):
@@ -218,7 +223,7 @@ def main():
         elif args.action == "verify-required-copy":
             if not args.copy or not args.required_relative:
                 raise ValueError("verify-required-copy requires --copy and --required-relative")
-            verify_required_copy(args.path, args.copy, args.required_relative)
+            print(verify_required_copy(args.path, args.copy, args.required_relative))
         elif args.action == "tree-digest":
             print(tree_digest(args.path))
         elif args.action == "verify-device":

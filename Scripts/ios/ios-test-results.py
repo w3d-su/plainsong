@@ -1,9 +1,23 @@
 #!/usr/bin/env python3
 """Fail closed on malformed, empty, skipped or incomplete required XCTest results."""
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import sys
+
+
+def required_names(path, expected_sha256=None):
+    """Names in a required-name manifest, read once.
+
+    With expected_sha256 the digest is of the bytes parsed here, so the file
+    cannot be swapped between a separate check and this parse.
+    """
+    data = Path(path).read_bytes()
+    if expected_sha256 is not None and hashlib.sha256(data).hexdigest() != expected_sha256:
+        raise ValueError("required-name manifest does not match captured source: " + str(path))
+    return {line.strip() for line in data.decode("utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")}
 
 
 def executed_tests(document):
@@ -53,13 +67,13 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("results")
     parser.add_argument("--required", required=True)
+    parser.add_argument("--required-sha256")
     parser.add_argument("--report", required=True)
     parser.add_argument("--names", required=True)
     parser.add_argument("--no-skips", action="store_true")
     args = parser.parse_args()
     try:
-        required = {line.strip() for line in Path(args.required).read_text().splitlines()
-                    if line.strip() and not line.lstrip().startswith("#")}
+        required = required_names(args.required, args.required_sha256)
         report = validate_results(json.loads(Path(args.results).read_text()), required, args.no_skips)
         Path(args.names).write_text("\n".join(sorted(report["cases"])) + "\n")
         Path(args.report).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")

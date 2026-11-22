@@ -1,10 +1,12 @@
+@testable import MarkdownCore
 @testable import Plainsong
 import XCTest
 
 @MainActor
 extension EditorFindHostedGateTests {
     /// Picking a file whose session is already warm must hand the dirty document's pending
-    /// autosave and word count to the per-session tasks, as a cold pick does.
+    /// autosave to the per-session tasks, as a cold pick does. The session owns its count,
+    /// which keeps running when the document leaves the window.
     func testSwitchingToACachedFileKeepsThePreviousDocumentsAutosaveAndStatistics() async throws {
         let fixture = try await makeReadyFilesSwitchFixture()
         let state = fixture.appState
@@ -17,13 +19,13 @@ extension EditorFindHostedGateTests {
 
         state.replaceDocumentText("alpha unsaved", in: sessionA)
         XCTAssertNotNil(state.autosaveTask)
-        XCTAssertNotNil(state.statisticsTask)
+        XCTAssertNotNil(sessionA.statisticsTask)
 
         XCTAssertTrue(state.selectWorkspaceNode(id: bID, requestingEditorFocus: false))
 
         XCTAssertFalse(state.shownSession === sessionA)
         XCTAssertTrue(sessionA.isDirty)
         XCTAssertNotNil(state.sessionAutosaveTasks[ObjectIdentifier(sessionA)])
-        XCTAssertNotNil(state.sessionStatisticsTasks[ObjectIdentifier(sessionA)])
+        XCTAssertNotNil(sessionA.statisticsTask)
     }
 }

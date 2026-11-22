@@ -43,44 +43,57 @@ struct IOSImagePhotoPicker: UIViewControllerRepresentable {
     }
 }
 
+/// The picker dismisses itself. Keep its delegate on the parent sheet rather
+/// than in a SwiftUI sheet that can be recreated during UIKit's dismissal.
 struct IOSImageFilePicker: UIViewControllerRepresentable {
-    let onURLs: ([URL]) -> Void
+    let operationID: UUID?
+    let onURLs: (UUID, [URL]) -> Void
 
-    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: Self.contentTypes, asCopy: true)
-        picker.allowsMultipleSelection = false
-        picker.delegate = context.coordinator
-        return picker
+    func makeUIViewController(context _: Context) -> Host {
+        Host()
     }
 
-    func updateUIViewController(_: UIDocumentPickerViewController, context _: Context) {}
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onURLs: onURLs)
+    func updateUIViewController(_ host: Host, context _: Context) {
+        guard let operationID else { return }
+        host.presentPicker(operationID: operationID, onURLs: onURLs)
     }
 
-    private static let contentTypes: [UTType] = [.png, .jpeg, .gif, .webP, .heic, .heif]
+    final class Host: UIViewController, UIDocumentPickerDelegate, UIAdaptivePresentationControllerDelegate {
+        private static let contentTypes: [UTType] = [.png, .jpeg, .gif, .webP, .heic, .heif]
+        private var lastRequest: UUID?
+        private var picker: UIDocumentPickerViewController?
+        private var onURLs: ((UUID, [URL]) -> Void)?
 
-    final class Coordinator: NSObject, UIDocumentPickerDelegate {
-        let onURLs: ([URL]) -> Void
-        private var delivered = false
-
-        init(onURLs: @escaping ([URL]) -> Void) {
+        func presentPicker(operationID: UUID, onURLs: @escaping (UUID, [URL]) -> Void) {
+            guard lastRequest != operationID, picker == nil, viewIfLoaded?.window != nil else { return }
+            lastRequest = operationID
             self.onURLs = onURLs
+            let picker = UIDocumentPickerViewController(forOpeningContentTypes: Self.contentTypes, asCopy: true)
+            picker.allowsMultipleSelection = false
+            picker.delegate = self
+            picker.modalPresentationStyle = .formSheet
+            picker.presentationController?.delegate = self
+            self.picker = picker
+            present(picker, animated: true)
         }
 
-        func documentPicker(_: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-            deliver(urls)
+        func documentPicker(_ picker: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            deliver(urls, from: picker)
         }
 
-        func documentPickerWasCancelled(_: UIDocumentPickerViewController) {
-            deliver([])
+        func documentPickerWasCancelled(_ picker: UIDocumentPickerViewController) {
+            deliver([], from: picker)
         }
 
-        private func deliver(_ urls: [URL]) {
-            guard !delivered else { return }
-            delivered = true
-            onURLs(urls)
+        func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+            deliver([], from: presentationController.presentedViewController)
+        }
+
+        private func deliver(_ urls: [URL], from controller: UIViewController) {
+            guard controller === picker, let lastRequest, let onURLs else { return }
+            picker = nil
+            self.onURLs = nil
+            onURLs(lastRequest, urls)
         }
     }
 }

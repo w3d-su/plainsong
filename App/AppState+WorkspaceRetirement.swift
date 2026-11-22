@@ -326,7 +326,6 @@ private extension AppState {
         for session in sessions where !retainedSessionIdentities.contains(ObjectIdentifier(session)) {
             let sessionIdentity = ObjectIdentifier(session)
             sessionAutosaveTasks.removeValue(forKey: sessionIdentity)?.task.cancel()
-            sessionStatisticsTasks.removeValue(forKey: sessionIdentity)?.task.cancel()
             removeEditorDocumentBindingRegistration(for: session)
         }
         for session in sessions {
@@ -365,7 +364,6 @@ private extension AppState {
             autosaveTask?.cancel()
             autosaveTask = nil
         }
-        cancelStatisticsRefresh(for: shownSession)
     }
 
     func resetWindowPromptsAfterClosure() {

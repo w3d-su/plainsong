@@ -70,7 +70,6 @@ struct IOSWorkspaceBrowserView: View {
                         return
                     }
                     scene.openEntry(entry)
-                    scene.navigateToDocument()
                 }
                 .disabled(!isTappable(entry))
         }

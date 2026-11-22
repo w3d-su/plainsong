@@ -41,6 +41,7 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
     var isAdjustingSelection = false
     var isHostAlive = true
     var hadMarkedText = false
+    var hasUncountedComposition = false
     var presentationGeneration: UInt64 = 0
     var presentationFloor: UInt64 = 0
     var lastSelectionViewport = NSRange(location: NSNotFound, length: 0)
@@ -198,30 +199,12 @@ public final class IOSSourceEditorController: NSObject, IOSSourceEditorBinding, 
     /// SwiftUI `updateUIView` must not push text back into the native view.
     public func acceptInterfaceUpdate() {}
 
-    func invalidateHost() {
-        isHostAlive = false
-        scheduler.cancel()
-        presentationGeneration &+= 1
-        presentationFloor = presentationGeneration
-        observations.forEach { $0.cancel() }
-        observations.removeAll()
-    }
-
     func plainText() -> String {
         textView.textStorage.string
     }
 
     func noteViewportChanged() {
         scheduleHighlight()
-    }
-
-    private func fenceInstallation() {
-        scheduler.cancel()
-        scheduler.activate()
-        presentationGeneration &+= 1
-        presentationFloor = presentationGeneration
-        textView.undoManager?.removeAllActions()
-        hadMarkedText = false
     }
 
     private func installInitialText(_ text: String) {

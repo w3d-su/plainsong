@@ -19,6 +19,7 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     /// may use ordinary open without extending the frozen access contract.
     let openDestinationFolder: @MainActor (URL) async throws -> IOSWorkspaceGrant
     var openExternalURL: ((URL) -> Void)?
+    var onPreviewDocumentOpened: (() -> Void)?
     var onNavigationFailure: ((String) -> Void)?
     var onPreviewUnavailable: ((String) -> Void)? {
         didSet { deliverPendingPreviewUnavailable() }
@@ -47,6 +48,7 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
     var editorObservation: (any IOSObservation)?
     var previewObservation: (any IOSObservation)?
     var renderTask: Task<Void, Never>?
+    var pendingRenderRevision: IOSDocumentRevision?
     var renderedRevision: IOSDocumentRevision?
     lazy var reloadRelay = IOSDocumentReloadRelay(documents: documents, editor: editor)
     /// `md` or `mdx`. Anything else stays Markdown so a bad setting cannot invent a type.
@@ -365,6 +367,7 @@ final class IOSDocumentSceneController: IOSAppSceneControlling {
         reloadRelay.detach()
         renderTask?.cancel()
         renderTask = nil
+        pendingRenderRevision = nil
         if let handle, let bindingID {
             editor.detach(expected: handle.identity, bindingID: bindingID)
         }

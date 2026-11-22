@@ -57,6 +57,7 @@ public extension IOSSourceEditorController {
         let ended = hadMarkedText && !marked
         hadMarkedText = marked
         guard ended else { return }
+        countStatisticsAfterComposition()
         if needsBaseStyle {
             applyBaseTextStyle()
             raisePresentationFloor()

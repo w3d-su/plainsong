@@ -95,6 +95,32 @@ final class IOSShellChromeTests: XCTestCase {
         XCTAssertEqual(otherScene.chrome.statistics, TextStatistics(text: "one"))
     }
 
+    func testInitialCountsFromStoreReachChromeWithPendingEditorSnapshot() {
+        let stored = ShellFixtures.storedDocument(text: "loaded text")
+        let pending = DocumentSnapshot(
+            text: stored.document.text, version: stored.document.version, fileKind: stored.document.fileKind,
+            fileURL: stored.document.fileURL, isDirty: false, statistics: nil
+        )
+        func editorSnapshot(version: Int) -> IOSSourceEditorSnapshot {
+            IOSSourceEditorSnapshot(
+                bindingID: UUID(), revision: IOSDocumentRevision(
+                    documentID: stored.revision.documentID,
+                    version: version
+                ),
+                document: pending, selection: .init(location: 0, length: 0), visibleRange: .init(
+                    location: 0,
+                    length: 1
+                ),
+                selectionGeneration: 0, accessGeneration: 1, hasMarkedText: false, canWrite: true, isFocused: true
+            )
+        }
+        let scene = ShellFixtures.sceneSnapshot(document: stored)
+        let current = IOSShellChromeSnapshot(scene: scene, editor: editorSnapshot(version: stored.revision.version))
+        XCTAssertEqual(current.statistics, TextStatistics(text: "loaded text"))
+        let edited = IOSShellChromeSnapshot(scene: scene, editor: editorSnapshot(version: stored.revision.version + 1))
+        XCTAssertNil(edited.statistics)
+    }
+
     func testSaveEligibilityRequiresBothStoreAndEditorWritableAuthority() {
         let editor = FakeEditorBinding()
         let facade = FakeSceneFacade(

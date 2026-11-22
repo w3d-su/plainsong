@@ -55,6 +55,9 @@ if ! grep -qE '^[^#[:space:]]' "$manifest"; then
     ios_die "required-resources manifest is empty: $manifest" 65
 fi
 [ -s "$required_tests" ] || ios_die "required named-test manifest is missing or empty: $required_tests" 65
+if ! grep -qE '^[^#[:space:]]' "$required_tests"; then
+    ios_die "required named-test manifest has no names: $required_tests" 65
+fi
 
 Scripts/generate-project.sh
 
@@ -69,8 +72,9 @@ cp "$required_tests" "$captured_required"
 chmod 0444 "$captured_required"
 Scripts/ios/ios-preflight.sh --need-simulator --write-evidence "$evidence"
 /usr/bin/python3 Scripts/ios/ios-provenance.py capture "$evidence/source.json"
-if ! /usr/bin/python3 Scripts/ios/ios-provenance.py verify-required-copy \
-    "$evidence/source.json" --copy "$captured_required" --required-relative "$required_tests"; then
+# The captured digest goes to the result gate, which checks the bytes it parses.
+if ! required_sha256="$(/usr/bin/python3 Scripts/ios/ios-provenance.py verify-required-copy \
+    "$evidence/source.json" --copy "$captured_required" --required-relative "$required_tests")"; then
     echo "$command_label: required-name copy does not match captured source; refusing to start tests" >&2
     exit 65
 fi
@@ -128,19 +132,11 @@ set -e
 if [ "$extraction_result" != 0 ]; then
     [ "$result" != 0 ] || result=65
 else
-    if ! /usr/bin/python3 Scripts/ios/ios-provenance.py verify-required-copy \
-        "$evidence/source.json" --copy "$captured_required" --required-relative "$required_tests"; then
-        [ "$result" != 0 ] || result=65
-    else
-        result_args=("$evidence/test-results.json" --required "$captured_required"
-            --report "$evidence/test-gate.json" --names "$evidence/named-tests.txt")
-        if [ "$scheme" = IOSPreview ]; then result_args+=(--no-skips); fi
-        if ! /usr/bin/python3 Scripts/ios/ios-test-results.py "${result_args[@]}"; then
-            [ "$result" != 0 ] || result=65
-        fi
-    fi
-    if ! /usr/bin/python3 Scripts/ios/ios-provenance.py verify-required-copy \
-        "$evidence/source.json" --copy "$captured_required" --required-relative "$required_tests"; then
+    result_args=("$evidence/test-results.json" --required "$captured_required"
+        --required-sha256 "$required_sha256"
+        --report "$evidence/test-gate.json" --names "$evidence/named-tests.txt")
+    if [ "$scheme" = IOSPreview ]; then result_args+=(--no-skips); fi
+    if ! /usr/bin/python3 Scripts/ios/ios-test-results.py "${result_args[@]}"; then
         [ "$result" != 0 ] || result=65
     fi
 fi
