@@ -52,6 +52,14 @@ final class DocumentIntegrityTests: XCTestCase {
         XCTAssertEqual(Frontmatter.updating(source, key: "title", value: .string("New")), expected)
     }
 
+    /// The iOS inspector applies the minimal difference, so a toggle must change only the
+    /// value: delimiters, other fields' quotes, and both comments stay byte-for-byte.
+    func testBooleanToggleChangesOnlyTheValueBesideCommentedFields() {
+        let source = "---\ntitle: \"\" # set me\ndraft: true # status\n---\nbody\n"
+        let expected = "---\ntitle: \"\" # set me\ndraft: false # status\n---\nbody\n"
+        XCTAssertEqual(Frontmatter.updating(source, key: "draft", value: .bool(false)), expected)
+    }
+
     func testEditDistinguishesBlockScalarContentFromHeaderComment() {
         let source = "---\ntitle: | # note\n  # part of the title\nslug: post\n---\n"
         let expected = "---\ntitle: \"New\" # note\nslug: post\n---\n"

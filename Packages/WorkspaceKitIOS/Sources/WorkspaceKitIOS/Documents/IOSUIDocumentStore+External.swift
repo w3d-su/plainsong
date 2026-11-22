@@ -85,7 +85,7 @@ extension IOSUIDocumentStore {
         guard guardCurrentAuthority(entry, generation: entry.accessGeneration) else {
             throw IOSDocumentFailure.documentChanged
         }
-        installSession(entry, text: text, canWrite: canWrite)
+        installSession(entry, text: text, canWrite: canWrite && !entry.lease.isReleased)
         guard let handle = entry.handle() else { throw IOSDocumentFailure.unavailable }
         finishOpen(entry, result: .success(handle))
         return handle
