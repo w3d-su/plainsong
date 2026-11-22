@@ -98,6 +98,24 @@ final class PreviewLinkOpeningTests: XCTestCase {
         XCTAssertEqual(appState.workspaceTreeRevealRequest, revealRequest &+ 2)
     }
 
+    func testWorkspaceLinkToAHiddenFileClearsTheSidebarSelection() async throws {
+        let root = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let index = root.appendingPathComponent("index.md")
+        try "[Other](Other.md)".write(to: index, atomically: true, encoding: .utf8)
+        try "[Draft](.draft.md)".write(to: root.appendingPathComponent("Other.md"), atomically: true, encoding: .utf8)
+        try "# Draft".write(to: root.appendingPathComponent(".draft.md"), atomically: true, encoding: .utf8)
+        let appState = try await openWorkspace(root, showing: index)
+        appState.openPreviewLink("Other.md")
+        XCTAssertEqual(appState.workspaceTree?.selectedNode?.relativePath, "Other.md")
+
+        appState.openPreviewLink(".draft.md")
+
+        XCTAssertNil(appState.presentedError)
+        XCTAssertEqual(appState.shownSession.text, "# Draft")
+        XCTAssertNil(appState.workspaceTree?.selectedNodeID)
+    }
+
     /// The sandbox refuses a file outside the workspace grant. The link used to close the
     /// workspace first and then fail to read the file, leaving "No Folder Open".
     func testUnreadableOutsideLinkKeepsTheWorkspace() async throws {

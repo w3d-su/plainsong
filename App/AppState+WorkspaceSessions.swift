@@ -33,13 +33,20 @@ extension AppState {
               workspaceInstalledCaptureGeneration == workspaceGeneration,
               let location = retainedManagedSessionLocation(for: session),
               location.rootAuthority == rootAuthority,
-              var tree = workspaceTree,
-              let node = firstNode(
-                  in: tree.root,
-                  canonicalRelativePath: location.relativePath,
-                  rootURL: rootAuthority.originalRootURL
-              )
+              var tree = workspaceTree
         else {
+            return
+        }
+        guard let node = firstNode(
+            in: tree.root,
+            canonicalRelativePath: location.relativePath,
+            rootURL: rootAuthority.originalRootURL
+        ) else {
+            // A file the scan leaves out (a hidden file) has no row; don't keep the old one lit.
+            if revealingAncestors {
+                tree.selectNode(id: nil)
+                workspaceTree = tree
+            }
             return
         }
 
