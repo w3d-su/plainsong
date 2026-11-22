@@ -115,7 +115,9 @@ extension IOSUIDocumentStore {
     }
 
     /// A scene may leave an unavailable file after its latest edits are durable
-    /// and the provider has actually relinquished its writer.
+    /// and the provider has actually relinquished its writer. An identity the store
+    /// does not hold returns without an error: closed history is bounded, so an
+    /// evicted identity cannot be told apart from one this store never issued.
     public func retireRetainedWriter(_ identity: IOSDocumentIdentity, disconnecting: Bool) async throws {
         // Evicted terminal IDs have already relinquished their writer.
         guard let registered = byIdentity[identity], !registered.closed else { return }

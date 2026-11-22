@@ -25,6 +25,8 @@ final class ScriptedFilePort: IOSDocumentFilePort {
     var canWrite = true
     var openFailure: IOSDocumentFailure?
     var blockOpen = false
+    /// Parks `create` after it writes, before it returns, like a provider notice racing it.
+    var blockCreate = false
     var createExisting = false
     var failNextSave = false
     var indeterminateNextSave = false
@@ -76,6 +78,12 @@ final class ScriptedFilePort: IOSDocumentFilePort {
         }
         written.append(snapshot)
         openedData = snapshot
+        if blockCreate {
+            await withCheckedContinuation { continuation in
+                self.blocked.append(continuation)
+                self.parked += 1
+            }
+        }
     }
 
     func save(
@@ -135,12 +143,14 @@ final class ScriptedPortFactory {
     var canWrite = true
     var openFailure: IOSDocumentFailure?
     var blockOpen = false
+    var blockCreate = false
 
     func make(fileURL: URL) -> ScriptedFilePort {
         let port = ScriptedFilePort(fileURL: fileURL, openedData: openedData)
         port.canWrite = canWrite
         port.openFailure = openFailure
         port.blockOpen = blockOpen
+        port.blockCreate = blockCreate
         created.append(port)
         return port
     }

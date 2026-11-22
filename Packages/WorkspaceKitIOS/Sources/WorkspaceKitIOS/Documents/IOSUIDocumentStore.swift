@@ -169,8 +169,7 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
                 text = decoded
                 canWrite = opened.canWrite
             }
-            return try await finishOpeningSession(entry, initialText: text, canWrite: canWrite,
-                                                  existingFile: initialText == nil)
+            return try await finishOpeningSession(entry, initialText: text, canWrite: canWrite)
         } catch {
             if error is CancellationError {
                 failOpen(entry, .unavailable)

@@ -54,8 +54,10 @@ extension IOSUIDocumentStore {
 
     /// A provider can report changes after capturing its open snapshot. Finish all notified
     /// reads before publishing the first editable session or waking another opener.
+    /// A failed readback keeps the last verified bytes as an untouched snapshot. Created
+    /// bytes count: create returns only after writing them, and a restored draft keeps its record.
     func finishOpeningSession(
-        _ entry: IOSDocumentEntry, initialText: String, canWrite: Bool, existingFile: Bool
+        _ entry: IOSDocumentEntry, initialText: String, canWrite: Bool
     ) async throws -> IOSDocumentHandle {
         var text = initialText
         while entry.hasDeferredExternalChange, !entry.fenced,
@@ -75,7 +77,7 @@ extension IOSUIDocumentStore {
             } catch {
                 if !entry.fenced {
                     fenceUnavailable(entry, (mapped(error) as? IOSDocumentFailure) ?? .unavailable,
-                                     openingReadbackFailed: existingFile)
+                                     openingReadbackFailed: true)
                 }
             }
         }

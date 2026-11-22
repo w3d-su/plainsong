@@ -77,6 +77,48 @@ final class IOSDocumentIntegrityTests: XCTestCase {
         XCTAssertTrue(port.written.isEmpty)
     }
 
+    func testClosingAnUneditedFailedCreateSnapshotDoesNotCreateRecovery() async throws {
+        let harness = DocumentIOHarness()
+        let (handle, port) = try await createNoteWithFailedReadback(harness, text: "restored draft")
+        guard case .closed = try await harness.store.close(handle.identity) else {
+            return XCTFail("closing an untouched created snapshot must release its writer")
+        }
+        let drafts = await harness.store.recoveryList()
+        XCTAssertTrue(drafts.records.isEmpty)
+        XCTAssertEqual(port.closeCalls, 1)
+        XCTAssertEqual(port.written, [Data("restored draft".utf8)])
+    }
+
+    func testCreatedSnapshotRegainsWritesWhenALaterReadMatchesIt() async throws {
+        let harness = DocumentIOHarness()
+        let (handle, port) = try await createNoteWithFailedReadback(harness, text: "draft")
+        await harness.coordinator.setReadFailure(nil)
+        await harness.coordinator.setBytes(Data("draft".utf8))
+        port.emit(.externalChange)
+        await waitUntil { harness.store.state(for: handle.identity)?.canWrite == true }
+        XCTAssertFalse(handle.session.isDirty)
+        XCTAssertNil(harness.store.byIdentity[handle.identity]?.pendingProposal)
+    }
+
+    /// Creates `Note.md` while the provider reports a change that cannot be read back.
+    private func createNoteWithFailedReadback(
+        _ harness: DocumentIOHarness, text: String
+    ) async throws -> (IOSDocumentHandle, ScriptedFilePort) {
+        harness.ports.blockCreate = true
+        await harness.coordinator.setReadFailure(.offline)
+        let location = harness.location(relativePath: "Note.md", generation: 1)
+        let lease = harness.directoryLease(generation: 1)
+        let creating = Task { try await harness.store.create(at: location, initialText: text, lease: lease) }
+        await waitUntil { harness.ports.created.first?.parked == 1 }
+        let port = try XCTUnwrap(harness.ports.created.first)
+        port.emit(.externalChange)
+        port.releaseOne()
+        let handle = try await creating.value
+        XCTAssertEqual(handle.session.text, text)
+        XCTAssertEqual(harness.store.state(for: handle.identity)?.canWrite, false)
+        return (handle, port)
+    }
+
     func testConflictReloadChecksLivePermissionAfterIndeterminateSave() async throws {
         for writable in [true, false] {
             let harness = DocumentIOHarness()

@@ -97,8 +97,8 @@ WorkspaceKitIOS frozen `Contracts.swift` 中：
 - save acknowledgement 帶 document identity、captured saved version／text、location／operation ID；不可只有 Bool 成功。
 - 每個實際 resource 唯一序列 writer；同檔重複 open 由 store registry 收斂，不能讓兩個 UUID writer 各自覆寫。
 - save 完成後先驗 document／location／operation 順序，再用既有 `rebaseSavedText(to:)` 更新保存基準。**對舊快照呼叫 `markSaved(text:url:)` 會改 live source，禁止。**
-- 開檔期間若收到外部修改通知，先協調重讀最新內容才開放寫入。補讀失敗時保留唯讀快照，待新的檔案或可寫通知重讀，未改動即可關閉。寫入結果不明時保留草稿並封鎖原檔寫入。重新選檔或接受衝突的 Reload 後，依最新檔案權限決定是否開放寫入。
-- 關檔後立即釋放文件內容與 writer。每個 store 可查詢最近 128 個關閉工作階段的 closed 狀態及 access generation；更舊的識別碼回傳 nil，重複要求釋放 writer 仍可安全完成。
+- 開檔或建立新檔期間若收到外部修改通知，先協調重讀最新內容才開放寫入。補讀失敗時保留唯讀快照，待新的檔案或可寫通知重讀，未改動即可關閉。寫入結果不明時保留草稿並封鎖原檔寫入。重新選檔或接受衝突的 Reload 後，依最新檔案權限決定是否開放寫入。
+- 關檔後立即釋放文件內容與 writer。每個 store 可查詢最近 128 個關閉工作階段的 closed 狀態及 access generation；更舊的識別碼回傳 nil。store 分不出已清除的舊識別碼與從未登記的識別碼，對兩者要求釋放 writer 都直接完成、不回報錯誤。
 - 外部 clean reload 只在 capture revision 仍有效且 native 非 composing 時套用；dirty conflict 先保存本地 recovery snapshot、阻擋 overwrite，顯示 reload／save-copy 選項。
 - recovery 在 app-private storage 以 operation/document IDs 定位，記錄 source、identity、captured version、原因。儲存／授權失敗不丟 dirty session；background flush 是 best effort，已持久化 recovery 才可聲稱可恢復。
 
