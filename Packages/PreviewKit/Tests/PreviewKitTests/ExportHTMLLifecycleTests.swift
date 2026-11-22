@@ -168,42 +168,28 @@ final class ExportHTMLLifecycleTests: XCTestCase {
         observesPendingExport: Bool = true,
         trigger: (PreviewController, Task<PreviewHTMLExportResult, Never>) -> Void
     ) async throws {
-        /// TEMPORARY CI diagnostic (PR 302): unbuffered markers locate the Xcode 16.4 crash.
-        func step(_ phase: String) {
-            FileHandle.standardError.write(Data("ASSERT_TERMINAL_STEP \(reason) \(phase)\n".utf8))
-        }
-        step("start")
         var controller: PreviewController? = try support.makeController()
-        step("made controller")
         weak var releasedController = controller
         defer { releasedController?.invalidate() }
         weak var releasedWebView = controller?.webView
-        step("made weak references")
         let renderID = try await support.render(controller!, text: "# Lifecycle", fileKind: .markdown, version: 1)
-        step("rendered")
         controller!.exportTimeoutNanoseconds = timeout
         try await suspendExports(controller!)
-        step("suspended exports")
         var task: Task<PreviewHTMLExportResult, Never>? = Task { [controller = controller!] in
             await controller.exportHTML(matchingRenderID: renderID)
         }
         if observesPendingExport {
             try await support.waitUntil("pending export") { controller?.pendingHTMLExport != nil }
         }
-        step("export pending")
         trigger(controller!, task!)
-        step("triggered")
         await assertFailure(task!.value, reason: reason)
-        step("export failed")
         XCTAssertNil(controller!.pendingHTMLExport)
         controller!.invalidate()
         task = nil
         controller = nil
-        step("released strong references")
         try await support.waitUntil("controller and WebView release") {
             releasedController == nil && releasedWebView == nil
         }
-        step("released")
     }
 
     private func suspendExports(_ controller: PreviewController) async throws {
