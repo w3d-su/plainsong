@@ -146,7 +146,9 @@ final class IOSProductionSurfaceTests: XCTestCase {
         XCTAssertTrue(harness.runtime.scene.previewHostView === harness.runtime.preview.webView)
     }
 
-    func testReturningActiveCannotTransferFocusToAReplacementBinding() throws {
+    /// The claim `noteNewBinding` queues runs after a `Task.yield()`, so the test
+    /// lets the main actor run before asserting that none was queued.
+    func testReturningActiveCannotTransferFocusToAReplacementBinding() async throws {
         let harness = try makeHarness { _, _ in }
         let identity = IOSDocumentIdentity(rawValue: UUID())
         let session = DocumentSession(text: "# Original", fileKind: .markdown)
@@ -165,9 +167,32 @@ final class IOSProductionSurfaceTests: XCTestCase {
             accessGeneration: 1, canWrite: true
         ))
         harness.runtime.setSceneActive(true)
+        try await Task.sleep(nanoseconds: 50_000_000)
         XCTAssertEqual(harness.facade.setCommandFocusCalls.count, callsBeforeReplacement)
         XCTAssertFalse(harness.runtime.editor.captureSnapshot()?.isFocused ?? true)
         harness.runtime.scene.stopObserving()
+    }
+
+    /// A document opened from Files while the scene was inactive was never queued,
+    /// because `noteNewBinding` only queues while active. Activation claims it.
+    func testReturningActiveClaimsADocumentBoundWhileInactive() async throws {
+        let harness = try makeHarness { _, _ in }
+        harness.runtime.startObserving()
+        harness.runtime.setSceneActive(false)
+        let identity = IOSDocumentIdentity(rawValue: UUID())
+        let bindingID = UUID()
+        harness.runtime.editor.attach(IOSSourceEditorDocumentBinding(
+            bindingID: bindingID, identity: identity, session: DocumentSession(text: "New", fileKind: .markdown),
+            accessGeneration: 1, canWrite: true
+        ))
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertFalse(harness.facade.setCommandFocusCalls.contains { $0.focused && $0.bindingID == bindingID })
+        harness.runtime.setSceneActive(true)
+        try await waitUntil {
+            harness.facade.setCommandFocusCalls.contains {
+                $0.focused && $0.identity == identity && $0.bindingID == bindingID
+            }
+        }
     }
 
     func testRepeatedSheetFactoryDoesNotRestartFindOrLoseDrafts() throws {
