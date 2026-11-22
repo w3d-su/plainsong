@@ -59,9 +59,10 @@ enum PreviewHostedTestWait {
         throw failure
     }
 
-    /// Tests evaluate JavaScript only through this completion-handler helper. In Swift 6 mode
-    /// built with Xcode 16.4, the async `WKWebView.evaluateJavaScript(_:)` import crashed the
-    /// test process with SIGSEGV (PR 298 CI); Xcode 26 and later did not.
+    /// Tests evaluate JavaScript only through this completion-handler helper. Every module
+    /// that awaits the async `WKWebView.evaluateJavaScript(_:)` import emits its bridging thunk
+    /// under one shared symbol; with Xcode 16.4, Swift 6 tests and a Swift 5 PreviewKit
+    /// disagreed about that thunk and the test process crashed with SIGSEGV (PR 298 CI).
     static func javascript(
         _ script: String,
         in webView: WKWebView,
