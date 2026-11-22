@@ -120,10 +120,11 @@ public final class DocumentSession: ObservableObject {
             }
             guard let counts = TextStatistics.countUnlessCancelled(source) else { return }
             await MainActor.run { [weak self] in
-                guard !Task.isCancelled, let self else { return }
-                self.statisticsTask = nil
-                self.applyStatistics(counts)
-                onReady?(self)
+                // A distinct name keeps the Xcode 16.4 compiler and SwiftFormat's redundantSelf rule agreed.
+                guard !Task.isCancelled, let session = self else { return }
+                session.statisticsTask = nil
+                session.applyStatistics(counts)
+                onReady?(session)
             }
         }
     }
