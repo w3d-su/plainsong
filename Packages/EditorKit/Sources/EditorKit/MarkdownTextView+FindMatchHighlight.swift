@@ -58,7 +58,11 @@ extension MarkdownTextViewCoordinator {
     /// and that window is padded more widely than this one. Between the two the scroll
     /// would show matches without decoration.
     func refreshFindMatchHighlightAfterViewportChange(in textView: STTextView) {
+        // A storage attribute write during a writer lease or an IME composition is held off
+        // like every other presentation write; the next scroll or update applies it.
         guard !isUpdating,
+              !hasPendingWriterLease,
+              !textView.hasMarkedText(),
               let request = appliedFindMatchHighlight,
               let visibleRange = lastVisibleTextRange,
               let applied = appliedFindMatchHighlightMaterialisation,

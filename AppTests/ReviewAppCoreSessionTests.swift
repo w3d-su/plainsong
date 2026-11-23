@@ -147,6 +147,31 @@ final class ReviewAppCoreSessionTests: XCTestCase {
         XCTAssertEqual(appState.shownSession.fileURL, post)
     }
 
+    func testAPreviewLinkToAMissingFileOutsideTheWorkspaceReportsItAsMissing() throws {
+        let parent = try makeRoot()
+        let root = parent.appendingPathComponent("workspace", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let post = root.appendingPathComponent("post.md")
+        try Data("[gone](../gone.md)".utf8).write(to: post)
+        let appState = AppState(
+            shownSession: DocumentSession(text: "[gone](../gone.md)", url: post, fileKind: .markdown),
+            shouldRestoreLastOpenedFile: false
+        )
+        appState.workspaceRootURL = root
+        let missing = CocoaError(.fileReadNoSuchFile, userInfo: [NSFilePathErrorKey: parent.path + "/gone.md"])
+
+        appState.openPreviewLink("../gone.md")
+
+        XCTAssertEqual(appState.workspaceRootURL, root)
+        XCTAssertEqual(appState.presentedError?.message, missing.localizedDescription)
+    }
+
+    /// The gate that keeps a test run off the owner's last-opened file and durable recovery
+    /// stores has to hold in every configuration the tests are built in.
+    func testATestRunIsRecognisedAsOne() {
+        XCTAssertTrue(AppState.isRunningUnderXCTest)
+    }
+
     private func makeRoot() throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("ReviewAppCoreSessionTests-\(UUID().uuidString)", isDirectory: true)
@@ -182,7 +207,7 @@ final class ReviewAppCoreSessionTests: XCTestCase {
             KeyWindowRouter.shared.closeFacade(closing)
         }
         sibling = nil
-        try XCTSkipIf(releasedSibling != nil, "the closed façade is still retained")
+        XCTAssertNil(releasedSibling, "the closed façade is still retained")
 
         let deadline = Date().addingTimeInterval(3)
         while session.isDirty, Date() < deadline {

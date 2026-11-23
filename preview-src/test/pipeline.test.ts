@@ -63,6 +63,25 @@ describe.each([
 });
 
 describe("mdx preview pipeline", () => {
+  it("does not turn an authored task-list class into a document task toggle", async () => {
+    const html = await renderMdx([
+      '<ul class="contains-task-list">',
+      '  <li class="task-list-item note"><input type="checkbox" /> fake</li>',
+      '  <li class={"task-list-item"}><input type="checkbox" /> fake</li>',
+      "</ul>",
+      "",
+      "- [ ] real",
+      "",
+    ].join("\n"));
+    const root = document.createElement("div");
+    root.innerHTML = html;
+
+    expect(root.querySelector("ul")!.className).toBe("");
+    expect(root.querySelector("li")!.className).toBe("");
+    expect(root.querySelectorAll("[data-task-checkbox]")).toHaveLength(1);
+    expect(root.querySelector("li.task-list-item [data-task-checkbox]")).not.toBeNull();
+  });
+
   it("drops authored preview-internal attributes and classes but keeps data images", async () => {
     const html = await renderMdx([
       "first",

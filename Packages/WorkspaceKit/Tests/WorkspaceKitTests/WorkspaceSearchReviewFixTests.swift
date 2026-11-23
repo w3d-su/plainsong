@@ -70,7 +70,27 @@ final class WorkspaceSearchReviewFixTests: XCTestCase {
         XCTAssertEqual(completedSummary(in: events)?.ignoredFileCount, 1)
     }
 
-    private func request(root: URL, paths: [String]) throws -> WorkspaceSearchRequest {
+    func testIgnoreFileProbesStopAtTheProbeLimit() async throws {
+        let root = try makeTemporaryDirectory()
+        // Root plus `dir0` are the four probes the limit allows; `zz/.gitignore` is past them.
+        let paths = ["dir0/post.md", "zz/secret.md"]
+        var files = Dictionary(uniqueKeysWithValues: paths.map { ($0, "needle") })
+        files["zz/.gitignore"] = "secret.md\n"
+
+        let events = try await collectEvents(
+            WorkspaceSearchService(reader: MapReader(root: root, files: files)),
+            request: request(root: root, paths: paths, limits: WorkspaceSearchLimits(maximumIgnoreFileProbes: 4))
+        )
+
+        XCTAssertEqual(Set(fileResults(in: events).map(\.relativePath)), Set(paths))
+        XCTAssertEqual(completedSummary(in: events)?.ignoredFileCount, 0)
+    }
+
+    private func request(
+        root: URL,
+        paths: [String],
+        limits: WorkspaceSearchLimits = .init()
+    ) throws -> WorkspaceSearchRequest {
         try WorkspaceSearchRequest(
             rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
             snapshot: WorkspaceFileSnapshot(entries: paths.map {
@@ -83,7 +103,8 @@ final class WorkspaceSearchReviewFixTests: XCTestCase {
             }),
             workspaceGeneration: 1,
             queryGeneration: 1,
-            query: TextSearchQuery(pattern: "needle")
+            query: TextSearchQuery(pattern: "needle"),
+            limits: limits
         )
     }
 

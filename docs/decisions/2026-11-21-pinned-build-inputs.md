@@ -30,3 +30,14 @@ SHA or the digest together with the version comment.
 
 Not covered: the editor Find F2 performance gate generates its own sealed source
 snapshot and records the resolved package input digest instead.
+
+## Alternatives considered
+
+- Commit `Plainsong.xcodeproj` with its `Package.resolved`. Rejected: the project is
+  generated (§2), and a committed pbxproj brings back the diffs XcodeGen removes.
+- Pin exact versions in `project.yml` only. Rejected: a version tag can be moved, and
+  the transitive packages are not named there.
+- Keep `@v4` action tags and let Dependabot bump them. Rejected: a tag is movable
+  between bumps; a SHA with a version comment is still bumped by the same tooling.
+- Keep `brew install xcodegen`. Rejected: Homebrew installs whatever is current, so the
+  generated project could change without a commit.

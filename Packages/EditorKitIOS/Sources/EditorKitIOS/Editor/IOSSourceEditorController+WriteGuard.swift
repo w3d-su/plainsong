@@ -30,8 +30,13 @@ extension IOSSourceEditorController {
         }
         let selected = textView.selectedRange
         _ = IOSNativeTextMutation.replaceBufferWithoutUndo(session.text, in: textView)
-        // The history now describes a buffer that was put back underneath it.
-        textView.undoManager?.removeAllActions()
+        // The history now describes a buffer that was put back underneath it. A native undo
+        // or redo calls this from inside its own replay, so the clear waits for it to end.
+        if let manager = textView.undoManager, manager.isUndoing || manager.isRedoing {
+            textView.discardHistoryAfterReplay()
+        } else {
+            textView.undoManager?.removeAllActions()
+        }
         isAdjustingSelection = true
         textView.selectedRange = IOSTextRanges.clamped(selected, length: textView.textStorage.length)
         isAdjustingSelection = false
@@ -40,6 +45,20 @@ extension IOSSourceEditorController {
         raisePresentationFloor()
         clearInheritedPresentation()
         rebuildLineIndex()
+    }
+
+    /// Ends a composition whose next keystroke was refused. Dropping that input alone would
+    /// leave the view marked with an input method that has moved on: highlighting, gutter
+    /// chrome and statistics stay deferred, and edits are refused with `.markedText` after
+    /// access returns. The session already holds the composing text, so it stays. A
+    /// composition nobody types into is left alone: a reload that is deferred behind it
+    /// applies when it ends.
+    func endCompositionAfterRefusedInput() {
+        guard textView.markedTextRange != nil, let session = installation?.session else { return }
+        isReconciling = true
+        textView.unmarkText()
+        isReconciling = false
+        restoreSessionTextAfterRefusedNativeEdit(session)
     }
 
     /// Replaces the buffer for another document. A whole-buffer replacement inherits the

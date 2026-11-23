@@ -5,31 +5,20 @@ import XCTest
 
 @MainActor
 final class IOSWorkspaceScanPruningTests: XCTestCase {
-    func testDefaultScanDoesNotListIgnoredOrHiddenDirectories() async throws {
+    func testDefaultScanSkipsHiddenDirectoriesAndKeepsVisibleGeneratedOnes() async throws {
         let harness = AccessHarness()
         let grant = try await harness.openDirectory("/tmp/plainsong-review/Pruned")
         scriptProject(harness, grant: grant)
         let snapshot = try await harness.service.refresh(grant)
         XCTAssertEqual(
             Set(harness.files.listedPaths()),
-            Set(["", "posts"].map { path(grant.rootURL, $0) })
+            Set(["", "posts", "node_modules", "Build"].map { path(grant.rootURL, $0) })
         )
         let paths = Self.paths(snapshot.entries)
         XCTAssertTrue(paths.contains("posts/page.md"))
-        XCTAssertFalse(paths.contains { $0.hasPrefix("node_modules") || $0.hasPrefix(".git") })
-    }
-
-    func testShowAllFilesStillListsIgnoredDirectories() async throws {
-        let harness = AccessHarness()
-        harness.service.includesAllFiles = true
-        let grant = try await harness.openDirectory("/tmp/plainsong-review/ShowAll")
-        scriptProject(harness, grant: grant)
-        let snapshot = try await harness.service.refresh(grant)
-        XCTAssertEqual(
-            Set(harness.files.listedPaths()),
-            Set(["", "posts", "node_modules"].map { path(grant.rootURL, $0) })
-        )
-        XCTAssertTrue(Self.paths(snapshot.entries).contains("node_modules/pkg.md"))
+        XCTAssertTrue(paths.contains("Build/notes.md"))
+        XCTAssertTrue(paths.contains("node_modules/pkg.md"))
+        XCTAssertFalse(paths.contains { $0.hasPrefix(".git") || $0.hasPrefix(".drafts") })
     }
 
     func testHiddenEntriesSettingListsHiddenDirectories() async throws {
@@ -40,7 +29,7 @@ final class IOSWorkspaceScanPruningTests: XCTestCase {
         _ = try await harness.service.refresh(grant)
         XCTAssertEqual(
             Set(harness.files.listedPaths()),
-            Set(["", "posts", ".drafts"].map { path(grant.rootURL, $0) })
+            Set(["", "posts", "node_modules", "Build", ".git", ".drafts"].map { path(grant.rootURL, $0) })
         )
     }
 
@@ -49,11 +38,13 @@ final class IOSWorkspaceScanPruningTests: XCTestCase {
         harness.files.nestedListing = { url, _ in
             switch url.path(percentEncoded: false) {
             case root.path(percentEncoded: false):
-                ["posts", "node_modules", ".git", ".drafts"].map { item(root, $0, directory: true) }
+                ["posts", "node_modules", "Build", ".git", ".drafts"].map { item(root, $0, directory: true) }
             case path(root, "posts"):
                 [item(root, "posts/page.md", directory: false)]
             case path(root, "node_modules"):
                 [item(root, "node_modules/pkg.md", directory: false)]
+            case path(root, "Build"):
+                [item(root, "Build/notes.md", directory: false)]
             default:
                 []
             }

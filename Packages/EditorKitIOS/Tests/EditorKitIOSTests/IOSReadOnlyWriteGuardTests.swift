@@ -92,6 +92,25 @@ final class IOSReadOnlyWriteGuardTests: XCTestCase {
         XCTAssertTrue(ExactSourceText.matches(harness.session.text, harness.textView.textStorage.string))
     }
 
+    func testRefusedCompositionInputEndsTheCompositionSoLaterEditsAreAccepted() {
+        let harness = IOSEditorHarness(text: "hello")
+        harness.placeCaret(at: 5)
+        harness.textView.setMarkedText("ㄓ", selectedRange: NSRange(location: 1, length: 0))
+        let composing = harness.textView.textStorage.string
+
+        setCanWrite(false, harness, generation: 2)
+        XCTAssertNotNil(harness.textView.markedTextRange, "an idle composition is left for a deferred reload")
+        harness.textView.setMarkedText("ㄓㄨ", selectedRange: NSRange(location: 2, length: 0))
+        XCTAssertNil(harness.textView.markedTextRange)
+        XCTAssertEqual(harness.textView.textStorage.string, composing)
+        XCTAssertTrue(ExactSourceText.matches(harness.session.text, composing))
+
+        setCanWrite(true, harness, generation: 3)
+        harness.placeCaret(at: harness.textView.textStorage.length)
+        harness.textView.insertText("x")
+        XCTAssertEqual(harness.session.text, composing + "x")
+    }
+
     private func setCanWrite(_ canWrite: Bool, _ harness: IOSEditorHarness, generation: UInt64) {
         harness.controller.updateAccess(
             for: harness.identity,

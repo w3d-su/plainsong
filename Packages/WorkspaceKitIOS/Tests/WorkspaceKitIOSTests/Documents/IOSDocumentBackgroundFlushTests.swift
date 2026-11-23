@@ -46,11 +46,13 @@ extension IOSDocumentBackgroundFlushTests {
         let outcomes = await harness.store.flushForBackground()
         guard case .recovered = outcomes.first else { return XCTFail("expected a timed-out flush") }
         await waitUntil { port.parked >= 1 }
+        // Edited before the parked save lands: the session is then dirty past that save's
+        // version, so the equal-version discard cannot remove the checkpoint first.
+        handle.session.replaceText("second draft")
         port.blocksSaves = false
         port.releaseOne()
         await waitUntil { port.written.count == 1 }
 
-        handle.session.replaceText("second draft")
         _ = try await harness.store.save(handle.identity)
         let list = await harness.store.recoveryList()
         XCTAssertTrue(list.records.isEmpty, "the older checkpoint stayed on disk")

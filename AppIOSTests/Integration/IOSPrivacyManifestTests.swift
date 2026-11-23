@@ -16,5 +16,7 @@ final class IOSPrivacyManifestTests: XCTestCase {
         }
         XCTAssertEqual(reasons["NSPrivacyAccessedAPICategoryUserDefaults"], ["CA92.1"])
         XCTAssertEqual(reasons["NSPrivacyAccessedAPICategorySystemBootTime"], ["35F9.1"])
+        // `fstat` on files the user picked (preview asset readers).
+        XCTAssertEqual(reasons["NSPrivacyAccessedAPICategoryFileTimestamp"], ["3B52.1"])
     }
 }

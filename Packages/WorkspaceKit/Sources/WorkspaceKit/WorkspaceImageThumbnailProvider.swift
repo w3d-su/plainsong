@@ -6,8 +6,9 @@ import MarkdownCore
 /// Resolves document-relative paths, evaluates `MarkdownImageThumbnailPolicy`, and returns a
 /// downsampled PNG bitmap. All file I/O runs under security-scoped root access; remote /
 /// `data:` / `file:` sources never reach disk. The actor owns only the cache and the in-flight
-/// table; the file read and the ImageIO decode run in a nonisolated function, so one large
-/// image does not hold up cache hits or other loads.
+/// table; the file read and the ImageIO decode run off it, so one large image does not hold
+/// up cache hits or other loads. Reads go one at a time through `SourceReader`; decodes run
+/// in parallel.
 public actor WorkspaceImageThumbnailProvider: WorkspaceImageThumbnailLoading {
     public static let defaultMaxPixelSize = 600
     public static let defaultCacheByteBudget = 32 * 1024 * 1024
@@ -16,6 +17,7 @@ public actor WorkspaceImageThumbnailProvider: WorkspaceImageThumbnailLoading {
     private var cache: WorkspaceImageThumbnailCache
     private var inFlight: [WorkspaceImageThumbnailCache.Key: Task<WorkspaceImageThumbnailOutcome, Never>] = [:]
     private let hooks: Hooks
+    private let sourceReader = SourceReader()
 
     /// Test seams for the off-actor read and decode.
     struct Hooks: Sendable {
@@ -222,8 +224,8 @@ public actor WorkspaceImageThumbnailProvider: WorkspaceImageThumbnailLoading {
             modificationDate: modificationDate,
             maxPixelSize: maxPixelSize
         )
-        let task = Task { [hooks] in
-            let outcome = await Self.readAndDecode(request, hooks: hooks)
+        let task = Task { [hooks, sourceReader] in
+            let outcome = await Self.readAndDecode(request, reader: sourceReader, hooks: hooks)
             return await self.finishDecode(outcome, cacheKey: cacheKey)
         }
         inFlight[cacheKey] = task
@@ -251,29 +253,44 @@ private extension WorkspaceImageThumbnailProvider {
         let maxPixelSize: Int
     }
 
-    /// Reads the image through a root-anchored, no-follow descriptor walk and decodes those
-    /// bytes. Nonisolated, so it runs on the global executor rather than on the provider actor.
-    ///
-    /// The path was resolved and contained a moment ago, but a path is not a file: an entry
-    /// swapped for a symlink since then is refused here instead of being followed by ImageIO.
-    nonisolated static func readAndDecode(
-        _ request: DecodeRequest,
-        hooks: Hooks
-    ) async -> WorkspaceImageThumbnailOutcome {
-        hooks.willReadSource?()
-        let maximumByteCount = Int(MarkdownImageAssetPolicy.maximumFileSizeBytes)
-        let read: WorkspaceAnchoredFileSystem.ReadResult
-        do {
+    /// One blocking read at a time. Each read holds up to 10 MiB + 1 in memory and blocks its
+    /// thread on a slow volume (an iCloud placeholder, SMB); unbounded, a page of large photos
+    /// would occupy every cooperative thread at once.
+    actor SourceReader {
+        func read(
+            _ request: DecodeRequest,
+            maximumByteCount: Int,
+            hooks: Hooks
+        ) throws -> WorkspaceAnchoredFileSystem.ReadResult {
+            hooks.willReadSource?()
             let location = try WorkspaceFileSystemLocation(
                 rootURL: WorkspaceRootContainment.resolvedRootURL(request.rootURL),
                 relativePath: request.workspaceRelativePath,
                 securityScopedURL: request.rootURL
             )
-            read = try WorkspaceAnchoredFileSystem.withSecurityScopedAccess(to: location) {
+            return try WorkspaceAnchoredFileSystem.withSecurityScopedAccess(to: location) {
                 // One byte past the cap tells a file that grew after the size check from one
                 // that fits, without reading an unbounded file into memory.
                 try WorkspaceAnchoredFileSystem.read(location, maximumByteCount: maximumByteCount + 1)
             }
+        }
+    }
+
+    /// Reads the image through a root-anchored, no-follow descriptor walk and decodes those
+    /// bytes. Nonisolated, so the decode runs on the global executor rather than on the
+    /// provider actor.
+    ///
+    /// The path was resolved and contained a moment ago, but a path is not a file: an entry
+    /// swapped for a symlink since then is refused here instead of being followed by ImageIO.
+    nonisolated static func readAndDecode(
+        _ request: DecodeRequest,
+        reader: SourceReader,
+        hooks: Hooks
+    ) async -> WorkspaceImageThumbnailOutcome {
+        let maximumByteCount = Int(MarkdownImageAssetPolicy.maximumFileSizeBytes)
+        let read: WorkspaceAnchoredFileSystem.ReadResult
+        do {
+            read = try await reader.read(request, maximumByteCount: maximumByteCount, hooks: hooks)
         } catch WorkspaceAnchoredFileSystemError.missing {
             return .failed(.missingFile)
         } catch {

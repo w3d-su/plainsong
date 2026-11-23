@@ -18,12 +18,16 @@ struct WorkspaceSearchIgnorePolicy {
         let directories = ancestorDirectories(for: candidatePaths)
         let readLimit = inclusiveLimit(for: limits.maximumIgnoreFileSizeBytes)
         var reads = 0
+        var probes = 0
         var rules: [WorkspaceSearchIgnoreRule] = []
 
         outer: for directory in directories {
             for filename in [".gitignore", ".ignore"] {
-                guard reads < limits.maximumIgnoreFiles else { break outer }
+                guard reads < limits.maximumIgnoreFiles,
+                      probes < limits.maximumIgnoreFileProbes
+                else { break outer }
                 try Task.checkCancellation()
+                probes += 1
 
                 let relativePath = directory.isEmpty ? filename : "\(directory)/\(filename)"
                 guard let location = try? rootAuthority.location(relativePath: relativePath) else {
@@ -40,7 +44,7 @@ struct WorkspaceSearchIgnorePolicy {
                     throw error
                 } catch WorkspaceSearchFileReadError.disappeared {
                     // Most directories have no ignore file. A probe that finds none reads
-                    // nothing, so it does not count toward `maximumIgnoreFiles`.
+                    // nothing, so it counts toward `maximumIgnoreFileProbes` only.
                     continue
                 } catch {
                     reads += 1

@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import EditorKit
+import MachO
 import MarkdownCore
 import SwiftUI
 import UniformTypeIdentifiers
@@ -246,15 +247,19 @@ final class AppState: ObservableObject {
 }
 
 extension AppState {
-    /// Debug only: a shipped build must not drop on-disk crash recovery because of an
-    /// environment variable.
-    private static var isRunningUnderXCTest: Bool {
-        #if DEBUG
-            ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-        #else
-            false
-        #endif
-    }
+    /// True only when XCTest's injection library is loaded in this process, in any build
+    /// configuration. A shipped build has the hardened runtime, which ignores
+    /// `DYLD_INSERT_LIBRARIES`, so an environment variable alone cannot drop on-disk crash
+    /// recovery there.
+    static let isRunningUnderXCTest: Bool = {
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil else {
+            return false
+        }
+        return (0 ..< _dyld_image_count()).contains { index in
+            guard let name = _dyld_get_image_name(index) else { return false }
+            return String(cString: name).hasSuffix("/libXCTestBundleInject.dylib")
+        }
+    }()
 
     private static func makeDefaultWorkspaceMutationOperationRecoveryStore()
         -> any WorkspaceMutationOperationRecoveryPersisting

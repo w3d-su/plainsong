@@ -74,6 +74,38 @@ final class WorkspaceImageThumbnailIsolationTests: XCTestCase {
         XCTAssertTrue(decodeWasReleasedInTime.value)
     }
 
+    func testSourceReadsRunOneAtATime() async throws {
+        let root = try makeWorkspace()
+        let names = (0 ..< 6).map { "photo\($0).png" }
+        for name in names {
+            try writePNG(size: 40, to: root.appendingPathComponent(name))
+        }
+        let overlap = OverlapCounter()
+        var hooks = WorkspaceImageThumbnailProvider.Hooks()
+        hooks.willReadSource = {
+            overlap.enter()
+            usleep(20000)
+            overlap.leave()
+        }
+        let provider = WorkspaceImageThumbnailProvider(hooks: hooks)
+
+        await withTaskGroup(of: Void.self) { group in
+            for name in names {
+                group.addTask {
+                    let outcome = await provider.load(
+                        rootURL: root,
+                        documentDirectoryRelativePath: "",
+                        source: name,
+                        hasDirectoryScope: true
+                    )
+                    XCTAssertNotNil(outcome.readyThumbnail)
+                }
+            }
+        }
+
+        XCTAssertEqual(overlap.maximum, 1)
+    }
+
     func testEntrySwappedForAnEscapingSymlinkAfterContainmentIsNotDecoded() async throws {
         let root = try makeWorkspace()
         let outside = try makeWorkspace()
@@ -99,6 +131,31 @@ final class WorkspaceImageThumbnailIsolationTests: XCTestCase {
         XCTAssertEqual(outcome, .failed(.unreadableFile))
         let stats = await provider.cacheStats()
         XCTAssertEqual(stats.entryCount, 0)
+    }
+}
+
+private final class OverlapCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var active = 0
+    private var peak = 0
+
+    var maximum: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return peak
+    }
+
+    func enter() {
+        lock.lock()
+        active += 1
+        peak = max(peak, active)
+        lock.unlock()
+    }
+
+    func leave() {
+        lock.lock()
+        active -= 1
+        lock.unlock()
     }
 }
 

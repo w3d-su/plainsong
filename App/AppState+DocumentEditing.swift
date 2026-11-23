@@ -97,8 +97,14 @@ extension AppState {
             // Opening a file outside the workspace closes the workspace first. The sandbox
             // grants no access to a file the user did not pick, so refuse before the close.
             guard workspaceRootURL == nil || FileManager.default.isReadableFile(atPath: url.path) else {
+                // The sandbox answers EPERM for a file it does not grant, so only a plain
+                // "no such entry" is reported as a missing target.
+                let isMissing = access(url.path, F_OK) != 0 && (errno == ENOENT || errno == ENOTDIR)
                 present(
-                    CocoaError(.fileReadNoPermission, userInfo: [NSFilePathErrorKey: url.path]),
+                    CocoaError(
+                        isMissing ? .fileReadNoSuchFile : .fileReadNoPermission,
+                        userInfo: [NSFilePathErrorKey: url.path]
+                    ),
                     title: "Could Not Open File"
                 )
                 return
