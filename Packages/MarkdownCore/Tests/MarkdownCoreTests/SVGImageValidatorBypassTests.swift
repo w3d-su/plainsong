@@ -66,11 +66,15 @@ final class SVGImageValidatorBypassTests: XCTestCase {
     }
 
     func testCombiningMarksCannotHideCSSTokens() {
-        // `(` + U+0301 is one grapheme; CSS still reads `url(` and `@import`.
+        // `(` + U+0301 is one grapheme; CSS still reads a `url(` function.
         assertRejected(.externalStyle, [
             "combining mark after url(": #"<rect fill="url(&#769;#a)"/>"#,
             "combining mark after a quote": #"<rect fill='url("&#769;#a")'/>"#,
             "combining mark in a fragment's closing quote": ##"<rect fill='url("#a"&#769;)'/>"##,
+        ])
+        // Not a working load in CSS (the mark starts an identifier, or joins the
+        // at-keyword's name); the scalar scan rejects it anyway.
+        assertRejected(.externalStyle, [
             "combining mark after image-set(": #"<style>rect{fill:image-set(&#769;"https://a.test/a.png" 1x)}</style>"#,
             "combining mark after @import": #"<style>@import&#769; "https://example.com/a.css";</style>"#,
         ])
