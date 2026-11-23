@@ -44,7 +44,7 @@ let package = Package(
             publicHeadersPath: "include",
             cSettings: [.headerSearchPath("src")]
         ),
-        .testTarget(name: "SyntaxKitTests", dependencies: ["SyntaxKit"]),
+        .testTarget(name: "SyntaxKitTests", dependencies: ["SyntaxKit", "TreeSitterYAMLFixed"]),
     ],
     swiftLanguageModes: [.v5]
 )

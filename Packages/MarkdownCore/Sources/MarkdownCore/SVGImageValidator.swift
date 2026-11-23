@@ -133,11 +133,12 @@ public enum SVGImageValidator {
     }
 
     static func isFragmentToken(_ value: some StringProtocol) -> Bool {
-        guard value.count >= 2, value.first == "#" else { return false }
-        return value.dropFirst().allSatisfy { character in
-            character != "#" && character != "(" && character != ")" && character != "\\" &&
-                character != "/" && character != ":" && character != "\"" && character != "'" &&
-                !character.isWhitespace
+        let scalars = value.unicodeScalars
+        guard scalars.count >= 2, scalars.first == "#" else { return false }
+        return scalars.dropFirst().allSatisfy { scalar in
+            scalar != "#" && scalar != "(" && scalar != ")" && scalar != "\\" &&
+                scalar != "/" && scalar != ":" && scalar != "\"" && scalar != "'" &&
+                !scalar.properties.isWhitespace
         }
     }
 

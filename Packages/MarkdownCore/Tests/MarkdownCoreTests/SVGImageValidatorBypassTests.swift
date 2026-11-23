@@ -49,6 +49,9 @@ final class SVGImageValidatorBypassTests: XCTestCase {
             "NBSP in url()": #"<rect fill="url(&#160;#a)"/>"#,
             "ideographic space in quoted url()": #"<style>rect{fill:url("&#12288;#a")}</style>"#,
             "escaped NBSP in url()": #"<rect style="fill:url(\a0 #a)"/>"#,
+            "NBSP after an escaped space": #"<rect fill="url(\20&#160;#a)"/>"#,
+            "NBSP after an escaped space, quoted": #"<rect fill='url("\20&#160;#a")'/>"#,
+            "line separator after an escaped space": #"<style>rect{fill:url(\20&#8232;#a)}</style>"#,
         ])
         XCTAssertEqual(
             admission(body: #"<use href="&#160;#a"/>"#),
@@ -60,6 +63,18 @@ final class SVGImageValidatorBypassTests: XCTestCase {
         )
         XCTAssertEqual(admission(body: #"<rect fill="url( #a )"/><use href=" #a "/>"#), .admit)
         XCTAssertEqual(admission(body: "<style>rect{fill:url(&#9;'#a'&#10;)}</style>"), .admit)
+    }
+
+    func testCombiningMarksCannotHideCSSTokens() {
+        // `(` + U+0301 is one grapheme; CSS still reads `url(` and `@import`.
+        assertRejected(.externalStyle, [
+            "combining mark after url(": #"<rect fill="url(&#769;#a)"/>"#,
+            "combining mark after a quote": #"<rect fill='url("&#769;#a")'/>"#,
+            "combining mark in a fragment's closing quote": ##"<rect fill='url("#a"&#769;)'/>"##,
+            "combining mark after image-set(": #"<style>rect{fill:image-set(&#769;"https://a.test/a.png" 1x)}</style>"#,
+            "combining mark after @import": #"<style>@import&#769; "https://example.com/a.css";</style>"#,
+        ])
+        XCTAssertEqual(admission(body: #"<rect fill="url(#a)"/><rect fill="url(#e&#769;)"/>"#), .admit)
     }
 
     func testEscapedFontNamesAndFragmentsStayAdmitted() {
