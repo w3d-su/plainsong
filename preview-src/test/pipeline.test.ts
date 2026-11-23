@@ -285,4 +285,10 @@ Inline <Badge tone="success">Ready</Badge> and {readingTime}.
     expect(html).toContain(`{globalThis.${marker} = true}`);
     expect(html).not.toContain("<script");
   });
+
+  it("does not typeset an MDX element whose class expression names a math class", async () => {
+    const html = await renderMdx('<span className={"math-inline"}>a_b</span>\n');
+    expect(html).not.toContain("katex");
+    expect(html).toContain("a_b");
+  });
 });

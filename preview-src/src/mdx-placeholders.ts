@@ -336,7 +336,9 @@ function lowercaseHtmlProperties(
       properties[name] = name === "className" ? authoredClassNames(value) : value;
     } else if (isLiteralMdxAttributeExpression(value)) {
       const literal = unquoteLiteralExpression(value.value);
-      properties[name] = name === "className" ? authoredClassNames(literal) : literal;
+      // Kept a string, as before: an array would let KaTeX read `{"math-inline"}` as math.
+      properties[name] =
+        name === "className" ? authoredClassNames(literal).join(" ") : literal;
     }
   }
 
