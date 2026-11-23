@@ -39,7 +39,7 @@ ALLOWED_CONSTRUCTORS = {
     },
 }
 ASYNC_EVALUATE_JAVASCRIPT = re.compile(
-    r"\bawait\s+(?:[A-Za-z_][A-Za-z0-9_]*\s*[?!]?\s*\.\s*)*evaluateJavaScript\s*\("
+    r"\bawait\s+(?:[A-Za-z_][A-Za-z0-9_]*\s*(?:[?!]\s*)?\.\s*)*evaluateJavaScript\s*\("
 )
 SOURCE_SUFFIXES = {".swift", ".m", ".mm"}
 WEBKIT_TYPE = r"(?:WebKit\s*\.\s*)?WKWebView(?:Configuration)?"
