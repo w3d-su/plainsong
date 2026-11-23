@@ -160,6 +160,43 @@ final class PreviewLinkOpeningTests: XCTestCase {
         XCTAssertEqual(appState.shownSession.fileURL?.lastPathComponent, "index.md")
     }
 
+    func testReadableOutsideFileReplacesTheWorkspace() async throws {
+        let root = try makeDirectory()
+        let outside = try makeDirectory()
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            try? FileManager.default.removeItem(at: outside)
+        }
+        let index = root.appendingPathComponent("index.md")
+        try "# Index".write(to: index, atomically: true, encoding: .utf8)
+        let note = outside.appendingPathComponent("note.md")
+        try "# Note".write(to: note, atomically: true, encoding: .utf8)
+        let appState = try await openWorkspace(root, showing: index)
+
+        try appState.open(url: note, rememberAsLastOpened: false, preserveWorkspace: false)
+
+        XCTAssertNil(appState.workspaceRootURL)
+        XCTAssertEqual(appState.shownSession.text, "# Note")
+    }
+
+    func testReopeningTheShownFileWhenItsDiskCopyIsUnreadableKeepsTheWorkspace() async throws {
+        let root = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let fileA = root.appendingPathComponent("a.md")
+        try "# A".write(to: fileA, atomically: true, encoding: .utf8)
+        let appState = try await openWorkspace(root, showing: fileA)
+        let sessionA = appState.shownSession
+        let workspaceRoot = appState.workspaceRootURL
+
+        try Data([0xFF, 0xFE]).write(to: fileA)
+        XCTAssertThrowsError(
+            try appState.open(url: fileA, rememberAsLastOpened: false, preserveWorkspace: false)
+        )
+
+        XCTAssertEqual(appState.workspaceRootURL, workspaceRoot)
+        XCTAssertTrue(appState.shownSession === sessionA)
+    }
+
     private func makeDirectory() throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("PreviewLinkOpeningTests-\(UUID().uuidString)", isDirectory: true)

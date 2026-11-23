@@ -209,10 +209,11 @@ extension AppState {
         }
     }
 
-    func recoverRetiredSession(
+    /// The one retired session `recoverRetiredSession` would activate, without releasing it.
+    func retiredSessionMatch(
         for canonicalURL: URL,
         matching candidateLocation: WorkspaceFileSystemLocation
-    ) -> DocumentSession? {
+    ) -> (key: URL, retirement: RetiredEditorDocumentSession)? {
         let matches = retiredEditorDocumentSessions.compactMap { key, retirement in
             if retainedManagedSessionLocation(for: retirement.session) == candidateLocation,
                let retiredURL = sessionStateURL(for: retirement.session),
@@ -223,6 +224,16 @@ extension AppState {
             return nil
         }
         guard matches.count == 1, let match = matches.first else { return nil }
+        return (match.0, match.1)
+    }
+
+    func recoverRetiredSession(
+        for canonicalURL: URL,
+        matching candidateLocation: WorkspaceFileSystemLocation
+    ) -> DocumentSession? {
+        guard let match = retiredSessionMatch(for: canonicalURL, matching: candidateLocation) else {
+            return nil
+        }
         // #85 releases a fully ended standalone retirement at activation. WS3B's
         // multi-window extension keeps the record only while exact installations
         // are still live, so their late commits and revocations remain authorized.
