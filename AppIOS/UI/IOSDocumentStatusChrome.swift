@@ -185,6 +185,9 @@ struct IOSDocumentStateBanner: View {
                         scene.surfaces.cloudVersionReviewEnded?()
                     } content: { request in
                         IOSCloudVersionPicker(documentID: request.documentID, load: load, apply: apply)
+                            // Applying a version can clear the conflict and remove this
+                            // button, taking the sheet down without its onDismiss.
+                            .onDisappear { scene.surfaces.cloudVersionReviewEnded?() }
                     }
                 }
                 ViewThatFits(in: .horizontal) {
