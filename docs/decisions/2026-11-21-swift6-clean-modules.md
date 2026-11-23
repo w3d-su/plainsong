@@ -13,8 +13,9 @@ changes were needed: `DocumentSession`'s statistics callbacks become `@Sendable`
 PreviewKit awaits `evaluateJavaScript` through the completion-handler wrapper
 `evaluateJavaScriptReply(_:)`. The async import's bridging thunk is shared across
 modules, and a Swift 6 and a Swift 5 module in one binary disagreed about it
-(SIGSEGV in PreviewKitTests with Xcode 16.4). A SwiftLint rule,
-`no_async_evaluate_javascript`, rejects awaits of the async import in package sources; widen it when a test target or AppTests moves to Swift 6.
+(SIGSEGV in PreviewKitTests with Xcode 16.4). `make check-preview-layering`
+(`Scripts/check-preview-webview-layering.py`) rejects awaits of the async import in
+package sources; widen it when a test target or AppTests moves to Swift 6.
 
 Alternatives:
 - Change package-wide defaults: also migrates tests outside this step's scope.

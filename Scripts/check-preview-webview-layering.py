@@ -10,6 +10,11 @@ factories. Aliases, subclasses, metatype references, inferred `.init`,
 Source roots include every non-test target in the resolved XcodeGen spec and
 package Sources. Objective-C `.m` and `.mm` are scanned; vendored C headers are not.
 
+Swift 6 package sources (`Packages/*/Sources`) must not await WebKit's async
+`evaluateJavaScript` import: its bridging thunk is shared across modules and
+crashed when a Swift 5 module awaited it in the same binary. They call the
+completion-handler wrapper `evaluateJavaScriptReply(_:)` instead.
+
 Comments and string literals are ignored, except that a string passed to
 `NSClassFromString` or `objc_getClass` is still inspected. Concatenated class
 names and `removeAllContentRuleLists()` are outside this check.
@@ -33,6 +38,9 @@ ALLOWED_CONSTRUCTORS = {
         "WKWebViewConfiguration"
     },
 }
+ASYNC_EVALUATE_JAVASCRIPT = re.compile(
+    r"\bawait\s+(?:[A-Za-z_][A-Za-z0-9_]*\s*[?!]?\s*\.\s*)*evaluateJavaScript\s*\("
+)
 SOURCE_SUFFIXES = {".swift", ".m", ".mm"}
 WEBKIT_TYPE = r"(?:WebKit\s*\.\s*)?WKWebView(?:Configuration)?"
 CONSTRUCTOR = re.compile(rf"\b(WKWebView(?:Configuration)?)\s*(?:\.\s*init\s*)?\(")
@@ -334,6 +342,10 @@ def scan_source(relative, source, violations):
         for match in OBJC_ALLOC.finditer(code):
             add(violations, relative, source, match.start(),
                 f"{match.group(1)} must be created by PreviewController")
+    if re.match(r"Packages/[^/]+/Sources/", relative):
+        for match in ASYNC_EVALUATE_JAVASCRIPT.finditer(code):
+            add(violations, relative, source, match.start(),
+                "await the completion-handler evaluateJavaScriptReply(_:), not the async evaluateJavaScript import")
     for match in SWIFTUI_WEB.finditer(code):
         add(violations, relative, source, match.start(),
             f"SwiftUI {match.group(1)} bypasses the PreviewController constructor")
