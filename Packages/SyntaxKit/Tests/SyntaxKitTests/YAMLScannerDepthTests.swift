@@ -37,11 +37,19 @@ final class YAMLScannerDepthTests: XCTestCase {
         let scanner = try XCTUnwrap(tree_sitter_yaml_external_scanner_create())
         defer { tree_sitter_yaml_external_scanner_destroy(scanner) }
         var buffer = [CChar](repeating: 0, count: 1024)
+        // row 0, col 0, blk_imp_row -1, blk_imp_col -1, blk_imp_tab 0
+        let resetHeader: [CChar] = [0, 0, 0, 0, -1, -1, -1, -1, 0, 0]
+        let loadedHeader = [CChar](repeating: 1, count: 10)
         for (length, expected) in [(0, 10), (9, 10), (10, 10), (12, 10), (14, 14), (17, 14)] {
+            // Start from a loaded state, so a short state must reset it.
+            let full = [CChar](repeating: 2, count: 14)
+            tree_sitter_yaml_external_scanner_deserialize(scanner, full, UInt32(full.count))
             let state = [CChar](repeating: 1, count: length)
             tree_sitter_yaml_external_scanner_deserialize(scanner, state, UInt32(length))
             let written = Int(tree_sitter_yaml_external_scanner_serialize(scanner, &buffer))
             XCTAssertEqual(written, expected, "length \(length)")
+            XCTAssertEqual(Array(buffer[..<10]), length < 10 ? resetHeader : loadedHeader, "length \(length)")
+            XCTAssertTrue(buffer[10 ..< written].allSatisfy { $0 == 1 }, "length \(length)")
         }
     }
 }
