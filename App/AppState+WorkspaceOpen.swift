@@ -70,7 +70,8 @@ extension AppState {
 
     /// Reads a file that will replace the workspace while the workspace is still open, so a file
     /// this window cannot load fails first and activation reuses the read. `nil` when a session
-    /// that outlives the close (retired, or shown by another window) serves it from memory.
+    /// that outlives the close (retired, or shown by another window) serves it from memory, or
+    /// when the close may save this window's copy first.
     func prepareReplacementFileRead(url: URL) throws -> PreparedReplacementFileRead? {
         // Activation runs with no workspace installed, where `canonicalSessionURL` keeps `url`.
         let location = try WorkspaceFileSystemLocation(fileURL: url)
@@ -86,10 +87,16 @@ extension AppState {
         if retiredSessionMatch(for: key, matching: location) != nil {
             return nil
         }
-        return try PreparedReplacementFileRead(
-            location: location,
-            read: prepareEditorImageAssetDocumentRead(fileStore: fileStore, at: location)
-        )
+        let read = try prepareEditorImageAssetDocumentRead(fileStore: fileStore, at: location)
+        // Closing the workspace saves this window's dirty copy of the file, so activation reads
+        // the saved file instead.
+        let shownURL = sessionStateURL(for: shownSession)
+        if registry.warmSession(at: key) != nil
+            || shownURL.map({ exactFileURLSpellingMatches($0, key) }) == true
+        {
+            return nil
+        }
+        return PreparedReplacementFileRead(location: location, read: read)
     }
 
     func activateFileSession(

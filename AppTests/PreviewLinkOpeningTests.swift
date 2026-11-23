@@ -179,6 +179,25 @@ final class PreviewLinkOpeningTests: XCTestCase {
         XCTAssertEqual(appState.shownSession.text, "# Note")
     }
 
+    func testReopeningTheDirtyShownFileInstallsTheCopyTheCloseSaved() async throws {
+        let root = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let fileA = root.appendingPathComponent("a.md")
+        try "# A".write(to: fileA, atomically: true, encoding: .utf8)
+        let appState = try await openWorkspace(root, showing: fileA)
+        let sessionA = appState.shownSession
+        appState.replaceDocumentText("# A unsaved", in: sessionA)
+        appState.cancelAutosave(for: sessionA)
+
+        try appState.open(url: fileA, rememberAsLastOpened: false, preserveWorkspace: false)
+
+        XCTAssertEqual(try String(contentsOf: fileA, encoding: .utf8), "# A unsaved")
+        XCTAssertEqual(appState.shownSession.text, "# A unsaved")
+        appState.replaceDocumentText("# A again", in: appState.shownSession)
+        try appState.save(session: appState.shownSession)
+        XCTAssertEqual(try String(contentsOf: fileA, encoding: .utf8), "# A again")
+    }
+
     func testReopeningTheShownFileWhenItsDiskCopyIsUnreadableKeepsTheWorkspace() async throws {
         let root = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
