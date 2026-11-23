@@ -7,8 +7,14 @@ Package defaults remain Swift 5 so other targets can migrate independently.
 Swift 6 replaces the migrated targets' experimental strict-concurrency setting
 with mandatory concurrency checking.
 
-This continues the tools-version migration in PR #284 without changing source,
-dependencies, deployment targets, or the language mode of parallel migration lanes.
+This continues the tools-version migration in PR #284 without changing dependencies,
+deployment targets, or the language mode of parallel migration lanes. Three source
+changes were needed: `DocumentSession`'s statistics callbacks become `@Sendable`, and
+PreviewKit awaits `evaluateJavaScript` through the completion-handler wrapper
+`evaluateJavaScriptReply(_:)`. The async import's bridging thunk is shared across
+modules, and a Swift 6 and a Swift 5 module in one binary disagreed about it
+(SIGSEGV in PreviewKitTests with Xcode 16.4). A SwiftLint rule,
+`no_async_evaluate_javascript`, rejects awaits of the async import in package sources; widen it when a test target or AppTests moves to Swift 6.
 
 Alternatives:
 - Change package-wide defaults: also migrates tests outside this step's scope.

@@ -23,3 +23,12 @@ opening_brace:
 
 identifier_name:
   min_length: 2
+
+custom_rules:
+  no_async_evaluate_javascript:
+    name: "Async evaluateJavaScript import"
+    # Swift 6 module sources only; the Swift 5 test targets may keep the async import.
+    included: 'Packages/[^/]+/Sources/'
+    regex: 'await\s+([A-Za-z_][A-Za-z0-9_]*\.)*evaluateJavaScript\('
+    message: "Use the completion-handler evaluateJavaScript (see PreviewController+JavaScriptReply.swift): the async import's thunk crashes when Swift 5 and Swift 6 modules share a binary."
+    severity: error
