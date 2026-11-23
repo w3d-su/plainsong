@@ -66,6 +66,67 @@ final class IOSProductionCommandFocusTests: XCTestCase {
     /// An iPad sheet with no text input leaves the source first responder, so no
     /// begin-editing event would follow its dismissal. A Zhuyin composition is
     /// left alone: resigning would commit its marked text.
+    /// The iCloud versions sheet is the banner's `@State`, so none of the
+    /// runtime's own presentation flags covers it.
+    func testTheCloudVersionsSheetHoldsTheRouteUntilItCloses() async throws {
+        let harness = try makeHarness()
+        let bindingID = UUID()
+        harness.runtime.editor.attach(Self.binding(bindingID))
+        harness.runtime.scene.startObserving()
+        defer { harness.runtime.scene.stopObserving() }
+        harness.runtime.startObserving()
+        try await waitUntil { Self.claims(in: harness.facade, bindingID) > 0 }
+
+        harness.runtime.beginCloudVersionReview()
+        let before = Self.claims(in: harness.facade, bindingID)
+        harness.runtime.setSceneActive(false)
+        harness.runtime.setSceneActive(true)
+        Self.postBeginEditing(harness.runtime.editor.textView)
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(Self.claims(in: harness.facade, bindingID), before)
+
+        harness.runtime.endCloudVersionReview()
+        Self.postBeginEditing(harness.runtime.editor.textView)
+        try await waitUntil { Self.claims(in: harness.facade, bindingID) > before }
+    }
+
+    /// A focused document replaced while inactive gets no route on activation.
+    /// The source is resigned at the replacement, so the next tap begins editing.
+    func testReplacingAFocusedDocumentWhileInactiveResignsTheSource() async throws {
+        let harness = try makeHarness()
+        let first = Self.binding(UUID())
+        harness.runtime.editor.attach(first)
+        let textView = harness.runtime.editor.textView
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        let host = UIViewController()
+        window.rootViewController = host
+        textView.frame = CGRect(x: 0, y: 0, width: 390, height: 700)
+        host.view.addSubview(textView)
+        window.makeKeyAndVisible()
+        defer {
+            textView.removeFromSuperview()
+            window.isHidden = true
+        }
+        harness.runtime.scene.startObserving()
+        defer { harness.runtime.scene.stopObserving() }
+        harness.runtime.startObserving()
+        try await waitUntil { Self.claims(in: harness.facade, first.bindingID) > 0 }
+        // The fake facade records the claim without forwarding it to the editor.
+        harness.runtime.editor.updateCommandFocus(for: first.identity, bindingID: first.bindingID, isFocused: true)
+        XCTAssertTrue(textView.becomeFirstResponder())
+
+        harness.runtime.setSceneActive(false)
+        let replacement = UUID()
+        harness.runtime.editor.attach(Self.binding(replacement))
+        XCTAssertFalse(textView.isFirstResponder)
+
+        harness.runtime.setSceneActive(true)
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(Self.claims(in: harness.facade, replacement), 0)
+        Self.postBeginEditing(textView)
+        try await waitUntil { Self.claims(in: harness.facade, replacement) > 0 }
+    }
+
     func testReadOnlyPresentationResignsTheSourceExceptDuringComposition() throws {
         let harness = try makeHarness()
         harness.runtime.editor.attach(Self.binding(UUID()))

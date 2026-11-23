@@ -65,6 +65,7 @@ final class IOSProductionRuntime: ObservableObject {
     private var observedBindingID: UUID?
     private var editingObserver: (any NSObjectProtocol)?
     private var isSceneActive = true
+    private var isReviewingCloudVersions = false
     private var inactiveFocus: IOSProductionFocus?
     private var pendingFocus: IOSProductionFocus?
     private var focusTask: Task<Void, Never>?
@@ -152,13 +153,17 @@ final class IOSProductionRuntime: ObservableObject {
                 if observedBindingID != snapshot.bindingID {
                     exporter.cancel()
                     retireAuthoringCapture()
+                    // The banner that owns the versions sheet goes with its document.
+                    isReviewingCloudVersions = false
                     observedBindingID = snapshot.bindingID
+                    resignSourceReplacedWhileInactive()
                     noteNewBinding(snapshot)
                 }
                 queueCommandFocus(snapshot)
             case .detached:
                 exporter.cancel()
                 observedBindingID = nil
+                isReviewingCloudVersions = false
                 pendingFocus = nil
                 focusTask?.cancel()
                 retireAuthoringCapture()
@@ -291,7 +296,8 @@ final class IOSProductionRuntime: ObservableObject {
                 return
             }
             // Focus held by an older binding is not transferred to its replacement;
-            // the source claims the route when it next begins editing.
+            // the source claims the route when it next begins editing. The source
+            // was resigned when it was replaced, so the next tap is that event.
             guard current.revision.documentID == focus.identity,
                   current.bindingID == focus.bindingID
             else { return }
@@ -307,11 +313,29 @@ final class IOSProductionRuntime: ObservableObject {
         }
     }
 
+    /// The replacement of a focused document while inactive gets no route on
+    /// activation. Left first responder, it would also get no begin-editing
+    /// event, so the keyboard would return with every bar command refused.
+    private func resignSourceReplacedWhileInactive() {
+        guard !isSceneActive, inactiveFocus != nil, editor.textView.isFirstResponder else { return }
+        editor.textView.resignFirstResponder()
+    }
+
     /// A read-only modal or sheet released the route on purpose; neither
     /// activation nor the text view may take it back while one is up.
     private var canClaimCommandFocus: Bool {
         scene.presentation == nil && !recentPresentation.isActive && recovery?.isPresented != true &&
-            conflictCopy?.draft?.id == nil
+            conflictCopy?.draft?.id == nil && !isReviewingCloudVersions
+    }
+
+    /// The iCloud versions sheet is view-local state, so the banner reports it.
+    func beginCloudVersionReview() {
+        prepareForReadOnlyPresentation()
+        isReviewingCloudVersions = true
+    }
+
+    func endCloudVersionReview() {
+        isReviewingCloudVersions = false
     }
 
     /// The route is released for read-only modals and while inactive, and not
