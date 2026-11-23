@@ -86,9 +86,9 @@ extension AppState {
         if retiredSessionMatch(for: key, matching: location) != nil {
             return nil
         }
-        return PreparedReplacementFileRead(
+        return try PreparedReplacementFileRead(
             location: location,
-            read: try prepareEditorImageAssetDocumentRead(fileStore: fileStore, at: location)
+            read: prepareEditorImageAssetDocumentRead(fileStore: fileStore, at: location)
         )
     }
 
