@@ -234,8 +234,16 @@ jobs:
       - name: Check preview layering
         run: make check-preview-layering
 
+      # Each `swift build --build-tests` already uses all three cores, so the six
+      # packages build one after another (`--jobs 1`; running three `swift build`s at
+      # once hit the SwiftPM `build-delegate` segfault in run 44056852361). Then the
+      # three test lanes run side by side (Makefile, TEST_LANES;
+      # `swift test --skip-build`), and the sandbox probes run serially after the lanes
+      # finish so their swiftc/swift-build work never runs beside timed package tests.
+      # Running the three test lanes at once cuts about two minutes off the time
+      # `packages` outlasts `hosted (build)` and holds a macOS runner the shards need.
       - name: Test packages
-        run: make test-packages
+        run: make test-packages TEST_PACKAGES_JOBS=3
 
   # Hosted XCTest bundles: one job builds every bundle once (~3 min) and the shards
   # run the same products. A shard that names a class also skips it in that bundle's
