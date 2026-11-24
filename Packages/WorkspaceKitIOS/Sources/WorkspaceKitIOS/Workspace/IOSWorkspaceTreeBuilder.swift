@@ -18,7 +18,7 @@ enum IOSWorkspaceTreeBuilder {
                 includesAllFiles: includesAllFiles
             )
         }
-        let entries = nest(visible, parent: "", record: record)
+        let entries = nest(childrenByParent(visible), parent: "", record: record)
         return IOSWorkspaceSnapshot(
             workspaceID: record.workspaceID,
             accessGeneration: record.generation,
@@ -65,20 +65,29 @@ enum IOSWorkspaceTreeBuilder {
         }
     }
 
+    /// Groups the items by parent once, so building the tree is linear in the item count.
+    private static func childrenByParent(
+        _ items: [IOSWorkspaceFileItem]
+    ) -> [WorkspacePathByteKey: [IOSWorkspaceFileItem]] {
+        var children: [WorkspacePathByteKey: [IOSWorkspaceFileItem]] = [:]
+        for item in items {
+            let parent = WorkspacePathByteKey(IOSWorkspacePathAuthority.parentSpelling(item.relativePath))
+            children[parent, default: []].append(item)
+        }
+        return children
+    }
+
     private static func nest(
-        _ items: [IOSWorkspaceFileItem],
+        _ childrenByParent: [WorkspacePathByteKey: [IOSWorkspaceFileItem]],
         parent: String,
         record: IOSWorkspaceScopeRecord
     ) -> [IOSWorkspaceEntry] {
-        let parentKey = WorkspacePathByteKey(parent)
-        let children = items.filter {
-            WorkspacePathByteKey(IOSWorkspacePathAuthority.parentSpelling($0.relativePath)) == parentKey
-        }
+        let children = childrenByParent[WorkspacePathByteKey(parent)] ?? []
         return children.compactMap { item in
             guard let location = location(record: record, relativePath: item.relativePath, item: item) else {
                 return nil
             }
-            let nested = item.isDirectory ? nest(items, parent: item.relativePath, record: record) : []
+            let nested = item.isDirectory ? nest(childrenByParent, parent: item.relativePath, record: record) : []
             return IOSWorkspaceEntry(
                 id: UUID(),
                 location: location,
