@@ -159,7 +159,7 @@ final class ExportPDFWideRunsAppTests: XCTestCase {
         let source = [before, quote, after].joined(separator: "\n\n")
         let (controller, pdf) = try await Support.capture(source)
         defer { controller.invalidate() }
-        let lastChildBottom = try await controller.webView.evaluateJavaScript("""
+        let lastChildBottom = try await controller.webView.evaluateJavaScriptReply("""
         (() => {
           const root = document.getElementById("preview-root");
           const style = getComputedStyle(root);
@@ -279,7 +279,7 @@ final class ExportPDFWideRunsAppTests: XCTestCase {
         defer { controller.invalidate() }
         _ = try await controller.captureExportPDF()
         let measured = try await controller.measureUnsplittableSpans()
-        let edge = try await controller.webView.evaluateJavaScript(
+        let edge = try await controller.webView.evaluateJavaScriptReply(
             "Math.ceil(document.getElementById('preview-root').getBoundingClientRect().right + window.scrollX)"
         ) as? Double
         XCTAssertEqual(measured.baselineWidth, CGFloat(edge ?? -1), accuracy: 1)
@@ -294,7 +294,7 @@ final class ExportPDFWideRunsAppTests: XCTestCase {
         let controller = try await Support.preparedController("# \(heading)\n\nGEOMETRYBODY Some prose.\n")
         defer { controller.invalidate() }
         let layoutWidth = controller.webView.bounds.width
-        let beforeWidth = try await controller.webView.evaluateJavaScript("""
+        let beforeWidth = try await controller.webView.evaluateJavaScriptReply("""
         document.documentElement.style.width = "0px";
         document.getElementById("preview-root").getBoundingClientRect().width;
         """) as? Double

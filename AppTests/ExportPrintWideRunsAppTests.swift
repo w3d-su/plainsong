@@ -61,7 +61,7 @@ final class ExportPrintWideRunsAppTests: XCTestCase {
         defer { controller.invalidate() }
         let captured = try await controller.captureExportPDF(pageAspect: 1.29)
         XCTAssertEqual(captured.droppedTrailingBlankPages, 0)
-        let lastChildBottom = try await controller.webView.evaluateJavaScript("""
+        let lastChildBottom = try await controller.webView.evaluateJavaScriptReply("""
         (() => {
           const root = document.getElementById("preview-root");
           const style = getComputedStyle(root);
@@ -106,7 +106,7 @@ final class ExportPrintWideRunsAppTests: XCTestCase {
         try await controller.applyExportOverflowStyle()
         let contentSize = try await controller.settleExportGeometry()
         let measurement = try await controller.measureUnsplittableSpans()
-        let measuredWidths = try await controller.webView.evaluateJavaScript("""
+        let measuredWidths = try await controller.webView.evaluateJavaScriptReply("""
         (() => Array.from(document.querySelectorAll("pre")).map(pre => {
           const rect = pre.getBoundingClientRect();
           return rect.left + Math.max(rect.width, pre.scrollWidth);

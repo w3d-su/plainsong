@@ -10,13 +10,12 @@ import XCTest
 final class EditorReplaceBatchSpikeAppTests: XCTestCase {
     private var windows: [NSWindow] = []
 
-    override func tearDown() {
+    override func tearDown() async throws {
         for window in windows {
             window.isReleasedWhenClosed = false
             window.orderOut(nil)
         }
         windows.removeAll()
-        super.tearDown()
     }
 
     func testMinimalEnclosingRangeUsesTheRealAppSourceContract() throws {

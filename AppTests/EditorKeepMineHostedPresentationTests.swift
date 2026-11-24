@@ -280,13 +280,11 @@ extension EditorFindHostedGateTests {
         let selectionBefore = editor.selectedRange()
         let revisionBefore = session.version
         let bindingBefore = coordinator.currentDocumentBindingInstallation
-        let edits = StorageCharacterEditCounter()
+        let edits = StorageCharacterEditCounter(storage: storage)
         let observer = NotificationCenter.default.addObserver(
             forName: NSTextStorage.didProcessEditingNotification, object: storage, queue: nil
         ) { _ in
-            MainActor.assumeIsolated {
-                if storage.editedMask.contains(.editedCharacters) { edits.count += 1 }
-            }
+            MainActor.assumeIsolated { edits.recordEdit() }
         }
         defer { NotificationCenter.default.removeObserver(observer) }
 
@@ -329,6 +327,16 @@ extension EditorFindHostedGateTests {
     }
 }
 
+@MainActor
 private final class StorageCharacterEditCounter {
-    var count = 0
+    private let storage: NSTextStorage
+    private(set) var count = 0
+
+    init(storage: NSTextStorage) {
+        self.storage = storage
+    }
+
+    func recordEdit() {
+        if storage.editedMask.contains(.editedCharacters) { count += 1 }
+    }
 }

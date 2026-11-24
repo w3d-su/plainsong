@@ -10,14 +10,13 @@ import XCTest
 final class EditorReplaceSingleReplaceAppTests: XCTestCase {
     private var windows: [NSWindow] = []
 
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorSelectionProbe.keyWindowOverrideForTesting = nil
         for window in windows {
             window.isReleasedWhenClosed = false
             window.orderOut(nil)
         }
         windows.removeAll()
-        super.tearDown()
     }
 
     func testSingleReplacePublishesToDocumentConsumersAndRescansOnce() async throws {

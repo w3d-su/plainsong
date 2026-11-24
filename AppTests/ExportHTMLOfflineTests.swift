@@ -37,7 +37,7 @@ final class ExportHTMLOfflineTests: XCTestCase {
         let proxies = [ProxyConfiguration(httpCONNECTProxy: .hostPort(host: "127.0.0.1", port: port))]
         fixture.appState.preferences.setAllowsRemoteImages(true)
         let destination = fixture.exportsDirectory.appendingPathComponent("offline.html")
-        func proxyDataStore() -> WKWebsiteDataStore {
+        let proxyDataStore: @MainActor @Sendable () -> WKWebsiteDataStore = {
             let store = WKWebsiteDataStore.nonPersistent()
             store.proxyConfigurations = proxies
             return store
@@ -64,7 +64,7 @@ final class ExportHTMLOfflineTests: XCTestCase {
         }
         XCTAssertTrue(navigation.didFinish)
         XCTAssertNil(navigation.error)
-        let features = try await reopened.evaluateJavaScript(
+        let features = try await reopened.evaluateJavaScriptReply(
             "JSON.stringify({image:document.images[0].naturalWidth, math:!!document.querySelector('.katex'), " +
                 "code:!!document.querySelector('.hljs'), mermaid:!!document.querySelector('.mermaid-rendered svg')})"
         ) as? String

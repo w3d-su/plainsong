@@ -109,7 +109,7 @@ final class ExportPDFContentAppTests: XCTestCase {
         // Runs after the capture, against the offscreen DOM that was just captured.
         fixture.appState.exportHTMLOperations.didPrepareArtifact = {
             guard let webView = fixture.appState.exportHTMLOperations.offscreenController?.webView else { return }
-            let json = try? await webView.evaluateJavaScript(Self.snapshotScript) as? String
+            let json = try? await webView.evaluateJavaScriptReply(Self.snapshotScript) as? String
             snapshot = Self.summary(json)
         }
         let destination = fixture.exportsDirectory.appendingPathComponent("content-\(theme.rawValue).pdf")

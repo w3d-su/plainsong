@@ -170,7 +170,7 @@ final class ExportPDFCommandAppTests: XCTestCase {
                 fixture.appState.exportHTMLOperations.destinationChooser = { _ in destination }
                 fixture.appState.exportHTMLOperations.didPrepareArtifact = {
                     let value = try? await fixture.appState.exportHTMLOperations.offscreenController?
-                        .webView.evaluateJavaScript("document.documentElement.dataset.theme")
+                        .webView.evaluateJavaScriptReply("document.documentElement.dataset.theme")
                     recordedTheme = value as? String ?? ""
                 }
                 try await XCTUnwrap(fixture.appState.exportCurrentDocumentAsPDF()).value

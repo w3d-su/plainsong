@@ -73,7 +73,7 @@ final class E0OffscreenPDFProbe {
           scrollY: window.scrollY
         })
         """
-        guard let json = try await evaluateJavaScript(script, label: "DOM state") as? String,
+        guard let json = try await evaluateJavaScriptWithTimeout(script, label: "DOM state") as? String,
               let data = json.data(using: .utf8)
         else {
             throw E0ProbeError.invalidJavaScriptResult("DOM state")
@@ -104,7 +104,7 @@ final class E0OffscreenPDFProbe {
           )
         })
         """
-        guard let json = try await evaluateJavaScript(script, label: "content bounds") as? String,
+        guard let json = try await evaluateJavaScriptWithTimeout(script, label: "content bounds") as? String,
               let data = json.data(using: .utf8)
         else {
             throw E0ProbeError.invalidJavaScriptResult("content bounds")
@@ -195,7 +195,7 @@ final class E0OffscreenPDFProbe {
     }
 
     func scroll(toY offset: CGFloat) async throws {
-        _ = try await evaluateJavaScript("window.scrollTo(0, \(offset))", label: "preview scroll")
+        _ = try await evaluateJavaScriptWithTimeout("window.scrollTo(0, \(offset))", label: "preview scroll")
     }
 
     /// Baseline visible state only after resources and queued layout/scroll work settle.
@@ -204,7 +204,7 @@ final class E0OffscreenPDFProbe {
         var previousSignature: String?
         var stableSamples = 0
         try await waitUntil("visible preview presentation settled", timeoutNanoseconds: 5_000_000_000) {
-            let signature = try await self.evaluateJavaScript("""
+            let signature = try await self.evaluateJavaScriptWithTimeout("""
             (() => {
               const root = document.getElementById("preview-root");
               if (!root || window.scrollY <= 0 || document.fonts?.status === "loading"
@@ -268,7 +268,7 @@ final class E0OffscreenPDFProbe {
         }
     }
 
-    private func evaluateJavaScript(
+    private func evaluateJavaScriptWithTimeout(
         _ script: String,
         label: String,
         timeoutNanoseconds: UInt64 = 5_000_000_000
@@ -277,13 +277,13 @@ final class E0OffscreenPDFProbe {
             label: label,
             timeoutNanoseconds: timeoutNanoseconds
         ) { gate in
-            self.controller.webView.evaluateJavaScript(script) { result, error in
+            self.controller.webView.evaluateJavaScript(script, completionHandler: { result, error in
                 if let error {
                     gate.resolve(.failure(error))
                 } else {
                     gate.resolve(.success(E0JavaScriptValue(rawValue: result)))
                 }
-            }
+            })
         }
         return value.rawValue
     }

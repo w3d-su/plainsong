@@ -194,6 +194,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.tests
         GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "6"
 
   PerformanceTests:
     type: bundle.unit-test

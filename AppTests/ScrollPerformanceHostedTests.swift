@@ -113,7 +113,7 @@ extension EditorFindHostedGateTests {
             text: source, version: 0, fileKind: .markdown, fileURL: nil
         ))
         try await waitUntil("large preview rendered", timeout: 60) { completedID == renderID }
-        try await controller.webView.evaluateJavaScript("""
+        try await controller.webView.evaluateJavaScriptReply("""
         window.scrollProbe = null;
         (async () => {
           const root = document.getElementById('preview-root');
@@ -156,9 +156,9 @@ extension EditorFindHostedGateTests {
         true;
         """)
         try await waitUntil("scroll probe completed", timeout: 60) {
-            try await controller.webView.evaluateJavaScript("window.scrollProbe !== null") as? Bool == true
+            try await controller.webView.evaluateJavaScriptReply("window.scrollProbe !== null") as? Bool == true
         }
-        let value = try await controller.webView.evaluateJavaScript("window.scrollProbe")
+        let value = try await controller.webView.evaluateJavaScriptReply("window.scrollProbe")
         let report = try XCTUnwrap(value as? [String: Any])
         XCTAssertNil(report["error"])
         XCTAssertGreaterThan(report["messages"] as? Int ?? 0, 0)

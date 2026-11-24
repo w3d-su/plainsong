@@ -49,7 +49,7 @@ final class ExportPDFLayoutAppTests: XCTestCase {
         }
         // Every selector must exist in the export DOM — a missing one must fail rather
         // than silently skip the edge assertion.
-        let edges = try await controller.webView.evaluateJavaScript("""
+        let edges = try await controller.webView.evaluateJavaScriptReply("""
         (() => {
           const width = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
           const box = (selector) => {
@@ -156,13 +156,13 @@ final class ExportPDFLayoutAppTests: XCTestCase {
         )) else { return XCTFail("Live render failed") }
         let (exportController, _) = try await capture(source)
         defer { exportController.invalidate() }
-        let liveOverflow = try await live.webView.evaluateJavaScript(
+        let liveOverflow = try await live.webView.evaluateJavaScriptReply(
             "getComputedStyle(document.querySelector('table')).overflow"
         ) as? String
-        let exportStyle = try await exportController.webView.evaluateJavaScript(
+        let exportStyle = try await exportController.webView.evaluateJavaScriptReply(
             "Boolean(document.getElementById('plainsong-export-layout'))"
         ) as? Bool
-        let liveMinimumWidth = try await live.webView.evaluateJavaScript(
+        let liveMinimumWidth = try await live.webView.evaluateJavaScriptReply(
             "document.documentElement.style.minWidth"
         ) as? String
         XCTAssertEqual(liveOverflow, "auto")

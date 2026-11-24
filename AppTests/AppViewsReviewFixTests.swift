@@ -8,6 +8,7 @@ import XCTest
 /// Find/Replace field composition item).
 @MainActor
 final class AppViewsReviewFixTests: XCTestCase {
+    @MainActor
     private final class TextBox {
         var value: String
         var writeCount = 0
