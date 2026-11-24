@@ -18,8 +18,7 @@ let package = Package(
             dependencies: [
                 .product(name: "MarkdownCore", package: "MarkdownCore"),
                 .product(name: "WorkspaceCore", package: "WorkspaceCore"),
-            ],
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            ]
         ),
         .testTarget(
             name: "IOSAcceptanceHarnessTests",
@@ -28,9 +27,8 @@ let package = Package(
                 .product(name: "MarkdownCore", package: "MarkdownCore"),
                 .product(name: "WorkspaceCore", package: "WorkspaceCore"),
                 .product(name: "PreviewKit", package: "PreviewKit"),
-            ],
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            ]
         ),
     ],
-    swiftLanguageModes: [.v5]
+    swiftLanguageModes: [.v6]
 )

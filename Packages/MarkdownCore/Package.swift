@@ -15,14 +15,12 @@ let package = Package(
             name: "MarkdownCore",
             dependencies: [
                 .product(name: "Yams", package: "Yams"),
-            ],
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            ]
         ),
         .testTarget(
             name: "MarkdownCoreTests",
-            dependencies: ["MarkdownCore"],
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            dependencies: ["MarkdownCore"]
         ),
     ],
-    swiftLanguageModes: [.v5]
+    swiftLanguageModes: [.v6]
 )

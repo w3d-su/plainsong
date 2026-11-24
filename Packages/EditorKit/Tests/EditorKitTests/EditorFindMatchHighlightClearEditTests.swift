@@ -6,11 +6,18 @@ import XCTest
 final class EditorFindMatchHighlightClearEditTests: XCTestCase {
     func testClearingAStorageWithoutDecorationDoesNotEditIt() {
         let storage = NSTextStorage(string: String(repeating: "no matches here\n", count: 200))
-        let edits = EditCounter(storage)
+        var edits = 0
+        let recordEdit: @MainActor () -> Void = { edits += 1 }
+        let observer = NotificationCenter.default.addObserver(
+            forName: NSTextStorage.didProcessEditingNotification, object: storage, queue: nil
+        ) { _ in
+            MainActor.assumeIsolated { recordEdit() }
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
 
         EditorFindMatchHighlight.clear(in: storage)
 
-        XCTAssertEqual(edits.count, 0, "nothing to clear must not invalidate the document's layout")
+        XCTAssertEqual(edits, 0, "nothing to clear must not invalidate the document's layout")
     }
 
     func testClearingStillRemovesAStrandedCoveredBackground() {
@@ -29,26 +36,5 @@ final class EditorFindMatchHighlightClearEditTests: XCTestCase {
             at: stranded.location,
             effectiveRange: nil
         ))
-    }
-
-    private final class EditCounter {
-        private(set) var count = 0
-        private var token: NSObjectProtocol?
-
-        init(_ storage: NSTextStorage) {
-            token = NotificationCenter.default.addObserver(
-                forName: NSTextStorage.didProcessEditingNotification,
-                object: storage,
-                queue: nil
-            ) { [weak self] _ in
-                self?.count += 1
-            }
-        }
-
-        deinit {
-            if let token {
-                NotificationCenter.default.removeObserver(token)
-            }
-        }
     }
 }
