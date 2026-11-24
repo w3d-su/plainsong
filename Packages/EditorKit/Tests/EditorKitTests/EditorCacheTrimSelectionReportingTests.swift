@@ -17,7 +17,6 @@ final class EditorCacheTrimSelectionReportingTests: XCTestCase {
         }
         fixtures.removeAll()
         Support.tearDownWindows()
-        try await super.tearDown()
     }
 
     func testSelectionOnlyChangeSchedulesOnceWithoutRepublishingTheViewport() throws {

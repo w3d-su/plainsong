@@ -11,7 +11,6 @@ import XCTest
 final class EditorBatchSelectionUndoLifetimeTests: XCTestCase {
     override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        try await super.tearDown()
     }
 
     func testRegisteredSelectionUndoOutlivesItsCreatorUntilUndone() throws {

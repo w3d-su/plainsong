@@ -15,7 +15,6 @@ final class EditorFindMatchHighlightTests: XCTestCase {
 
     override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        try await super.tearDown()
     }
 
     func testFindHighlightSurvivesRecomputeWhileAnUnpreservedAttributeIsWiped() throws {

@@ -7,7 +7,6 @@ import XCTest
 final class EditorReplacePublicationTests: XCTestCase {
     override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        try await super.tearDown()
     }
 
     func testReplacementRescansOnceAndSkipsTheInsertedSpan() async throws {

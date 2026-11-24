@@ -14,7 +14,6 @@ import XCTest
 final class EditorIncomingTextPresentationTests: XCTestCase {
     override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        try await super.tearDown()
     }
 
     /// One incoming App text change: same UTF-16 length, same first and last 64 units, one

@@ -8,7 +8,6 @@ import XCTest
 final class EditorInstalledDocumentTransitionTests: XCTestCase {
     override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        try await super.tearDown()
     }
 
     private let documentA = EditorDocumentIdentity(rawValue: "document-a")

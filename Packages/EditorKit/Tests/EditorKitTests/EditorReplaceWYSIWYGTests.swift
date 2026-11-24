@@ -23,7 +23,6 @@ private struct DelimiterCase {
 final class EditorReplaceWYSIWYGTests: XCTestCase {
     override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        try await super.tearDown()
     }
 
     func testFoldedDelimitersNavigateThenReplaceExactSpanAndUndoRedo() async throws {

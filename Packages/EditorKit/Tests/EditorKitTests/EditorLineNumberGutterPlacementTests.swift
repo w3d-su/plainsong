@@ -13,7 +13,6 @@ final class EditorLineNumberGutterPlacementTests: XCTestCase {
     override func tearDown() async throws {
         windows.forEach { $0.close() }
         windows.removeAll()
-        try await super.tearDown()
     }
 
     func testNumbersSitOnTheBaselineOfEachSourceLinesFirstVisualLine() throws {

@@ -8,13 +8,11 @@ import XCTest
 @MainActor
 final class EditorFindSpikeTests: XCTestCase {
     override func setUp() async throws {
-        try await super.setUp()
         EditorFindSpike.reset()
     }
 
     override func tearDown() async throws {
         EditorFindSpike.reset()
-        try await super.tearDown()
     }
 
     func testShowFindSelectorRecordsFireOnFocusedEditor() throws {

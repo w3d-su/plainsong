@@ -14,7 +14,6 @@ final class EditorKeepMinePresentationTests: XCTestCase {
 
     override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        try await super.tearDown()
     }
 
     func testUnchangedSnapshotKeepsWYSIWYGPresentationFindDecorationAndMarkersWithoutInput() async throws {

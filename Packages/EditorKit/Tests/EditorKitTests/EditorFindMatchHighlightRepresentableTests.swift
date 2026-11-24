@@ -11,7 +11,6 @@ final class FindHighlightRepresentableTests: XCTestCase {
 
     override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        try await super.tearDown()
     }
 
     // These drive `updateRepresentedTextView` — the same entry point SwiftUI uses — instead of

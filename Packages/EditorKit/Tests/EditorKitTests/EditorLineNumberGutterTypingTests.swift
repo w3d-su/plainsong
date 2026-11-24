@@ -9,7 +9,6 @@ import XCTest
 final class EditorLineNumberGutterTypingTests: XCTestCase {
     override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        try await super.tearDown()
     }
 
     func testTypingKeepsNumbersCurrentWithoutRescanningTheDocument() throws {

@@ -10,7 +10,6 @@ import XCTest
 final class EditorReplaceWriteOutcomeTests: XCTestCase {
     override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        try await super.tearDown()
     }
 
     func testRefusedNativeInsertionIsNotReportedAsReplaced() async throws {

@@ -8,7 +8,6 @@ import XCTest
 final class MarkdownSyntaxThemeCustomTests: XCTestCase {
     override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        try await super.tearDown()
     }
 
     func testBuiltInChromeMatchesTheSystemColorsTheEditorAlreadyUsed() {

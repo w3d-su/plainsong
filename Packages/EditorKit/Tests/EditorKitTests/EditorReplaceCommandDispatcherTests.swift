@@ -11,7 +11,6 @@ final class EditorReplaceCommandDispatcherTests: XCTestCase {
     override func tearDown() async throws {
         EditorSelectionProbe.keyWindowOverrideForTesting = nil
         EditorFindControllerTestSupport.tearDownWindows()
-        try await super.tearDown()
     }
 
     func testResponderChainDeliversToTheKeyWindowEditor() async throws {

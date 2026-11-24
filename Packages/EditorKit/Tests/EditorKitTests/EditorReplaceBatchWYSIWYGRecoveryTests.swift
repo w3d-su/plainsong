@@ -8,7 +8,6 @@ import XCTest
 final class EditorReplaceBatchWYSIWYGRecoveryTests: XCTestCase {
     override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        try await super.tearDown()
     }
 
     func testRejectedPublicationResetsImageCacheAndRequestsExactlyOnePresentationDerivation() async throws {

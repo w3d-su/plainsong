@@ -9,7 +9,6 @@ import XCTest
 final class EditorSelectionProbeTests: XCTestCase {
     override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        try await super.tearDown()
     }
 
     private let documentA = EditorDocumentIdentity(rawValue: "document-a")
