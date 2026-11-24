@@ -134,8 +134,8 @@ final class WorkspaceSearchReviewFixTests: XCTestCase {
     }
 
     private func completedSummary(in events: [WorkspaceSearchEvent]) -> WorkspaceSearchSummary? {
-        events.compactMap {
-            guard case let .completed(_, summary) = $0 else { return nil }
+        events.compactMap { event -> WorkspaceSearchSummary? in
+            guard case let .completed(_, summary) = event else { return nil }
             return summary
         }.last
     }
