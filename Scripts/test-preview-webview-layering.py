@@ -383,6 +383,54 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
             for line in (3, 4, 6, 8)
         ])
 
+    def test_swift6_discovery_reads_every_settings_form(self):
+        names = ["Flat", "Configs", "BaseWithConfigs", "Group", "Swift5", "ProjectDefault", "ProjectRelease"]
+        for name in names:
+            self.write_source(f"{name}/Probe.swift", "view.evaluateJavaScript(script) { _, _ in }")
+
+        def test_target(settings=None):
+            target = {"type": "bundle.unit-test"}
+            if settings is not None:
+                target["settings"] = settings
+            return target
+
+        def structured(base=None, configs=None, groups=None):
+            return {"base": base or {}, "configs": configs or {}, "groups": groups or []}
+
+        project = {
+            "settings": structured(base={"SWIFT_VERSION": "5.10"}),
+            "settingGroups": {
+                "swift6": {"SWIFT_VERSION": "6.0"},
+                "outer": structured(base={"OTHER": "YES"}, groups=["swift6", "outer"]),
+            },
+            "targets": {
+                "Flat": test_target({"SWIFT_VERSION": "6"}),
+                "Configs": test_target(structured(configs={"Release": {"SWIFT_VERSION": "6"}})),
+                "BaseWithConfigs": test_target(structured(
+                    base={"SWIFT_VERSION": "6.0"}, configs={"Release": {"ONLY_ACTIVE_ARCH": "NO"}}
+                )),
+                "Group": test_target(structured(groups=["outer"])),
+                "Swift5": test_target(structured(
+                    base={"SWIFT_VERSION": "5.10"}, configs={"Release": {"ONLY_ACTIVE_ARCH": "NO"}}
+                )),
+                "ProjectDefault": test_target(),
+            },
+        }
+        for name, target in project["targets"].items():
+            target["sources"] = [name]
+        detail = "use evaluateJavaScriptReply(_:) or label evaluateJavaScript's completionHandler: argument"
+        self.assertEqual(self.violations(project), [
+            f"{name}/Probe.swift:1: {detail}" for name in ("BaseWithConfigs", "Configs", "Flat", "Group")
+        ])
+
+        project["settings"] = structured(base={"SWIFT_VERSION": "5.10"}, configs={"Release": {"SWIFT_VERSION": "6"}})
+        project["targets"]["ProjectRelease"] = test_target(structured(configs={"Debug": {"OTHER": "YES"}}))
+        project["targets"]["ProjectRelease"]["sources"] = ["ProjectRelease"]
+        self.assertEqual(self.violations(project), [
+            f"{name}/Probe.swift:1: {detail}"
+            for name in ("BaseWithConfigs", "Configs", "Flat", "Group", "ProjectDefault", "ProjectRelease")
+        ])
+
     def test_current_repository_has_no_violations(self):
         root = Path(__file__).resolve().parent.parent
         self.assertEqual(CHECKER["find_violations"](root), [])
