@@ -110,8 +110,8 @@ final class KeyWindowRouter: ObservableObject {
             object: nil,
             queue: .main
         ) { notification in
+            let window = notification.object as? NSWindow
             MainActor.assumeIsolated {
-                let window = notification.object as? NSWindow
                 KeyWindowRouter.shared.noteKeyChange(resigned: window)
             }
         }

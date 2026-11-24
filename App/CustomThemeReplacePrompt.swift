@@ -1,5 +1,6 @@
 import AppKit
 
+@MainActor
 enum CustomThemeReplacePrompt {
     static func alert(identifier: String, name: String) -> NSAlert {
         let alert = NSAlert()
@@ -14,7 +15,6 @@ enum CustomThemeReplacePrompt {
         return alert
     }
 
-    @MainActor
     static func confirm(identifier: String, name: String) -> Bool {
         alert(identifier: identifier, name: name).runModal() == .alertFirstButtonReturn
     }
