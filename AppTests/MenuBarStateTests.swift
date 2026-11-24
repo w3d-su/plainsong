@@ -1,5 +1,7 @@
+import AppKit
 import Combine
 import Foundation
+import MarkdownCore
 @testable import Plainsong
 import XCTest
 
@@ -22,17 +24,32 @@ final class MenuBarStateTests: XCTestCase {
         XCTAssertEqual(menuState.snapshot.recentItemURLs, appState.recentItemURLs)
     }
 
-    func testNotificationFromOutsideMainActorCanReachMenuSubscription() async {
-        let appState = AppState(shouldRestoreLastOpenedFile: false)
+    func testNotificationFromOutsideMainActorCanReachMenuSubscription() async throws {
+        let session = DocumentSession(text: "# Menu test", url: URL(fileURLWithPath: "/tmp/menu-bar-state-tests.md"))
+        let appState = AppState(shownSession: session, shouldRestoreLastOpenedFile: false)
+        let window = NSWindow()
+        var windowIsAvailable = false
+        appState.exportHTMLOperations.panelWindowProvider = { windowIsAvailable ? window : nil }
         let menuState = MenuBarState(appState: appState)
-        let initialSnapshot = menuState.snapshot
+
+        try await settleMainQueue()
+        windowIsAvailable = true
+        XCTAssertTrue(appState.canExportCurrentDocumentAsHTML)
+        XCTAssertFalse(menuState.snapshot.canExportHTML)
         let name = AppState.exportHTMLWindowRegistered
+        let refreshed = expectation(description: "background notification refreshes export availability")
+        let subscription = menuState.$snapshot.dropFirst().filter(\.canExportHTML).sink { _ in
+            MainActor.preconditionIsolated()
+            refreshed.fulfill()
+        }
+        defer { subscription.cancel() }
 
         await Task.detached {
             NotificationCenter.default.post(name: name, object: nil)
         }.value
 
-        XCTAssertEqual(menuState.snapshot, initialSnapshot)
+        await fulfillment(of: [refreshed], timeout: 2)
+        XCTAssertTrue(menuState.snapshot.canExportHTML)
     }
 
     /// A menu-relevant mutation must republish exactly once, and only after the mutation
