@@ -341,6 +341,8 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
             "    .webView.evaluateJavaScript(script)",
             "let allowed = try await webView.evaluateJavaScriptReply(script)",
             "webView.evaluateJavaScript(script) { _, _ in }",
+            "let subscripted = try await webViews[0].evaluateJavaScript(script)",
+            "let allowedSubscripted = try await webViews[0].evaluateJavaScriptReply(script)",
         ])
         self.write_source("AppTests/ProbeTests.swift", source)
         self.write_source("PerformanceTests/ProbeTests.swift", source)
@@ -348,6 +350,7 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
         self.assertEqual(self.violations({"targets": {}}), [
             f"AppTests/ProbeTests.swift:3: {detail}",
             f"AppTests/ProbeTests.swift:4: {detail}",
+            f"AppTests/ProbeTests.swift:8: {detail}",
         ])
 
     def test_current_repository_has_no_violations(self):

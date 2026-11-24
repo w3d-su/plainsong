@@ -40,7 +40,9 @@ ALLOWED_CONSTRUCTORS = {
 }
 ASYNC_CHECK_TEST_ROOTS = ("AppTests", "Packages/EditorKit/Tests/EditorKitTests")
 ASYNC_EVALUATE_JAVASCRIPT = re.compile(
-    r"\bawait\s+(?:\(\s*)*(?:[A-Za-z_][A-Za-z0-9_]*\s*(?:[?!]\s*)?\.\s*)*evaluateJavaScript\s*\("
+    r"\bawait\s+(?:\(\s*)*"
+    r"(?:[A-Za-z_][A-Za-z0-9_]*(?:\s*\[[^\[\]\r\n]*\])*\s*(?:[?!]\s*)?\.\s*)*"
+    r"evaluateJavaScript\s*\("
 )
 SOURCE_SUFFIXES = {".swift", ".m", ".mm"}
 WEBKIT_TYPE = r"(?:WebKit\s*\.\s*)?WKWebView(?:Configuration)?"
