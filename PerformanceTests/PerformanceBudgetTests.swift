@@ -742,7 +742,7 @@ extension PerformanceBudgetTests {
         return try operation()
     }
 
-    func withSignpost<T>(_ name: StaticString, operation: () async throws -> T) async rethrows -> T {
+    func withSignpost<T>(_ name: StaticString, operation: @MainActor () async throws -> T) async rethrows -> T {
         let signpostID = OSSignpostID(log: Self.signpostLog)
         os_signpost(.begin, log: Self.signpostLog, name: name, signpostID: signpostID)
         defer { os_signpost(.end, log: Self.signpostLog, name: name, signpostID: signpostID) }
