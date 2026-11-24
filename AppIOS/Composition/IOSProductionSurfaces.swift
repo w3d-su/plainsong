@@ -184,6 +184,7 @@ final class IOSProductionRuntime: ObservableObject {
 
     func observeSceneDisconnection(_ scene: UIWindowScene) {
         guard !isShutDown else { return }
+        exporter.windowScene = scene
         if disconnectObserver == nil {
             disconnectObserver = IOSWindowSceneDisconnectObserver { [self] in
                 await shutdownDisconnectedScene()

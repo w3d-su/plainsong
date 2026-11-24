@@ -6,17 +6,27 @@ import UIKit
 /// `CACurrentMediaTime()`.
 @MainActor
 final class IOSPerformanceFrameClock: NSObject {
+    private let screen: UIScreen?
     private var link: CADisplayLink?
     private var refreshWaiters: [(after: CFTimeInterval, continuation: CheckedContinuation<CFTimeInterval, Never>)] = []
     private(set) var lastFrameInterval: CFTimeInterval?
 
+    let maximumFramesPerSecond: Int
+
+    init(screen: UIScreen?) {
+        self.screen = screen
+        maximumFramesPerSecond = screen?.maximumFramesPerSecond ?? 60
+    }
+
     func start() {
         guard link == nil else { return }
-        let link = CADisplayLink(target: self, selector: #selector(tick(_:)))
+        let selector = #selector(tick(_:))
+        let link = screen?.displayLink(withTarget: self, selector: selector) ??
+            CADisplayLink(target: self, selector: selector)
         // Ask for the panel's full rate. An iPhone grants more than 60 Hz only when the
         // app's Info.plist opts in; `lastFrameInterval` records what was granted.
-        let maximum = Float(UIScreen.main.maximumFramesPerSecond)
-        link.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: maximum, preferred: maximum)
+        let maximum = Float(maximumFramesPerSecond)
+        link.preferredFrameRateRange = CAFrameRateRange(minimum: min(60, maximum), maximum: maximum, preferred: maximum)
         link.add(to: .main, forMode: .common)
         self.link = link
     }
