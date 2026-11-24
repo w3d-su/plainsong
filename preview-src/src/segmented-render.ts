@@ -74,6 +74,7 @@ export class SegmentedRenderer {
   private checkedCandidates = "";
   /** The definition-like lines of the text whose whole render was "required". */
   private requiredCandidates = "";
+  private tail: Promise<void> = Promise.resolve();
   /** Segments the last `render` call ran through the pipeline (cache misses). */
   renderedSegmentCount = 0;
   /** Segments the last `render` call assembled, or 0 after a whole-document render. */
@@ -85,7 +86,15 @@ export class SegmentedRenderer {
   ) {}
 
   /** Equal to `renderMarkdown(text)` (or `renderMdx`), including what it throws. */
-  async render(text: string): Promise<string> {
+  render(text: string): Promise<string> {
+    // One at a time: a whole render awaits the pipeline, and a second call started
+    // meanwhile would read and overwrite `wholeNext` and the candidates mid-render.
+    const result = this.tail.then(() => this.renderNext(text));
+    this.tail = result.then(noop, noop);
+    return result;
+  }
+
+  private async renderNext(text: string): Promise<string> {
     this.renderedSegmentCount = 0;
     this.assembledSegmentCount = 0;
     // A definition makes the document render whole. New definition-like lines go to a whole
@@ -378,3 +387,5 @@ function lineHash(text: string, start: number, end: number): number {
   }
   return hash >>> 0;
 }
+
+function noop(): void {}

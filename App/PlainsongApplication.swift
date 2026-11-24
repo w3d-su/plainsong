@@ -101,10 +101,27 @@ enum PlainsongWorkspaceSearchHotKey {
 
     @discardableResult
     static func handlePress() -> OSStatus {
+        // A modal session or a sheet owns the keyboard: toggling the sidebar behind it would
+        // unmount the view presenting the alert, and an open or save panel has its own ⇧⌘F.
+        guard !modalPresentationOwnsKeyboard(modalWindow: NSApp.modalWindow, keyWindow: NSApp.keyWindow) else {
+            return OSStatus(eventNotHandledErr)
+        }
         PlainsongWorkspaceSearchKeyAction.performIfAvailable()
         // The combination belongs to Plainsong while it is active. Consume even when workspace
         // search is unavailable so the conflicting system View-menu item cannot claim it.
         return noErr
+    }
+
+    static func modalPresentationOwnsKeyboard(modalWindow: NSWindow?, keyWindow: NSWindow?) -> Bool {
+        guard modalWindow == nil else {
+            return true
+        }
+        guard let keyWindow else {
+            return false
+        }
+        // `sheets` also holds a sheet that is queued or still animating in.
+        return keyWindow.isSheet || keyWindow.sheetParent != nil
+            || keyWindow.attachedSheet != nil || !keyWindow.sheets.isEmpty
     }
 
     private static var identifier: EventHotKeyID {

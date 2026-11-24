@@ -17,6 +17,24 @@ final class PreviewBridgeTransportTests: XCTestCase {
         XCTAssertEqual(opened.map(\.absoluteString), links)
     }
 
+    func testOnlyRelativeLinksReachTheRelativeLinkHandler() {
+        let controller = PreviewController(previewIndexURL: nil)
+        defer { controller.shutdownForTesting() }
+        var opened: [URL] = []
+        var clicked: [String] = []
+        controller.externalURLOpenerOverrideForTesting = { opened.append($0) }
+        controller.onLinkClicked = { clicked.append($0) }
+        let links = [
+            "file:///etc/hosts", "javascript:alert(1)", "data:text/html,hi", "mailto:a@b.c",
+            "../other.md#part",
+        ]
+        for href in links {
+            controller.receiveBridgeBody(["name": "linkClicked", "payload": ["href": href]])
+        }
+        XCTAssertEqual(clicked, ["../other.md#part"])
+        XCTAssertEqual(opened, [])
+    }
+
     // MARK: Viewport scroll traffic
 
     func testViewportScrollsKeepOneInFlightAndTheNewestWaiting() {

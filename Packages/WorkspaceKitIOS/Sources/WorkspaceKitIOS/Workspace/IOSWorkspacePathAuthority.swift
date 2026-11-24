@@ -3,12 +3,12 @@ import WorkspaceCore
 
 enum IOSWorkspacePathAuthority {
     static func lastComponent(_ path: String) -> String {
-        guard let slash = path.lastIndex(of: "/") else { return path }
-        return String(path[path.index(after: slash)...])
+        guard let slash = path.lastPathSeparatorIndex else { return path }
+        return String(path[path.utf8.index(after: slash)...])
     }
 
     static func parentSpelling(_ relativePath: String) -> String {
-        guard let slash = relativePath.lastIndex(of: "/") else { return "" }
+        guard let slash = relativePath.lastPathSeparatorIndex else { return "" }
         return String(relativePath[..<slash])
     }
 
@@ -27,7 +27,7 @@ enum IOSWorkspacePathAuthority {
     static func fileURL(path: String) -> URL {
         var components = URLComponents()
         components.scheme = "file"
-        components.path = path.hasPrefix("/") ? path : "/" + path
+        components.path = path.hasLeadingPathSeparator ? path : "/" + path
         return components.url ?? URL(fileURLWithPath: path)
     }
 
@@ -37,7 +37,7 @@ enum IOSWorkspacePathAuthority {
 
     static func joined(root: URL, relativePath: String) -> String {
         var rootPath = root.path(percentEncoded: false)
-        if !rootPath.hasSuffix("/") {
+        if !rootPath.hasTrailingPathSeparator {
             rootPath.append("/")
         }
         rootPath.append(relativePath)
@@ -101,15 +101,15 @@ enum IOSWorkspacePathAuthority {
     }
 
     static func isHiddenSpelling(_ relativePath: String) -> Bool {
-        relativePath.split(separator: "/", omittingEmptySubsequences: false)
+        relativePath.splitOnPathSeparator(omittingEmptySubsequences: false)
             .contains { $0.hasPrefix(".") }
     }
 
     static func rejectsSymlinkTarget(_ target: String) -> Bool {
-        if target.isEmpty || target.hasPrefix("/") || target.contains("\\") || target.utf8.contains(0) {
+        if target.isEmpty || target.hasLeadingPathSeparator || target.contains("\\") || target.utf8.contains(0) {
             return true
         }
-        let parts = target.split(separator: "/", omittingEmptySubsequences: false)
+        let parts = target.splitOnPathSeparator(omittingEmptySubsequences: false)
         return parts.contains { $0 == ".." || $0.isEmpty }
     }
 
@@ -122,7 +122,7 @@ enum IOSWorkspacePathAuthority {
         if trimmed.isEmpty || trimmed == "." || trimmed == ".." || trimmed.hasPrefix(".") {
             return "assets"
         }
-        if trimmed.contains("/") || trimmed.contains("\\") || trimmed.utf8.contains(0) {
+        if trimmed.containsPathSeparator || trimmed.contains("\\") || trimmed.utf8.contains(0) {
             return "assets"
         }
         if trimmed.unicodeScalars.contains(where: isRefusedFolderScalar) {
@@ -192,7 +192,9 @@ enum IOSWorkspacePathAuthority {
         if preferredFilename.isEmpty || preferredFilename == "." || preferredFilename == ".." {
             return nil
         }
-        if preferredFilename.contains("/") || preferredFilename.contains("\\") || preferredFilename.utf8.contains(0) {
+        if preferredFilename.containsPathSeparator || preferredFilename.contains("\\") || preferredFilename.utf8
+            .contains(0)
+        {
             return nil
         }
         if preferredFilename.unicodeScalars.contains(where: { $0.value < 0x20 }) {

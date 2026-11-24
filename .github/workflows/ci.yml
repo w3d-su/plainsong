@@ -65,9 +65,10 @@ jobs:
       # below tests; depth 2 adds its first parent, the base branch tip. The diff
       # below reads trees, never file contents, so a sparse checkout (which
       # actions/checkout fetches blobless) skips downloading the repository.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         if: ${{ github.event_name == 'pull_request' }}
         with:
+          persist-credentials: false
           fetch-depth: 2
           sparse-checkout: .github
 
@@ -109,12 +110,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Validate committed acceptance resources
         run: sha256sum --strict -c IOSAcceptanceTests/Resources/acceptance-resource-manifest.txt
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -130,6 +133,11 @@ jobs:
 
       - name: Test preview
         run: make test-preview
+
+      # The app loads the committed bundle, so a preview-src change without a
+      # rebuild would pass every test above and ship the old preview.
+      - name: Check the committed preview bundle is current
+        run: make check-preview-bundle
 
   # SwiftFormat and SwiftLint parse text and do not care which OS runs them. Both are
   # pinned to exact release binaries instead of `brew install`: Homebrew tracks the
@@ -149,7 +157,14 @@ jobs:
       SWIFTLINT_VERSION: "0.65.1"
       SWIFTLINT_LINUX_SHA256: "caeed6f4a679c35539ffaf124f6c4ab4a8416917f7d8796279dc52b74026059d"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # Unpinned actions, a checkout that keeps the token, and Homebrew installs
+      # fail here (Scripts/ci/check-workflow-pins.py).
+      - name: Test CI tooling
+        run: make test-ci-tooling
 
       - name: Install pinned swiftformat and swiftlint
         run: |
@@ -186,7 +201,7 @@ jobs:
       # SwiftFormat's cache is keyed by file content, tool version and options, so an
       # unchanged file is not reformatted. The cache is a few hundred kilobytes.
       - name: Cache SwiftFormat results
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ${{ runner.temp }}/swiftformat-cache
           key: swiftformat-${{ env.SWIFTFORMAT_VERSION }}-${{ hashFiles('.swiftformat', 'Makefile') }}-${{ github.run_id }}
@@ -210,15 +225,17 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Install tools
         run: |
-          brew install xcodegen
+          Scripts/ci/install-xcodegen.sh
           echo "xcodegen: $(xcodegen --version)"
 
       - name: Cache Swift package builds
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/Library/Caches/org.swift.swiftpm
@@ -236,6 +253,11 @@ jobs:
 
       - name: Test packages
         run: make test-packages
+
+      # The iOS runners' provenance, admission and archive-selection logic.
+      # ios.yml runs only on a schedule and by hand, so a pull request tests it here.
+      - name: Test iOS tooling
+        run: make test-ios-tooling
 
   # Hosted XCTest bundles: one job builds every bundle once (~3 min) and the shards
   # run the same products. A shard that names a class also skips it in that bundle's
@@ -255,7 +277,9 @@ jobs:
     env:
       SHARD: build
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - &prepare-evidence
         name: Prepare CI evidence paths
@@ -270,14 +294,14 @@ jobs:
 
       - name: Install tools
         run: |
-          brew install xcodegen
+          Scripts/ci/install-xcodegen.sh
           echo "xcodegen: $(xcodegen --version)"
 
       - name: Cache Xcode package checkouts
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ${{ runner.temp }}/plainsong-dd/SourcePackages
-          key: xcode-spm-${{ hashFiles('project.yml', 'Packages/**/Package.swift', 'Packages/**/Package.resolved') }}
+          key: xcode-spm-${{ hashFiles('project.yml', 'Package.resolved', 'Packages/**/Package.swift', 'Packages/**/Package.resolved') }}
           restore-keys: xcode-spm-
 
       - name: Build for testing
@@ -294,6 +318,11 @@ jobs:
       - name: Check built update configuration
         run: Scripts/check-shipped-update-configuration.sh "$XCODE_DERIVED_DATA/Build/Products/Debug/Plainsong.app/Contents/Info.plist"
 
+      # Scripts/make-appcast.sh against the Sparkle tools this build resolved and a
+      # throwaway key. release.yml runs it only on a tag, after the release is built.
+      - name: Appcast self-test
+        run: Scripts/make-appcast.sh --self-test --sparkle-bin "$XCODE_DERIVED_DATA/SourcePackages/artifacts/sparkle/Sparkle/bin"
+
       # tar keeps the symlinks and signatures an artifact zip would lose. Objects and
       # module files only serve the link step, which is finished.
       - name: Package test products
@@ -306,7 +335,7 @@ jobs:
 
       # No attempt in the name: re-running a failed shard reuses this run's products.
       - name: Upload test products
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: hosted-products-${{ github.run_id }}
           path: ${{ runner.temp }}/hosted-products.tar.zst
@@ -335,7 +364,7 @@ jobs:
       - &keep-failure-evidence
         name: Keep failure evidence
         if: ${{ failure() || cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: plainsong-ci-failure-${{ env.SHARD }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ env.XCODE_ARTIFACT_DIR }}/
@@ -376,12 +405,14 @@ jobs:
     env:
       SHARD: ${{ matrix.shard }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - *prepare-evidence
 
       - name: Download test products
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: hosted-products-${{ github.run_id }}
           path: ${{ runner.temp }}

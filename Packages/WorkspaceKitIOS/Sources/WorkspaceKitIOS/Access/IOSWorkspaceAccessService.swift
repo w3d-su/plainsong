@@ -138,6 +138,7 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
     ) -> any IOSObservation {
         let observation = IOSWorkspaceObservation(handler: handler)
         observations[observation.token] = observation
+        observation.onCancel = { [weak self, token = observation.token] in self?.observations[token] = nil }
         return observation
     }
 
@@ -157,7 +158,10 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
     }
 
     public func previewContext(for grant: IOSWorkspaceGrant) -> PreviewAssetAccessContext? {
-        guard let record = records[grant.workspaceID], record.generation == grant.accessGeneration else {
+        // A revoked record only drains its in-flight work; it authorizes no new preview read.
+        guard let record = records[grant.workspaceID], !record.revoked, !record.stopped,
+              record.generation == grant.accessGeneration
+        else {
             return nil
         }
         return PreviewAssetAccessContext(
@@ -250,7 +254,7 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
         let identity = IOSWorkspaceIdentity(rawValue: context.grantIdentity)
         guard let record = records[identity] else { return nil }
         guard record.rootToken == context.rootToken else { return nil }
-        guard record.generation == context.accessGeneration, !record.stopped else { return nil }
+        guard record.generation == context.accessGeneration, !record.revoked, !record.stopped else { return nil }
         guard IOSWorkspacePathAuthority.sameFile(record.rootURL, context.allowedRoot) else { return nil }
         return record
     }

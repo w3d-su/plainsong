@@ -4,6 +4,72 @@ Created 2026-10-08. Contract: **IOS-C0-v1 declarations implemented**. Live main:
 
 The C0 tag preserves declarations and an unavailable scaffold. **The current branch contains the production composition candidate described below; full v1 acceptance remains OPEN. Older dated sections retain their original source and acceptance boundaries.**
 
+## I2 simulator walk — 2026-11-15
+
+This section records the first run of the production app through its real UI. It closes
+no device gate, and **full v1 acceptance remains OPEN**.
+
+`main` `f664c5af` (after #264–#267) was built and driven by a temporary XCUITest, not
+committed, on an iPhone 17 Pro / iOS 27.0 simulator: the system document picker, the
+Recent list, the editor, the preview, Settings and the Performance Probe entry. The
+unsigned Release IPA from that commit (`f2a5e60a…82e1`) is **not usable**: opening a
+file or a folder through the picker did nothing.
+
+Seven defects were found and are fixed in
+[#269](https://github.com/w3d-su/plainsong/pull/269), squash-merged to `main` as
+`162b7932`; the causes, the fixes and what was not verified are in that PR's
+[decision entry](../decisions/2026-11-15-ios-first-real-ui-walk-fixes.md):
+
+1. picker results dropped (file, folder, recovery restore, conflict copy);
+2. one tap on a Recent row ran Open, Choose Again and Remove Record;
+3. no Source/Preview control on iPhone;
+4. no Undo/Redo or formatting controls, and their shortcuts not installed;
+5. shortcut-host titles drawn over the iPad navigation bar;
+6. preview laid out 980 px wide on iPhone;
+7. every relative image in a picked folder refused as outside the root.
+
+On #269's earlier head `0c0e8f28`, local, Xcode 27.0, iOS 27.0 simulator: `make ios-test`
+719 run, 719 passed, 0 skipped; `make test-ios-tooling` 44/44; `make lint` with
+SwiftFormat 0.62.1 passed. `make ios-preview` 217/217 was run three source changes
+earlier, none of them in PreviewKit or `index.html`. The exact-head Mac CI passed for
+`0c0e8f28`. The walk was repeated after the fixes on the iPhone simulator and, for the
+layout and the bars, on an iPad Pro 11-inch simulator.
+
+On #269's later head `2175bfe3` (adding the `/private` preview-root symlink resolution
+fallback, the Files image-picker dismissal/delegate split, Recent row hit-target framing,
+scene-local resign on preview switch, and `IOSDocumentScreen` shortcut test hosting),
+local, Xcode 27.0, iOS 27.0 simulator (`59CB04BD-26CC-4841-8D06-E75A2EDEBC66`):
+`make ios-test` 723 run, 723 passed, 0 skipped; `make test-ios-tooling` 44/44. The
+exact-head Mac CI passed for `2175bfe3`, including `lint` with the pinned SwiftFormat
+0.62.1. No `make ios-preview` run is recorded for this head; the commit touches neither
+PreviewKit nor `index.html`. No simulator walk is recorded for these changes, so the
+device pass is their first UI check: G10 for Insert Image → Files, D7 for the pane
+switch during Zhuyin composition, and H6 for the `/private` spelling of a picked
+folder. Hosted `ios.yml` was not dispatched for this head.
+
+On #269's final head `be3587f1` (after `416da03f`, which resolves the preview root only when
+the plain spelling fails and maps workspace-watcher callbacks across a symlinked root,
+and `be3587f1`, which maps folder callbacks spelled with a trailing slash and keeps the
+find shortcuts installed while a single pane shows the preview), #269 records `make
+ios-test` 726 run, 726 passed, 0 skipped on the iOS 27.0 simulator. The exact-head Mac
+CI passed for `be3587f1` (every job, run 44100001307). Neither commit touches
+PreviewKit or `index.html`, and no simulator walk is recorded for them: device-pass F8
+(a file and a folder added from the Mac appear without Refresh) is the first UI check of
+the watcher changes.
+
+The device-pass kit is rebuilt from `be3587f1` with `make ios-ipa` (clean source):
+`PlainsongIOS-be3587f152e6.ipa`, SHA-256
+`ea4972de9ae48fa18607d046500229215c2b33bbfe10745cdb81ab8803f4bbed`. It replaces the
+`2175bfe3` kit (`892e35dd…87211`), which lacks the watcher and find-shortcut fixes.
+`docs/ios/device-pass.md` names it and now says where each control is. The kit is
+local and not committed. It predates #278 and #285, which changed the iOS app on `main`
+after #269; #285 changes how Insert Image → Files (G10) delivers its pick.
+
+Not walked in the simulator: iCloud Drive, Chinese input, backgrounding and termination,
+external change and conflict, image insertion, the frontmatter panel, export and print,
+workspace search results, and accessibility. Those device-pass steps are still written
+from the source, and more defects of the same kind may be behind them.
+
 ## I0 baseline re-check — 2026-11-15
 
 This section records the state of `main` three weeks after the section below. It closes

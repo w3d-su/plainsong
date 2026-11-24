@@ -48,6 +48,14 @@ extension IOSWorkspaceAccessService {
                 try await context.files.list(url: directoryURL, relativePath: parent, root: context.rootURL)
             }
             for child in children where seen.insert(Array(child.relativePath.utf8)).inserted {
+                // Prune before queueing: one coordinated listing per directory of `.git` is
+                // what runs a real project past the coordination deadline.
+                if child.isDirectory, IOSWorkspaceScanPruning.skipsDirectory(
+                    child.relativePath,
+                    includesHiddenEntries: context.includesHiddenEntries
+                ) {
+                    continue
+                }
                 output.append(child)
                 if child.isDirectory, !child.isSymlink {
                     pending.append(child.relativePath)

@@ -53,14 +53,30 @@ struct IOSPerformanceProbePanel: View {
         case let .finished(report):
             IOSPerformanceReportSummary(report: report)
             HStack {
-                if let file = IOSPerformanceReportFile(report: report) {
-                    ShareLink(item: file.url) {
-                        Label("Share Report", systemImage: "square.and.arrow.up")
-                    }
-                }
+                IOSPerformanceReportShareLink(report: report)
                 Spacer()
                 Button("Run Again") { probe.reset() }
             }
+        }
+    }
+}
+
+/// Writes the report file once per report. Building it in the panel's `body` rewrote the
+/// JSON file on every redraw.
+private struct IOSPerformanceReportShareLink: View {
+    let report: IOSPerformanceReport
+    @State private var file: IOSPerformanceReportFile?
+
+    var body: some View {
+        Group {
+            if let file {
+                ShareLink(item: file.url) {
+                    Label("Share Report", systemImage: "square.and.arrow.up")
+                }
+            }
+        }
+        .onChange(of: report, initial: true) {
+            file = IOSPerformanceReportFile(report: report)
         }
     }
 }

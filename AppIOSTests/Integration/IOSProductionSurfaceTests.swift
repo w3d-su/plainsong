@@ -146,7 +146,9 @@ final class IOSProductionSurfaceTests: XCTestCase {
         XCTAssertTrue(harness.runtime.scene.previewHostView === harness.runtime.preview.webView)
     }
 
-    func testReturningActiveCannotTransferFocusToAReplacementBinding() throws {
+    /// The claim `noteNewBinding` queues runs after a `Task.yield()`, so the test
+    /// lets the main actor run before asserting that none was queued.
+    func testReturningActiveCannotTransferFocusToAReplacementBinding() async throws {
         let harness = try makeHarness { _, _ in }
         let identity = IOSDocumentIdentity(rawValue: UUID())
         let session = DocumentSession(text: "# Original", fileKind: .markdown)
@@ -165,6 +167,7 @@ final class IOSProductionSurfaceTests: XCTestCase {
             accessGeneration: 1, canWrite: true
         ))
         harness.runtime.setSceneActive(true)
+        try await Task.sleep(nanoseconds: 50_000_000)
         XCTAssertEqual(harness.facade.setCommandFocusCalls.count, callsBeforeReplacement)
         XCTAssertFalse(harness.runtime.editor.captureSnapshot()?.isFocused ?? true)
         harness.runtime.scene.stopObserving()

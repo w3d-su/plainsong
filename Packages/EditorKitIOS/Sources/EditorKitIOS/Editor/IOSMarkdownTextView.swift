@@ -69,6 +69,10 @@ public final class IOSMarkdownTextView: UITextView {
     }
 
     override public func setMarkedText(_ markedText: String?, selectedRange: NSRange) {
+        if editor?.refusesNativeInput == true {
+            editor?.endCompositionAfterRefusedInput()
+            return
+        }
         super.setMarkedText(markedText, selectedRange: selectedRange)
         let marked = markedTextRange != nil || markedText?.isEmpty == false
         editor?.noteMarkedText(marked)
@@ -80,6 +84,10 @@ public final class IOSMarkdownTextView: UITextView {
     }
 
     override public func insertText(_ text: String) {
+        if editor?.refusesNativeInput == true {
+            editor?.endCompositionAfterRefusedInput()
+            return
+        }
         if markedTextRange != nil {
             super.insertText(text)
             return

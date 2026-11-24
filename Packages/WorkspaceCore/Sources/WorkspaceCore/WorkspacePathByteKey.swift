@@ -28,8 +28,8 @@ public struct WorkspacePathByteKey: Hashable, Comparable, Sendable {
     private static let hexDigits = Array("0123456789abcdef")
 }
 
-enum WorkspacePathOrder {
-    static func isBefore(_ first: String, _ second: String) -> Bool {
+public enum WorkspacePathOrder {
+    public static func isBefore(_ first: String, _ second: String) -> Bool {
         let pathComparison = first.compare(
             second,
             options: [.caseInsensitive, .numeric]

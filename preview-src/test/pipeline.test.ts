@@ -63,6 +63,54 @@ describe.each([
 });
 
 describe("mdx preview pipeline", () => {
+  it("does not turn an authored task-list class into a document task toggle", async () => {
+    const html = await renderMdx([
+      '<ul class="contains-task-list">',
+      '  <li class="task-list-item note"><input type="checkbox" /> fake</li>',
+      '  <li class={"task-list-item"}><input type="checkbox" /> fake</li>',
+      "</ul>",
+      "",
+      "- [ ] real",
+      "",
+    ].join("\n"));
+    const root = document.createElement("div");
+    root.innerHTML = html;
+
+    expect(root.querySelector("ul")!.className).toBe("");
+    expect(root.querySelector("li")!.className).toBe("");
+    expect(root.querySelectorAll("[data-task-checkbox]")).toHaveLength(1);
+    expect(root.querySelector("li.task-list-item [data-task-checkbox]")).not.toBeNull();
+  });
+
+  it("drops authored preview-internal attributes and classes but keeps data images", async () => {
+    const html = await renderMdx([
+      "first",
+      "",
+      '<div data-line="1" class="note mermaid-pending mermaid-rendered mdx-error-banner">',
+      '  <input type="checkbox" data-task-checkbox="true" /> <span data-line="1">s</span>',
+      "</div>",
+      "",
+      '<math altimg="https://evil.example/a.png" alttext="x"><mi>x</mi></math>',
+      "",
+      "![a](data:image/png;base64,iVBORw0KGgo=)",
+      "",
+      "- [ ] task",
+      "",
+    ].join("\n"));
+    const root = document.createElement("div");
+    root.innerHTML = html;
+
+    const div = root.querySelector("div")!;
+    expect(div.className).toBe("note");
+    expect(div.dataset.line).toBe("3");
+    expect(div.querySelector("input")!.hasAttribute("data-task-checkbox")).toBe(false);
+    expect(div.querySelector("span")!.hasAttribute("data-line")).toBe(false);
+    expect(root.querySelector("math")!.getAttributeNames()).toEqual(["alttext"]);
+    expect(root.querySelector("img")!.getAttribute("src")).toBe("data:image/png;base64,iVBORw0KGgo=");
+    // The generated task checkbox still carries its marker.
+    expect(root.querySelector("li input")!.getAttribute("data-task-checkbox")).toBe("true");
+  });
+
   it("renders the MDX kitchen sink fixture", async () => {
     await expect(renderMdx(kitchenSinkMdx)).resolves.toMatchSnapshot();
   });
@@ -236,5 +284,11 @@ Inline <Badge tone="success">Ready</Badge> and {readingTime}.
     expect((globalThis as Record<string, unknown>)[marker]).toBe(false);
     expect(html).toContain(`{globalThis.${marker} = true}`);
     expect(html).not.toContain("<script");
+  });
+
+  it("does not typeset an MDX element whose class expression names a math class", async () => {
+    const html = await renderMdx('<span className={"math-inline"}>a_b</span>\n');
+    expect(html).not.toContain("katex");
+    expect(html).toContain("a_b");
   });
 });

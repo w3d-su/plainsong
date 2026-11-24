@@ -53,15 +53,39 @@ private extension AppState {
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
         do {
-            guard FileKind(url: url) != nil else {
-                throw AppStateError.unsupportedFile(url)
-            }
-            try SecurityScopedAccess.withAccess(to: url) {
-                try Data().write(to: url, options: [.atomic])
-            }
-            try open(url: url, rememberAsLastOpened: true, preserveWorkspace: false)
+            try createEmptyFileAndOpen(at: url)
         } catch {
             present(error, title: "Could Not Create File")
         }
+    }
+}
+
+@MainActor
+extension AppState {
+    /// Runs every refusal `open` can raise before the chosen file is emptied. The save panel
+    /// may name an existing file, and a close blocked by a conflict or a failed save must
+    /// leave that file's bytes alone.
+    func createEmptyFileAndOpen(at url: URL) throws {
+        guard FileKind(url: url) != nil else {
+            throw AppStateError.unsupportedFile(url)
+        }
+        try refuseWindowFileOpenIfNeeded()
+        try validateWorkspaceMutationRecoveryStoresLoaded(at: url)
+        // Unsaved text for the chosen file would be written over the new empty file, or lost.
+        let stateURL = url.standardizedFileURL
+        let dirtyOwner = registry.sessions(from: [
+            .warmCache, .retired, .editorBindings, .editorInstallations, .mutationRecovery, .windowDocuments,
+        ]).first { session in
+            guard session.isDirty, let ownedURL = sessionStateURL(for: session) else { return false }
+            return exactFileURLSpellingMatches(ownedURL, stateURL)
+        }
+        guard dirtyOwner == nil else {
+            throw AppStateError.duplicateSessionOwnership(url)
+        }
+        try closeWorkspaceForReplacement()
+        try SecurityScopedAccess.withAccess(to: url) {
+            try Data().write(to: url, options: [.atomic])
+        }
+        try open(url: url, rememberAsLastOpened: true, preserveWorkspace: false)
     }
 }

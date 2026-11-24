@@ -308,12 +308,29 @@ function rehypeSourceLines(options: SegmentHoleOptions) {
         node.properties!.dataMathIndex = holeMarker("M", Number(mathIndex));
       }
 
-      if (node.tagName === "input" && node.properties?.type === "checkbox") {
-        delete node.properties.disabled;
-        node.properties.dataTaskCheckbox = "true";
+      // Only the checkbox of a task list item writes back; an `<input>` authored in MDX
+      // is not a task marker in the source.
+      const checkbox = taskListCheckbox(node);
+      if (checkbox?.properties) {
+        delete checkbox.properties.disabled;
+        checkbox.properties.dataTaskCheckbox = "true";
       }
     });
   };
+}
+
+/** The checkbox remark-gfm put first in a task list item (inside its paragraph when loose). */
+function taskListCheckbox(node: TreeNode): TreeNode | undefined {
+  const classes = node.properties?.className;
+  if (node.tagName !== "li" || !Array.isArray(classes) || !classes.includes("task-list-item")) {
+    return undefined;
+  }
+  const isCheckbox = (child: TreeNode | undefined) =>
+    child?.tagName === "input" && child.properties?.type === "checkbox";
+  const first = node.children?.find((child) => child.type === "element");
+  if (isCheckbox(first)) return first;
+  const nested = first?.tagName === "p" ? first.children?.[0] : undefined;
+  return isCheckbox(nested) ? nested : undefined;
 }
 
 function rehypeDropScriptLikeElements() {

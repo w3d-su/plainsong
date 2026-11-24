@@ -17,12 +17,12 @@ evidence="$archive-meta"
 mkdir -p "$evidence"
 Scripts/ios/ios-preflight.sh --write-evidence "$evidence"
 /usr/bin/python3 Scripts/ios/ios-provenance.py capture "$evidence/source.json"
-xcodegen generate
+Scripts/generate-project.sh
 start_ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 set +e
 xcodebuild -project Plainsong.xcodeproj -scheme PlainsongIOS -configuration Release \
     -destination 'generic/platform=iOS' -archivePath "$archive" \
-    -derivedDataPath "$run_root/DerivedData" \
+    -derivedDataPath "$run_root/DerivedData" -onlyUsePackageVersionsFromResolvedFile \
     CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO archive > "$evidence/archive.log" 2>&1
 result=$?
 set -e

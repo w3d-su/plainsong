@@ -599,7 +599,7 @@ private func editorImageAssetDiscardPreflightDisposition(
         )
     }
     let publishedIdentity = WorkspaceFileSystemIdentity(
-        device: UInt64(publishedStatus.st_dev),
+        device: UInt64(UInt32(bitPattern: publishedStatus.st_dev)),
         inode: UInt64(publishedStatus.st_ino)
     )
     guard (publishedStatus.st_mode & S_IFMT) == S_IFREG,

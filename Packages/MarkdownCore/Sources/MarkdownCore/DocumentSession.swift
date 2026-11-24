@@ -131,6 +131,11 @@ public final class DocumentSession: ObservableObject {
 
     deinit {
         statisticsTask?.cancel()
+        // A continuation that is dropped without `finish()` leaves its consumer suspended
+        // in `for await` forever, because the consumer's iterator keeps the stream alive.
+        for continuation in textChangeContinuations.values {
+            continuation.finish()
+        }
     }
 
     private init(text: String, url: URL?, fileKind: FileKind?, isDirty: Bool, statistics: TextStatistics?) {

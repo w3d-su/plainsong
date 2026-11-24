@@ -391,7 +391,7 @@ private func editorImageNamespaceEntryIdentity(
     }
     guard result == 0 else { return nil }
     return WorkspaceFileSystemIdentity(
-        device: UInt64(status.st_dev),
+        device: UInt64(UInt32(bitPattern: status.st_dev)),
         inode: UInt64(status.st_ino)
     )
 }
@@ -477,7 +477,7 @@ private func editorImageFileSystemIdentity(
         throw WorkspaceAnchoredFileSystemError.namespaceChanged
     }
     return WorkspaceFileSystemIdentity(
-        device: UInt64(status.st_dev),
+        device: UInt64(UInt32(bitPattern: status.st_dev)),
         inode: UInt64(status.st_ino)
     )
 }
@@ -755,7 +755,7 @@ private func editorImageDirectoryIdentity(
         throw WorkspaceAnchoredFileSystemError.namespaceChanged
     }
     return WorkspaceFileSystemIdentity(
-        device: UInt64(status.st_dev),
+        device: UInt64(UInt32(bitPattern: status.st_dev)),
         inode: UInt64(status.st_ino)
     )
 }
@@ -772,7 +772,7 @@ private func editorImageDirectoryIdentity(
         throw WorkspaceAnchoredFileSystemError.namespaceChanged
     }
     return WorkspaceFileSystemIdentity(
-        device: UInt64(status.st_dev),
+        device: UInt64(UInt32(bitPattern: status.st_dev)),
         inode: UInt64(status.st_ino)
     )
 }
@@ -787,7 +787,7 @@ private func editorImageRegularFileIdentity(
         throw WorkspaceAnchoredFileSystemError.namespaceChanged
     }
     return WorkspaceFileSystemIdentity(
-        device: UInt64(status.st_dev),
+        device: UInt64(UInt32(bitPattern: status.st_dev)),
         inode: UInt64(status.st_ino)
     )
 }
@@ -804,7 +804,7 @@ private func validateEditorImageRegularFileNamespaceEntry(
     guard result == 0,
           (status.st_mode & S_IFMT) == S_IFREG,
           WorkspaceFileSystemIdentity(
-              device: UInt64(status.st_dev),
+              device: UInt64(UInt32(bitPattern: status.st_dev)),
               inode: UInt64(status.st_ino)
           ) == expectedIdentity
     else {

@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import WorkspaceCore
 
 /// A lexical root-relative location permanently bound to one root authority.
 public struct WorkspaceFileSystemLocation: Sendable, Hashable {
@@ -81,7 +82,7 @@ public struct WorkspaceFileSystemLocation: Sendable, Hashable {
     }
 
     func sibling(named name: String) -> WorkspaceFileSystemLocation? {
-        let components = relativePath.split(separator: "/", omittingEmptySubsequences: true)
+        let components = relativePath.splitOnPathSeparator(omittingEmptySubsequences: true)
         guard !components.isEmpty else { return nil }
         let parent = components.dropLast().map(String.init)
         return try? WorkspaceFileSystemLocation(
@@ -111,7 +112,7 @@ enum WorkspaceLiteralFileURL {
             throw WorkspaceRootContainmentError.absolutePath(fileURL.absoluteString)
         }
         let path = fileURL.path(percentEncoded: false)
-        guard path.hasPrefix("/") else {
+        guard path.hasLeadingPathSeparator else {
             throw WorkspaceRootContainmentError.absolutePath(path)
         }
         guard !path.utf8.contains(0) else {
@@ -121,7 +122,7 @@ enum WorkspaceLiteralFileURL {
     }
 
     static func fileURL(path: String, isDirectory: Bool) -> URL {
-        precondition(path.hasPrefix("/"), "Filesystem URL paths must be absolute")
+        precondition(path.hasLeadingPathSeparator, "Filesystem URL paths must be absolute")
         precondition(!path.utf8.contains(0), "Filesystem URL paths may not contain NUL")
 
         let encodedPath = path.utf8.map { byte -> String in
@@ -132,7 +133,7 @@ enum WorkspaceLiteralFileURL {
                 String(format: "%%%02X", byte)
             }
         }.joined()
-        let directorySuffix = isDirectory && path != "/" && !path.hasSuffix("/") ? "/" : ""
+        let directorySuffix = isDirectory && path != "/" && !path.hasTrailingPathSeparator ? "/" : ""
         guard let url = URL(string: "file://\(encodedPath)\(directorySuffix)") else {
             preconditionFailure("Validated filesystem path could not form a lexical file URL")
         }
@@ -140,25 +141,25 @@ enum WorkspaceLiteralFileURL {
     }
 
     static func parentPath(of path: String) throws -> String {
-        guard path.hasPrefix("/") else {
+        guard path.hasLeadingPathSeparator else {
             throw WorkspaceRootContainmentError.absolutePath(path)
         }
         let trimmedPath = WorkspaceRootContainment.normalizedDirectoryPath(path)
-        guard let separator = trimmedPath.lastIndex(of: "/") else {
+        guard let separator = trimmedPath.lastPathSeparatorIndex else {
             throw WorkspaceRootContainmentError.absolutePath(path)
         }
         return separator == trimmedPath.startIndex ? "/" : String(trimmedPath[..<separator])
     }
 
     static func leafName(of path: String) throws -> String {
-        guard path.hasPrefix("/") else {
+        guard path.hasLeadingPathSeparator else {
             throw WorkspaceRootContainmentError.absolutePath(path)
         }
         let trimmedPath = WorkspaceRootContainment.normalizedDirectoryPath(path)
-        guard let separator = trimmedPath.lastIndex(of: "/"), separator != trimmedPath.endIndex else {
+        guard let separator = trimmedPath.lastPathSeparatorIndex else {
             throw WorkspaceRootContainmentError.emptyRelativePath
         }
-        let leaf = String(trimmedPath[trimmedPath.index(after: separator)...])
+        let leaf = String(trimmedPath[trimmedPath.utf8.index(after: separator)...])
         guard !leaf.isEmpty else {
             throw WorkspaceRootContainmentError.emptyRelativePath
         }
@@ -192,7 +193,7 @@ enum WorkspaceLiteralFileURL {
     }
 
     private static func literalPathComponents(_ path: String) -> [Substring] {
-        path.split(separator: "/", omittingEmptySubsequences: true)
+        path.splitOnPathSeparator(omittingEmptySubsequences: true)
     }
 }
 

@@ -125,8 +125,6 @@ extension AppState {
         switch activation.source {
         case .cached:
             if session !== shownSession {
-                autosaveTask?.cancel()
-                autosaveTask = nil
                 setCurrentDocument(session, synchronizingWorkspaceTree: false)
             }
             guard reconcileObservedRetainedFileVersion(
