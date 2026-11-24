@@ -15,6 +15,9 @@ Swift 6 package sources (`Packages/*/Sources`) must not await WebKit's async
 crashed when a Swift 5 module awaited it in the same binary. They call the
 completion-handler wrapper `evaluateJavaScriptReply(_:)` instead.
 
+Xcode test targets set to Swift 6 get the async import check, but not the
+production construction checks.
+
 Comments and string literals are ignored, except that a string passed to
 `NSClassFromString` or `objc_getClass` is still inspected. Concatenated class
 names and `removeAllContentRuleLists()` are outside this check.
@@ -265,14 +268,19 @@ def find_violations(root: Path, project_spec=None) -> list[str]:
     if project_spec is None:
         project_spec = read_project_spec(root)
     source_roots = [root / "App", root / "AppIOS"]
+    swift6_test_roots = []
     for target in project_spec["targets"].values():
         if target["type"] in {"bundle.unit-test", "bundle.ui-testing"}:
-            continue
+            if str(target.get("settings", {}).get("SWIFT_VERSION")) != "6":
+                continue
+            roots = swift6_test_roots
+        else:
+            roots = source_roots
         sources = target.get("sources", [])
         if isinstance(sources, str):
             sources = [sources]
         for source in sources:
-            source_roots.append(root / (source if isinstance(source, str) else source["path"]))
+            roots.append(root / (source if isinstance(source, str) else source["path"]))
     packages = root / "Packages"
     if packages.exists():
         source_roots.extend(sorted(path for path in packages.glob("*/Sources") if path.is_dir()))
@@ -287,6 +295,11 @@ def find_violations(root: Path, project_spec=None) -> list[str]:
     for path in sorted(paths):
         relative = path.relative_to(root).as_posix()
         scan_source(relative, path.read_text(), violations)
+    for source_root in swift6_test_roots:
+        candidates = [source_root] if source_root.is_file() else source_root.rglob("*.swift")
+        for path in candidates:
+            if path.suffix == ".swift" and path.is_file():
+                scan_async_import(root, path, violations)
     unique = []
     seen = set()
     for violation in sorted(violations, key=violation_key):
@@ -294,6 +307,14 @@ def find_violations(root: Path, project_spec=None) -> list[str]:
             seen.add(violation)
             unique.append(violation)
     return unique
+
+
+def scan_async_import(root, path, violations):
+    source = path.read_text()
+    relative = path.relative_to(root).as_posix()
+    for match in ASYNC_EVALUATE_JAVASCRIPT.finditer(ScannedSource(source).code_text()):
+        add(violations, relative, source, match.start(),
+            "await the completion-handler evaluateJavaScriptReply(_:), not the async evaluateJavaScript import")
 
 
 def violation_key(message):

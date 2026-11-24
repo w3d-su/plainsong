@@ -10,7 +10,6 @@ import XCTest
 @MainActor
 final class PerformanceBudgetTests: XCTestCase {
     override func setUp() async throws {
-        try await super.setUp()
         try PerformanceResourcePreflight.validateOnce(bundle: Self.testBundle)
     }
 
@@ -580,7 +579,8 @@ extension PerformanceBudgetTests {
         guard result > 0 else {
             return ""
         }
-        return String(cString: buffer)
+        let bytes = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+        return String(decoding: bytes, as: UTF8.self)
     }
 
     static func makeWarmDocumentSessions() throws -> [DocumentSession] {
@@ -689,7 +689,7 @@ extension PerformanceBudgetTests {
 
     func waitForRenderedText(controller: PreviewController, marker: String, label: String) async throws {
         try await waitUntil(label) {
-            let text = try await controller.webView.evaluateJavaScript("document.body.innerText") as? String
+            let text = try await controller.evaluateJavaScriptReply("document.body.innerText") as? String
             return text?.contains(marker) == true
         }
     }

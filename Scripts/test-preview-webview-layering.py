@@ -332,6 +332,38 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
             f"Packages/PreviewKit/Sources/PreviewKit/Probe.swift:2: {detail}",
         ])
 
+    def test_swift6_xcode_tests_reject_the_async_import_but_keep_test_exemptions(self):
+        source = "\n".join([
+            "import WebKit",
+            "let view = WKWebView()",
+            "let value = try await view.evaluateJavaScript(script)",
+            "view.evaluateJavaScript(script) { _, _ in }",
+        ])
+        self.write_source("PerformanceTests/Probe.swift", source)
+        self.write_source("PlainsongUITests/Probe.swift", source)
+        self.write_source("AppTests/Probe.swift", source)
+        project = {"targets": {
+            "PerformanceTests": {
+                "type": "bundle.unit-test",
+                "sources": [{"path": "PerformanceTests"}],
+                "settings": {"SWIFT_VERSION": "6"},
+            },
+            "PlainsongUITests": {
+                "type": "bundle.ui-testing",
+                "sources": ["PlainsongUITests"],
+                "settings": {"SWIFT_VERSION": "6"},
+            },
+            "PlainsongTests": {
+                "type": "bundle.unit-test",
+                "sources": ["AppTests"],
+            },
+        }}
+        detail = "await the completion-handler evaluateJavaScriptReply(_:), not the async evaluateJavaScript import"
+        self.assertEqual(self.violations(project), [
+            f"PerformanceTests/Probe.swift:3: {detail}",
+            f"PlainsongUITests/Probe.swift:3: {detail}",
+        ])
+
     def test_current_repository_has_no_violations(self):
         root = Path(__file__).resolve().parent.parent
         self.assertEqual(CHECKER["find_violations"](root), [])
