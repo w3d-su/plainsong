@@ -28,12 +28,11 @@ final class MenuBarStateTests: XCTestCase {
         let session = DocumentSession(text: "# Menu test", url: URL(fileURLWithPath: "/tmp/menu-bar-state-tests.md"))
         let appState = AppState(shownSession: session, shouldRestoreLastOpenedFile: false)
         let window = NSWindow()
-        var windowIsAvailable = false
-        appState.exportHTMLOperations.panelWindowProvider = { windowIsAvailable ? window : nil }
+        appState.exportHTMLOperations.panelWindowProvider = { nil }
         let menuState = MenuBarState(appState: appState)
 
         try await settleMainQueue()
-        windowIsAvailable = true
+        appState.exportHTMLOperations.panelWindowProvider = { window }
         XCTAssertTrue(appState.canExportCurrentDocumentAsHTML)
         XCTAssertFalse(menuState.snapshot.canExportHTML)
         let name = AppState.exportHTMLWindowRegistered
