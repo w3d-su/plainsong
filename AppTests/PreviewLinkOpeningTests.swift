@@ -52,4 +52,21 @@ final class PreviewLinkOpeningTests: XCTestCase {
         XCTAssertEqual(appState.shownSession.fileURL?.standardizedFileURL, target.standardizedFileURL)
         XCTAssertEqual(appState.shownSession.text, "# Target")
     }
+
+    /// A workspace picked as `/private/tmp/w` (what the Open panel returns) refused every
+    /// relative link: `standardizedFileURL` turned the target into `/tmp/w/Target.md`, which
+    /// the workspace authority compares literally against `/private/tmp/w`. `/private/etc`
+    /// has the same alias and is readable from the sandboxed test host.
+    func testWorkspaceFileURLIsReanchoredOnAPrivatePrefixedRoot() {
+        let root = URL(fileURLWithPath: "/private/etc", isDirectory: true)
+        let linkURL = URL(fileURLWithPath: "hosts", relativeTo: root).standardizedFileURL
+        XCTAssertEqual(linkURL.path, "/etc/hosts", "standardizedFileURL drops the /private alias")
+
+        XCTAssertEqual(AppState.workspaceFileURL(for: linkURL, under: root)?.path, "/private/etc/hosts")
+        XCTAssertEqual(
+            AppState.workspaceFileURL(for: root.appendingPathComponent("hosts"), under: root)?.path,
+            "/private/etc/hosts"
+        )
+        XCTAssertNil(AppState.workspaceFileURL(for: URL(fileURLWithPath: "/usr/bin/true"), under: root))
+    }
 }
