@@ -61,7 +61,7 @@ final class MarkdownUIDocumentTests: XCTestCase {
             XCTAssertEqual(disposition, .stored)
             saved.fulfill()
         }
-        await fulfillment(of: [saved], timeout: 5)
+        await assertFulfillment(of: [saved], timeout: 5)
         let reread = try Data(contentsOf: url)
         XCTAssertEqual(reread, replacement)
         try? FileManager.default.removeItem(at: directory)

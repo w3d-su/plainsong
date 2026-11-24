@@ -22,7 +22,11 @@ let package = Package(
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
-        .testTarget(name: "WorkspaceKitIOSTests", dependencies: ["WorkspaceKitIOS"]),
+        .testTarget(
+            name: "WorkspaceKitIOSTests",
+            dependencies: ["WorkspaceKitIOS"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
     ],
     swiftLanguageModes: [.v5]
 )
