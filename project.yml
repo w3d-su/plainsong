@@ -216,6 +216,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.performance-tests
+        SWIFT_VERSION: "6"
         GENERATE_INFOPLIST_FILE: YES
 
   PlainsongUITests:
@@ -228,6 +229,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ui-tests
+        SWIFT_VERSION: "6"
         GENERATE_INFOPLIST_FILE: YES
 
   # Production composition uses the reviewed UIKit preview provider.

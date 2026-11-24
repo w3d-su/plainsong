@@ -10,12 +10,21 @@ factories. Aliases, subclasses, metatype references, inferred `.init`,
 Source roots include every non-test target in the resolved XcodeGen spec and
 package Sources. Objective-C `.m` and `.mm` are scanned; vendored C headers are not.
 
-Package sources (`Packages/*/Sources`), EditorKitTests and AppIOSTests must not
-await WebKit's async `evaluateJavaScript` import: its bridging thunk is shared
-across modules and crashed with mixed Swift language modes in the same binary.
-Use `evaluateJavaScriptReply(_:)` or explicitly label the `completionHandler:`
-argument (`nil` is allowed). This distinguishes the overload without parsing
-Swift control flow to tell trailing closures from statement bodies.
+Package sources (`Packages/*/Sources`), EditorKitTests and every Xcode test target
+set to Swift 6 must not call WebKit's async `evaluateJavaScript` import: its
+bridging thunk is shared across modules and crashed with mixed Swift language
+modes in the same binary. Use `evaluateJavaScriptReply(_:)` or label the
+`completionHandler:` argument explicitly (`nil` is allowed). Requiring the label
+tells the overloads apart without parsing Swift control flow to separate trailing
+closures from statement bodies, and it also catches an `async let` call that no
+`await` precedes. Swift 6 test targets get only this check, not the production
+construction checks.
+
+A test target counts as Swift 6 when some build configuration gives it a
+`SWIFT_VERSION` with major version 6 or later. Each configuration is resolved as
+XcodeGen resolves it: setting groups in order, then `base`, then the `configs`
+entries that apply, a later layer replacing an earlier one, and the target's
+settings replacing the project-level settings. xcconfig files are not read.
 
 Comments and string literals are ignored, except that a string passed to
 `NSClassFromString` or `objc_getClass` is still inspected. Concatenated class
@@ -40,9 +49,10 @@ ALLOWED_CONSTRUCTORS = {
         "WKWebViewConfiguration"
     },
 }
-ASYNC_JAVASCRIPT_TEST_ROOTS = ("Packages/EditorKit/Tests/EditorKitTests", "AppIOSTests")
+EDITOR_KIT_TESTS = "Packages/EditorKit/Tests/EditorKitTests"
 EVALUATE_JAVASCRIPT_CALL = re.compile(r"\bevaluateJavaScript\s*\(")
 COMPLETION_HANDLER_LABEL = re.compile(r"\s*completionHandler\s*:")
+EVALUATE_JAVASCRIPT_DETAIL = "use evaluateJavaScriptReply(_:) or label evaluateJavaScript's completionHandler: argument"
 SOURCE_SUFFIXES = {".swift", ".m", ".mm"}
 WEBKIT_TYPE = r"(?:WebKit\s*\.\s*)?WKWebView(?:Configuration)?"
 CONSTRUCTOR = re.compile(rf"\b(WKWebView(?:Configuration)?)\s*(?:\.\s*init\s*)?\(")
@@ -263,22 +273,99 @@ def read_project_spec(root):
     return json.loads(result.stdout)
 
 
+STRUCTURED_SETTINGS_KEYS = {"base", "configs", "groups"}
+DEFAULT_CONFIGS = {"Debug": "debug", "Release": "release"}
+
+
+def is_structured_settings(settings):
+    return bool(settings) and set(settings) <= STRUCTURED_SETTINGS_KEYS
+
+
+def config_variant_applies(variant, config, configs):
+    """XcodeGen applies a `configs` key to each configuration whose name contains it,
+    ignoring case, unless the key is exactly the name of another configuration."""
+    if variant.lower() not in config.lower():
+        return False
+    return variant == config or variant not in configs
+
+
+def swift_versions(settings, config, configs, setting_groups, visited_groups=frozenset()):
+    """The SWIFT_VERSION values XcodeGen gives `settings` in `config`; empty when unset.
+
+    XcodeGen merges the setting groups in order, then `base`, then every `configs` entry
+    that applies, and a later layer replaces an earlier one. Entries that apply are
+    merged in no fixed order, so every value they set is returned. The parsed-json dump
+    keeps settings flat only when a target or group has nothing but `base`.
+    """
+    if not isinstance(settings, dict):
+        return set()
+    if not is_structured_settings(settings):
+        value = settings.get("SWIFT_VERSION")
+        return set() if value is None else {str(value)}
+
+    def resolve(nested, visited=visited_groups):
+        return swift_versions(nested, config, configs, setting_groups, visited)
+
+    versions = set()
+    for group in settings.get("groups") or []:
+        if group not in visited_groups:
+            versions = resolve(setting_groups.get(group, {}), visited_groups | {group}) or versions
+    versions = resolve(settings.get("base", {})) or versions
+    matching = set()
+    for variant, variant_settings in (settings.get("configs") or {}).items():
+        if config_variant_applies(variant, config, configs):
+            matching |= resolve(variant_settings)
+    return matching or versions
+
+
+def builds_with_swift6(target, project_spec):
+    """Whether some configuration builds `target` with Swift 6 or later.
+
+    In each configuration the target's own settings win where they set SWIFT_VERSION,
+    and the project-level settings decide where they do not.
+    """
+    configs = project_spec.get("configs") or DEFAULT_CONFIGS
+    setting_groups = project_spec.get("settingGroups") or {}
+    for config in configs:
+        versions = (swift_versions(target.get("settings", {}), config, configs, setting_groups)
+                    or swift_versions(project_spec.get("settings", {}), config, configs, setting_groups))
+        if any(swift_major_version(version) >= 6 for version in versions):
+            return True
+    return False
+
+
+def swift_major_version(version):
+    """The major language version, or 6 for a value that does not start with a digit.
+
+    Build-setting references such as `$(inherited)` or `$(MY_SWIFT)` are not expanded,
+    so they count as Swift 6: the guard fails closed, and the `completionHandler:` label
+    it then asks for is harmless in Swift 5.
+    """
+    match = re.match(r"\s*([0-9]+)", version)
+    return int(match.group(1)) if match else 6
+
+
 def find_violations(root: Path, project_spec=None) -> list[str]:
     if project_spec is None:
         project_spec = read_project_spec(root)
     source_roots = [root / "App", root / "AppIOS"]
+    swift6_test_roots = []
     for target in project_spec["targets"].values():
         if target["type"] in {"bundle.unit-test", "bundle.ui-testing"}:
-            continue
+            if not builds_with_swift6(target, project_spec):
+                continue
+            roots = swift6_test_roots
+        else:
+            roots = source_roots
         sources = target.get("sources", [])
         if isinstance(sources, str):
             sources = [sources]
         for source in sources:
-            source_roots.append(root / (source if isinstance(source, str) else source["path"]))
+            roots.append(root / (source if isinstance(source, str) else source["path"]))
     packages = root / "Packages"
     if packages.exists():
         source_roots.extend(sorted(path for path in packages.glob("*/Sources") if path.is_dir()))
-    source_roots.extend(root / path for path in ASYNC_JAVASCRIPT_TEST_ROOTS)
+    source_roots.append(root / EDITOR_KIT_TESTS)
     paths = set()
     for source_root in source_roots:
         if source_root.is_file() and source_root.suffix in SOURCE_SUFFIXES:
@@ -290,6 +377,13 @@ def find_violations(root: Path, project_spec=None) -> list[str]:
     for path in sorted(paths):
         relative = path.relative_to(root).as_posix()
         scan_source(relative, path.read_text(), violations)
+    for source_root in swift6_test_roots:
+        candidates = [source_root] if source_root.is_file() else source_root.rglob("*.swift")
+        for path in candidates:
+            if path.suffix == ".swift" and path.is_file():
+                source = path.read_text()
+                relative = path.relative_to(root).as_posix()
+                scan_evaluate_javascript(relative, source, ScannedSource(source).code_text(), violations)
     unique = []
     seen = set()
     for violation in sorted(violations, key=violation_key):
@@ -297,11 +391,6 @@ def find_violations(root: Path, project_spec=None) -> list[str]:
             seen.add(violation)
             unique.append(violation)
     return unique
-
-
-def violation_key(message):
-    relative, line, detail = message.split(":", 2)
-    return relative, int(line), detail
 
 
 def has_javascript_completion_handler(code, arguments_start):
@@ -319,16 +408,24 @@ def has_javascript_completion_handler(code, arguments_start):
     return False
 
 
+def scan_evaluate_javascript(relative, source, code, violations):
+    for match in EVALUATE_JAVASCRIPT_CALL.finditer(code):
+        if not has_javascript_completion_handler(code, match.end()):
+            add(violations, relative, source, match.start(), EVALUATE_JAVASCRIPT_DETAIL)
+
+
+def violation_key(message):
+    relative, line, detail = message.split(":", 2)
+    return relative, int(line), detail
+
+
 def scan_source(relative, source, violations):
     scanned = ScannedSource(source)
     code = scanned.code_text()
-    is_guarded_test = any(relative.startswith(f"{path}/") for path in ASYNC_JAVASCRIPT_TEST_ROOTS)
-    if is_guarded_test or re.match(r"Packages/[^/]+/Sources/", relative):
-        for match in EVALUATE_JAVASCRIPT_CALL.finditer(code):
-            if not has_javascript_completion_handler(code, match.end()):
-                add(violations, relative, source, match.start(),
-                    "use evaluateJavaScriptReply(_:) or label evaluateJavaScript's completionHandler: argument")
-    if is_guarded_test:
+    is_editor_kit_test = relative.startswith(f"{EDITOR_KIT_TESTS}/")
+    if is_editor_kit_test or re.match(r"Packages/[^/]+/Sources/", relative):
+        scan_evaluate_javascript(relative, source, code, violations)
+    if is_editor_kit_test:
         return
 
     allowed = import_allowed(relative)

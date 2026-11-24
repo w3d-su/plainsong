@@ -69,13 +69,13 @@ enum PreviewHostedTestWait {
         timeoutNanoseconds: UInt64 = 2_000_000_000
     ) async throws -> Any? {
         try await callback("JavaScript reply", timeoutNanoseconds: timeoutNanoseconds) { complete in
-            webView.evaluateJavaScript(script) { value, error in
+            webView.evaluateJavaScript(script, completionHandler: { value, error in
                 if let error {
                     complete(.failure(error))
                 } else {
                     complete(.success(value))
                 }
-            }
+            })
         }
     }
 
