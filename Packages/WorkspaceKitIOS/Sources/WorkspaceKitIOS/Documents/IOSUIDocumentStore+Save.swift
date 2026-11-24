@@ -45,8 +45,11 @@ extension IOSUIDocumentStore {
 
     func watchEdits(_ entry: IOSDocumentEntry) {
         guard let session = entry.session else { return }
+        // Subscribe now, not when the task first runs: an edit made before then would
+        // otherwise never reach autosave or recovery. The stream buffers that edit.
+        let changes = session.textChanges(includeCurrent: false)
         entry.textTask = Task { @MainActor in
-            for await _ in session.textChanges(includeCurrent: false) {
+            for await _ in changes {
                 self.scheduleAutosave(entry)
             }
         }
