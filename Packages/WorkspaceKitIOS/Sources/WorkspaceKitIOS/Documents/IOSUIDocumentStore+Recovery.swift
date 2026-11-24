@@ -113,12 +113,7 @@ extension IOSUIDocumentStore {
         // background time before a later dirty document has its recovery record.
         return await withTaskGroup(of: (Int, IOSDocumentFlushOutcome?).self) { group in
             for (index, identity) in identities.enumerated() {
-                group.addTask { @MainActor in
-                    guard let entry = self.byIdentity[identity], !entry.closed, !entry.superseded else {
-                        return (index, nil)
-                    }
-                    return await (index, self.flush(entry))
-                }
+                group.addTask { await (index, self.flushIfOpen(identity)) }
             }
             var outcomes: [(Int, IOSDocumentFlushOutcome)] = []
             for await (index, outcome) in group {
@@ -128,6 +123,11 @@ extension IOSUIDocumentStore {
             }
             return outcomes.sorted { $0.0 < $1.0 }.map(\.1)
         }
+    }
+
+    private func flushIfOpen(_ identity: IOSDocumentIdentity) async -> IOSDocumentFlushOutcome? {
+        guard let entry = byIdentity[identity], !entry.closed, !entry.superseded else { return nil }
+        return await flush(entry)
     }
 
     func flush(_ entry: IOSDocumentEntry) async -> IOSDocumentFlushOutcome? {
