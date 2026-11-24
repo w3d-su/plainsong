@@ -315,22 +315,191 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
             "App/Legacy.mm:2: import WebKit outside PreviewController",
         ])
 
-    def test_rejects_the_async_evaluate_javascript_import_in_package_sources(self):
+    def test_package_sources_label_the_evaluate_javascript_completion_handler(self):
         source = "\n".join([
             "let a = try await webView.evaluateJavaScript(script)",
             "let b = try await controller.webView",
             "    .evaluateJavaScript(script)",
-            "webView.evaluateJavaScript(script) { _, _ in }",
+            "webView.evaluateJavaScript(script, completionHandler: { _, _ in })",
             "// await webView.evaluateJavaScript(script)",
             "let c = try await evaluateJavaScriptReply(script)",
+            "let d = try await (webView.evaluateJavaScript(script))",
+            "let e = try await makeWebView(resolveOwner()).evaluateJavaScript(script)",
+            "await makeWebView(owner).evaluateJavaScript(script, completionHandler: { _, _ in })",
+            "await makeWebView(owner).evaluateJavaScript(makeScript(a, b), completionHandler: nil)",
+            "await webView.evaluateJavaScript(makeScript(a, completionHandler: nil))",
+            "switch try await webView.evaluateJavaScript(script) {",
+            "case nil: break",
+            "default: break",
+            "}",
+            "webView.evaluateJavaScript(script) { _, _ in }",
+            "async let f = webView.evaluateJavaScript(script)",
+            "let g = try await webViews[0].evaluateJavaScript(script)",
+            "webView.evaluateJavaScript(script, completionHandler: nil)",
         ])
         self.write_source("Packages/PreviewKit/Sources/PreviewKit/Probe.swift", source)
         self.write_source("Packages/PreviewKit/Tests/PreviewKitTests/ProbeTests.swift", source)
-        detail = "await the completion-handler evaluateJavaScriptReply(_:), not the async evaluateJavaScript import"
+        detail = "use evaluateJavaScriptReply(_:) or label evaluateJavaScript's completionHandler: argument"
         self.assertEqual(self.violations({"targets": {}}), [
-            f"Packages/PreviewKit/Sources/PreviewKit/Probe.swift:1: {detail}",
-            f"Packages/PreviewKit/Sources/PreviewKit/Probe.swift:2: {detail}",
+            f"Packages/PreviewKit/Sources/PreviewKit/Probe.swift:{line}: {detail}"
+            for line in (1, 3, 7, 8, 11, 12, 16, 17, 18)
         ])
+
+    def test_swift6_xcode_tests_label_the_completion_handler_but_keep_test_exemptions(self):
+        source = "\n".join([
+            "import WebKit",
+            "let view = WKWebView()",
+            "let value = try await view.evaluateJavaScript(script)",
+            "view.evaluateJavaScript(script) { _, _ in }",
+            "let cast = try await (",
+            "    view.evaluateJavaScript(script) as? String",
+            ")",
+            "async let pending = view.evaluateJavaScript(script)",
+            "view.evaluateJavaScript(script, completionHandler: nil)",
+        ])
+        self.write_source("PerformanceTests/Probe.swift", source)
+        self.write_source("PlainsongUITests/Probe.swift", source)
+        self.write_source("AppTests/Probe.swift", source)
+        project = {"targets": {
+            "PerformanceTests": {
+                "type": "bundle.unit-test",
+                "sources": [{"path": "PerformanceTests"}],
+                "settings": {"SWIFT_VERSION": "6"},
+            },
+            "PlainsongUITests": {
+                "type": "bundle.ui-testing",
+                "sources": ["PlainsongUITests"],
+                "settings": {"SWIFT_VERSION": "6"},
+            },
+            "PlainsongTests": {
+                "type": "bundle.unit-test",
+                "sources": ["AppTests"],
+            },
+        }}
+        detail = "use evaluateJavaScriptReply(_:) or label evaluateJavaScript's completionHandler: argument"
+        self.assertEqual(self.violations(project), [
+            f"{target}/Probe.swift:{line}: {detail}"
+            for target in ("PerformanceTests", "PlainsongUITests")
+            for line in (3, 4, 6, 8)
+        ])
+
+    def test_swift6_discovery_reads_every_settings_form(self):
+        names = ["Flat", "Configs", "BaseWithConfigs", "Group", "Swift5", "ProjectDefault", "ProjectRelease"]
+        for name in names:
+            self.write_source(f"{name}/Probe.swift", "view.evaluateJavaScript(script) { _, _ in }")
+
+        def test_target(settings=None):
+            target = {"type": "bundle.unit-test"}
+            if settings is not None:
+                target["settings"] = settings
+            return target
+
+        def structured(base=None, configs=None, groups=None):
+            return {"base": base or {}, "configs": configs or {}, "groups": groups or []}
+
+        project = {
+            "settings": structured(base={"SWIFT_VERSION": "5.10"}),
+            "settingGroups": {
+                "swift6": {"SWIFT_VERSION": "6.0"},
+                "outer": structured(base={"OTHER": "YES"}, groups=["swift6", "outer"]),
+            },
+            "targets": {
+                "Flat": test_target({"SWIFT_VERSION": "6"}),
+                "Configs": test_target(structured(configs={"Release": {"SWIFT_VERSION": "6"}})),
+                "BaseWithConfigs": test_target(structured(
+                    base={"SWIFT_VERSION": "6.0"}, configs={"Release": {"ONLY_ACTIVE_ARCH": "NO"}}
+                )),
+                "Group": test_target(structured(groups=["outer"])),
+                "Swift5": test_target(structured(
+                    base={"SWIFT_VERSION": "5.10"}, configs={"Release": {"ONLY_ACTIVE_ARCH": "NO"}}
+                )),
+                "ProjectDefault": test_target(),
+            },
+        }
+        for name, target in project["targets"].items():
+            target["sources"] = [name]
+        detail = "use evaluateJavaScriptReply(_:) or label evaluateJavaScript's completionHandler: argument"
+        self.assertEqual(self.violations(project), [
+            f"{name}/Probe.swift:1: {detail}" for name in ("BaseWithConfigs", "Configs", "Flat", "Group")
+        ])
+
+        project["settings"] = structured(base={"SWIFT_VERSION": "5.10"}, configs={"Release": {"SWIFT_VERSION": "6"}})
+        project["targets"]["ProjectRelease"] = test_target(structured(configs={"Debug": {"OTHER": "YES"}}))
+        project["targets"]["ProjectRelease"]["sources"] = ["ProjectRelease"]
+        self.assertEqual(self.violations(project), [
+            f"{name}/Probe.swift:1: {detail}"
+            for name in ("BaseWithConfigs", "Configs", "Flat", "Group", "ProjectDefault", "ProjectRelease")
+        ])
+
+    def test_swift6_discovery_resolves_each_configuration_like_xcodegen(self):
+        # Every expectation matches `xcodebuild -showBuildSettings` on the same spec
+        # generated by XcodeGen 2.46.0.
+        five, six = {"SWIFT_VERSION": "5.10"}, {"SWIFT_VERSION": "6"}
+
+        def structured(base=None, configs=None, groups=None):
+            return {"base": base or {}, "configs": configs or {}, "groups": groups or []}
+
+        def flagged(project_settings, project_configs, targets):
+            for name in targets:
+                self.write_source(f"{name}/Probe.swift", "view.evaluateJavaScript(script) { _, _ in }")
+            project = {
+                "configs": project_configs,
+                "settings": project_settings,
+                "settingGroups": {"five": five, "six": six},
+                "targets": {
+                    name: {"type": "bundle.unit-test", "sources": [name], "settings": settings}
+                    for name, settings in targets.items()
+                },
+            }
+            return [violation.split("/", 1)[0] for violation in self.violations(project)]
+
+        release_six = structured(base=five, configs={"Release": six})
+        self.assertEqual(flagged(release_six, {"Debug": "debug", "Release": "release"}, {
+            "Inherits": {},
+            "OverridesRelease": structured(configs={"Release": five}),
+            "OverridesReleaseByPart": structured(configs={"rel": five}),
+            "OverridesDebugOnly": structured(configs={"Debug": five}),
+        }), ["Inherits", "OverridesDebugOnly"])
+
+        staging = {"Debug": "debug", "Release": "release", "Staging Release": "release"}
+        self.assertEqual(flagged(structured(base=five), staging, {
+            "BaseOverGroup": structured(base=five, groups=["six"]),
+            "LaterGroupWins": structured(groups=["six", "five"]),
+            "EarlierGroupLoses": structured(groups=["five", "six"]),
+            "ExactNameSkipsOthers": structured(base=six, configs={"Debug": five, "Release": five}),
+            "LowercaseNameCoversOthers": structured(base=six, configs={"debug": five, "release": five}),
+            "PartialNameOnly": structured(configs={"staging": six}),
+        }), ["EarlierGroupLoses", "ExactNameSkipsOthers", "PartialNameOnly"])
+
+    def test_swift6_discovery_counts_unexpanded_references_as_swift6(self):
+        # The checker does not expand build-setting references, so it fails closed.
+        # xcodebuild builds the first three targets with Swift 6 and the fourth with
+        # Swift 5.10; a `completionHandler:` label is harmless there.
+        def structured(base=None, configs=None):
+            return {"base": base or {}, "configs": configs or {}, "groups": []}
+
+        def flagged(project_settings, targets):
+            for name in targets:
+                self.write_source(f"{name}/Probe.swift", "view.evaluateJavaScript(script) { _, _ in }")
+            project = {
+                "settings": project_settings,
+                "targets": {
+                    name: {"type": "bundle.unit-test", "sources": [name], "settings": settings}
+                    for name, settings in targets.items()
+                },
+            }
+            return [violation.split("/", 1)[0] for violation in self.violations(project)]
+
+        inherited = {"SWIFT_VERSION": "$(inherited)"}
+        self.assertEqual(flagged(structured(base={"SWIFT_VERSION": "6"}), {
+            "Inherited": inherited,
+            "InheritedRelease": structured(configs={"Release": inherited}),
+        }), ["Inherited", "InheritedRelease"])
+        self.assertEqual(flagged(structured(base={"SWIFT_VERSION": "5.10", "MY_SWIFT": "6"}), {
+            "Reference": {"SWIFT_VERSION": "$(MY_SWIFT)"},
+            "InheritedFive": inherited,
+            "LiteralFive": {"SWIFT_VERSION": "5.10"},
+        }), ["InheritedFive", "Reference"])
 
     def test_current_repository_has_no_violations(self):
         root = Path(__file__).resolve().parent.parent
@@ -345,7 +514,7 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
         editor_kit_test = "Packages/EditorKit/Tests/EditorKitTests/Fixtures/Probe.swift"
         self.write_source(editor_kit_test, source)
         self.write_source("Packages/EditorKit/Tests/OtherTests/Probe.swift", source)
-        detail = "await the completion-handler evaluateJavaScriptReply(_:), not the async evaluateJavaScript import"
+        detail = "use evaluateJavaScriptReply(_:) or label evaluateJavaScript's completionHandler: argument"
         self.assertEqual(self.violations(), [f"{editor_kit_test}:3: {detail}"])
 
 
