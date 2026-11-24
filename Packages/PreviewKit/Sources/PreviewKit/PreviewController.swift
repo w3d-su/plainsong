@@ -358,11 +358,11 @@ public final class PreviewController: NSObject, ObservableObject {
 
         let script = "window.PlainsongBridge.receive(\(json));"
         if let completion {
-            webView.evaluateJavaScript(script) { _, error in
+            webView.evaluateJavaScript(script, completionHandler: { _, error in
                 completion(error == nil)
-            }
+            })
         } else {
-            webView.evaluateJavaScript(script)
+            webView.evaluateJavaScript(script, completionHandler: nil)
         }
     }
 
@@ -554,7 +554,7 @@ extension PreviewController: WKNavigationDelegate {
             readinessProbeOverrideForTesting(accept)
         } else {
             let script = "window.PlainsongPreview && window.PlainsongPreview.PROTOCOL_VERSION"
-            webView.evaluateJavaScript(script) { @MainActor result, _ in accept(result) }
+            webView.evaluateJavaScript(script, completionHandler: { @MainActor result, _ in accept(result) })
         }
     }
 

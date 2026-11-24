@@ -10,13 +10,15 @@ factories. Aliases, subclasses, metatype references, inferred `.init`,
 Source roots include every non-test target in the resolved XcodeGen spec and
 package Sources. Objective-C `.m` and `.mm` are scanned; vendored C headers are not.
 
-Swift 6 package sources (`Packages/*/Sources`) and EditorKitTests must not await
-WebKit's async `evaluateJavaScript` import: its bridging thunk is shared across modules and
-crashed when a Swift 5 module awaited it in the same binary. They call the
-completion-handler wrapper `evaluateJavaScriptReply(_:)` instead.
-
-Xcode test targets set to Swift 6 get the async import check, but not the
-production construction checks.
+Package sources (`Packages/*/Sources`), EditorKitTests and every Xcode test target
+set to Swift 6 must not call WebKit's async `evaluateJavaScript` import: its
+bridging thunk is shared across modules and crashed with mixed Swift language
+modes in the same binary. Use `evaluateJavaScriptReply(_:)` or label the
+`completionHandler:` argument explicitly (`nil` is allowed). Requiring the label
+tells the overloads apart without parsing Swift control flow to separate trailing
+closures from statement bodies, and it also catches an `async let` call that no
+`await` precedes. Swift 6 test targets get only this check, not the production
+construction checks.
 
 Comments and string literals are ignored, except that a string passed to
 `NSClassFromString` or `objc_getClass` is still inspected. Concatenated class
@@ -42,9 +44,9 @@ ALLOWED_CONSTRUCTORS = {
     },
 }
 EDITOR_KIT_TESTS = "Packages/EditorKit/Tests/EditorKitTests"
-ASYNC_EVALUATE_JAVASCRIPT = re.compile(
-    r"\bawait\s+(?:\(\s*)*(?:[A-Za-z_][A-Za-z0-9_]*\s*(?:[?!]\s*)?\.\s*)*evaluateJavaScript\s*\("
-)
+EVALUATE_JAVASCRIPT_CALL = re.compile(r"\bevaluateJavaScript\s*\(")
+COMPLETION_HANDLER_LABEL = re.compile(r"\s*completionHandler\s*:")
+EVALUATE_JAVASCRIPT_DETAIL = "use evaluateJavaScriptReply(_:) or label evaluateJavaScript's completionHandler: argument"
 SOURCE_SUFFIXES = {".swift", ".m", ".mm"}
 WEBKIT_TYPE = r"(?:WebKit\s*\.\s*)?WKWebView(?:Configuration)?"
 CONSTRUCTOR = re.compile(rf"\b(WKWebView(?:Configuration)?)\s*(?:\.\s*init\s*)?\(")
@@ -301,7 +303,9 @@ def find_violations(root: Path, project_spec=None) -> list[str]:
         candidates = [source_root] if source_root.is_file() else source_root.rglob("*.swift")
         for path in candidates:
             if path.suffix == ".swift" and path.is_file():
-                scan_async_import(root, path, violations)
+                source = path.read_text()
+                relative = path.relative_to(root).as_posix()
+                scan_evaluate_javascript(relative, source, ScannedSource(source).code_text(), violations)
     unique = []
     seen = set()
     for violation in sorted(violations, key=violation_key):
@@ -311,12 +315,25 @@ def find_violations(root: Path, project_spec=None) -> list[str]:
     return unique
 
 
-def scan_async_import(root, path, violations):
-    source = path.read_text()
-    relative = path.relative_to(root).as_posix()
-    for match in ASYNC_EVALUATE_JAVASCRIPT.finditer(ScannedSource(source).code_text()):
-        add(violations, relative, source, match.start(),
-            "await the completion-handler evaluateJavaScriptReply(_:), not the async evaluateJavaScript import")
+def has_javascript_completion_handler(code, arguments_start):
+    depth = 0
+    for index in range(arguments_start, len(code)):
+        char = code[index]
+        if char in "([{":
+            depth += 1
+        elif char == ")" and depth == 0:
+            return False
+        elif char in ")]}":
+            depth -= 1
+        elif char == "," and depth == 0 and COMPLETION_HANDLER_LABEL.match(code, index + 1):
+            return True
+    return False
+
+
+def scan_evaluate_javascript(relative, source, code, violations):
+    for match in EVALUATE_JAVASCRIPT_CALL.finditer(code):
+        if not has_javascript_completion_handler(code, match.end()):
+            add(violations, relative, source, match.start(), EVALUATE_JAVASCRIPT_DETAIL)
 
 
 def violation_key(message):
@@ -329,9 +346,7 @@ def scan_source(relative, source, violations):
     code = scanned.code_text()
     is_editor_kit_test = relative.startswith(f"{EDITOR_KIT_TESTS}/")
     if is_editor_kit_test or re.match(r"Packages/[^/]+/Sources/", relative):
-        for match in ASYNC_EVALUATE_JAVASCRIPT.finditer(code):
-            add(violations, relative, source, match.start(),
-                "await the completion-handler evaluateJavaScriptReply(_:), not the async evaluateJavaScript import")
+        scan_evaluate_javascript(relative, source, code, violations)
     if is_editor_kit_test:
         return
 
