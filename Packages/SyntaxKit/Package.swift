@@ -22,7 +22,7 @@ let package = Package(
                 "TreeSitterTSXFixed",
                 "TreeSitterYAMLFixed",
             ],
-            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .target(
             name: "TreeSitterTSXFixed",
@@ -44,7 +44,11 @@ let package = Package(
             publicHeadersPath: "include",
             cSettings: [.headerSearchPath("src")]
         ),
-        .testTarget(name: "SyntaxKitTests", dependencies: ["SyntaxKit", "TreeSitterYAMLFixed"]),
+        .testTarget(
+            name: "SyntaxKitTests",
+            dependencies: ["SyntaxKit", "TreeSitterYAMLFixed"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
     ],
     swiftLanguageModes: [.v5]
 )

@@ -15,15 +15,11 @@ final class GrantMatchingAssetReader: PreviewAssetReading, @unchecked Sendable {
     }
 
     var recorded: [PreviewAssetReadRequest] {
-        lock.lock()
-        defer { lock.unlock() }
-        return requests
+        lock.withLock { requests }
     }
 
     func read(_ request: PreviewAssetReadRequest) async throws -> PreviewAssetReadResult {
-        lock.lock()
-        requests.append(request)
-        lock.unlock()
+        lock.withLock { requests.append(request) }
         guard AssetAuthority.matches(request.access, expected) else {
             throw PreviewAssetReadFailure.accessChanged
         }
@@ -56,8 +52,9 @@ final class ExportProviderAuthorityTests: XCTestCase {
         XCTAssertTrue(reader.recorded.allSatisfy { AssetAuthority.matches($0.access, access) })
         // The live DOM is what PDF and Print capture: the image decoded through the reader.
         try await PreviewHostedTestWait.until("export DOM image decoded", timeoutNanoseconds: 8_000_000_000) {
-            let loaded = try await controller.webView.evaluateJavaScript(
-                "Array.from(document.querySelectorAll('img')).filter(i => i.complete && i.naturalWidth > 0).length"
+            let loaded = try await PreviewHostedTestWait.javascript(
+                "Array.from(document.querySelectorAll('img')).filter(i => i.complete && i.naturalWidth > 0).length",
+                in: controller.webView
             ) as? Int
             return loaded == 1
         }

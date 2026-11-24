@@ -59,6 +59,10 @@ enum PreviewHostedTestWait {
         throw failure
     }
 
+    /// Tests evaluate JavaScript only through this completion-handler helper. Every module
+    /// that awaits the async `WKWebView.evaluateJavaScript(_:)` import emits its bridging thunk
+    /// under one shared symbol; with Xcode 16.4, Swift 6 tests and a Swift 5 PreviewKit
+    /// disagreed about that thunk and the test process crashed with SIGSEGV (PR 298 CI).
     static func javascript(
         _ script: String,
         in webView: WKWebView,
@@ -84,8 +88,10 @@ enum PreviewHostedTestWait {
             note(description, phase: "callback-check-cancellation-error", error: error)
             throw error
         }
-        return try await withCheckedThrowingContinuation { continuation in
-            let gate = CompletionGate(continuation, operation: description)
+        // Keep WebKit's non-Sendable reply on the main actor; the continuation only signals completion.
+        let gate = CompletionGate(operation: description)
+        try await withCheckedThrowingContinuation { continuation in
+            gate.continuation = continuation
             gate.deadline = Task { @MainActor in
                 do { try await Task.sleep(nanoseconds: timeoutNanoseconds) } catch {
                     if !(error is CancellationError) {
@@ -97,16 +103,17 @@ enum PreviewHostedTestWait {
             }
             operation { result in gate.finish(result, phase: "callback-delivered-error") }
         }
+        return gate.value
     }
 
     @MainActor
     private final class CompletionGate {
-        private var continuation: CheckedContinuation<Any?, Error>?
         private let operation: String
+        var continuation: CheckedContinuation<Void, Error>?
+        private(set) var value: Any?
         var deadline: Task<Void, Never>?
 
-        init(_ continuation: CheckedContinuation<Any?, Error>, operation: String) {
-            self.continuation = continuation
+        init(operation: String) {
             self.operation = operation
         }
 
@@ -115,10 +122,14 @@ enum PreviewHostedTestWait {
             continuation = nil
             deadline?.cancel()
             deadline = nil
-            if case let .failure(error) = result {
+            switch result {
+            case let .success(value):
+                self.value = value
+                pending.resume()
+            case let .failure(error):
                 PreviewHostedTestWait.note(operation, phase: phase, error: error)
+                pending.resume(throwing: error)
             }
-            pending.resume(with: result)
         }
     }
 }

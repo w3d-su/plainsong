@@ -5,16 +5,6 @@ import XCTest
 
 @MainActor
 final class PreviewAssetFenceTests: XCTestCase {
-    private var directories: [URL] = []
-
-    override func tearDown() {
-        for directory in directories {
-            try? FileManager.default.removeItem(at: directory)
-        }
-        directories.removeAll()
-        super.tearDown()
-    }
-
     func testContainedReadDeliversBytes() async throws {
         let root = try makeRoot()
         let handler = makeHandler(root: root, generation: 1)
@@ -238,7 +228,7 @@ final class PreviewAssetFenceTests: XCTestCase {
 
     private func makeRoot() throws -> URL {
         let root = try PreviewAssetTestSupport.directory()
-        directories.append(root)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
         return root
     }
 

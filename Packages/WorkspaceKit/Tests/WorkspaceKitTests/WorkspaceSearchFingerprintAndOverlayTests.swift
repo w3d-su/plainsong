@@ -74,7 +74,7 @@ final class WorkspaceSearchContractTests: XCTestCase {
             overlays: overlays
         )
 
-        let results = await fileResults(in: collectEvents(
+        let results = await fileResults(in: Self.collectEvents(
             WorkspaceSearchService(reader: reader),
             request: request
         ))
@@ -101,11 +101,11 @@ final class WorkspaceSearchContractTests: XCTestCase {
             entries: [entry("post.md", identity: "new-identity", modificationDate: .distantFuture)]
         )
 
-        let firstEvents = await collectEvents(
+        let firstEvents = await Self.collectEvents(
             WorkspaceSearchService(reader: reader),
             request: firstRequest
         )
-        let secondEvents = await collectEvents(
+        let secondEvents = await Self.collectEvents(
             WorkspaceSearchService(reader: reader),
             request: secondRequest
         )
@@ -132,7 +132,7 @@ final class WorkspaceSearchContractTests: XCTestCase {
         )
         let reader = GatedFingerprintDiskReader()
         let consumer = Task {
-            await collectEvents(WorkspaceSearchService(reader: reader), request: request)
+            await WorkspaceSearchContractTests.collectEvents(WorkspaceSearchService(reader: reader), request: request)
         }
 
         await reader.waitUntilPlanningReadStarts()
@@ -260,7 +260,7 @@ extension WorkspaceSearchContractTests {
         ])
         let request = try makeRequest(root: root, entries: [entry("post.md")], overlays: overlays)
 
-        let events = await collectEvents(
+        let events = await Self.collectEvents(
             WorkspaceSearchService(reader: reader),
             request: request
         )
@@ -471,7 +471,7 @@ extension WorkspaceSearchContractTests {
         )
     }
 
-    private func collectEvents(
+    private static func collectEvents(
         _ service: WorkspaceSearchService,
         request: WorkspaceSearchRequest
     ) async -> [WorkspaceSearchEvent] {

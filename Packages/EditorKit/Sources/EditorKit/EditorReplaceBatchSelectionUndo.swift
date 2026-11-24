@@ -14,8 +14,13 @@ final class EditorReplaceBatchSelectionUndo {
     }
 
     func register(priorSelection: NSRange, postSelection: NSRange) {
+        // The undo manager keeps only an unowned reference to its target, and nothing
+        // else retains this object; the handler must capture it strongly. Reading the
+        // handler's target parameter instead hands back whatever reused the freed memory.
         textView?.undoManager?.registerUndo(withTarget: self) { [self] _ in
-            restoreAfterNativeGroup(priorSelection, inverse: postSelection)
+            MainActor.assumeIsolated {
+                self.restoreAfterNativeGroup(priorSelection, inverse: postSelection)
+            }
         }
     }
 
@@ -34,7 +39,9 @@ final class EditorReplaceBatchSelectionUndo {
             }
         }
         manager.registerUndo(withTarget: self) { [self] _ in
-            restoreAfterNativeGroup(inverse, inverse: selection)
+            MainActor.assumeIsolated {
+                self.restoreAfterNativeGroup(inverse, inverse: selection)
+            }
         }
     }
 }

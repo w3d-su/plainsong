@@ -1,8 +1,9 @@
 import AppKit
 import Foundation
 import MarkdownCore
+import SyntaxKit
 
-struct MarkdownHighlightResult: Equatable {
+struct MarkdownHighlightResult: Equatable, Sendable {
     let range: NSRange
     let text: AttributedString
     let foldPlan: WYSIWYGFoldPlan?

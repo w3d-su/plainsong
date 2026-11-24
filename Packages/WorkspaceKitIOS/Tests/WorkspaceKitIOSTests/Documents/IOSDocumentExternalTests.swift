@@ -163,7 +163,7 @@ final class IOSDocumentExternalTests: XCTestCase {
         let entered = expectation(description: "save")
         port.onSaveEntered = { entered.fulfill() }
         let saving = Task { try await harness.store.save(handle.identity) }
-        await fulfillment(of: [entered], timeout: 2)
+        await assertFulfillment(of: [entered], timeout: 2)
         port.releaseOne()
         _ = try await saving.value
         await harness.coordinator.setBytes(Data("saved plus".utf8))
