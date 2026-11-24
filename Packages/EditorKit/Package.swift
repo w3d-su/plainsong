@@ -22,7 +22,11 @@ let package = Package(
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
-        .testTarget(name: "EditorKitTests", dependencies: ["EditorKit"]),
+        .testTarget(
+            name: "EditorKitTests",
+            dependencies: ["EditorKit"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
     ],
     swiftLanguageModes: [.v5]
 )

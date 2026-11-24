@@ -10,14 +10,13 @@ final class EditorCacheTrimSelectionReportingTests: XCTestCase {
     private typealias Support = EditorFindControllerTestSupport
     private var fixtures: [Support.WindowedFixture] = []
 
-    override func tearDown() {
+    override func tearDown() async throws {
         for fixture in fixtures {
             fixture.coordinator.detachVisibleRangeReporter()
             fixture.coordinator.textElementCacheTrimmer.probeHandler = nil
         }
         fixtures.removeAll()
         Support.tearDownWindows()
-        super.tearDown()
     }
 
     func testSelectionOnlyChangeSchedulesOnceWithoutRepublishingTheViewport() throws {

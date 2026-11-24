@@ -9,10 +9,9 @@ final class EditorLineNumberGutterViewTests: XCTestCase {
     private typealias Support = EditorLineNumberGutterTestSupport
     private var windows: [NSWindow] = []
 
-    override func tearDown() {
+    override func tearDown() async throws {
         windows.forEach { $0.close() }
         windows.removeAll()
-        super.tearDown()
     }
 
     func testGutterReplacesSTTextViewGutterAndNarrowsTheClipView() throws {
@@ -57,12 +56,13 @@ final class EditorLineNumberGutterViewTests: XCTestCase {
         let editor = try makeEditor("one\ntwo\n")
         let width = editor.textView.frame.width
         var widths: [CGFloat] = []
+        let recordWidth: @MainActor () -> Void = { widths.append(editor.textView.frame.width) }
         let observer = NotificationCenter.default.addObserver(
             forName: NSView.frameDidChangeNotification,
             object: editor.textView,
             queue: nil
         ) { _ in
-            MainActor.assumeIsolated { widths.append(editor.textView.frame.width) }
+            MainActor.assumeIsolated { recordWidth() }
         }
         defer { NotificationCenter.default.removeObserver(observer) }
 
