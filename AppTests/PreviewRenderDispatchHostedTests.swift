@@ -54,7 +54,7 @@ extension EditorFindHostedGateTests {
 
     private func waitForPreviewText(_ text: String, in controller: PreviewController) async throws {
         try await waitUntil("preview shows \(text)", timeout: 8) {
-            let body = try await controller.webView.evaluateJavaScript("document.body.innerText") as? String
+            let body = try await controller.webView.evaluateJavaScriptReply("document.body.innerText") as? String
             return body?.contains(text) == true
         }
     }

@@ -293,7 +293,7 @@ extension EditorFindHostedGateTests {
         }
         let preview = try XCTUnwrap(hosted.group.members.first?.host.previewLifecycle.controllerForShutdown)
         try await waitUntil("initial large preview render", timeout: 60) {
-            let count = try? await preview.webView.evaluateJavaScript(
+            let count = try? await preview.webView.evaluateJavaScriptReply(
                 "document.querySelectorAll('[data-line]').length"
             ) as? Int
             return (count ?? 0) > 10000

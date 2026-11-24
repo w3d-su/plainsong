@@ -22,7 +22,7 @@ final class PreviewIntegrationTests: XCTestCase {
         )
 
         try await waitUntil("rendered markdown visible") {
-            let text = try await controller.webView.evaluateJavaScript("document.body.innerText") as? String
+            let text = try await controller.webView.evaluateJavaScriptReply("document.body.innerText") as? String
             return text?.contains("App preview smoke") == true && text?.contains("task") == true
         }
     }
@@ -41,7 +41,7 @@ final class PreviewIntegrationTests: XCTestCase {
         try await waitUntil("preview bridge ready") { controller.isReady }
         controller.render(first.currentTextChange, for: first)
         try await waitUntil("first checkbox visible") {
-            try await controller.webView.evaluateJavaScript(
+            try await controller.webView.evaluateJavaScriptReply(
                 "document.querySelector('input[data-task-checkbox]') !== null"
             ) as? Bool == true
         }
@@ -50,21 +50,21 @@ final class PreviewIntegrationTests: XCTestCase {
 
         // Before SwiftUI/debounce submits B, A's bridge event still has valid controller provenance.
         // App must reject its exact session identity even though both documents are version zero.
-        try await controller.webView.evaluateJavaScript("document.querySelector('input').click(); true;")
+        try await controller.webView.evaluateJavaScriptReply("document.querySelector('input').click(); true;")
         try await waitUntil("old event reached App") { callbacks == 1 }
         XCTAssertEqual(replacement.text, "- [ ] second\n<Component")
         XCTAssertEqual(first.text, "- [ ] first")
 
         controller.render(replacement.currentTextChange, for: replacement)
         try await waitUntil("MDX error retains old checkbox") {
-            try await controller.webView.evaluateJavaScript(
+            try await controller.webView.evaluateJavaScriptReply(
                 "document.querySelector('.mdx-error-banner') !== null && document.querySelector('input') !== null"
             ) as? Bool == true
         }
         // Use an acknowledged ordered bridge message as a barrier after the checkbox event.
         var bridgeBarrier = false
         controller.onPreviewScrolled = { _ in bridgeBarrier = true }
-        try await controller.webView.evaluateJavaScript("""
+        try await controller.webView.evaluateJavaScriptReply("""
         document.querySelector('input').click();
         window.webkit.messageHandlers.bridge.postMessage({name:'previewScrolled',payload:{topVisibleLine:1}});
         true;
@@ -77,10 +77,10 @@ final class PreviewIntegrationTests: XCTestCase {
         appState.setCurrentDocument(current)
         controller.render(current.currentTextChange, for: current)
         try await waitUntil("current checkbox visible") {
-            let text = try await controller.webView.evaluateJavaScript("document.body.innerText") as? String
+            let text = try await controller.webView.evaluateJavaScriptReply("document.body.innerText") as? String
             return text?.contains("current") == true
         }
-        try await controller.webView.evaluateJavaScript("document.querySelector('input').click(); true;")
+        try await controller.webView.evaluateJavaScriptReply("document.querySelector('input').click(); true;")
         try await waitUntil("current checkbox writes back") { current.text == "- [x] current" }
         XCTAssertEqual(callbacks, 2)
         XCTAssertEqual(first.text, "- [ ] first")

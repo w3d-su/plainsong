@@ -66,7 +66,7 @@ final class ExportPDFMatrixAppTests: XCTestCase {
         }
         fixture.appState.exportHTMLOperations.didPrepareArtifact = {
             let value = try? await fixture.appState.exportHTMLOperations.offscreenController?
-                .webView.evaluateJavaScript("document.documentElement.dataset.theme")
+                .webView.evaluateJavaScriptReply("document.documentElement.dataset.theme")
             renderedTheme = value as? String ?? ""
         }
         fixture.appState.exportHTMLOperations.destinationChooser = { _ in destination }
@@ -103,7 +103,7 @@ final class ExportPDFMatrixAppTests: XCTestCase {
         }
         fixture.appState.exportHTMLOperations.didPrepareArtifact = {
             let value = try? await fixture.appState.exportHTMLOperations.offscreenController?
-                .webView.evaluateJavaScript("document.documentElement.dataset.theme")
+                .webView.evaluateJavaScriptReply("document.documentElement.dataset.theme")
             renderedTheme = value as? String ?? ""
         }
         fixture.appState.exportHTMLOperations.destinationChooser = { _ in

@@ -10,7 +10,7 @@ final class PreviewScrollGeometryTests: XCTestCase {
         defer { controller.shutdownForTesting() }
         controller.webView.frame = NSRect(x: 0, y: 0, width: 600, height: 300)
         try await render(source: String(repeating: "Paragraph\n\n", count: 200), in: controller)
-        let result = try await controller.webView.evaluateJavaScript("""
+        let result = try await controller.webView.evaluateJavaScriptReply("""
         (() => {
           const root = document.getElementById('preview-root');
           const target = root.querySelector('[data-line="201"]');
@@ -51,7 +51,7 @@ final class PreviewScrollGeometryTests: XCTestCase {
         """
         // Reparent a target into a positioned block. This reproduces the coordinate
         // mismatch in table/MDX descendants whose offsetTop is not document-relative.
-        try await controller.webView.evaluateJavaScript("""
+        try await controller.webView.evaluateJavaScriptReply("""
         const target = document.querySelector('[data-line="201"]');
         const wrapper = document.createElement('div');
         wrapper.style.position = 'relative';
@@ -59,14 +59,14 @@ final class PreviewScrollGeometryTests: XCTestCase {
         wrapper.append(target);
         true;
         """)
-        let initial = try await controller.webView.evaluateJavaScript(script) as? Double
+        let initial = try await controller.webView.evaluateJavaScriptReply(script) as? Double
         XCTAssertEqual(try XCTUnwrap(initial), 12, accuracy: 2)
         controller.webView.frame.size.width = 300
         // Wait for WebKit's resize event/layout before requesting the new mapping.
         try await waitUntil {
-            try await controller.webView.evaluateJavaScript("innerWidth === 300") as? Bool == true
+            try await controller.webView.evaluateJavaScriptReply("innerWidth === 300") as? Bool == true
         }
-        let resized = try await controller.webView.evaluateJavaScript(script) as? Double
+        let resized = try await controller.webView.evaluateJavaScriptReply(script) as? Double
         XCTAssertEqual(try XCTUnwrap(resized), 12, accuracy: 2)
     }
 
@@ -79,22 +79,22 @@ final class PreviewScrollGeometryTests: XCTestCase {
         let source = String(repeating: "A long paragraph with wrapping text and **bold** words.\n\n", count: 200)
         try await render(source: source, in: controller)
         let targetTop = "document.querySelector('[data-line=\"201\"]').getBoundingClientRect().top"
-        let initial = try await controller.webView.evaluateJavaScript("""
+        let initial = try await controller.webView.evaluateJavaScriptReply("""
         window.PlainsongBridge.receive({name:'scrollToLine',payload:{line:201,animated:false}});
         \(targetTop)
         """) as? Double
         XCTAssertEqual(try XCTUnwrap(initial), 12, accuracy: 2)
-        let scrollBefore = try await controller.webView.evaluateJavaScript("scrollY") as? Double
+        let scrollBefore = try await controller.webView.evaluateJavaScriptReply("scrollY") as? Double
         for width in [420, 300, 360] {
             controller.webView.frame.size.width = CGFloat(width)
             // The resize observer runs in a later rendering update; poll across frames.
             try await waitUntil {
-                try await controller.webView.evaluateJavaScript(
+                try await controller.webView.evaluateJavaScriptReply(
                     "innerWidth === \(width) && Math.abs(\(targetTop) - 12) <= 2"
                 ) as? Bool == true
             }
         }
-        let scrollAfter = try await controller.webView.evaluateJavaScript("scrollY") as? Double
+        let scrollAfter = try await controller.webView.evaluateJavaScriptReply("scrollY") as? Double
         XCTAssertNotEqual(scrollBefore, scrollAfter, "the reflow must actually have moved the content")
     }
 

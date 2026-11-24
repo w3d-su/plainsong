@@ -46,7 +46,7 @@ final class ExportPDFPaginationDesignStopTests: XCTestCase {
 
         let geometry = try await probe.settleFullContentGeometry()
         XCTAssertGreaterThan(geometry.contentBounds.height, 14400)
-        let measuredWidths = try await controller.webView.evaluateJavaScript("""
+        let measuredWidths = try await controller.webView.evaluateJavaScriptReply("""
         (() => {
           const table = document.querySelector('#preview-root table');
           return [table.clientWidth, table.scrollWidth, document.documentElement.scrollWidth];
@@ -74,7 +74,7 @@ final class ExportPDFPaginationDesignStopTests: XCTestCase {
 
         // Positive control only: expand this diagnostic DOM's table overflow, then recapture.
         // A production layout policy requires an owner decision; this is not a product fix.
-        _ = try await controller.webView.evaluateJavaScript("""
+        _ = try await controller.webView.evaluateJavaScriptReply("""
         document.querySelector('#preview-root table').style.overflow = 'visible';
         document.querySelector('#preview-root table').style.maxWidth = 'none';
         """)

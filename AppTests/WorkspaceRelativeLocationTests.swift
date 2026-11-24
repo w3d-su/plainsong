@@ -11,7 +11,6 @@ final class WorkspaceRelativeLocationTests: XCTestCase {
     private var link: URL!
 
     override func setUp() async throws {
-        try await super.setUp()
         base = FileManager.default.temporaryDirectory
             .resolvingSymlinksInPath()
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -37,7 +36,6 @@ final class WorkspaceRelativeLocationTests: XCTestCase {
         if let base {
             try? FileManager.default.removeItem(at: base)
         }
-        try await super.tearDown()
     }
 
     private var aMarkdown: URL {
