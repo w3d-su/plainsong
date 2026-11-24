@@ -323,6 +323,9 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
             "webView.evaluateJavaScript(script) { _, _ in }",
             "// await webView.evaluateJavaScript(script)",
             "let c = try await evaluateJavaScriptReply(script)",
+            "let d = try await (webView.evaluateJavaScript(script))",
+            "let e = try await makeWebView(owner).evaluateJavaScript(script)",
+            "makeWebView(owner).evaluateJavaScript(script) { _, _ in }",
         ])
         self.write_source("Packages/PreviewKit/Sources/PreviewKit/Probe.swift", source)
         self.write_source("Packages/PreviewKit/Tests/PreviewKitTests/ProbeTests.swift", source)
@@ -331,8 +334,12 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
         self.assertEqual(self.violations({"targets": {}}), [
             f"AppIOSTests/Integration/ProbeTests.swift:2: {detail}",
             f"AppIOSTests/Integration/ProbeTests.swift:3: {detail}",
+            f"AppIOSTests/Integration/ProbeTests.swift:8: {detail}",
+            f"AppIOSTests/Integration/ProbeTests.swift:9: {detail}",
             f"Packages/PreviewKit/Sources/PreviewKit/Probe.swift:1: {detail}",
             f"Packages/PreviewKit/Sources/PreviewKit/Probe.swift:2: {detail}",
+            f"Packages/PreviewKit/Sources/PreviewKit/Probe.swift:7: {detail}",
+            f"Packages/PreviewKit/Sources/PreviewKit/Probe.swift:8: {detail}",
         ])
 
     def test_current_repository_has_no_violations(self):
