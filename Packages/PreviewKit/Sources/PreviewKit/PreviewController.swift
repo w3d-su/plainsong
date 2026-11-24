@@ -362,7 +362,7 @@ public final class PreviewController: NSObject, ObservableObject {
                 completion(error == nil)
             }
         } else {
-            webView.evaluateJavaScript(script)
+            webView.evaluateJavaScript(script, completionHandler: nil)
         }
     }
 

@@ -324,22 +324,26 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
             "// await webView.evaluateJavaScript(script)",
             "let c = try await evaluateJavaScriptReply(script)",
             "let d = try await (webView.evaluateJavaScript(script))",
-            "let e = try await makeWebView(owner).evaluateJavaScript(script)",
-            "makeWebView(owner).evaluateJavaScript(script) { _, _ in }",
+            "let e = try await makeWebView(resolveOwner()).evaluateJavaScript(script)",
+            "await makeWebView(owner).evaluateJavaScript(script) { _, _ in }",
+            "await makeWebView(owner).evaluateJavaScript(makeScript(a, b), completionHandler: nil)",
+            "await webView.evaluateJavaScript(makeScript(a, completionHandler: nil))",
         ])
         self.write_source("Packages/PreviewKit/Sources/PreviewKit/Probe.swift", source)
         self.write_source("Packages/PreviewKit/Tests/PreviewKitTests/ProbeTests.swift", source)
         self.write_source("AppIOSTests/Integration/ProbeTests.swift", "import WebKit\n" + source)
-        detail = "await the completion-handler evaluateJavaScriptReply(_:), not the async evaluateJavaScript import"
+        detail = "use evaluateJavaScriptReply(_:) or pass a completion handler to evaluateJavaScript"
         self.assertEqual(self.violations({"targets": {}}), [
             f"AppIOSTests/Integration/ProbeTests.swift:2: {detail}",
-            f"AppIOSTests/Integration/ProbeTests.swift:3: {detail}",
+            f"AppIOSTests/Integration/ProbeTests.swift:4: {detail}",
             f"AppIOSTests/Integration/ProbeTests.swift:8: {detail}",
             f"AppIOSTests/Integration/ProbeTests.swift:9: {detail}",
+            f"AppIOSTests/Integration/ProbeTests.swift:12: {detail}",
             f"Packages/PreviewKit/Sources/PreviewKit/Probe.swift:1: {detail}",
-            f"Packages/PreviewKit/Sources/PreviewKit/Probe.swift:2: {detail}",
+            f"Packages/PreviewKit/Sources/PreviewKit/Probe.swift:3: {detail}",
             f"Packages/PreviewKit/Sources/PreviewKit/Probe.swift:7: {detail}",
             f"Packages/PreviewKit/Sources/PreviewKit/Probe.swift:8: {detail}",
+            f"Packages/PreviewKit/Sources/PreviewKit/Probe.swift:11: {detail}",
         ])
 
     def test_current_repository_has_no_violations(self):
@@ -355,7 +359,7 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
         editor_kit_test = "Packages/EditorKit/Tests/EditorKitTests/Fixtures/Probe.swift"
         self.write_source(editor_kit_test, source)
         self.write_source("Packages/EditorKit/Tests/OtherTests/Probe.swift", source)
-        detail = "await the completion-handler evaluateJavaScriptReply(_:), not the async evaluateJavaScript import"
+        detail = "use evaluateJavaScriptReply(_:) or pass a completion handler to evaluateJavaScript"
         self.assertEqual(self.violations(), [f"{editor_kit_test}:3: {detail}"])
 
 
