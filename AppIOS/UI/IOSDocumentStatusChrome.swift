@@ -181,8 +181,13 @@ struct IOSDocumentStateBanner: View {
                 {
                     bannerButton("Review iCloud Versions") { reviewingVersions = IOSCloudVersionRequest(documentID: id)
                     }
-                    .sheet(item: $reviewingVersions) { request in
+                    .sheet(item: $reviewingVersions) {
+                        scene.surfaces.cloudVersionReviewEnded?()
+                    } content: { request in
                         IOSCloudVersionPicker(documentID: request.documentID, load: load, apply: apply)
+                            // Applying a version can clear the conflict and remove this
+                            // button, taking the sheet down without its onDismiss.
+                            .onDisappear { scene.surfaces.cloudVersionReviewEnded?() }
                     }
                 }
                 ViewThatFits(in: .horizontal) {
