@@ -20,10 +20,11 @@ closures from statement bodies, and it also catches an `async let` call that no
 `await` precedes. Swift 6 test targets get only this check, not the production
 construction checks.
 
-A test target counts as Swift 6 when any `SWIFT_VERSION` it can build with has
-major version 6 or later: its flat settings, `base`, any `configs` entry or
-setting group, or, where its `base` leaves the key unset, the project-level
-settings in the same forms. xcconfig files are not read.
+A test target counts as Swift 6 when some build configuration gives it a
+`SWIFT_VERSION` with major version 6 or later. Each configuration is resolved as
+XcodeGen resolves it: setting groups in order, then `base`, then the `configs`
+entries that apply, a later layer replacing an earlier one, and the target's
+settings replacing the project-level settings. xcconfig files are not read.
 
 Comments and string literals are ignored, except that a string passed to
 `NSClassFromString` or `objc_getClass` is still inspected. Concatenated class
@@ -273,47 +274,64 @@ def read_project_spec(root):
 
 
 STRUCTURED_SETTINGS_KEYS = {"base", "configs", "groups"}
+DEFAULT_CONFIGS = {"Debug": "debug", "Release": "release"}
 
 
 def is_structured_settings(settings):
     return bool(settings) and set(settings) <= STRUCTURED_SETTINGS_KEYS
 
 
-def swift_versions(settings, setting_groups, visited_groups=frozenset()):
-    """Every SWIFT_VERSION a resolved XcodeGen settings value can select.
+def config_variant_applies(variant, config, configs):
+    """XcodeGen applies a `configs` key to each configuration whose name contains it,
+    ignoring case, unless the key is exactly the name of another configuration."""
+    if variant.lower() not in config.lower():
+        return False
+    return variant == config or variant not in configs
 
-    The parsed-json dump keeps flat settings flat only when a target or group has
-    nothing but `base`; otherwise it nests them under `base`, `configs` and `groups`.
+
+def swift_versions(settings, config, configs, setting_groups, visited_groups=frozenset()):
+    """The SWIFT_VERSION values XcodeGen gives `settings` in `config`; empty when unset.
+
+    XcodeGen merges the setting groups in order, then `base`, then every `configs` entry
+    that applies, and a later layer replaces an earlier one. Entries that apply are
+    merged in no fixed order, so every value they set is returned. The parsed-json dump
+    keeps settings flat only when a target or group has nothing but `base`.
     """
     if not isinstance(settings, dict):
-        return []
+        return set()
     if not is_structured_settings(settings):
         value = settings.get("SWIFT_VERSION")
-        return [] if value is None else [str(value)]
-    versions = swift_versions(settings.get("base", {}), setting_groups, visited_groups)
-    for config in (settings.get("configs") or {}).values():
-        versions += swift_versions(config, setting_groups, visited_groups)
+        return set() if value is None else {str(value)}
+
+    def resolve(nested, visited=visited_groups):
+        return swift_versions(nested, config, configs, setting_groups, visited)
+
+    versions = set()
     for group in settings.get("groups") or []:
         if group not in visited_groups:
-            versions += swift_versions(setting_groups.get(group, {}), setting_groups, visited_groups | {group})
-    return versions
-
-
-def sets_base_swift_version(settings):
-    if not isinstance(settings, dict):
-        return False
-    if is_structured_settings(settings):
-        return sets_base_swift_version(settings.get("base", {}))
-    return "SWIFT_VERSION" in settings
+            versions = resolve(setting_groups.get(group, {}), visited_groups | {group}) or versions
+    versions = resolve(settings.get("base", {})) or versions
+    matching = set()
+    for variant, variant_settings in (settings.get("configs") or {}).items():
+        if config_variant_applies(variant, config, configs):
+            matching |= resolve(variant_settings)
+    return matching or versions
 
 
 def builds_with_swift6(target, project_spec):
+    """Whether some configuration builds `target` with Swift 6 or later.
+
+    In each configuration the target's own settings win where they set SWIFT_VERSION,
+    and the project-level settings decide where they do not.
+    """
+    configs = project_spec.get("configs") or DEFAULT_CONFIGS
     setting_groups = project_spec.get("settingGroups") or {}
-    target_settings = target.get("settings", {})
-    versions = swift_versions(target_settings, setting_groups)
-    if not sets_base_swift_version(target_settings):
-        versions += swift_versions(project_spec.get("settings", {}), setting_groups)
-    return any(swift_major_version(version) >= 6 for version in versions)
+    for config in configs:
+        versions = (swift_versions(target.get("settings", {}), config, configs, setting_groups)
+                    or swift_versions(project_spec.get("settings", {}), config, configs, setting_groups))
+        if any(swift_major_version(version) >= 6 for version in versions):
+            return True
+    return False
 
 
 def swift_major_version(version):
