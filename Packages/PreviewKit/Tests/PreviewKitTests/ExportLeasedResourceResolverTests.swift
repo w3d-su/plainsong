@@ -14,7 +14,7 @@ final class ExportLeasedResourceResolverTests: XCTestCase {
         )
         let resources = (0 ..< 8).map { image("large-\($0)", "asset://large-\($0).png") }
 
-        let outcomes = await resolve(
+        let outcomes = await Self.resolve(
             resources, access: access, previewDirectory: nil, reader: reader
         )
 
@@ -45,7 +45,7 @@ final class ExportLeasedResourceResolverTests: XCTestCase {
             ],
             allocations: allocations
         )
-        let outcomes = await resolve(
+        let outcomes = await Self.resolve(
             [
                 image("authored", authored),
                 image("first", "asset://large-1.png"),
@@ -78,7 +78,7 @@ final class ExportLeasedResourceResolverTests: XCTestCase {
         let reader = try PausedExportReader(png: ExportRasterFixture.encoded(.png))
         let resources = [image("first", "asset://first.png"), image("second", "asset://second.png")]
         let task = Task {
-            await resolve(
+            await ExportLeasedResourceResolverTests.resolve(
                 resources, access: access, previewDirectory: nil, reader: reader
             )
         }
@@ -105,7 +105,7 @@ final class ExportLeasedResourceResolverTests: XCTestCase {
             ],
             allocations: allocations
         )
-        let outcomes = await resolve(
+        let outcomes = await Self.resolve(
             [
                 image("invalid", "asset://invalid.png"),
                 image("first", "asset://large-1.png"),
@@ -125,7 +125,7 @@ final class ExportLeasedResourceResolverTests: XCTestCase {
         XCTAssertEqual(allocations.snapshot.live, 0)
     }
 
-    private func resolve(
+    private static func resolve(
         _ resources: [ExportResourceDescriptor],
         access: PreviewAssetAccessContext,
         previewDirectory: URL?,

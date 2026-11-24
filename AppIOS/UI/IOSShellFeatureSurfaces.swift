@@ -109,9 +109,9 @@ struct IOSShellFeatureSurfaces {
     /// composition; nil hides that button (W14).
     var reviewCloudVersions: ((IOSDocumentIdentity) async throws -> IOSCloudVersionReview)?
     var applyCloudVersion: ((UUID, IOSCloudVersionReview) async throws -> Void)?
+    /// The versions sheet is the banner's local state; composition cannot see it close.
+    var cloudVersionReviewEnded: (() -> Void)?
     var resolveConflictCopy: (() -> Void)?
-    /// The versions sheet released the command route; its dismissal gives it back.
-    var cloudVersionsDidDismiss: (() -> Void)?
 
     /// Workspace refresh requires the live grant; composition routes it (W15).
     var refreshWorkspace: (() -> Void)?

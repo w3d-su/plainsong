@@ -104,6 +104,23 @@ extension AppState {
             preserving: preservedRootSessions
         )
     }
+
+    /// The closing window's own document still releases with its root. Another window's
+    /// shown session, or a live installation that window holds, stays out of the set.
+    func isPreservedForAnotherWindow(_ session: DocumentSession) -> Bool {
+        if registry.connectedWindows.contains(where: { window in
+            window !== windowState && window.shownSession === session
+        }) {
+            return true
+        }
+        return editorBindingInstallations.contains { installation, owner in
+            guard owner === session,
+                  let window = registry.editorInstallationWindows[installation]?.window,
+                  window !== windowState
+            else { return false }
+            return registry.connectedWindows.contains { $0 === window }
+        }
+    }
 }
 
 @MainActor
@@ -123,23 +140,6 @@ private extension AppState {
             sessionClosureIdentity(first).utf8.lexicographicallyPrecedes(
                 sessionClosureIdentity(second).utf8
             )
-        }
-    }
-
-    /// The closing window's own document still releases with its root. Another window's
-    /// shown session, or a live installation that window holds, stays out of the set.
-    func isPreservedForAnotherWindow(_ session: DocumentSession) -> Bool {
-        if registry.connectedWindows.contains(where: { window in
-            window !== windowState && window.shownSession === session
-        }) {
-            return true
-        }
-        return editorBindingInstallations.contains { installation, owner in
-            guard owner === session,
-                  let window = registry.editorInstallationWindows[installation]?.window,
-                  window !== windowState
-            else { return false }
-            return registry.connectedWindows.contains { $0 === window }
         }
     }
 

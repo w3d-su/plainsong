@@ -114,10 +114,10 @@ struct IOSProductionComposition {
         )
         runtime.scene.surfaces.reviewCloudVersions = { [weak controller, weak runtime] id in
             guard let controller else { throw IOSDocumentFailure.unavailable }
-            runtime?.prepareForReadOnlyPresentation()
-            runtime?.isReviewingCloudVersions = true
+            runtime?.beginCloudVersionReview()
             return try await controller.reviewVersions(id)
         }
+        runtime.scene.surfaces.cloudVersionReviewEnded = { [weak runtime] in runtime?.endCloudVersionReview() }
         runtime.scene.surfaces.applyCloudVersion = { [weak controller, weak scene = runtime.scene] id, review in
             guard let controller else { throw IOSDocumentFailure.unavailable }
             do {

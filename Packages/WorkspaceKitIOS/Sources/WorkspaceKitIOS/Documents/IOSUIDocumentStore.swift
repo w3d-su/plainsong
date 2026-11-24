@@ -229,9 +229,11 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
         entry.lastPersistedText = text
         entry.allowsProviderWrite = canWrite
         entry.openFinished = true
+        // Observers run synchronously inside the next two calls and may edit the
+        // session; watch before they run so those edits reach autosave too.
+        watchEdits(entry)
         refreshWritableState(entry)
         emitSnapshot(entry)
-        watchEdits(entry)
     }
 
     func finishOpen(_ entry: IOSDocumentEntry, result: Result<IOSDocumentHandle, Error>) {

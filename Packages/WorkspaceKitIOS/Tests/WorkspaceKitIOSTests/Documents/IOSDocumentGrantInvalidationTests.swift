@@ -48,7 +48,7 @@ final class IOSDocumentGrantInvalidationTests: XCTestCase {
         let entered = expectation(description: "save entered")
         port.onSaveEntered = { entered.fulfill() }
         let saving = Task { try await fixture.store.save(handle.identity) }
-        await fulfillment(of: [entered], timeout: 2)
+        await assertFulfillment(of: [entered], timeout: 2)
 
         _ = fixture.service.invalidate(fixture.grant.workspaceID)
         XCTAssertFalse(fixture.lease.isReleased)

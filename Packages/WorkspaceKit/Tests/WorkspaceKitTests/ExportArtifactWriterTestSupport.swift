@@ -344,7 +344,8 @@ private func exportOpenDescriptorPaths() -> [String] {
     {
         var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
         guard Darwin.fcntl(info.proc_fd, F_GETPATH, &buffer) != -1 else { continue }
-        paths.append(String(cString: buffer).trimmingCharacters(in: CharacterSet(charactersIn: "/")))
+        let bytes = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+        paths.append(String(decoding: bytes, as: UTF8.self).trimmingCharacters(in: CharacterSet(charactersIn: "/")))
     }
     return paths
 }

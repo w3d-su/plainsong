@@ -95,7 +95,9 @@ final class WorkspaceSearchSymlinkEligibilityTests: XCTestCase {
             query: TextSearchQuery(pattern: "needle")
         )
         let consumer = Task {
-            await collectEvents(WorkspaceSearchService(reader: reader), request: request)
+            await WorkspaceSearchSymlinkEligibilityTests.collectEvents(
+                WorkspaceSearchService(reader: reader), request: request
+            )
         }
 
         await reader.waitUntilIgnoreRead()
@@ -150,7 +152,7 @@ final class WorkspaceSearchSymlinkEligibilityTests: XCTestCase {
             queryGeneration: 5,
             query: TextSearchQuery(pattern: "needle")
         )
-        let events = await collectEvents(WorkspaceSearchService(), request: request)
+        let events = await Self.collectEvents(WorkspaceSearchService(), request: request)
         let summary = try XCTUnwrap(completedSummary(in: events))
         let finalProgress = events.compactMap { event -> WorkspaceSearchProgress? in
             guard case let .progress(_, progress) = event else { return nil }
@@ -187,7 +189,7 @@ private extension WorkspaceSearchSymlinkEligibilityTests {
         )
     }
 
-    func collectEvents(
+    static func collectEvents(
         _ service: WorkspaceSearchService,
         request: WorkspaceSearchRequest
     ) async -> [WorkspaceSearchEvent] {
@@ -213,14 +215,14 @@ private extension WorkspaceSearchSymlinkEligibilityTests {
     }
 
     func completedSummary(in events: [WorkspaceSearchEvent]) -> WorkspaceSearchSummary? {
-        events.compactMap {
-            guard case let .completed(_, summary) = $0 else { return nil }
+        events.compactMap { event -> WorkspaceSearchSummary? in
+            guard case let .completed(_, summary) = event else { return nil }
             return summary
         }.last
     }
 
     func finalProgress(in events: [WorkspaceSearchEvent]) -> WorkspaceSearchProgress? {
-        events.compactMap { event in
+        events.compactMap { event -> WorkspaceSearchProgress? in
             guard case let .progress(_, progress) = event else { return nil }
             return progress
         }.last
@@ -247,7 +249,9 @@ private extension WorkspaceSearchSymlinkEligibilityTests {
             ])
         )
         let consumer = Task {
-            await collectEvents(WorkspaceSearchService(reader: reader), request: request)
+            await WorkspaceSearchSymlinkEligibilityTests.collectEvents(
+                WorkspaceSearchService(reader: reader), request: request
+            )
         }
 
         await reader.waitUntilIgnoreRead()

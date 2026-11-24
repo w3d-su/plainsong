@@ -74,7 +74,7 @@ public enum SVGImageValidator {
     ]
     /// Presentation attributes that take CSS image values. `url(#id)` stays allowed.
     private static let cssValuedAttributes: Set<String> = [
-        "clip-path", "cursor", "fill", "filter", "marker-end", "marker-mid",
+        "clip-path", "cursor", "fill", "filter", "marker", "marker-end", "marker-mid",
         "marker-start", "mask", "stroke", "style",
     ]
 
@@ -129,15 +129,16 @@ public enum SVGImageValidator {
     }
 
     private static func isSameDocumentFragment(_ value: String) -> Bool {
-        isFragmentToken(value.trimmingCharacters(in: .whitespacesAndNewlines))
+        isFragmentToken(value.trimmingCharacters(in: urlEdgeSpaces))
     }
 
     static func isFragmentToken(_ value: some StringProtocol) -> Bool {
-        guard value.count >= 2, value.first == "#" else { return false }
-        return value.dropFirst().allSatisfy { character in
-            character != "#" && character != "(" && character != ")" && character != "\\" &&
-                character != "/" && character != ":" && character != "\"" && character != "'" &&
-                !character.isWhitespace
+        let scalars = value.unicodeScalars
+        guard scalars.count >= 2, scalars.first == "#" else { return false }
+        return scalars.dropFirst().allSatisfy { scalar in
+            scalar != "#" && scalar != "(" && scalar != ")" && scalar != "\\" &&
+                scalar != "/" && scalar != ":" && scalar != "\"" && scalar != "'" &&
+                !scalar.properties.isWhitespace
         }
     }
 

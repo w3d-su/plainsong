@@ -23,22 +23,44 @@ extension AppState {
         return resolvedURL
     }
 
-    func synchronizeWorkspaceTreeSelection(for session: DocumentSession) {
+    /// `revealingAncestors` also expands the folders above the row, as a sidebar click on it
+    /// would have needed.
+    func synchronizeWorkspaceTreeSelection(
+        for session: DocumentSession,
+        revealingAncestors: Bool = false
+    ) {
         guard let rootAuthority = workspaceSearchRootAuthority,
               workspaceInstalledCaptureGeneration == workspaceGeneration,
               let location = retainedManagedSessionLocation(for: session),
               location.rootAuthority == rootAuthority,
-              var tree = workspaceTree,
-              let node = firstNode(
-                  in: tree.root,
-                  canonicalRelativePath: location.relativePath,
-                  rootURL: rootAuthority.originalRootURL
-              )
+              var tree = workspaceTree
         else {
+            return
+        }
+        guard let node = firstNode(
+            in: tree.root,
+            canonicalRelativePath: location.relativePath,
+            rootURL: rootAuthority.originalRootURL
+        ) else {
+            // A file the scan leaves out (a hidden file) has no row; don't keep the old one lit.
+            if revealingAncestors {
+                tree.selectNode(id: nil)
+                workspaceTree = tree
+            }
             return
         }
 
         tree.selectNode(id: node.id)
+        if revealingAncestors {
+            var ancestorPath = ""
+            for component in node.relativePath.split(separator: "/").dropLast() {
+                ancestorPath = ancestorPath.isEmpty ? String(component) : "\(ancestorPath)/\(component)"
+                if let ancestor = firstNode(in: tree.root, relativePath: ancestorPath) {
+                    tree.setExpanded(true, for: ancestor.id)
+                }
+            }
+            workspaceTreeRevealRequest &+= 1
+        }
         workspaceTree = tree
     }
 
@@ -187,10 +209,11 @@ extension AppState {
         }
     }
 
-    func recoverRetiredSession(
+    /// The one retired session `recoverRetiredSession` would activate, without releasing it.
+    func retiredSessionMatch(
         for canonicalURL: URL,
         matching candidateLocation: WorkspaceFileSystemLocation
-    ) -> DocumentSession? {
+    ) -> (key: URL, retirement: RetiredEditorDocumentSession)? {
         let matches = retiredEditorDocumentSessions.compactMap { key, retirement in
             if retainedManagedSessionLocation(for: retirement.session) == candidateLocation,
                let retiredURL = sessionStateURL(for: retirement.session),
@@ -201,6 +224,16 @@ extension AppState {
             return nil
         }
         guard matches.count == 1, let match = matches.first else { return nil }
+        return (match.0, match.1)
+    }
+
+    func recoverRetiredSession(
+        for canonicalURL: URL,
+        matching candidateLocation: WorkspaceFileSystemLocation
+    ) -> DocumentSession? {
+        guard let match = retiredSessionMatch(for: canonicalURL, matching: candidateLocation) else {
+            return nil
+        }
         // #85 releases a fully ended standalone retirement at activation. WS3B's
         // multi-window extension keeps the record only while exact installations
         // are still live, so their late commits and revocations remain authorized.

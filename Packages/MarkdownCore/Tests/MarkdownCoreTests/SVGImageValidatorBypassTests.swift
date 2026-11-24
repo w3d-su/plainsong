@@ -30,6 +30,57 @@ final class SVGImageValidatorBypassTests: XCTestCase {
         ])
     }
 
+    func testCSSNewlineFormsAfterAnEscapeAreRejected() {
+        // XML character references keep CR and CRLF out of line-end normalization.
+        assertRejected(.externalStyle, [
+            "escape then CRLF in style": #"<style>@\69&#13;&#10;mport "https://x.invalid/a.css";</style>"#,
+            "escape then CR in style": #"<style>rect{fill:\75&#13;rl(https://x.invalid/a)}</style>"#,
+            "escape then CRLF in attribute": #"<rect style="fill:\75&#13;&#10;rl(https://x.invalid/a)"/>"#,
+            "marker shorthand": #"<path marker="url(https://x.invalid/a)"/>"#,
+        ])
+        XCTAssertEqual(admission(body: #"<path marker="url(#m)"/>"#), .admit)
+        XCTAssertEqual(admission(body: "<style>.a{fill:url(#g)}&#13;&#10;.b{}</style>"), .admit)
+    }
+
+    /// URL parsing trims only C0 controls and space, so a fragment preceded by NBSP or
+    /// another Unicode space is a relative path to WebKit, not a same-document reference.
+    func testUnicodeSpacesBeforeAFragmentAreNotTrimmed() {
+        assertRejected(.externalStyle, [
+            "NBSP in url()": #"<rect fill="url(&#160;#a)"/>"#,
+            "ideographic space in quoted url()": #"<style>rect{fill:url("&#12288;#a")}</style>"#,
+            "escaped NBSP in url()": #"<rect style="fill:url(\a0 #a)"/>"#,
+            "NBSP after an escaped space": #"<rect fill="url(\20&#160;#a)"/>"#,
+            "NBSP after an escaped space, quoted": #"<rect fill='url("\20&#160;#a")'/>"#,
+            "line separator after an escaped space": #"<style>rect{fill:url(\20&#8232;#a)}</style>"#,
+        ])
+        XCTAssertEqual(
+            admission(body: #"<use href="&#160;#a"/>"#),
+            .reject(.externalReference("href"))
+        )
+        XCTAssertEqual(
+            admission(body: #"<use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="&#8195;#a"/>"#),
+            .reject(.externalReference("href"))
+        )
+        XCTAssertEqual(admission(body: #"<rect fill="url( #a )"/><use href=" #a "/>"#), .admit)
+        XCTAssertEqual(admission(body: "<style>rect{fill:url(&#9;'#a'&#10;)}</style>"), .admit)
+    }
+
+    func testCombiningMarksCannotHideCSSTokens() {
+        // `(` + U+0301 is one grapheme; CSS still reads a `url(` function.
+        assertRejected(.externalStyle, [
+            "combining mark after url(": #"<rect fill="url(&#769;#a)"/>"#,
+            "combining mark after a quote": #"<rect fill='url("&#769;#a")'/>"#,
+            "combining mark in a fragment's closing quote": ##"<rect fill='url("#a"&#769;)'/>"##,
+        ])
+        // Not a working load in CSS (the mark starts an identifier, or joins the
+        // at-keyword's name); the scalar scan rejects it anyway.
+        assertRejected(.externalStyle, [
+            "combining mark after image-set(": #"<style>rect{fill:image-set(&#769;"https://a.test/a.png" 1x)}</style>"#,
+            "combining mark after @import": #"<style>@import&#769; "https://example.com/a.css";</style>"#,
+        ])
+        XCTAssertEqual(admission(body: #"<rect fill="url(#a)"/><rect fill="url(#e&#769;)"/>"#), .admit)
+    }
+
     func testEscapedFontNamesAndFragmentsStayAdmitted() {
         // Illustrator writes CJK font families as CSS escapes.
         XCTAssertEqual(

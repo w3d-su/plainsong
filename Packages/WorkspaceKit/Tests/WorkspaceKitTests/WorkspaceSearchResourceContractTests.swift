@@ -8,7 +8,7 @@ final class WorkspaceSearchResourceContractTests: XCTestCase {
         let root = try makeTemporaryDirectory()
         let request = try makeRequest(root: root, paths: [])
 
-        let events = await collectEvents(
+        let events = await Self.collectEvents(
             WorkspaceSearchService(reader: MissingContractReader()),
             request: request
         )
@@ -44,7 +44,7 @@ final class WorkspaceSearchResourceContractTests: XCTestCase {
             failurePoint: .afterReadOutcome(1)
         )
 
-        let events = await collectEvents(service, request: request)
+        let events = await Self.collectEvents(service, request: request)
         let activeReadCount = await reader.activeReadCount()
 
         XCTAssertEqual(failures(in: events), [.unexpectedProducerFailure])
@@ -74,7 +74,7 @@ final class WorkspaceSearchResourceContractTests: XCTestCase {
             )
         )
 
-        let events = await collectEvents(WorkspaceSearchService(reader: reader), request: request)
+        let events = await Self.collectEvents(WorkspaceSearchService(reader: reader), request: request)
         let summary = try XCTUnwrap(completedSummaries(in: events).only)
         let maximumActiveReadCount = await reader.maximumActiveReadCount()
 
@@ -103,7 +103,9 @@ final class WorkspaceSearchResourceContractTests: XCTestCase {
             )
         )
         let consumer = Task {
-            await collectEvents(WorkspaceSearchService(reader: reader), request: request)
+            await WorkspaceSearchResourceContractTests.collectEvents(
+                WorkspaceSearchService(reader: reader), request: request
+            )
         }
 
         await reader.waitUntilCandidateStartCount(4)
@@ -140,7 +142,7 @@ final class WorkspaceSearchResourceContractTests: XCTestCase {
             )
         )
 
-        let events = await collectEvents(
+        let events = await Self.collectEvents(
             WorkspaceSearchService(reader: MixedContractReader()),
             request: request,
             consumerDelayNanoseconds: 100_000
@@ -201,7 +203,7 @@ extension WorkspaceSearchResourceContractTests {
         )
     }
 
-    private func collectEvents(
+    private static func collectEvents(
         _ service: WorkspaceSearchService,
         request: WorkspaceSearchRequest,
         consumerDelayNanoseconds: UInt64 = 0

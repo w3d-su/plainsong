@@ -29,6 +29,11 @@ extension AppState {
         _modify { yield &windowState.workspaceTree }
     }
 
+    var workspaceTreeRevealRequest: UInt64 {
+        get { windowState.workspaceTreeRevealRequest }
+        _modify { yield &windowState.workspaceTreeRevealRequest }
+    }
+
     var workspaceSearchState: WorkspaceSearchState {
         get { windowState.workspaceSearchState }
         _modify { yield &windowState.workspaceSearchState }

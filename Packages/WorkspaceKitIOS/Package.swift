@@ -20,9 +20,13 @@ let package = Package(
                 .product(name: "WorkspaceCore", package: "WorkspaceCore"),
                 .product(name: "PreviewKitContracts", package: "PreviewKit"),
             ],
-            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
-        .testTarget(name: "WorkspaceKitIOSTests", dependencies: ["WorkspaceKitIOS"]),
+        .testTarget(
+            name: "WorkspaceKitIOSTests",
+            dependencies: ["WorkspaceKitIOS"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
     ],
     swiftLanguageModes: [.v5]
 )

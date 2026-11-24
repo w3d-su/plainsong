@@ -91,7 +91,7 @@ public final class DocumentSession: ObservableObject {
         opening text: String,
         url: URL,
         fileKind: FileKind,
-        onStatisticsReady: (@MainActor (DocumentSession) -> Void)? = nil
+        onStatisticsReady: (@MainActor @Sendable (DocumentSession) -> Void)? = nil
     ) {
         guard text.utf8.count >= 64 * 1024 else {
             self.init(text: text, url: url, fileKind: fileKind)
@@ -104,13 +104,13 @@ public final class DocumentSession: ObservableObject {
     /// Count the most recent edit after a typing pause. The work follows this session
     /// through window switches and URL changes. Only a source change invalidates it.
     /// `onReady` runs after the counts are applied, and not when a newer change cancels them.
-    public func scheduleStatisticsRefreshAfterEdit(onReady: (@MainActor (DocumentSession) -> Void)? = nil) {
+    public func scheduleStatisticsRefreshAfterEdit(onReady: (@MainActor @Sendable (DocumentSession) -> Void)? = nil) {
         scheduleStatisticsCount(debounced: true, onReady: onReady)
     }
 
     private func scheduleStatisticsCount(
         debounced: Bool,
-        onReady: (@MainActor (DocumentSession) -> Void)? = nil
+        onReady: (@MainActor @Sendable (DocumentSession) -> Void)? = nil
     ) {
         cancelStatisticsTask()
         let source = text
@@ -120,10 +120,11 @@ public final class DocumentSession: ObservableObject {
             }
             guard let counts = TextStatistics.countUnlessCancelled(source) else { return }
             await MainActor.run { [weak self] in
-                guard !Task.isCancelled, let self else { return }
-                statisticsTask = nil
-                applyStatistics(counts)
-                onReady?(self)
+                // A distinct name keeps the Xcode 16.4 compiler and SwiftFormat's redundantSelf rule agreed.
+                guard !Task.isCancelled, let session = self else { return }
+                session.statisticsTask = nil
+                session.applyStatistics(counts)
+                onReady?(session)
             }
         }
     }

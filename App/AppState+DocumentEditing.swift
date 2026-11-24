@@ -90,9 +90,8 @@ extension AppState {
         let url = URL(fileURLWithPath: path, relativeTo: baseURL).standardizedFileURL
         guard FileKind(url: url) != nil else { return }
 
-        let isWorkspaceLink = workspaceRootURL.map { Self.isDescendant(url, of: $0) } ?? false
-        if isWorkspaceLink {
-            openWorkspaceFile(url)
+        if let workspaceURL = workspaceRootURL.flatMap({ Self.workspaceFileURL(for: url, under: $0) }) {
+            openWorkspaceFile(workspaceURL)
         } else {
             // Opening a file outside the workspace closes the workspace first. The sandbox
             // grants no access to a file the user did not pick, so refuse before the close.
@@ -111,6 +110,20 @@ extension AppState {
             }
             openExternalFile(url)
         }
+    }
+
+    /// `url` spelled under `rootURL`, or `nil` when it is outside the workspace.
+    ///
+    /// `standardizedFileURL` drops a leading `/private` (`/private/tmp/w/a.md` becomes
+    /// `/tmp/w/a.md`), and the workspace authority matches root components literally, so a
+    /// link URL is re-anchored on the root before it is opened.
+    static func workspaceFileURL(for url: URL, under rootURL: URL) -> URL? {
+        guard isDescendant(url, of: rootURL),
+              let relativePath = try? WorkspaceRootContainment.relativePath(for: url, rootURL: rootURL)
+        else {
+            return nil
+        }
+        return rootURL.appendingPathComponent(relativePath, isDirectory: false)
     }
 
     /// The relative file path a preview link names, decoded, or `nil` when the link does

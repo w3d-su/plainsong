@@ -272,10 +272,15 @@ extension AppState {
             throw AppStateError.unsupportedFile(url)
         }
 
-        if !preserveWorkspace {
+        if preserveWorkspace {
+            try activateFileSession(url: url)
+        } else {
+            // A file this window cannot load (outside the sandbox grant, not a regular file,
+            // or not UTF-8) must fail before the workspace it replaces is closed.
+            let replacementRead = try prepareReplacementFileRead(url: url)
             try closeWorkspaceForReplacement()
+            try activateFileSession(url: url, preparedRead: replacementRead)
         }
-        try activateFileSession(url: url)
 
         if rememberAsLastOpened {
             rememberLastOpenedFile(url)
@@ -295,6 +300,7 @@ extension AppState {
                 }
                 let location = try rootAuthority.canonicalizedLocation(forFileURL: url)
                 try activateAnchoredFileSession(at: location)
+                synchronizeWorkspaceTreeSelection(for: shownSession, revealingAncestors: true)
             } else {
                 try activateFileSession(url: url)
             }

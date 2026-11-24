@@ -576,9 +576,11 @@ republishes only when its value changes literally.
 - Link clicks: intercepted in Swift. `http(s)` → `NSWorkspace.open` (external browser).
   Relative `.md`/`.mdx` → open that file in the editor. The `href` arrives percent-encoded
   (remark encodes non-ASCII and spaces), so the App cuts the query and fragment, decodes the
-  path and opens it only when it is a scheme-less relative path. With a workspace open, a
-  link to a file outside it that cannot be read (the sandbox grants none the user did not
-  pick) or does not exist shows an error and leaves the workspace open. `#anchor` stays in JavaScript
+  path and opens it only when it is a scheme-less relative path. A workspace target is
+  selected in the sidebar with its folders expanded; an outside target follows the Open rule
+  and is loaded before the workspace closes, so a file that cannot be read (the sandbox
+  grants none the user did not pick) or does not exist shows an error and leaves the
+  workspace open. `#anchor` stays in JavaScript
   and scrolls the preview to a generated heading ID (Unicode and duplicate headings supported).
   On iOS, PreviewKit also owns external browser opening; production scene observation
   must not open its informational external-link event a second time.

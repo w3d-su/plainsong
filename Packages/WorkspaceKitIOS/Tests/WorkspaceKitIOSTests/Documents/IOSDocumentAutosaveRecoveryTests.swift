@@ -61,31 +61,41 @@ final class IOSDocumentAutosaveRecoveryTests: XCTestCase {
 
     private func parkedCloseAfterAutosaveExited() async throws -> SuspendedClose {
         let harness = DocumentIOHarness(timing: .fastAutosave)
-        harness.ports.openedData = Data("baseline".utf8)
         let handle = try await harness.openNote(text: "baseline")
         let port = try XCTUnwrap(harness.port(for: handle))
         let entry = try XCTUnwrap(harness.store.byIdentity[handle.identity])
         var closeContinuation: CheckedContinuation<Void, Never>?
         port.closeGate = { await withCheckedContinuation { closeContinuation = $0 } }
         let closing = Task { try await harness.store.close(handle.identity) }
-        await waitUntil { closeContinuation != nil }
-        let generation = entry.autosaveGeneration
-        let source = "N+1 retained during close 繁中 👩🏽‍💻"
-        handle.session.replaceText(source)
-        let version = handle.session.version
-        await waitUntil { entry.autosaveGeneration > generation }
-        let autosave = try XCTUnwrap(entry.autosaveTask)
-        await autosave.value
-        XCTAssertTrue(port.written.isEmpty, "the parked close must fence that old autosave")
-        XCTAssertTrue(entry.isClosing)
         let releaseClose: @MainActor () -> Void = {
             closeContinuation?.resume()
             closeContinuation = nil
         }
-        return SuspendedClose(harness: harness, handle: handle, entry: entry, port: port,
-                              source: source, version: version,
-                              exitedAutosaveGeneration: entry.autosaveGeneration,
-                              closing: closing, releaseClose: releaseClose)
+        do {
+            await waitUntil { closeContinuation != nil }
+            _ = try XCTUnwrap(closeContinuation, "provider close must be parked")
+            let watcher = try XCTUnwrap(entry.textTask, "the edit watcher must outlive a parked close")
+            XCTAssertFalse(watcher.isCancelled)
+            let generation = entry.autosaveGeneration
+            let source = "N+1 retained during close 繁中 👩🏽‍💻"
+            handle.session.replaceText(source)
+            let version = handle.session.version
+            // The edit watcher, not the test, schedules this autosave.
+            await waitUntil { entry.autosaveGeneration > generation }
+            let autosave = try XCTUnwrap(entry.autosaveTask)
+            await autosave.value
+            XCTAssertTrue(port.written.isEmpty, "the parked close must fence that old autosave")
+            XCTAssertTrue(entry.isClosing)
+            return SuspendedClose(harness: harness, handle: handle, entry: entry, port: port,
+                                  source: source, version: version,
+                                  exitedAutosaveGeneration: entry.autosaveGeneration,
+                                  closing: closing, releaseClose: releaseClose)
+        } catch {
+            port.closeGate = nil
+            releaseClose()
+            _ = await closing.result
+            throw error
+        }
     }
 }
 

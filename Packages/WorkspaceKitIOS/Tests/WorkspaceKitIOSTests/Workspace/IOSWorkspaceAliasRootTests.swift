@@ -147,9 +147,7 @@ private final class CountingFilePort: IOSWorkspaceFilePort, @unchecked Sendable 
         maximumByteCount: Int,
         root: URL
     ) async throws -> IOSWorkspaceFilePayload {
-        lock.lock()
-        reads += 1
-        lock.unlock()
+        lock.withLock { reads += 1 }
         return try await base.readFile(
             url: url,
             relativePath: relativePath,
