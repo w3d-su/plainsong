@@ -20,7 +20,11 @@ let package = Package(
             ],
             swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
         ),
-        .testTarget(name: "WorkspaceKitTests", dependencies: ["WorkspaceKit"]),
+        .testTarget(
+            name: "WorkspaceKitTests",
+            dependencies: ["WorkspaceKit"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
     ],
     swiftLanguageModes: [.v5]
 )

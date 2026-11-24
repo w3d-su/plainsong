@@ -370,11 +370,16 @@ extension ExportArtifactWriterTests {
     func testCancelledOperationWritesNothing() async throws {
         let fixture = try makeExportFixture()
         let destination = fixture.destination
-        let task = Task { [self] () -> ExportArtifactWriteOutcome in
+        let task = Task { () -> ExportArtifactWriteOutcome in
             while !Task.isCancelled {
                 await Task.yield()
             }
-            return export(to: destination, disposition: .createNew)
+            return ExportArtifactWriter.write(ExportArtifactWriteRequest(
+                destinationURL: destination,
+                kind: .html,
+                disposition: .createNew,
+                bytes: Data("<!doctype html><title>Export</title>".utf8)
+            ), appPrivateRoot: nil, ownership: { _ in .permitted })
         }
         task.cancel()
 
