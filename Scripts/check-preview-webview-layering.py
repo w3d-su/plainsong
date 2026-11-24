@@ -10,10 +10,10 @@ factories. Aliases, subclasses, metatype references, inferred `.init`,
 Source roots include every non-test target in the resolved XcodeGen spec and
 package Sources. Objective-C `.m` and `.mm` are scanned; vendored C headers are not.
 
-Swift 6 package sources (`Packages/*/Sources`) must not await WebKit's async
-`evaluateJavaScript` import: its bridging thunk is shared across modules and
-crashed when a Swift 5 module awaited it in the same binary. They call the
-completion-handler wrapper `evaluateJavaScriptReply(_:)` instead.
+Package sources (`Packages/*/Sources`) and `AppIOSTests` must not await WebKit's
+async `evaluateJavaScript` import: its bridging thunk is shared across modules
+and crashed with mixed Swift language modes in the same binary. Use the
+completion-handler overload or `evaluateJavaScriptReply(_:)` instead.
 
 Comments and string literals are ignored, except that a string passed to
 `NSClassFromString` or `objc_getClass` is still inspected. Concatenated class
@@ -287,6 +287,10 @@ def find_violations(root: Path, project_spec=None) -> list[str]:
     for path in sorted(paths):
         relative = path.relative_to(root).as_posix()
         scan_source(relative, path.read_text(), violations)
+    for path in (root / "AppIOSTests").rglob("*.swift"):
+        relative = path.relative_to(root).as_posix()
+        source = path.read_text()
+        scan_async_evaluate_javascript(relative, source, ScannedSource(source).code_text(), violations)
     unique = []
     seen = set()
     for violation in sorted(violations, key=violation_key):
@@ -299,6 +303,12 @@ def find_violations(root: Path, project_spec=None) -> list[str]:
 def violation_key(message):
     relative, line, detail = message.split(":", 2)
     return relative, int(line), detail
+
+
+def scan_async_evaluate_javascript(relative, source, code, violations):
+    for match in ASYNC_EVALUATE_JAVASCRIPT.finditer(code):
+        add(violations, relative, source, match.start(),
+            "await the completion-handler evaluateJavaScriptReply(_:), not the async evaluateJavaScript import")
 
 
 def scan_source(relative, source, violations):
@@ -343,9 +353,7 @@ def scan_source(relative, source, violations):
             add(violations, relative, source, match.start(),
                 f"{match.group(1)} must be created by PreviewController")
     if re.match(r"Packages/[^/]+/Sources/", relative):
-        for match in ASYNC_EVALUATE_JAVASCRIPT.finditer(code):
-            add(violations, relative, source, match.start(),
-                "await the completion-handler evaluateJavaScriptReply(_:), not the async evaluateJavaScript import")
+        scan_async_evaluate_javascript(relative, source, code, violations)
     for match in SWIFTUI_WEB.finditer(code):
         add(violations, relative, source, match.start(),
             f"SwiftUI {match.group(1)} bypasses the PreviewController constructor")

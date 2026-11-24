@@ -4,7 +4,7 @@ import MarkdownCore
 @testable import PlainsongIOS
 @testable import PreviewKit
 import UIKit
-@preconcurrency import WebKit
+import WebKit
 import WorkspaceCore
 @testable import WorkspaceKitIOS
 import XCTest

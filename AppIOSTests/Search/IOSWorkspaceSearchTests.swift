@@ -312,12 +312,16 @@ final class IOSWorkspaceSearchTests: XCTestCase {
     }
 
     func testSameTreeRefreshReusesReadsAndFileChangesOnlyRereadTheChangedPath() async {
+        @MainActor final class ReadState {
+            var text = "old hit"
+            var paths: [String] = []
+        }
+
         let entry = ShellFixtures.entry("posts/b.md")
         let other = ShellFixtures.entry("posts/c.md")
         let entries = [entry, other]
         let workspace = SearchWorkspaceDouble()
-        var text = "old hit"
-        var reads: [String] = []
+        let readState = ReadState()
         let facade = FakeSceneFacade(
             snapshot: ShellFixtures.sceneSnapshot(workspace: ShellFixtures.workspace(entries: entries)),
             capabilities: IOSSceneCapabilities(
@@ -329,8 +333,8 @@ final class IOSWorkspaceSearchTests: XCTestCase {
             surfaces: IOSShellFeatureSurfaces(
                 currentGrant: { ShellFixtures.grant() },
                 readWorkspaceDocument: { location in
-                    reads.append(location.relativePath)
-                    return location.relativePath == entry.location.relativePath ? text : "unchanged"
+                    readState.paths.append(location.relativePath)
+                    return location.relativePath == entry.location.relativePath ? readState.text : "unchanged"
                 }
             )
         )
@@ -338,13 +342,13 @@ final class IOSWorkspaceSearchTests: XCTestCase {
         defer { scene.stopObserving() }
         scene.presentWorkspaceSearch()
         await scene.workspaceSearch.searchNow(query: "hit", environment: scene.workspaceSearchEnvironment())
-        XCTAssertEqual(reads, ["posts/b.md", "posts/c.md"])
+        XCTAssertEqual(readState.paths, ["posts/b.md", "posts/c.md"])
         XCTAssertEqual(scene.workspaceSearch.sections.map(\.relativePath), ["posts/b.md"])
 
-        text = "fresh hit"
+        readState.text = "fresh hit"
         workspace.emit(.resourceChanged(entry.location))
         await waitForIdle(scene.workspaceSearch)
-        XCTAssertEqual(reads, ["posts/b.md", "posts/c.md", "posts/b.md"])
+        XCTAssertEqual(readState.paths, ["posts/b.md", "posts/c.md", "posts/b.md"])
         XCTAssertEqual(scene.workspaceSearch.sections.first?.hits.map(\.matchedText), ["hit"])
 
         for _ in 0 ..< 5 {
@@ -356,15 +360,15 @@ final class IOSWorkspaceSearchTests: XCTestCase {
             )))
         }
         await waitForIdle(scene.workspaceSearch)
-        XCTAssertEqual(reads, ["posts/b.md", "posts/c.md", "posts/b.md"])
+        XCTAssertEqual(readState.paths, ["posts/b.md", "posts/c.md", "posts/b.md"])
         XCTAssertEqual(scene.workspaceSearch.sections.map(\.relativePath), ["posts/b.md"])
 
-        text = "fresh"
+        readState.text = "fresh"
         for _ in 0 ..< 5 {
             workspace.emit(.resourceChanged(entry.location))
         }
         await waitForIdle(scene.workspaceSearch)
-        XCTAssertEqual(reads, ["posts/b.md", "posts/c.md", "posts/b.md", "posts/b.md"])
+        XCTAssertEqual(readState.paths, ["posts/b.md", "posts/c.md", "posts/b.md", "posts/b.md"])
         XCTAssertTrue(scene.workspaceSearch.sections.isEmpty)
     }
 

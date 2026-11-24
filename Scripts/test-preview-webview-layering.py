@@ -315,7 +315,7 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
             "App/Legacy.mm:2: import WebKit outside PreviewController",
         ])
 
-    def test_rejects_the_async_evaluate_javascript_import_in_package_sources(self):
+    def test_rejects_the_async_evaluate_javascript_import_in_package_sources_and_ios_app_tests(self):
         source = "\n".join([
             "let a = try await webView.evaluateJavaScript(script)",
             "let b = try await controller.webView",
@@ -326,8 +326,11 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
         ])
         self.write_source("Packages/PreviewKit/Sources/PreviewKit/Probe.swift", source)
         self.write_source("Packages/PreviewKit/Tests/PreviewKitTests/ProbeTests.swift", source)
+        self.write_source("AppIOSTests/Integration/ProbeTests.swift", "import WebKit\n" + source)
         detail = "await the completion-handler evaluateJavaScriptReply(_:), not the async evaluateJavaScript import"
         self.assertEqual(self.violations({"targets": {}}), [
+            f"AppIOSTests/Integration/ProbeTests.swift:2: {detail}",
+            f"AppIOSTests/Integration/ProbeTests.swift:3: {detail}",
             f"Packages/PreviewKit/Sources/PreviewKit/Probe.swift:1: {detail}",
             f"Packages/PreviewKit/Sources/PreviewKit/Probe.swift:2: {detail}",
         ])

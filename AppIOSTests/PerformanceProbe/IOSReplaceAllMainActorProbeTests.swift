@@ -211,7 +211,7 @@ private final class ProbeEditorHost {
     init(text: String) throws {
         session = DocumentSession(text: text, isDirty: false)
         controller = try IOSSourceEditorController(syntaxTokenizer: MarkdownSyntaxTokenizer())
-        window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window = try makeHostedTestWindow()
         window.rootViewController = root
         window.makeKeyAndVisible()
         controller.textView.frame = CGRect(x: 0, y: 0, width: 390, height: 700)

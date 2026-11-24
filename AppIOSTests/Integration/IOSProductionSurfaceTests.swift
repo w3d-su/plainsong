@@ -263,24 +263,28 @@ final class IOSProductionSurfaceTests: XCTestCase {
     }
 
     func testShutdownPreservesARetainedWriterThenInvalidatesOnlyAfterClose() async throws {
-        var canClose = false
-        var closes = 0
+        @MainActor final class CloseState {
+            var canClose = false
+            var attempts = 0
+        }
+
+        let state = CloseState()
         let harness = try makeHarness(shutdown: {
-            closes += 1
-            return canClose
+            state.attempts += 1
+            return state.canClose
         }) { _, _ in }
         harness.runtime.stopObserving()
-        XCTAssertEqual(closes, 0, "Ordinary view disappearance is not scene disposal")
+        XCTAssertEqual(state.attempts, 0, "Ordinary view disappearance is not scene disposal")
         let retained = await harness.runtime.shutdown()
         XCTAssertFalse(retained)
         XCTAssertNotNil(harness.runtime.preview.webView.navigationDelegate)
-        canClose = true
+        state.canClose = true
         let closed = await harness.runtime.shutdown()
         XCTAssertTrue(closed)
         XCTAssertNil(harness.runtime.preview.webView.navigationDelegate)
         let closedAgain = await harness.runtime.shutdown()
         XCTAssertTrue(closedAgain)
-        XCTAssertEqual(closes, 2)
+        XCTAssertEqual(state.attempts, 2)
     }
 
     private func waitUntil(_ condition: @escaping @MainActor () -> Bool) async throws {

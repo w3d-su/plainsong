@@ -14,9 +14,13 @@ final class IOSTypewriterSyncTests: XCTestCase {
     }
 
     func testPreviewEchoDoesNotScrollTheEditorUntilTheOwnerDecays() {
+        @MainActor final class Clock {
+            var time: UInt64 = 1000
+        }
+
         let sync = IOSTypewriterSync()
-        var time: UInt64 = 1000
-        sync.installClockForTesting { time }
+        let clock = Clock()
+        sync.installClockForTesting { clock.time }
         var preview: [Int] = []
         var editor: [Int] = []
         sync.scrollPreview = { preview.append($0) }
@@ -26,7 +30,7 @@ final class IOSTypewriterSyncTests: XCTestCase {
         sync.previewScrolled(to: 9)
         XCTAssertEqual(preview, [4])
         XCTAssertTrue(editor.isEmpty)
-        time += IOSTypewriterSync.ownerDecayNanoseconds
+        clock.time += IOSTypewriterSync.ownerDecayNanoseconds
         sync.previewScrolled(to: 9)
         XCTAssertEqual(editor, [9])
         sync.editorViewportChanged(to: 3)

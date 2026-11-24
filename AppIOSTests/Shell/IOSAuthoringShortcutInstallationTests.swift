@@ -9,8 +9,8 @@ import XCTest
 final class IOSAuthoringShortcutInstallationTests: XCTestCase {
     /// The host mirrors the document column: navigation-bar items plus the
     /// keyboard bar, which carries the primary commands' shortcuts.
-    func testToolbarInstallsEveryDescriptorShortcut() {
-        let mounted = Self.mountDocumentScreen()
+    func testToolbarInstallsEveryDescriptorShortcut() throws {
+        let mounted = try Self.mountDocumentScreen()
         defer { mounted.window.isHidden = true }
         Self.focusTextInput(in: mounted.host.view)
         RunLoop.current.run(until: Date().addingTimeInterval(0.1))
@@ -42,8 +42,8 @@ final class IOSAuthoringShortcutInstallationTests: XCTestCase {
     /// the Find button stays in the navigation bar there. Find, Find Next, Find
     /// Previous and Use Selection stay installed with it; the bar's own commands
     /// do not.
-    func testPreviewLayoutKeepsTheFindShortcuts() {
-        let mounted = Self.mountDocumentScreen()
+    func testPreviewLayoutKeepsTheFindShortcuts() throws {
+        let mounted = try Self.mountDocumentScreen()
         defer { mounted.window.isHidden = true }
         guard case .single = mounted.scene.layout else {
             return XCTFail("a 390 pt column shows one pane; got \(mounted.scene.layout)")
@@ -79,7 +79,8 @@ final class IOSAuthoringShortcutInstallationTests: XCTestCase {
     }
 
     /// The document column at iPhone width, with the editor stand-in mounted.
-    private static func mountDocumentScreen() -> MountedDocumentScreen {
+    private static func mountDocumentScreen() throws -> MountedDocumentScreen {
+        let window = try makeHostedTestWindow()
         let provider = FakeAuthoringProvider(actions: IOSAuthoringCatalog.actions)
         let editor = FakeEditorBinding()
         let scene = IOSShellSceneState(
@@ -96,7 +97,6 @@ final class IOSAuthoringShortcutInstallationTests: XCTestCase {
         )
         scene.startObserving()
         let router = IOSShellActionRouter(scene: scene)
-        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         let host = UIHostingController(rootView: ShortcutToolbarHost(scene: scene, router: router))
         window.rootViewController = host
         window.makeKeyAndVisible()
