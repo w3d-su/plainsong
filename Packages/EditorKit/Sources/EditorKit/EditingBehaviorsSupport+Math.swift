@@ -28,9 +28,11 @@ extension EditingBehaviorsSupport {
     ) {
         guard let undoManager = textView.undoManager, undoManager.isUndoRegistrationEnabled else { return }
         undoManager.registerUndo(withTarget: textView) { textView in
-            registerMathCommandSelectionRedo(selection, on: textView)
-            guard textView.undoManager?.isRedoing == true else { return }
-            textView.textSelection = selection
+            MainActor.assumeIsolated {
+                registerMathCommandSelectionRedo(selection, on: textView)
+                guard textView.undoManager?.isRedoing == true else { return }
+                textView.textSelection = selection
+            }
         }
     }
 

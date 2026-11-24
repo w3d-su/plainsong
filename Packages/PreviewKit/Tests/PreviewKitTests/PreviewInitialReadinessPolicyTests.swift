@@ -17,7 +17,7 @@ final class PreviewInitialReadinessPolicyTests: XCTestCase {
         let page = InitialReadinessTestPage()
         let controller = PreviewController(
             previewIndexURL: nil,
-            initialReadinessScheduler: clock.schedule,
+            initialReadinessScheduler: clock.scheduler,
             pageLoadOverrideForTesting: page.load
         )
         defer { controller.invalidate() }
@@ -38,10 +38,10 @@ final class PreviewInitialReadinessPolicyTests: XCTestCase {
         let controller = PreviewController(
             previewIndexURL: nil,
             retriesSilentInitialLoad: false,
-            initialReadinessScheduler: clock.schedule,
+            initialReadinessScheduler: clock.scheduler,
             pageLoadOverrideForTesting: page.load
         )
-        controller.bridgeTransportOverrideForTesting = page.send
+        page.installBridgeTransport(on: controller)
         defer { controller.invalidate() }
         let renderID = controller.renderForTesting(InitialReadinessTestFixture.change("kept source"))
 

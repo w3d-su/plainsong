@@ -19,7 +19,7 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
         for path in paths {
             await reader.set(.data("needle"), at: root.appendingPathComponent(path).path)
         }
-        let events = try await collectEvents(
+        let events = try await Self.collectEvents(
             WorkspaceSearchService(reader: reader), request: request(root: root, paths: paths)
         )
         XCTAssertEqual(fileResults(in: events).map(\.relativePath), [
@@ -63,7 +63,7 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
             await reader.set(.data("needle \(path)"), at: root.appendingPathComponent(path).path)
         }
 
-        let events = try await collectEvents(
+        let events = try await Self.collectEvents(
             WorkspaceSearchService(reader: reader),
             request: request(root: root, paths: paths)
         )
@@ -100,7 +100,7 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
             root.appendingPathComponent("visible.md").path: .data("needle"),
         ])
 
-        let events = try await collectEvents(
+        let events = try await Self.collectEvents(
             WorkspaceSearchService(reader: reader),
             request: request(root: root, paths: paths)
         )
@@ -129,7 +129,7 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
             limits: WorkspaceSearchLimits(maximumIgnoreFiles: 1)
         )
 
-        let events = await collectEvents(WorkspaceSearchService(reader: reader), request: request)
+        let events = await Self.collectEvents(WorkspaceSearchService(reader: reader), request: request)
         let nestedIgnoreReadCount = await reader.readCount(for: nestedIgnorePath)
 
         XCTAssertEqual(fileResults(in: events).map(\.relativePath), ["nested/post.md"])
@@ -165,7 +165,7 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
             entry("../workspace-other/outside.md", kind: .markdown),
             entry("escape.md", kind: .markdown),
         ])
-        let events = try await collectEvents(
+        let events = try await Self.collectEvents(
             WorkspaceSearchService(reader: reader),
             request: WorkspaceSearchRequest(
                 rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
@@ -219,7 +219,9 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
             query: TextSearchQuery(pattern: "needle")
         )
         let consumer = Task {
-            await collectEvents(WorkspaceSearchService(reader: reader), request: request)
+            await WorkspaceSearchIgnoreAndContainmentTests.collectEvents(
+                WorkspaceSearchService(reader: reader), request: request
+            )
         }
 
         await reader.waitUntilIgnoreRead()
@@ -258,7 +260,7 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
         )
     }
 
-    private func collectEvents(
+    private static func collectEvents(
         _ service: WorkspaceSearchService,
         request: WorkspaceSearchRequest
     ) async -> [WorkspaceSearchEvent] {
@@ -284,8 +286,8 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
     }
 
     private func completedSummary(in events: [WorkspaceSearchEvent]) -> WorkspaceSearchSummary? {
-        events.compactMap {
-            guard case let .completed(_, summary) = $0 else { return nil }
+        events.compactMap { event -> WorkspaceSearchSummary? in
+            guard case let .completed(_, summary) = event else { return nil }
             return summary
         }.last
     }
