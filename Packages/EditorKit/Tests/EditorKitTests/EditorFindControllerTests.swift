@@ -7,9 +7,8 @@ import XCTest
 
 @MainActor
 final class EditorFindControllerTests: XCTestCase {
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        super.tearDown()
     }
 
     private let documentA = EditorDocumentIdentity(rawValue: "find-doc-a")

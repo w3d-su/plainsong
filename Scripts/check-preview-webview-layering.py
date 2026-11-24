@@ -10,8 +10,8 @@ factories. Aliases, subclasses, metatype references, inferred `.init`,
 Source roots include every non-test target in the resolved XcodeGen spec and
 package Sources. Objective-C `.m` and `.mm` are scanned; vendored C headers are not.
 
-Swift 6 package sources (`Packages/*/Sources`) and `AppTests` must not await WebKit's async
-`evaluateJavaScript` import: its bridging thunk is shared across modules and
+Swift 6 package sources (`Packages/*/Sources`), EditorKitTests, and `AppTests`
+must not await WebKit's async `evaluateJavaScript` import: its bridging thunk is shared across modules and
 crashed when a Swift 5 module awaited it in the same binary. They call the
 completion-handler wrapper `evaluateJavaScriptReply(_:)` instead.
 
@@ -38,6 +38,7 @@ ALLOWED_CONSTRUCTORS = {
         "WKWebViewConfiguration"
     },
 }
+ASYNC_CHECK_TEST_ROOTS = ("AppTests", "Packages/EditorKit/Tests/EditorKitTests")
 ASYNC_EVALUATE_JAVASCRIPT = re.compile(
     r"\bawait\s+(?:\(\s*)*(?:[A-Za-z_][A-Za-z0-9_]*\s*(?:[?!]\s*)?\.\s*)*evaluateJavaScript\s*\("
 )
@@ -276,6 +277,7 @@ def find_violations(root: Path, project_spec=None) -> list[str]:
     packages = root / "Packages"
     if packages.exists():
         source_roots.extend(sorted(path for path in packages.glob("*/Sources") if path.is_dir()))
+    source_roots.extend(root / test_root for test_root in ASYNC_CHECK_TEST_ROOTS)
     paths = set()
     for source_root in source_roots:
         if source_root.is_file() and source_root.suffix in SOURCE_SUFFIXES:
@@ -287,11 +289,6 @@ def find_violations(root: Path, project_spec=None) -> list[str]:
     for path in sorted(paths):
         relative = path.relative_to(root).as_posix()
         scan_source(relative, path.read_text(), violations)
-    for path in (root / "AppTests").rglob("*.swift"):
-        if path.is_file():
-            relative = path.relative_to(root).as_posix()
-            source = path.read_text()
-            scan_async_evaluate_javascript(relative, source, ScannedSource(source).code_text(), violations)
     unique = []
     seen = set()
     for violation in sorted(violations, key=violation_key):
@@ -306,15 +303,17 @@ def violation_key(message):
     return relative, int(line), detail
 
 
-def scan_async_evaluate_javascript(relative, source, code, violations):
-    for match in ASYNC_EVALUATE_JAVASCRIPT.finditer(code):
-        add(violations, relative, source, match.start(),
-            "await the completion-handler evaluateJavaScriptReply(_:), not the async evaluateJavaScript import")
-
-
 def scan_source(relative, source, violations):
     scanned = ScannedSource(source)
     code = scanned.code_text()
+    is_guarded_test = any(relative.startswith(f"{root}/") for root in ASYNC_CHECK_TEST_ROOTS)
+    if is_guarded_test or re.match(r"Packages/[^/]+/Sources/", relative):
+        for match in ASYNC_EVALUATE_JAVASCRIPT.finditer(code):
+            add(violations, relative, source, match.start(),
+                "await the completion-handler evaluateJavaScriptReply(_:), not the async evaluateJavaScript import")
+    if is_guarded_test:
+        return
+
     allowed = import_allowed(relative)
     if not allowed:
         for match in IMPORT_WEBKIT.finditer(code):
@@ -353,8 +352,6 @@ def scan_source(relative, source, violations):
         for match in OBJC_ALLOC.finditer(code):
             add(violations, relative, source, match.start(),
                 f"{match.group(1)} must be created by PreviewController")
-    if re.match(r"Packages/[^/]+/Sources/", relative):
-        scan_async_evaluate_javascript(relative, source, code, violations)
     for match in SWIFTUI_WEB.finditer(code):
         add(violations, relative, source, match.start(),
             f"SwiftUI {match.group(1)} bypasses the PreviewController constructor")
