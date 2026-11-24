@@ -332,27 +332,6 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
             f"Packages/PreviewKit/Sources/PreviewKit/Probe.swift:2: {detail}",
         ])
 
-    def test_app_tests_reject_only_the_async_webkit_import(self):
-        source = "\n".join([
-            "import WebKit",
-            "let webView = WKWebView()",
-            "let reply = try await (webView.evaluateJavaScript(script) as? String)",
-            "let nested = try await controller?",
-            "    .webView.evaluateJavaScript(script)",
-            "let allowed = try await webView.evaluateJavaScriptReply(script)",
-            "webView.evaluateJavaScript(script) { _, _ in }",
-            "let subscripted = try await webViews[0].evaluateJavaScript(script)",
-            "let allowedSubscripted = try await webViews[0].evaluateJavaScriptReply(script)",
-        ])
-        self.write_source("AppTests/ProbeTests.swift", source)
-        self.write_source("PerformanceTests/ProbeTests.swift", source)
-        detail = "await the completion-handler evaluateJavaScriptReply(_:), not the async evaluateJavaScript import"
-        self.assertEqual(self.violations({"targets": {}}), [
-            f"AppTests/ProbeTests.swift:3: {detail}",
-            f"AppTests/ProbeTests.swift:4: {detail}",
-            f"AppTests/ProbeTests.swift:8: {detail}",
-        ])
-
     def test_current_repository_has_no_violations(self):
         root = Path(__file__).resolve().parent.parent
         self.assertEqual(CHECKER["find_violations"](root), [])

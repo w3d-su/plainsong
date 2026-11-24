@@ -277,13 +277,13 @@ final class E0OffscreenPDFProbe {
             label: label,
             timeoutNanoseconds: timeoutNanoseconds
         ) { gate in
-            self.controller.webView.evaluateJavaScript(script) { result, error in
+            self.controller.webView.evaluateJavaScript(script, completionHandler: { result, error in
                 if let error {
                     gate.resolve(.failure(error))
                 } else {
                     gate.resolve(.success(E0JavaScriptValue(rawValue: result)))
                 }
-            }
+            })
         }
         return value.rawValue
     }
