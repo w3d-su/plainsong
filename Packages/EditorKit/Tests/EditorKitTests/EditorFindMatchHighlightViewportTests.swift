@@ -6,9 +6,9 @@ import XCTest
 final class EditorFindMatchHighlightViewportTests: XCTestCase {
     private let document = EditorDocumentIdentity(rawValue: "find-highlight-viewport-doc")
 
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        super.tearDown()
+        try await super.tearDown()
     }
 
     func testOnlyMatchesNearTheViewportAreDecorated() throws {

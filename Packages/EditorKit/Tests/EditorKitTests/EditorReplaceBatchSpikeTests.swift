@@ -5,9 +5,9 @@ import XCTest
 
 @MainActor
 final class EditorReplaceBatchSpikeTests: XCTestCase {
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        super.tearDown()
+        try await super.tearDown()
     }
 
     func testAuthorizationRefusalOpensNoWriterOrUndo() throws {

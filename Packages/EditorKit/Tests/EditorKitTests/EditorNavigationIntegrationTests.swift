@@ -6,9 +6,9 @@ import XCTest
 
 @MainActor
 final class EditorNavigationIntegrationTests: XCTestCase {
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        super.tearDown()
+        try await super.tearDown()
     }
 
     private let documentA = EditorDocumentIdentity(rawValue: "document-a")

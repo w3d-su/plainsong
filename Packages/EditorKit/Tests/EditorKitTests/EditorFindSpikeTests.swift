@@ -7,14 +7,14 @@ import XCTest
 /// Synthetic events are **not** F0 evidence; owner physical keyboard under ABC/Zhuyin is.
 @MainActor
 final class EditorFindSpikeTests: XCTestCase {
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         EditorFindSpike.reset()
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorFindSpike.reset()
-        super.tearDown()
+        try await super.tearDown()
     }
 
     func testShowFindSelectorRecordsFireOnFocusedEditor() throws {

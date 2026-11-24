@@ -8,10 +8,10 @@ import XCTest
 /// before the executor when its installation or planning stamp no longer holds.
 @MainActor
 final class EditorReplaceCommandDispatcherTests: XCTestCase {
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorSelectionProbe.keyWindowOverrideForTesting = nil
         EditorFindControllerTestSupport.tearDownWindows()
-        super.tearDown()
+        try await super.tearDown()
     }
 
     func testResponderChainDeliversToTheKeyWindowEditor() async throws {

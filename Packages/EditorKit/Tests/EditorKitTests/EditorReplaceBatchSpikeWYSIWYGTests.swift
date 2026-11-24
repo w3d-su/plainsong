@@ -5,9 +5,9 @@ import XCTest
 
 @MainActor
 final class EditorReplaceBatchSpikeWYSIWYGTests: XCTestCase {
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        super.tearDown()
+        try await super.tearDown()
     }
 
     func testMinimalEnclosingRangeUndoRestoresFoldPresentation() throws {

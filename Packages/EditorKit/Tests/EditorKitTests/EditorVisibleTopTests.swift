@@ -6,10 +6,10 @@ import XCTest
 final class EditorVisibleTopTests: XCTestCase {
     private var windows: [NSWindow] = []
 
-    override func tearDown() {
+    override func tearDown() async throws {
         windows.forEach { $0.close() }
         windows.removeAll()
-        super.tearDown()
+        try await super.tearDown()
     }
 
     func testTopIsTheFragmentAtTheVisibleEdgeNotTheViewportStart() throws {

@@ -6,9 +6,9 @@ import XCTest
 
 @MainActor
 final class EditorReplaceBatchExecutorTests: XCTestCase {
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        super.tearDown()
+        try await super.tearDown()
     }
 
     func testProductB1OneEditPublicationUndoRedoAndPriorTypingSeparation() async throws {

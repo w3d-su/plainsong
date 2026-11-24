@@ -12,9 +12,9 @@ import XCTest
 final class EditorKeepMinePresentationTests: XCTestCase {
     private let source = "# Heading\nIntro **bold** [link](https://host/a) ![alt](fixture.png)\nTail"
 
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        super.tearDown()
+        try await super.tearDown()
     }
 
     func testUnchangedSnapshotKeepsWYSIWYGPresentationFindDecorationAndMarkersWithoutInput() async throws {

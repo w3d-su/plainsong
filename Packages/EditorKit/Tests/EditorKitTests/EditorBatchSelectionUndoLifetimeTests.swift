@@ -9,9 +9,9 @@ import XCTest
 /// (CI crashed casting an `_NSUndoEndMark` to the selection-undo type).
 @MainActor
 final class EditorBatchSelectionUndoLifetimeTests: XCTestCase {
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        super.tearDown()
+        try await super.tearDown()
     }
 
     func testRegisteredSelectionUndoOutlivesItsCreatorUntilUndone() throws {
