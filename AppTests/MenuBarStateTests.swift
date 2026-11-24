@@ -22,6 +22,19 @@ final class MenuBarStateTests: XCTestCase {
         XCTAssertEqual(menuState.snapshot.recentItemURLs, appState.recentItemURLs)
     }
 
+    func testNotificationFromOutsideMainActorCanReachMenuSubscription() async {
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+        let menuState = MenuBarState(appState: appState)
+        let initialSnapshot = menuState.snapshot
+        let name = AppState.exportHTMLWindowRegistered
+
+        await Task.detached {
+            NotificationCenter.default.post(name: name, object: nil)
+        }.value
+
+        XCTAssertEqual(menuState.snapshot, initialSnapshot)
+    }
+
     /// A menu-relevant mutation must republish exactly once, and only after the mutation
     /// has landed (`objectWillChange` fires pre-mutation; a menu rebuilt at that instant
     /// would re-read stale values — the launch-time frozen-disabled bug).

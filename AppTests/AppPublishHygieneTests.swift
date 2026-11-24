@@ -153,6 +153,38 @@ final class AppPublishHygieneTests: XCTestCase {
 
     // MARK: - Files rows
 
+    func testDirectoryDropMovesTheProvidedNodeOnMainActor() async {
+        let directory = WorkspaceFileNode(
+            id: "directory",
+            name: "folder",
+            relativePath: "folder",
+            kind: .directory,
+            contentModificationDate: nil
+        )
+        let moved = expectation(description: "provider delivers a workspace move")
+        let row = WorkspaceTreeNodeRow(
+            node: directory,
+            rootURL: nil,
+            expandedNodeIDs: [],
+            actions: WorkspaceTreeRowActions(
+                setExpanded: { _, _ in },
+                rename: { _ in },
+                create: { _, _ in },
+                fileClick: { _ in },
+                trash: { _ in },
+                move: { droppedID, directoryID in
+                    MainActor.preconditionIsolated()
+                    XCTAssertEqual(droppedID, "file")
+                    XCTAssertEqual(directoryID, directory.id)
+                    moved.fulfill()
+                }
+            )
+        )
+
+        XCTAssertTrue(row.handleDrop([WorkspaceSidebarDragProvider.make(nodeID: "file", imageURL: nil)]))
+        await fulfillment(of: [moved], timeout: 2)
+    }
+
     func testTreeRowEqualityTracksSubtreeAndExpansionButNotActions() {
         let file = WorkspaceFileNode(
             id: "f",

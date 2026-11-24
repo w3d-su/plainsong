@@ -94,7 +94,7 @@ final class MenuBarState: ObservableObject {
         let windowChanges = [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification,
                              NSWindow.didBecomeMainNotification, NSWindow.didResignMainNotification,
                              NSWindow.willCloseNotification, AppState.exportHTMLWindowRegistered].map {
-            NotificationCenter.default.publisher(for: $0).map { _ in () }.eraseToAnyPublisher()
+            NotificationCenter.default.publisher(for: $0).map { @Sendable _ in () }.eraseToAnyPublisher()
         }
         let routerChanges = KeyWindowRouter.shared.objectWillChange.map { _ in () }.eraseToAnyPublisher()
         var sources = windowChanges + [routerChanges]
