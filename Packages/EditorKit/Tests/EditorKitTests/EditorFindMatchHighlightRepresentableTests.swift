@@ -9,9 +9,8 @@ final class FindHighlightRepresentableTests: XCTestCase {
     private let documentA = EditorDocumentIdentity(rawValue: "find-highlight-doc")
     private let documentB = EditorDocumentIdentity(rawValue: "find-highlight-doc-b")
 
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        super.tearDown()
     }
 
     // These drive `updateRepresentedTextView` — the same entry point SwiftUI uses — instead of

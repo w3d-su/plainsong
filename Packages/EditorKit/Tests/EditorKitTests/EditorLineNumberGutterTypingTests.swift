@@ -7,9 +7,8 @@ import XCTest
 /// The gutter on the typing path: per-keystroke work must not depend on the document.
 @MainActor
 final class EditorLineNumberGutterTypingTests: XCTestCase {
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        super.tearDown()
     }
 
     func testTypingKeepsNumbersCurrentWithoutRescanningTheDocument() throws {

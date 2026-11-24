@@ -346,6 +346,18 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
         root = Path(__file__).resolve().parent.parent
         self.assertEqual(CHECKER["find_violations"](root), [])
 
+    def test_only_the_async_import_check_applies_to_editor_kit_tests(self):
+        source = "\n".join([
+            "import WebKit",
+            "let webView = WKWebView()",
+            "let result = try await webView.evaluateJavaScript(script)",
+        ])
+        editor_kit_test = "Packages/EditorKit/Tests/EditorKitTests/Fixtures/Probe.swift"
+        self.write_source(editor_kit_test, source)
+        self.write_source("Packages/EditorKit/Tests/OtherTests/Probe.swift", source)
+        detail = "await the completion-handler evaluateJavaScriptReply(_:), not the async evaluateJavaScript import"
+        self.assertEqual(self.violations(), [f"{editor_kit_test}:3: {detail}"])
+
 
 if __name__ == "__main__":
     unittest.main()

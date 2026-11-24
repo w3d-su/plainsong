@@ -5,9 +5,8 @@ import XCTest
 
 @MainActor
 final class EditorReplaceWYSIWYGPerformanceTests: XCTestCase {
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        super.tearDown()
     }
 
     /// Measure real native insertion with WYSIWYG installed, not a source-mode proposal.

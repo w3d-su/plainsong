@@ -6,9 +6,8 @@ import XCTest
 
 @MainActor
 final class EditorInteractionRegressionTests: XCTestCase {
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        super.tearDown()
     }
 
     func testShiftDirectionReversalsShrinkAndCrossTheOriginalAnchor() throws {
