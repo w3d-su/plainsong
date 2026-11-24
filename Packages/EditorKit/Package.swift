@@ -19,14 +19,12 @@ let package = Package(
                 .product(name: "MarkdownCore", package: "MarkdownCore"),
                 .product(name: "SyntaxKit", package: "SyntaxKit"),
                 .product(name: "STTextView", package: "STTextView"),
-            ],
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            ]
         ),
         .testTarget(
             name: "EditorKitTests",
-            dependencies: ["EditorKit"],
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            dependencies: ["EditorKit"]
         ),
     ],
-    swiftLanguageModes: [.v5]
+    swiftLanguageModes: [.v6]
 )

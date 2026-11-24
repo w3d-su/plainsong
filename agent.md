@@ -55,7 +55,7 @@ projects such as Astro/Next.js content directories).
 
 | Layer | Technology | Notes |
 |---|---|---|
-| Language | Swift 5.10+ (enable strict concurrency; migrate to Swift 6 language mode when all deps allow) | |
+| Language | Swift 6 language mode for every target: `project.yml` sets `SWIFT_VERSION: "6"` once at project level and every package manifest sets `swiftLanguageModes: [.v6]` (Swift tools 6.0) | Complete concurrency checking comes with the language mode, so no target sets `SWIFT_STRICT_CONCURRENCY` or a per-target mode. The iOS M0 prototype (`Prototypes/iOSM0`) is a separate project and stays on Swift 5.10. |
 | UI shell | SwiftUI (windows, sidebar, settings, toolbars) | |
 | Text editor | [STTextView](https://github.com/krzyzanowskim/STTextView) (TextKit 2, AppKit) wrapped in `NSViewRepresentable` | Actively maintained; provides plugins and the completion window (line numbers are EditorKit's own, §6.1). Keep it behind our own `MarkdownEditorView` abstraction so it can be swapped for raw `NSTextView`+TextKit 2 if needed. |
 | Syntax highlighting | [SwiftTreeSitter](https://github.com/tree-sitter/swift-tree-sitter) behind the EditorKit `MarkdownSyntaxHighlighter` façade | Async, visible-range highlighting; Neon adoption is deferred until its dependency graph is deterministic (§18). |

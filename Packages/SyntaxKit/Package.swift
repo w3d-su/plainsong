@@ -21,8 +21,7 @@ let package = Package(
                 .product(name: "TreeSitterMarkdown", package: "tree-sitter-markdown"),
                 "TreeSitterTSXFixed",
                 "TreeSitterYAMLFixed",
-            ],
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            ]
         ),
         .target(
             name: "TreeSitterTSXFixed",
@@ -46,9 +45,8 @@ let package = Package(
         ),
         .testTarget(
             name: "SyntaxKitTests",
-            dependencies: ["SyntaxKit", "TreeSitterYAMLFixed"],
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            dependencies: ["SyntaxKit", "TreeSitterYAMLFixed"]
         ),
     ],
-    swiftLanguageModes: [.v5]
+    swiftLanguageModes: [.v6]
 )
