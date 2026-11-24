@@ -190,14 +190,14 @@ final class IOSScanProbe: MarkdownSyntaxTokenizing, @unchecked Sendable {
             for index in 0 ..< storage.length where storage.character(at: index) == 10 {
                 newlines += 1
             }
-            return (!Thread.isMainThread, newlines)
+            return (Self.isOffMainThread(), newlines)
         }.value
         let elapsed = clock.now - started
-        lock.lock()
-        offMain = leftMain
-        nanoseconds = UInt64(elapsed.components.seconds) * 1_000_000_000
-            + UInt64(elapsed.components.attoseconds / 1_000_000_000)
-        lock.unlock()
+        lock.withLock {
+            offMain = leftMain
+            nanoseconds = UInt64(elapsed.components.seconds) * 1_000_000_000
+                + UInt64(elapsed.components.attoseconds / 1_000_000_000)
+        }
         _ = newlines
         return SyntaxResult(
             requestID: request.requestID,
@@ -205,6 +205,10 @@ final class IOSScanProbe: MarkdownSyntaxTokenizing, @unchecked Sendable {
             coveredRange: request.visibleRange,
             tokens: []
         )
+    }
+
+    private static func isOffMainThread() -> Bool {
+        !Thread.isMainThread
     }
 
     var ranOffMain: Bool {
