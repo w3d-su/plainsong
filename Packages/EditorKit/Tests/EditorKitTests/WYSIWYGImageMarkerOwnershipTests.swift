@@ -10,9 +10,8 @@ import XCTest
 final class WYSIWYGImageMarkerOwnershipTests: XCTestCase {
     private typealias Support = WYSIWYGImageThumbnailGateSupport
 
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        super.tearDown()
     }
 
     func testRevealedImageIsProjectedAgainWhenTheNextPlanStillCoversIt() async throws {
