@@ -12,7 +12,7 @@ struct IOSPerformanceProbeTarget {
     let fileKind: String
     let canWrite: Bool
     var setHighlightObserver: ((() -> Void)?) -> Void = { _ in }
-    var setRenderObserver: (((PreviewRenderTiming) -> Void)?) -> Void = { _ in }
+    var setRenderObserver: ((@MainActor (PreviewRenderTiming) -> Void)?) -> Void = { _ in }
     var previewIsVisible: () -> Bool = { false }
 }
 
@@ -101,7 +101,7 @@ final class IOSPerformanceProbe: ObservableObject {
         textView.selectedRange = NSRange(location: offset, length: 0)
         textView.scrollRangeToVisible(textView.selectedRange)
 
-        let clock = IOSPerformanceFrameClock()
+        let clock = IOSPerformanceFrameClock(screen: textView.window?.windowScene?.screen)
         clock.start()
         let session = Session(textView: textView, clock: clock, configuration: configuration)
         target.setHighlightObserver { [weak session] in session?.highlightUptime = CACurrentMediaTime() }
@@ -191,7 +191,7 @@ final class IOSPerformanceProbe: ObservableObject {
             appVersion: info["CFBundleShortVersionString"] as? String ?? "",
             appBuild: info["CFBundleVersion"] as? String ?? "",
             buildConfiguration: buildConfiguration,
-            maximumFramesPerSecond: UIScreen.main.maximumFramesPerSecond,
+            maximumFramesPerSecond: clock.maximumFramesPerSecond,
             frameIntervalMilliseconds: clock.lastFrameInterval.map { $0 * 1000 },
             thermalStateAtStart: thermalAtStart.probeName,
             thermalStateAtEnd: ProcessInfo.processInfo.thermalState.probeName,
