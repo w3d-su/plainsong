@@ -19,8 +19,7 @@ final class WindowKeyStateTracker: ObservableObject {
     private(set) weak var window: NSWindow?
     /// Concrete Search field bound by the scoped TextField bridge (preferred over scans).
     private(set) weak var boundSearchField: NSTextField?
-    private var becomeKeyObserver: NSObjectProtocol?
-    private var resignKeyObserver: NSObjectProtocol?
+    private var keyObservation: WindowKeyStateObservation?
 
     /// Live AppKit key query for this host window (never a Bool captured before `await`).
     var isKeyWindow: Bool {
@@ -32,7 +31,7 @@ final class WindowKeyStateTracker: ObservableObject {
             refreshBoundSearchFieldIfNeeded()
             return
         }
-        detachObservers()
+        keyObservation = nil
         self.window = window
         boundSearchField = nil
         guard let window else {
@@ -40,23 +39,8 @@ final class WindowKeyStateTracker: ObservableObject {
             return
         }
 
-        becomeKeyObserver = NotificationCenter.default.addObserver(
-            forName: NSWindow.didBecomeKeyNotification,
-            object: window,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.keyEpoch &+= 1
-            }
-        }
-        resignKeyObserver = NotificationCenter.default.addObserver(
-            forName: NSWindow.didResignKeyNotification,
-            object: window,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.keyEpoch &+= 1
-            }
+        keyObservation = WindowKeyStateObservation(window: window) { [weak self] in
+            self?.keyEpoch &+= 1
         }
         publishKeyEpochChange()
         refreshBoundSearchFieldIfNeeded()
@@ -124,25 +108,24 @@ final class WindowKeyStateTracker: ObservableObject {
             noteIdentifierMatchedField(found)
         }
     }
+}
 
-    deinit {
-        if let becomeKeyObserver {
-            NotificationCenter.default.removeObserver(becomeKeyObserver)
-        }
-        if let resignKeyObserver {
-            NotificationCenter.default.removeObserver(resignKeyObserver)
+private final class WindowKeyStateObservation {
+    private let tokens: [NSObjectProtocol]
+
+    @MainActor
+    init(window: NSWindow, onChange: @escaping @MainActor @Sendable () -> Void) {
+        tokens = [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification].map { name in
+            NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { _ in
+                Task { @MainActor in
+                    onChange()
+                }
+            }
         }
     }
 
-    private func detachObservers() {
-        if let becomeKeyObserver {
-            NotificationCenter.default.removeObserver(becomeKeyObserver)
-            self.becomeKeyObserver = nil
-        }
-        if let resignKeyObserver {
-            NotificationCenter.default.removeObserver(resignKeyObserver)
-            self.resignKeyObserver = nil
-        }
+    deinit {
+        tokens.forEach(NotificationCenter.default.removeObserver)
     }
 }
 
@@ -203,7 +186,7 @@ enum WorkspaceSearchFieldFocus {
     static let accessibilityLabel = "Search in workspace"
     static let placeholder = "Search in workspace"
     /// Stable AppKit identity for the Search query field.
-    static let accessibilityIdentifier = "plainsong.workspaceSearch.queryField"
+    nonisolated static let accessibilityIdentifier = "plainsong.workspaceSearch.queryField"
 
     /// Production identity: accessibility identifier only.
     static func matchesSearchField(_ textField: NSTextField) -> Bool {

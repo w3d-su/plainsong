@@ -61,7 +61,7 @@ struct WorkspaceSearchState: Equatable {
     }
 }
 
-private struct WorkspaceSearchDirtyOverlayInput {
+private struct WorkspaceSearchDirtyOverlayInput: Sendable {
     let fileURL: URL
     let fileKind: FileKind
     let text: String
@@ -212,7 +212,7 @@ extension AppState {
         return try await withThrowingTaskGroup(
             of: WorkspaceSearchOverlayCollection.self
         ) { group in
-            group.addTask(priority: .utility) {
+            group.addTask(priority: .utility) { [inputs] in
                 var seenRelativePaths: [String] = []
                 var overlays: [WorkspaceSearchOverlay] = []
 

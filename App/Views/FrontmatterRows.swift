@@ -111,7 +111,7 @@ private struct StringFieldRow: View {
 
     var body: some View {
         InspectorRow(key) {
-            TextField(key, text: Binding(get: { value }, set: update), axis: .vertical)
+            TextField(key, text: Binding(get: { value }, set: { update($0) }), axis: .vertical)
                 .labelsHidden()
                 .lineLimit(1 ... 4)
                 .textFieldStyle(.roundedBorder)

@@ -1,4 +1,5 @@
 import AppKit
+import os
 
 /// Wraps the delegate SwiftUI (or AppKit) already installed so `windowShouldClose` can
 /// veto or defer a close without replacing the rest of scene teardown.
@@ -13,7 +14,16 @@ import AppKit
 /// window → interceptor → delegate chain.
 @MainActor
 final class WindowCloseInterceptor: NSObject, NSWindowDelegate {
-    private(set) var forwarded: NSWindowDelegate?
+    // NSObject's forwarding hooks can read the delegate reference without entering the main actor.
+    private let delegateStorage = OSAllocatedUnfairLock<NSWindowDelegate?>(uncheckedState: nil)
+    private(set) nonisolated var forwarded: NSWindowDelegate? {
+        get { delegateStorage.withLockUnchecked { $0 } }
+        set {
+            var previous = newValue
+            delegateStorage.withLockUnchecked { swap(&$0, &previous) }
+        }
+    }
+
     /// The next `windowShouldClose` returns false and stays closed until this is cleared.
     var vetoesClose = false
     /// The next `windowShouldClose` returns false once. The caller closes later.
