@@ -55,7 +55,7 @@ projects such as Astro/Next.js content directories).
 
 | Layer | Technology | Notes |
 |---|---|---|
-| Language | Swift 5.10+ (enable strict concurrency; migrate to Swift 6 language mode when all deps allow) | |
+| Language | Swift 6 | Swift 6 language mode is the default for the app project and first-party Swift packages; dependencies select their own language modes. |
 | UI shell | SwiftUI (windows, sidebar, settings, toolbars) | |
 | Text editor | [STTextView](https://github.com/krzyzanowskim/STTextView) (TextKit 2, AppKit) wrapped in `NSViewRepresentable` | Actively maintained; provides plugins and the completion window (line numbers are EditorKit's own, §6.1). Keep it behind our own `MarkdownEditorView` abstraction so it can be swapped for raw `NSTextView`+TextKit 2 if needed. |
 | Syntax highlighting | [SwiftTreeSitter](https://github.com/tree-sitter/swift-tree-sitter) behind the EditorKit `MarkdownSyntaxHighlighter` façade | Async, visible-range highlighting; Neon adoption is deferred until its dependency graph is deterministic (§18). |

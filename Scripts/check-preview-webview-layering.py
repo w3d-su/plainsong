@@ -10,9 +10,10 @@ factories. Aliases, subclasses, metatype references, inferred `.init`,
 Source roots include every non-test target in the resolved XcodeGen spec and
 package Sources. Objective-C `.m` and `.mm` are scanned; vendored C headers are not.
 
-Package sources (`Packages/*/Sources`), EditorKitTests and every Xcode test target
-set to Swift 6 must not call WebKit's async `evaluateJavaScript` import: its
-bridging thunk is shared across modules and crashed with mixed Swift language
+Package sources (`Packages/*/Sources`), first-party Swift package tests and
+every Xcode test target that builds in Swift 6 must not call WebKit's async
+`evaluateJavaScript` import: its bridging thunk is shared across modules and
+crashed with mixed Swift language
 modes in the same binary. Use `evaluateJavaScriptReply(_:)` or label the
 `completionHandler:` argument explicitly (`nil` is allowed). Requiring the label
 tells the overloads apart without parsing Swift control flow to separate trailing
@@ -20,7 +21,8 @@ closures from statement bodies, and it also catches an `async let` call that no
 `await` precedes. Swift 6 test targets get only this check, not the production
 construction checks.
 
-A test target counts as Swift 6 when some build configuration gives it a
+First-party Swift packages default to Swift 6. An Xcode test target counts as
+Swift 6 when some build configuration gives it a
 `SWIFT_VERSION` with major version 6 or later. Each configuration is resolved as
 XcodeGen resolves it: setting groups in order, then `base`, then the `configs`
 entries that apply, a later layer replacing an earlier one, and the target's
@@ -49,7 +51,6 @@ ALLOWED_CONSTRUCTORS = {
         "WKWebViewConfiguration"
     },
 }
-EDITOR_KIT_TESTS = "Packages/EditorKit/Tests/EditorKitTests"
 EVALUATE_JAVASCRIPT_CALL = re.compile(r"\bevaluateJavaScript\s*\(")
 COMPLETION_HANDLER_LABEL = re.compile(r"\s*completionHandler\s*:")
 EVALUATE_JAVASCRIPT_DETAIL = "use evaluateJavaScriptReply(_:) or label evaluateJavaScript's completionHandler: argument"
@@ -365,7 +366,8 @@ def find_violations(root: Path, project_spec=None) -> list[str]:
     packages = root / "Packages"
     if packages.exists():
         source_roots.extend(sorted(path for path in packages.glob("*/Sources") if path.is_dir()))
-    source_roots.append(root / EDITOR_KIT_TESTS)
+        swift6_test_roots.extend(path for path in packages.glob("*/Tests") if path.is_dir())
+    swift6_test_roots.append(root / "IOSAcceptanceTests" / "Tests")
     paths = set()
     for source_root in source_roots:
         if source_root.is_file() and source_root.suffix in SOURCE_SUFFIXES:
@@ -422,11 +424,8 @@ def violation_key(message):
 def scan_source(relative, source, violations):
     scanned = ScannedSource(source)
     code = scanned.code_text()
-    is_editor_kit_test = relative.startswith(f"{EDITOR_KIT_TESTS}/")
-    if is_editor_kit_test or re.match(r"Packages/[^/]+/Sources/", relative):
+    if re.match(r"Packages/[^/]+/Sources/", relative):
         scan_evaluate_javascript(relative, source, code, violations)
-    if is_editor_kit_test:
-        return
 
     allowed = import_allowed(relative)
     if not allowed:

@@ -315,7 +315,7 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
             "App/Legacy.mm:2: import WebKit outside PreviewController",
         ])
 
-    def test_package_sources_label_the_evaluate_javascript_completion_handler(self):
+    def test_package_sources_and_tests_label_the_evaluate_javascript_completion_handler(self):
         source = "\n".join([
             "let a = try await webView.evaluateJavaScript(script)",
             "let b = try await controller.webView",
@@ -341,7 +341,8 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
         self.write_source("Packages/PreviewKit/Tests/PreviewKitTests/ProbeTests.swift", source)
         detail = "use evaluateJavaScriptReply(_:) or label evaluateJavaScript's completionHandler: argument"
         self.assertEqual(self.violations({"targets": {}}), [
-            f"Packages/PreviewKit/Sources/PreviewKit/Probe.swift:{line}: {detail}"
+            f"Packages/PreviewKit/{path}:{line}: {detail}"
+            for path in ("Sources/PreviewKit/Probe.swift", "Tests/PreviewKitTests/ProbeTests.swift")
             for line in (1, 3, 7, 8, 11, 12, 16, 17, 18)
         ])
 
@@ -505,17 +506,25 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
         root = Path(__file__).resolve().parent.parent
         self.assertEqual(CHECKER["find_violations"](root), [])
 
-    def test_only_the_async_import_check_applies_to_editor_kit_tests(self):
+    def test_only_the_async_import_check_applies_to_first_party_package_tests(self):
         source = "\n".join([
             "import WebKit",
             "let webView = WKWebView()",
             "let result = try await webView.evaluateJavaScript(script)",
         ])
         editor_kit_test = "Packages/EditorKit/Tests/EditorKitTests/Fixtures/Probe.swift"
+        preview_kit_test = "Packages/PreviewKit/Tests/PreviewKitTests/Probe.swift"
+        acceptance_test = "IOSAcceptanceTests/Tests/IOSAcceptanceHarnessTests/Probe.swift"
         self.write_source(editor_kit_test, source)
         self.write_source("Packages/EditorKit/Tests/OtherTests/Probe.swift", source)
+        self.write_source(preview_kit_test, source)
+        self.write_source(acceptance_test, source)
         detail = "use evaluateJavaScriptReply(_:) or label evaluateJavaScript's completionHandler: argument"
-        self.assertEqual(self.violations(), [f"{editor_kit_test}:3: {detail}"])
+        self.assertEqual(self.violations(), [
+            f"{path}:3: {detail}" for path in (
+                acceptance_test, editor_kit_test, "Packages/EditorKit/Tests/OtherTests/Probe.swift", preview_kit_test
+            )
+        ])
 
 
 if __name__ == "__main__":
