@@ -13,8 +13,9 @@ package Sources. Objective-C `.m` and `.mm` are scanned; vendored C headers are 
 Package sources (`Packages/*/Sources`), EditorKitTests and AppIOSTests must not
 await WebKit's async `evaluateJavaScript` import: its bridging thunk is shared
 across modules and crashed with mixed Swift language modes in the same binary.
-Use `evaluateJavaScriptReply(_:)`, a trailing callback, or an explicit
-`completionHandler:` argument (`nil` is allowed).
+Use `evaluateJavaScriptReply(_:)` or explicitly label the `completionHandler:`
+argument (`nil` is allowed). This distinguishes the overload without parsing
+Swift control flow to tell trailing closures from statement bodies.
 
 Comments and string literals are ignored, except that a string passed to
 `NSClassFromString` or `objc_getClass` is still inspected. Concatenated class
@@ -42,7 +43,6 @@ ALLOWED_CONSTRUCTORS = {
 ASYNC_JAVASCRIPT_TEST_ROOTS = ("Packages/EditorKit/Tests/EditorKitTests", "AppIOSTests")
 EVALUATE_JAVASCRIPT_CALL = re.compile(r"\bevaluateJavaScript\s*\(")
 COMPLETION_HANDLER_LABEL = re.compile(r"\s*completionHandler\s*:")
-TRAILING_CLOSURE = re.compile(r"\s*\{")
 SOURCE_SUFFIXES = {".swift", ".m", ".mm"}
 WEBKIT_TYPE = r"(?:WebKit\s*\.\s*)?WKWebView(?:Configuration)?"
 CONSTRUCTOR = re.compile(rf"\b(WKWebView(?:Configuration)?)\s*(?:\.\s*init\s*)?\(")
@@ -311,7 +311,7 @@ def has_javascript_completion_handler(code, arguments_start):
         if char in "([{":
             depth += 1
         elif char == ")" and depth == 0:
-            return TRAILING_CLOSURE.match(code, index + 1) is not None
+            return False
         elif char in ")]}":
             depth -= 1
         elif char == "," and depth == 0 and COMPLETION_HANDLER_LABEL.match(code, index + 1):
@@ -327,7 +327,7 @@ def scan_source(relative, source, violations):
         for match in EVALUATE_JAVASCRIPT_CALL.finditer(code):
             if not has_javascript_completion_handler(code, match.end()):
                 add(violations, relative, source, match.start(),
-                    "use evaluateJavaScriptReply(_:) or pass a completion handler to evaluateJavaScript")
+                    "use evaluateJavaScriptReply(_:) or label evaluateJavaScript's completionHandler: argument")
     if is_guarded_test:
         return
 

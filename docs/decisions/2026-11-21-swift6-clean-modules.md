@@ -16,7 +16,9 @@ modules, and a Swift 6 and a Swift 5 module in one binary disagreed about it
 (SIGSEGV in PreviewKitTests with Xcode 16.4). `make check-preview-layering`
 (`Scripts/check-preview-webview-layering.py`) rejects awaits of the async import in
 package sources; widen it when a test target or AppTests moves to Swift 6.
-EditorKitTests is also covered by the async import check.
+EditorKitTests and PlainsongIOSTests are also covered. In these guarded sources,
+direct calls label `completionHandler:` so the check can distinguish overloads
+without parsing trailing closures or statements in Swift.
 
 Alternatives:
 - Change package-wide defaults: also migrates tests outside this step's scope.

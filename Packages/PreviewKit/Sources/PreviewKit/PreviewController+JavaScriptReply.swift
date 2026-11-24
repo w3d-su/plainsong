@@ -9,14 +9,14 @@ extension PreviewController {
     func evaluateJavaScriptReply(_ script: String) async throws -> Any? {
         let reply = ExportJavaScriptReply()
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            webView.evaluateJavaScript(script) { result, error in
+            webView.evaluateJavaScript(script, completionHandler: { result, error in
                 if let error {
                     continuation.resume(throwing: error)
                 } else {
                     reply.value = result
                     continuation.resume()
                 }
-            }
+            })
         }
         return reply.value
     }
