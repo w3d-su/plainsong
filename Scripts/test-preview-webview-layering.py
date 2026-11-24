@@ -338,6 +338,9 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
             "let view = WKWebView()",
             "let value = try await view.evaluateJavaScript(script)",
             "view.evaluateJavaScript(script) { _, _ in }",
+            "let cast = try await (",
+            "    view.evaluateJavaScript(script) as? String",
+            ")",
         ])
         self.write_source("PerformanceTests/Probe.swift", source)
         self.write_source("PlainsongUITests/Probe.swift", source)
@@ -361,7 +364,9 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
         detail = "await the completion-handler evaluateJavaScriptReply(_:), not the async evaluateJavaScript import"
         self.assertEqual(self.violations(project), [
             f"PerformanceTests/Probe.swift:3: {detail}",
+            f"PerformanceTests/Probe.swift:5: {detail}",
             f"PlainsongUITests/Probe.swift:3: {detail}",
+            f"PlainsongUITests/Probe.swift:5: {detail}",
         ])
 
     def test_current_repository_has_no_violations(self):
