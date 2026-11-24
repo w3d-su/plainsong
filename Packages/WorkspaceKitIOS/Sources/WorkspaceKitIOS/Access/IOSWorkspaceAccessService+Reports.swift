@@ -212,6 +212,8 @@ extension IOSWorkspaceAccessService {
 final class IOSWorkspaceObservation: IOSObservation {
     let token = UUID()
     var handler: (@MainActor (IOSWorkspaceEvent) -> Void)?
+    /// Removes this observation from its owner, so a cancelled subscriber is not retained.
+    var onCancel: (@MainActor () -> Void)?
 
     init(handler: @escaping @MainActor (IOSWorkspaceEvent) -> Void) {
         self.handler = handler
@@ -219,6 +221,8 @@ final class IOSWorkspaceObservation: IOSObservation {
 
     func cancel() {
         handler = nil
+        onCancel?()
+        onCancel = nil
     }
 }
 

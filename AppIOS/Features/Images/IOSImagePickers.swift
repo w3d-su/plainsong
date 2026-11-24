@@ -108,7 +108,7 @@ enum IOSImagePhotoPayloadLoader {
         do {
             let data = try await dataRepresentation(provider, identifier: identifier)
             return .success(
-                IOSImagePickedPayload(
+                payload(
                     bytes: data,
                     contentType: mimeType(for: identifier),
                     preferredFilename: filename(provider, identifier: identifier)
@@ -116,6 +116,32 @@ enum IOSImagePhotoPayloadLoader {
             )
         } catch {
             return .failure(.unavailable)
+        }
+    }
+
+    /// Photos does not declare what it hands over: an item registered only as
+    /// `public.image`, or one whose suggested name keeps the original `.HEIC` while the
+    /// bytes are the JPEG rendition, would be refused as a mismatched representation.
+    /// The bytes decide the type and extension here; the normalizer still validates them.
+    static func payload(bytes: Data, contentType: String, preferredFilename: String) -> IOSImagePickedPayload {
+        let leaf = IOSImageFilename.leaf(preferredFilename)
+        switch IOSImageByteSignature.sniff(bytes) {
+        case let .raster(kind):
+            return IOSImagePickedPayload(
+                bytes: bytes,
+                contentType: kind.mimeType,
+                preferredFilename: IOSImageFilename.ensuringExtension(leaf, kind: kind)
+            )
+        case .heic:
+            return IOSImagePickedPayload(
+                bytes: bytes,
+                contentType: "image/heic",
+                preferredFilename: IOSImageFilename.isHEICLeaf(leaf)
+                    ? leaf
+                    : IOSImageFilename.replacingExtension(leaf, with: "heic")
+            )
+        case .svg, .executable, .unknown:
+            return IOSImagePickedPayload(bytes: bytes, contentType: contentType, preferredFilename: leaf)
         }
     }
 

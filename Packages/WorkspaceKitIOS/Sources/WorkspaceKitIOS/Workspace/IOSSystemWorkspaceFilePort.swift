@@ -11,7 +11,13 @@ struct IOSSystemWorkspaceFilePort: IOSWorkspaceFilePort {
         try await coordinate(url: url, reading: [.withoutChanges, .immediatelyAvailableMetadataOnly]) { readURL in
             let proven = try IOSWorkspaceRootAuthority.proveExisting(readURL, root: root)
             let logical = logicalFileURL(requested: url, relativePath: relativePath, root: root)
-            return try item(logicalURL: logical, statURL: proven, relativePath: relativePath, provedURL: proven)
+            var info = try item(logicalURL: logical, statURL: proven, relativePath: relativePath, provedURL: proven)
+            // `proven` is already resolved, so only the unresolved leaf can show a link. The root
+            // is exempt: it is the granted item and may sit behind an alias such as `/tmp`.
+            if !IOSWorkspacePathAuthority.sameFile(url, root), try isSymbolicLink(readURL) {
+                info.isSymlink = true
+            }
+            return info
         }
     }
 
@@ -57,7 +63,8 @@ struct IOSSystemWorkspaceFilePort: IOSWorkspaceFilePort {
             if let size = info.fileSize, size > maximumByteCount {
                 throw IOSWorkspaceFailure.tooLarge
             }
-            let data = try Data(contentsOf: proven)
+            // The size above is a hint: it can be missing, and the file can grow before the read.
+            let data = try Self.readBounded(proven, maximumByteCount: maximumByteCount)
             if data.count > maximumByteCount {
                 throw IOSWorkspaceFailure.tooLarge
             }
@@ -81,15 +88,7 @@ struct IOSSystemWorkspaceFilePort: IOSWorkspaceFilePort {
         }
         try await coordinate(url: url, writing: []) { coordinatedURL in
             let proven = try IOSWorkspaceRootAuthority.proveNewLeaf(coordinatedURL, root: root)
-            if FileManager.default.fileExists(atPath: proven.path(percentEncoded: false)) {
-                throw IOSWorkspaceFailure.alreadyExists
-            }
-            guard FileManager.default.createFile(
-                atPath: proven.path(percentEncoded: false),
-                contents: data
-            ) else {
-                throw IOSWorkspaceFailure.coordinationFailed
-            }
+            try Self.createExclusively(proven, data: data)
         }
         do {
             return try await metadata(url: url, relativePath: relativePath, root: root)
@@ -252,6 +251,40 @@ struct IOSSystemWorkspaceFilePort: IOSWorkspaceFilePort {
             }
         } onCancel: {
             handle.cancel()
+        }
+    }
+}
+
+private extension IOSSystemWorkspaceFilePort {
+    /// Reads at most one byte past the limit, so the caller can tell an oversized file apart.
+    static func readBounded(_ url: URL, maximumByteCount: Int) throws -> Data {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        let limit = maximumByteCount == .max ? maximumByteCount : max(maximumByteCount, 0) + 1
+        return try handle.read(upToCount: limit) ?? Data()
+    }
+
+    /// Creates the leaf atomically. `O_EXCL` fails on an existing file or link, so a leaf that
+    /// appears after the caller's existence check is neither overwritten nor followed.
+    static func createExclusively(_ url: URL, data: Data) throws {
+        let path = url.path(percentEncoded: false)
+        let descriptor = open(path, O_CREAT | O_EXCL | O_NOFOLLOW | O_WRONLY, 0o644)
+        guard descriptor >= 0 else {
+            switch errno {
+            case EEXIST, ELOOP: throw IOSWorkspaceFailure.alreadyExists
+            case EACCES, EPERM, EROFS: throw IOSWorkspaceFailure.permissionDenied
+            case ENOENT, ENOTDIR: throw IOSWorkspaceFailure.notFound
+            default: throw IOSWorkspaceFailure.coordinationFailed
+            }
+        }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        do {
+            try handle.write(contentsOf: data)
+            try handle.close()
+        } catch {
+            try? handle.close()
+            _ = unlink(path)
+            throw IOSWorkspaceFailure.coordinationFailed
         }
     }
 }

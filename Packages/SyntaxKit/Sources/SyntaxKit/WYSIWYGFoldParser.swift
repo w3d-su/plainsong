@@ -65,8 +65,8 @@ public extension MarkdownSyntaxParser {
         )
         let visibleRange = parseRange.range
         guard
-            let fragment = source.fragment(in: visibleRange),
-            let tree = markdownParser.parse(fragment),
+            let parsed = MarkdownParseFragment(source: source, range: visibleRange),
+            let tree = markdownParser.parse(parsed.text),
             let root = tree.rootNode
         else {
             return (
@@ -80,6 +80,7 @@ public extension MarkdownSyntaxParser {
             )
         }
 
+        let fragment = parsed.text
         var tokens: [MarkdownSyntaxToken] = []
         appendBlockTokens(from: root, parsesInlineMarkup: true, to: &tokens)
 
@@ -98,7 +99,7 @@ public extension MarkdownSyntaxParser {
                 MarkdownSyntaxToken(
                     kind: token.kind,
                     range: NSRange(
-                        location: token.range.location + visibleRange.location,
+                        location: token.range.location + parsed.base,
                         length: token.range.length
                     )
                 )
@@ -115,7 +116,8 @@ public extension MarkdownSyntaxParser {
         appendBlockCandidates(
             from: root,
             fragment: fragment,
-            baseLocation: visibleRange.location,
+            baseLocation: parsed.base,
+            skipsMDXESM: fileKind == .mdx,
             to: &candidates,
             imageRegions: &imageRegions
         )
@@ -141,7 +143,7 @@ public extension MarkdownSyntaxParser {
             regions: foldPlan.regions,
             imageRegions: imageRegions,
             tableRegions: tableRegionsEnabled
-                ? tableRegions(in: root, fragment: fragment, parseRange: parseRange)
+                ? tableRegions(in: root, fragment: parsed, parseRange: parseRange)
                 : [],
             linkFoldingEnabled: foldPlan.linkFoldingEnabled
         )
@@ -151,7 +153,7 @@ public extension MarkdownSyntaxParser {
 
     func foldPlan(
         in source: String,
-        fileKind _: FileKind,
+        fileKind: FileKind,
         visibleRange requestedRange: NSRange,
         selection: NSRange,
         tableRegionsEnabled: Bool = false
@@ -168,19 +170,21 @@ public extension MarkdownSyntaxParser {
         )
         let visibleRange = parseRange.range
         guard
-            let fragment = source.fragment(in: visibleRange),
-            let tree = markdownParser.parse(fragment),
+            let parsed = MarkdownParseFragment(source: source, range: visibleRange),
+            let tree = markdownParser.parse(parsed.text),
             let root = tree.rootNode
         else {
             return WYSIWYGFoldPlan(visibleRange: visibleRange, regions: [])
         }
 
+        let fragment = parsed.text
         var candidates: [WYSIWYGFoldCandidate] = []
         var imageRegions: [MarkdownInlineImageRegion] = []
         appendBlockCandidates(
             from: root,
             fragment: fragment,
-            baseLocation: visibleRange.location,
+            baseLocation: parsed.base,
+            skipsMDXESM: fileKind == .mdx,
             to: &candidates,
             imageRegions: &imageRegions
         )
@@ -204,7 +208,7 @@ public extension MarkdownSyntaxParser {
             regions: foldPlan.regions,
             imageRegions: imageRegions,
             tableRegions: tableRegionsEnabled
-                ? tableRegions(in: root, fragment: fragment, parseRange: parseRange)
+                ? tableRegions(in: root, fragment: parsed, parseRange: parseRange)
                 : [],
             linkFoldingEnabled: foldPlan.linkFoldingEnabled
         )
@@ -225,11 +229,17 @@ public extension MarkdownSyntaxParser {
 
     private func tableRegions(
         in root: Node,
-        fragment: String,
+        fragment: MarkdownParseFragment,
         parseRange: WYSIWYGTableParseRange
     ) -> [WYSIWYGTableRegion] {
         var regions: [WYSIWYGTableRegion] = []
-        appendTableRegions(from: root, fragment: fragment as NSString, parseRange: parseRange, to: &regions)
+        appendTableRegions(
+            from: root,
+            fragment: fragment.text as NSString,
+            parseRange: parseRange,
+            fragmentBase: fragment.base,
+            to: &regions
+        )
         return regions
     }
 
@@ -247,11 +257,15 @@ extension MarkdownSyntaxParser {
         from node: Node,
         fragment: String,
         baseLocation: Int,
+        skipsMDXESM: Bool = false,
         to candidates: inout [WYSIWYGFoldCandidate],
         imageRegions: inout [MarkdownInlineImageRegion]
     ) {
         switch node.nodeType {
         case "minus_metadata", "plus_metadata", "fenced_code_block", "indented_code_block":
+            return
+
+        case "paragraph" where skipsMDXESM && isMDXESMBlock(node, fragment: fragment):
             return
 
         case "atx_heading", "setext_heading":
@@ -280,6 +294,7 @@ extension MarkdownSyntaxParser {
                 from: child,
                 fragment: fragment,
                 baseLocation: baseLocation,
+                skipsMDXESM: skipsMDXESM,
                 to: &candidates,
                 imageRegions: &imageRegions
             )
@@ -294,9 +309,15 @@ extension MarkdownSyntaxParser {
         let localSourceRange = nsRange(for: node)
         let sourceRange = nsRange(for: node, offset: baseLocation)
         let level = headingLevel(from: node)
-        let revealRange = (fragment as NSString)
-            .lineRange(for: localSourceRange)
-            .offset(by: baseLocation)
+        let storage = fragment as NSString
+        let firstLine = storage.markdownLineRange(containing: localSourceRange.location)
+        let lastLine = storage.markdownLineRange(
+            containing: max(localSourceRange.location, NSMaxRange(localSourceRange) - 1)
+        )
+        let revealRange = NSRange(
+            location: firstLine.location,
+            length: NSMaxRange(lastLine) - firstLine.location
+        ).offset(by: baseLocation)
 
         let contentRange = node.child(byFieldName: "heading_content")
             .map { headingContentRange(for: $0, fragment: fragment, baseLocation: baseLocation) }
@@ -364,14 +385,5 @@ extension NSRange {
 
     func intersects(_ other: NSRange) -> Bool {
         NSIntersectionRange(self, other).length > 0
-    }
-}
-
-private extension String {
-    func fragment(in range: NSRange) -> String? {
-        guard let stringRange = Range(range, in: self) else {
-            return nil
-        }
-        return String(self[stringRange])
     }
 }

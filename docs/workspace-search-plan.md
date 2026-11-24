@@ -368,8 +368,9 @@ path components, package descendants, and `.git`, `node_modules`, `.build`, `.ne
 `.astro`, `DerivedData`, `dist`, and `build`. It then loads relevant ignore files from the
 workspace root through each candidate's parent directory, in deterministic directory order,
 reading `.gitignore` before `.ignore` within one directory. At most 128 ignore files are
-attempted and each read is capped at 64 KiB plus one detection byte; unavailable, invalid
-UTF-8, oversized, or escaped ignore files contribute no rules.
+read and at most 1024 ignore-file paths are probed, counting the ones that do not exist;
+each read is capped at 64 KiB plus one detection byte. Unavailable, invalid UTF-8,
+oversized, or escaped ignore files contribute no rules.
 
 Candidate paths are containment-checked during planning and revalidated immediately before a
 disk open. Empty, absolute, traversing, or escaping paths are reported as typed skipped files

@@ -30,22 +30,33 @@ final class EditorReplaceAuthorityState {
     /// `observeAdvances` when more than one `EditorFindHost` shares this authority: each
     /// observer runs once per advance, and the generation still moves by one.
     var onAdvance: ((_ fileID: StaticString, _ line: UInt) -> Void)?
-    private var advanceObservers: [ObjectIdentifier: (StaticString, UInt) -> Void] = [:]
+    private struct AdvanceObserver {
+        weak var owner: AnyObject?
+        let body: (StaticString, UInt) -> Void
+    }
+
+    private var advanceObservers: [ObjectIdentifier: AdvanceObserver] = [:]
+    var advanceObserverCount: Int {
+        advanceObservers.count
+    }
+
     private var keyWindowObservation: EditorReplaceKeyWindowObservation?
 
     func observeAdvances(
         from owner: AnyObject,
         body: @escaping (StaticString, UInt) -> Void
     ) {
-        advanceObservers[ObjectIdentifier(owner)] = body
+        // A closed window's host never unregisters; drop it here.
+        advanceObservers = advanceObservers.filter { $0.value.owner != nil }
+        advanceObservers[ObjectIdentifier(owner)] = AdvanceObserver(owner: owner, body: body)
     }
 
     func advance(fileID: StaticString = #fileID, line: UInt = #line) {
         precondition(generation < .max, "Replace authority generation exhausted")
         generation += 1
-        let observers = Array(advanceObservers.values)
+        let observers = advanceObservers.values.filter { $0.owner != nil }
         for observer in observers {
-            observer(fileID, line)
+            observer.body(fileID, line)
         }
         onAdvance?(fileID, line)
     }

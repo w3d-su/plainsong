@@ -64,10 +64,6 @@ final class IOSDocumentAutosaveRecoveryTests: XCTestCase {
         let handle = try await harness.openNote(text: "baseline")
         let port = try XCTUnwrap(harness.port(for: handle))
         let entry = try XCTUnwrap(harness.store.byIdentity[handle.identity])
-        // Drive the autosave explicitly so this race does not depend on the edit watcher's startup.
-        entry.textTask?.cancel()
-        await entry.textTask?.value
-
         var closeContinuation: CheckedContinuation<Void, Never>?
         port.closeGate = { await withCheckedContinuation { closeContinuation = $0 } }
         let closing = Task { try await harness.store.close(handle.identity) }
@@ -78,10 +74,14 @@ final class IOSDocumentAutosaveRecoveryTests: XCTestCase {
         do {
             await waitUntil { closeContinuation != nil }
             _ = try XCTUnwrap(closeContinuation, "provider close must be parked")
+            let watcher = try XCTUnwrap(entry.textTask, "the edit watcher must outlive a parked close")
+            XCTAssertFalse(watcher.isCancelled)
+            let generation = entry.autosaveGeneration
             let source = "N+1 retained during close 繁中 👩🏽‍💻"
             handle.session.replaceText(source)
             let version = handle.session.version
-            harness.store.scheduleAutosave(entry)
+            // The edit watcher, not the test, schedules this autosave.
+            await waitUntil { entry.autosaveGeneration > generation }
             let autosave = try XCTUnwrap(entry.autosaveTask)
             await autosave.value
             XCTAssertTrue(port.written.isEmpty, "the parked close must fence that old autosave")

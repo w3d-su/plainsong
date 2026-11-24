@@ -59,7 +59,7 @@ if ! grep -qE '^[^#[:space:]]' "$required_tests"; then
     ios_die "required named-test manifest has no names: $required_tests" 65
 fi
 
-xcodegen generate
+Scripts/generate-project.sh
 
 head="$(git rev-parse HEAD)"
 head12="${head:0:12}"

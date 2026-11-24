@@ -238,7 +238,7 @@ private struct WorkspacePureTreeBuilder {
     }
 
     private func parentPath(of entry: WorkspacePureEntry) -> String {
-        let components = entry.relativePath.split(separator: "/", omittingEmptySubsequences: true)
+        let components = entry.relativePath.splitOnPathSeparator(omittingEmptySubsequences: true)
         guard components.count > 1 else { return "" }
         return components.dropLast().joined(separator: "/")
     }
@@ -247,7 +247,7 @@ private struct WorkspacePureTreeBuilder {
         of relativePath: String,
         into paths: inout Set<WorkspacePathByteKey>
     ) {
-        let components = relativePath.split(separator: "/", omittingEmptySubsequences: true)
+        let components = relativePath.splitOnPathSeparator(omittingEmptySubsequences: true)
         guard components.count > 1 else { return }
 
         var current = ""
@@ -262,7 +262,7 @@ private struct WorkspacePureTreeBuilder {
     }
 
     private func lastPathComponent(of relativePath: String) -> String {
-        relativePath.split(separator: "/", omittingEmptySubsequences: true).last.map(String.init)
+        relativePath.splitOnPathSeparator(omittingEmptySubsequences: true).last.map(String.init)
             ?? relativePath
     }
 }

@@ -316,6 +316,36 @@ final class WindowFacadeRoutingAppTests: XCTestCase {
         XCTAssertGreaterThan(publishes, 0)
     }
 
+    func testOpeningAFileAnotherWindowHoldsDirtyReusesItsSessionWhenTheDiskCopyIsUnreadable() async throws {
+        let primary = makePrimary()
+        let second = primary.makeSiblingFacade(admitsFileOperations: true)
+        let root = try makeRoot("root", file: "B.md", contents: "beta\n")
+        let standalone = try write("A.md", "alpha\n")
+        try primary.openWorkspace(url: root, rememberAsLastOpened: false)
+        try await waitUntil("the root installs") {
+            primary.workspaceInstalledCaptureGeneration == primary.workspaceGeneration
+                && primary.workspaceSearchRootAuthority != nil
+        }
+        defer {
+            primary.closeWorkspace()
+            second.closeWorkspace()
+        }
+        primary.openWorkspaceFile(root.appendingPathComponent("B.md"))
+        try second.open(url: standalone, rememberAsLastOpened: false, preserveWorkspace: true)
+        let alpha = second.shownSession
+        XCTAssertEqual(alpha.fileURL?.lastPathComponent, "A.md")
+        second.replaceDocumentText("alpha unsaved\n", in: alpha)
+        second.cancelAutosave(for: alpha)
+
+        // An external tool leaves A's disk copy undecodable; window 1 opens A.
+        try Data([0xFF, 0xFE]).write(to: standalone)
+        primary.openExternalFile(standalone)
+        XCTAssertNil(primary.presentedError)
+
+        XCTAssertTrue(primary.shownSession === alpha)
+        XCTAssertEqual(alpha.text, "alpha unsaved\n")
+    }
+
     private func makePrimary() -> AppState {
         AppState(shouldRestoreLastOpenedFile: false, userDefaults: defaults)
     }

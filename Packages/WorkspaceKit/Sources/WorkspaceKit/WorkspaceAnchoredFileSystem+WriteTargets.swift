@@ -213,7 +213,7 @@ extension WorkspaceAnchoredFileSystem {
             throw SiblingStagingRefused()
         }
         // `0600` for a replacement, `0666` under the umask for a new file.
-        let descriptor = name.withCString {
+        let descriptor = name.withCStringPreservingErrno {
             Darwin.openat(
                 staging.descriptor,
                 $0,
@@ -388,7 +388,7 @@ extension WorkspaceAnchoredFileSystem {
     }
 
     static func unlink(parentDescriptor: Int32, name: String) -> Int32 {
-        name.withCString { Darwin.unlinkat(parentDescriptor, $0, 0) }
+        name.withCStringPreservingErrno { Darwin.unlinkat(parentDescriptor, $0, 0) }
     }
 
     static func syncDirectory(_ descriptor: Int32) throws {

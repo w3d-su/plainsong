@@ -36,11 +36,7 @@ func prepareExternalFileRead(
         if Task.isCancelled || error is CancellationError {
             return cancelledExternalFileRead(imageAssetAuthority: nil)
         }
-        return PreparedExternalFileRead(
-            outcome: .namespaceChanged,
-            payload: nil,
-            imageAssetAuthority: nil
-        )
+        return await externalFileReadWithoutAuthority(at: location, reader: reader)
     }
 
     guard !Task.isCancelled else {
@@ -100,6 +96,25 @@ func prepareExternalFileRead(
             imageAssetAuthority: authority
         )
     }
+}
+
+/// The authority could not be captured, so the read alone decides why. A deleted file or a
+/// symbolic link in its place is final and must detach at once; only a file that still
+/// reads is the replacement race the transient retries exist for.
+private func externalFileReadWithoutAuthority(
+    at location: WorkspaceFileSystemLocation,
+    reader: any WorkspaceCoherentFileReading
+) async -> PreparedExternalFileRead {
+    let readOutcome = await reader.readCoherentFile(at: location)
+    guard !Task.isCancelled else {
+        return cancelledExternalFileRead(imageAssetAuthority: nil)
+    }
+    let outcome: WorkspaceCoherentFileReadOutcome = switch readOutcome {
+    case .loaded: .namespaceChanged
+    case .missing, .symbolicLink, .notRegularFile, .unreadable, .invalidUTF8,
+         .namespaceChanged, .unstable, .cancelled: readOutcome
+    }
+    return PreparedExternalFileRead(outcome: outcome, payload: nil, imageAssetAuthority: nil)
 }
 
 private func cancellableDetachedExternalFileOperation<Value: Sendable>(

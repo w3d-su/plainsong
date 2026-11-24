@@ -21,6 +21,7 @@ extension IOSAuthoringController {
                 guard frontmatter.projectedSnapshot?.bindingID == bindingID else { return }
                 frontmatter.projectedSnapshot = nil
                 frontmatter.acceptedText = ""
+                frontmatter.acceptedHeadLength = nil
                 frontmatter.acceptedParse = FrontmatterParseResult(block: nil)
                 frontmatter.liveParse = frontmatter.acceptedParse
                 if frontmatter.drafts.isEmpty {
@@ -73,9 +74,16 @@ extension IOSAuthoringController {
             !ExactSourceText.matches(frontmatter.acceptedText, snapshot.document.text)
         frontmatter.projectedSnapshot = snapshot
         if changed {
-            frontmatter.acceptedText = snapshot.document.text
-            frontmatter.acceptedParse = Frontmatter.parse(snapshot.document.text)
-            frontmatter.liveParse = frontmatter.acceptedParse
+            let text = snapshot.document.text
+            let sharesHead = frontmatter.acceptedHeadLength.map {
+                IOSFrontmatterHead.isShared($0, by: frontmatter.acceptedText, and: text)
+            } ?? false
+            frontmatter.acceptedText = text
+            if !sharesHead {
+                frontmatter.acceptedParse = Frontmatter.parse(text)
+                frontmatter.liveParse = frontmatter.acceptedParse
+                frontmatter.acceptedHeadLength = IOSFrontmatterHead.length(of: text, parse: frontmatter.acceptedParse)
+            }
         }
         if frontmatter.drafts.isEmpty {
             frontmatter.capture = snapshot

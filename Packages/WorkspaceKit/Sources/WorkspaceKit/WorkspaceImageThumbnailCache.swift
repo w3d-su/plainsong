@@ -1,8 +1,11 @@
 import Foundation
 
-/// Bounded LRU cache keyed by resolved path + mtime + target pixel size.
+/// Bounded LRU cache keyed by resolved root + resolved path + mtime + target pixel size.
 struct WorkspaceImageThumbnailCache {
     struct Key: Hashable {
+        /// Two workspaces can hold the same relative path with the same mtime (a copied or
+        /// cloned project), so the relative path alone does not name one image.
+        let resolvedRootPath: String
         let resolvedWorkspaceRelativePath: String
         let contentModificationTime: TimeInterval
         let maxPixelSize: Int

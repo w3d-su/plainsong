@@ -212,7 +212,7 @@ extension WorkspaceAnchoredFileSystemTests {
             hooks: recorder.hooks(itemReplacementDirectory: { _ in destinationParent })
         )
 
-        let result = try XCTUnwrap(requireNotCommitted(outcome, reason: .unreadable))
+        let result = try XCTUnwrap(requireNotCommitted(outcome, reason: .writeNotPermitted))
         XCTAssertEqual(result.artifactState, .none)
         var isDirectory: ObjCBool = false
         XCTAssertTrue(
@@ -238,7 +238,7 @@ extension WorkspaceAnchoredFileSystemTests {
             })
         )
 
-        let result = try XCTUnwrap(requireNotCommitted(outcome, reason: .unreadable))
+        let result = try XCTUnwrap(requireNotCommitted(outcome, reason: .writeNotPermitted))
         XCTAssertEqual(result.artifactState, .none)
         XCTAssertEqual(try writeText(at: fixture.destination), "original")
         XCTAssertEqual(try writeFileIdentity(at: fixture.destination), originalIdentity)
@@ -269,7 +269,9 @@ extension WorkspaceAnchoredFileSystemTests {
             Darwin.open($0, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, mode_t(0o600))
         }
         let probeError = errno
-        if probeDescriptor >= 0 { Darwin.close(probeDescriptor) }
+        if probeDescriptor >= 0 {
+            Darwin.close(probeDescriptor)
+        }
         try XCTSkipIf(probeDescriptor >= 0, "Running as a user that bypasses directory permissions")
         XCTAssertEqual(probeError, EACCES)
 

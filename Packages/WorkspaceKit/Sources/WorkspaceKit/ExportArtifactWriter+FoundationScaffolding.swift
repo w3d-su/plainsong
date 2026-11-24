@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import WorkspaceCore
 
 /// Foundation may create these shared ancestors at an external volume's root even when the
 /// returned item-replacement directory is later refused. Metadata reads do not open or enumerate
@@ -26,8 +27,8 @@ extension ExportArtifactWriter {
         if let appPrivateRoot, let rootPath = try? WorkspaceLiteralFileURL.absolutePath(of: appPrivateRoot),
            pathLiesStrictly(rootPath, inside: selection.parentPath)
         {
-            let components = rootPath.split(separator: "/")
-            let parentCount = selection.parentPath.split(separator: "/").count
+            let components = rootPath.splitOnPathSeparator()
+            let parentCount = selection.parentPath.splitOnPathSeparator().count
             for count in (parentCount + 1) ... components.count {
                 paths.append("/" + components.prefix(count).joined(separator: "/"))
             }

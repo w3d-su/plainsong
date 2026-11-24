@@ -30,6 +30,7 @@ class FakeRoot {
   constructor(private readonly images: FakeImage[]) {}
 
   querySelectorAll(selector: string): NodeListOf<HTMLImageElement> {
+    if (selector === "picture > source") return [] as unknown as NodeListOf<HTMLImageElement>;
     expect(selector).toBe("img");
     return this.images as unknown as NodeListOf<HTMLImageElement>;
   }
@@ -57,4 +58,34 @@ describe("preview image source rewriting", () => {
     expect(image.dataset.plainsongOriginalSrc).toBe("../images/pixel.png");
     expect(image.dataset.plainsongBlockedSrc).toBeUndefined();
   });
+});
+
+import { test as reviewTest, expect as reviewExpect } from "vitest";
+import { rewriteImageSources as rewriteForReview } from "../src/image-rewrite";
+import { imageSourcePolicy as policyForReview } from "../src/image-policy";
+
+reviewTest("drops picture sources and srcset candidates that bypass the image policy", () => {
+  const root = document.createElement("main");
+  root.innerHTML =
+    '<picture><source srcset="https://example.com/a.png"><source srcset="data:image/svg+xml,%3Csvg/%3E">' +
+    '<img src="a.png" srcset="https://example.com/b.png 2x"></picture>';
+  rewriteForReview(root, null, false);
+  reviewExpect(root.querySelector("source")).toBeNull();
+  reviewExpect(root.querySelector("img")?.hasAttribute("srcset")).toBe(false);
+  reviewExpect(root.querySelector("img")?.getAttribute("src")).toBe("asset://a.png");
+});
+
+reviewTest("keeps authority-unsafe first segments inside the asset URL", () => {
+  for (const [source, host] of [
+    ["[slug]/cover.png", "%5Bslug%5D"],
+    ["screenshot@2x.png", "screenshot%402x.png"],
+    ["./foo:80/a.png", "foo%3A80"],
+  ]) {
+    const policy = policyForReview(source, null, false, "root-1");
+    reviewExpect(policy.action).toBe("rewrite");
+    if (policy.action !== "rewrite") continue;
+    const url = new URL(policy.src);
+    reviewExpect(url.host).toBe(host);
+    reviewExpect(url.username).toBe("");
+  }
 });

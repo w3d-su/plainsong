@@ -1,8 +1,24 @@
+import { sanitizedMermaidNodes } from "./mermaid-sanitize";
+
 export const MERMAID_RENDER_CACHE_CAPACITY = 64;
+
+/** Keys a diagram's frontmatter or `%%{init}%%` directive cannot set: Mermaid's defaults
+ * plus `themeCSS`, which is appended unscoped to the diagram's stylesheet. */
+export const MERMAID_SECURE_KEYS = [
+  "secure",
+  "securityLevel",
+  "startOnLoad",
+  "maxTextSize",
+  "suppressErrorRendering",
+  "maxEdges",
+  "themeCSS",
+] as const;
 
 export interface MermaidInitialization {
   startOnLoad: false;
   securityLevel: "strict";
+  suppressErrorRendering: true;
+  secure: readonly string[];
   theme: "dark" | "default";
 }
 
@@ -115,6 +131,9 @@ export class MermaidRenderCoordinator {
     this.initializeFunction({
       startOnLoad: false,
       securityLevel: "strict",
+      // A failed render otherwise leaves its error diagram in document.body.
+      suppressErrorRendering: true,
+      secure: MERMAID_SECURE_KEYS,
       theme: theme === "dark" ? "dark" : "default",
     });
     this.theme = theme;
@@ -212,7 +231,7 @@ export function applyMermaidBlockOutcome(
 
   wrapper.classList.remove("mermaid-pending", "mermaid-error");
   if (outcome.kind === "success") {
-    wrapper.innerHTML = outcome.svg;
+    wrapper.replaceChildren(...sanitizedMermaidNodes(outcome.svg));
   } else {
     wrapper.classList.add("mermaid-error");
     wrapper.textContent = outcome.message;
@@ -238,7 +257,7 @@ export function shouldUpdatePreviewElement(
   }
   return (
     fromElement.textContent !== toElement.textContent ||
-    codeLanguageClass(fromElement) !== codeLanguageClass(toElement)
+    authoredLanguageClass(fromElement) !== codeLanguageClass(toElement)
   );
 }
 
@@ -298,6 +317,12 @@ function shouldPreserveMermaidWrapper(
     fromElement.dataset.mermaidOrdinal === toElement.dataset.mermaidOrdinal &&
     fromElement.dataset.mermaidGeneration === toElement.dataset.mermaidGeneration
   );
+}
+
+/** The language class the rendered source had: highlighting records it before
+ * highlight.js adds the class of the language it detected for a bare fence. */
+function authoredLanguageClass(element: HTMLElement): string {
+  return element.dataset.plainsongLanguage ?? codeLanguageClass(element);
 }
 
 function codeLanguageClass(element: HTMLElement): string {

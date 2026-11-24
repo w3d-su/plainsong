@@ -156,9 +156,10 @@ extension PreviewController {
             configuration.rect = rect
             let piece: Data
             do {
-                piece = try await webView.captureExportPDFPiece(configuration)
+                piece = try await captureExportPDFPiece(configuration)
             } catch {
                 try checkExportAlive()
+                try Task.checkCancellation()
                 throw ExportPDFCaptureError.captureFailed(error.localizedDescription)
             }
             // One planned page must come back as exactly one PDF page: a piece WebKit

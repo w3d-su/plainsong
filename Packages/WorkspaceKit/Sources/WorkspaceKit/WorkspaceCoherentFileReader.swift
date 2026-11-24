@@ -283,7 +283,7 @@ extension WorkspaceCoherentFileReader {
     static func metadata(from fileStatus: stat) -> WorkspaceCoherentFileMetadata {
         WorkspaceCoherentFileMetadata(
             identity: WorkspaceFileSystemIdentity(
-                device: UInt64(fileStatus.st_dev),
+                device: UInt64(UInt32(bitPattern: fileStatus.st_dev)),
                 inode: UInt64(fileStatus.st_ino)
             ),
             byteCount: Int64(fileStatus.st_size),

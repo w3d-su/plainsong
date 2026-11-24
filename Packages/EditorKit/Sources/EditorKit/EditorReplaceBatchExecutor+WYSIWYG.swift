@@ -25,6 +25,9 @@ extension MarkdownTextViewCoordinator {
             manager?.enableUndoRegistration()
         }
         view.replacePresentationSnapshot = nil
+        // The markers are gone from storage. A same-length batch with unchanged document
+        // ends looks like the recorded source, so the controller would keep them as applied.
+        imageThumbnailPresentationController.presentationWasReset(in: view)
         if let textRange = NSTextRange(range, in: view.textContentManager) {
             view.textLayoutManager.invalidateLayout(for: textRange)
         }

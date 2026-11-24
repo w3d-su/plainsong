@@ -35,15 +35,24 @@ final class WindowKeyStateTracker: ObservableObject {
         self.window = window
         boundSearchField = nil
         guard let window else {
-            keyEpoch &+= 1
+            publishKeyEpochChange()
             return
         }
 
         keyObservation = WindowKeyStateObservation(window: window) { [weak self] in
             self?.keyEpoch &+= 1
         }
-        keyEpoch &+= 1
+        publishKeyEpochChange()
         refreshBoundSearchFieldIfNeeded()
+    }
+
+    /// `attach` runs inside SwiftUI `updateNSView`, where publishing synchronously is a
+    /// "Publishing changes from within view updates" fault, so the epoch moves on the next
+    /// main-actor turn like the Search field mount epoch.
+    private func publishKeyEpochChange() {
+        Task { @MainActor [weak self] in
+            self?.keyEpoch &+= 1
+        }
     }
 
     /// Records the concrete Search field for this window and ensures its accessibility identifier.

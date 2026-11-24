@@ -63,9 +63,18 @@ final class PreviewEventObservation: IOSObservation {
 @MainActor
 final class PreviewEventHub {
     private var observations: [ObjectIdentifier: PreviewEventObservation] = [:]
+    private var invalidated = false
+
+    var observationCount: Int {
+        observations.count
+    }
 
     func add(_ handler: @escaping @MainActor (IOSPreviewEvent) -> Void) -> PreviewEventObservation {
         let observation = PreviewEventObservation(handler)
+        guard !invalidated else {
+            observation.cancel()
+            return observation
+        }
         let key = ObjectIdentifier(observation)
         observations[key] = observation
         observation.onCancel = { [weak self] in
@@ -77,6 +86,17 @@ final class PreviewEventHub {
     func emit(_ event: IOSPreviewEvent) {
         for observation in observations.values {
             observation.emit(event)
+        }
+    }
+
+    /// An invalidated controller emits nothing, so it drops the handlers and whatever
+    /// they captured instead of holding them until each observer cancels.
+    func invalidate() {
+        invalidated = true
+        let pending = observations.values
+        observations.removeAll()
+        for observation in pending {
+            observation.cancel()
         }
     }
 }
