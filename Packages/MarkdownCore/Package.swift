@@ -18,7 +18,11 @@ let package = Package(
             ],
             swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
         ),
-        .testTarget(name: "MarkdownCoreTests", dependencies: ["MarkdownCore"]),
+        .testTarget(
+            name: "MarkdownCoreTests",
+            dependencies: ["MarkdownCore"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
     ],
     swiftLanguageModes: [.v5]
 )
