@@ -1,4 +1,5 @@
 import AppKit
+import MarkdownCore
 import SwiftUI
 
 /// Owned AppKit query field for in-document find (not SwiftUI `FocusState`).
@@ -63,16 +64,7 @@ struct EditorFindQueryField: NSViewRepresentable {
         coordinator.markFocusApplied = markFocusApplied
         coordinator.markSelectAllApplied = markSelectAllApplied
 
-        // Never overwrite the field while IME marked text is active (Zhuyin/Pinyin).
-        let isComposing: Bool = {
-            if let editor = field.currentEditor() as? NSTextView, editor.hasMarkedText() {
-                return true
-            }
-            return coordinator.isComposing
-        }()
-        if !isComposing, field.stringValue != text {
-            field.stringValue = text
-        }
+        coordinator.applyExternalText(text, to: field)
         field.isEditable = isEnabled
         field.setAccessibilityIdentifier(EditorFindAccessibility.queryField)
 
@@ -109,7 +101,6 @@ struct EditorFindQueryField: NSViewRepresentable {
         var onEscape: () -> Void
         var onReplaceOwnerUnmount: (NSTextField) -> Void = { _ in }
         weak var field: NSTextField?
-        var isComposing = false
 
         private var focusTask: Task<Void, Never>?
         private var focusTaskRequestID: UInt64?
@@ -239,24 +230,36 @@ struct EditorFindQueryField: NSViewRepresentable {
             window.firstResponder === field || window.firstResponder === field.currentEditor()
         }
 
+        /// Never overwrites the field while IME marked text is active (Zhuyin/Pinyin).
+        /// Composition is read live from the field editor: a stored flag stayed set when a
+        /// composition ended without a text-change notification, and the field then ignored
+        /// every later binding update.
+        func applyExternalText(_ newText: String, to field: NSTextField) {
+            guard !Self.hasMarkedText(field) else { return }
+            if !ExactSourceText.matches(field.stringValue, newText) {
+                field.stringValue = newText
+            }
+        }
+
         func controlTextDidChange(_ obj: Notification) {
-            guard let field = obj.object as? NSTextField else { return }
-            if let editor = field.currentEditor() as? NSTextView, editor.hasMarkedText() {
-                isComposing = true
-                return
-            }
-            isComposing = false
-            if text.wrappedValue != field.stringValue {
-                text.wrappedValue = field.stringValue
-            }
+            guard let field = obj.object as? NSTextField, !Self.hasMarkedText(field) else { return }
+            publish(field.stringValue)
         }
 
         func controlTextDidEndEditing(_ obj: Notification) {
             guard let field = obj.object as? NSTextField else { return }
-            isComposing = false
-            if text.wrappedValue != field.stringValue {
-                text.wrappedValue = field.stringValue
+            publish(field.stringValue)
+        }
+
+        /// Find matches exact source text, so a canonically equivalent query is a new query.
+        private func publish(_ value: String) {
+            if !ExactSourceText.matches(text.wrappedValue, value) {
+                text.wrappedValue = value
             }
+        }
+
+        private static func hasMarkedText(_ field: NSTextField) -> Bool {
+            (field.currentEditor() as? NSTextView)?.hasMarkedText() == true
         }
 
         func control(

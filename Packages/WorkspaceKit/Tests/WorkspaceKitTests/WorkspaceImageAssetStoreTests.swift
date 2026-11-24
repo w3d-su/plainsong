@@ -270,6 +270,55 @@ final class WorkspaceImageAssetStoreTests: XCTestCase {
         }
     }
 
+    func testClipboardImageDataDoesNotWriteThroughDanglingSymlinkOutOfWorkspace() throws {
+        let root = try makeTemporaryDirectory()
+        let outside = try makeTemporaryDirectory()
+        let assets = root.appendingPathComponent("assets", isDirectory: true)
+        try FileManager.default.createDirectory(at: assets, withIntermediateDirectories: true)
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let escapedTarget = outside.appendingPathComponent("planted.png")
+        try FileManager.default.createSymbolicLink(
+            at: assets.appendingPathComponent("image.png"),
+            withDestinationURL: escapedTarget
+        )
+
+        let paths = try WorkspaceImageAssetStore().place(
+            [.data(Data([7, 8, 9]), suggestedFilename: "image.png")],
+            rootURL: root,
+            currentFileURL: currentFile
+        )
+
+        XCTAssertEqual(paths, ["assets/image-1.png"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: escapedTarget.path))
+        XCTAssertEqual(try Data(contentsOf: assets.appendingPathComponent("image-1.png")), Data([7, 8, 9]))
+    }
+
+    func testOutsideWorkspaceImageDoesNotCopyOntoDanglingSymlink() throws {
+        let root = try makeTemporaryDirectory()
+        let outside = try makeTemporaryDirectory()
+        let assets = root.appendingPathComponent("assets", isDirectory: true)
+        try FileManager.default.createDirectory(at: assets, withIntermediateDirectories: true)
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let escapedTarget = outside.appendingPathComponent("planted.png")
+        try FileManager.default.createSymbolicLink(
+            at: assets.appendingPathComponent("hero.png"),
+            withDestinationURL: escapedTarget
+        )
+        let image = outside.appendingPathComponent("hero.png")
+        try Data([1, 2, 3]).write(to: image)
+
+        let paths = try WorkspaceImageAssetStore().place(
+            [.file(image)],
+            rootURL: root,
+            currentFileURL: currentFile
+        )
+
+        XCTAssertEqual(paths, ["assets/hero-1.png"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: escapedTarget.path))
+    }
+
     private func makeTemporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("WorkspaceImageAssetStoreTests")

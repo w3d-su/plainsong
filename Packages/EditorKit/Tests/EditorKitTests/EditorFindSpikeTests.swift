@@ -134,6 +134,61 @@ final class EditorFindSpikeTests: XCTestCase {
         }
     }
 
+    func testEditorBehindAnotherKeyWindowIsNotADeliveryTarget() {
+        // `NSApp.keyWindow` cannot be set from a test process, so the window rule is
+        // exercised directly. AppKit continues a nil-targeted action into the main window.
+        let workspace = makeWindow()
+        let settings = makeWindow()
+        let sheet = makeWindow()
+        let child = makeWindow()
+        workspace.addChildWindow(child, ordered: .above)
+        defer {
+            workspace.removeChildWindow(child)
+            for window in [workspace, settings, sheet, child] {
+                window.orderOut(nil)
+            }
+        }
+
+        XCTAssertTrue(EditorFindCommandDispatcher.isDeliverable(toEditorIn: workspace, keyWindow: workspace))
+        XCTAssertTrue(EditorFindCommandDispatcher.isDeliverable(toEditorIn: workspace, keyWindow: child))
+        XCTAssertFalse(
+            EditorFindCommandDispatcher.isDeliverable(toEditorIn: workspace, keyWindow: settings),
+            "a find command from Settings must not reach the editor of the window behind it"
+        )
+        XCTAssertFalse(EditorFindCommandDispatcher.isDeliverable(toEditorIn: workspace, keyWindow: sheet))
+        XCTAssertFalse(EditorFindCommandDispatcher.isDeliverable(toEditorIn: workspace, keyWindow: nil))
+        XCTAssertFalse(EditorFindCommandDispatcher.isDeliverable(toEditorIn: nil, keyWindow: workspace))
+    }
+
+    func testAmbientSendDoesNotDeliverToAnEditorWhoseWindowIsNotKey() throws {
+        let frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        let scrollView = MarkdownSTTextView.scrollableTextView(frame: frame)
+        let textView = try XCTUnwrap(scrollView.documentView as? MarkdownSTTextView)
+        let window = makeWindow()
+        defer { window.orderOut(nil) }
+        window.contentView = scrollView
+        window.orderFront(nil)
+        XCTAssertTrue(window.makeFirstResponder(textView))
+        try XCTSkipIf(NSApplication.shared.keyWindow === window, "the runner made the window key")
+        var fired = 0
+        EditorFindActionHooks.showFind = { _ in fired += 1 }
+        defer { EditorFindActionHooks.showFind = nil }
+
+        XCTAssertFalse(EditorFindCommandDispatcher.send(.show))
+        XCTAssertEqual(fired, 0)
+    }
+
+    private func makeWindow() -> NSWindow {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 100),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        return window
+    }
+
     /// Runs `body` with a key window whose first responder is deliberately **not** an editor,
     /// so responder-chain outcomes cannot depend on what another test left focused.
     ///

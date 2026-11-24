@@ -38,11 +38,6 @@ await build({
   globalName: "PlainsongMermaid",
   outfile: `${outDir}/mermaid.js`,
 });
-for (const name of ["bundle.js", "mermaid.js"]) {
-  const path = `${outDir}/${name}`;
-  writeFileSync(path, readFileSync(path, "utf8").replace(/[ \t]+$/gm, ""));
-}
-
 writeFileSync(`${outDir}/index.html`, readFileSync("src/index.html", "utf8"));
 writeFileSync(`${outDir}/bundle.css`, css);
 rmSync(`${outDir}/fonts`, { recursive: true, force: true });

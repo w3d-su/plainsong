@@ -231,3 +231,69 @@ final class WorkspaceEventWatcherTests: XCTestCase {
         XCTAssertTrue(showAll.isRelevant(ignoredOnly))
     }
 }
+
+extension WorkspaceEventWatcherTests {
+    /// The stream's context holds the watcher weakly, so dropping the last reference
+    /// without `stop()` while FSEvents still has batches to deliver neither crashes nor
+    /// reaches the handler late. Real writes, so delivery goes through the stream callback.
+    func testReleasingARunningWatcherWithQueuedBatchesIsSafe() async throws {
+        let calls = LockedCounter()
+        for _ in 0 ..< 40 {
+            let root = FileManager.default.temporaryDirectory
+                .appendingPathComponent("WorkspaceEventWatcherTests-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+            var watcher: WorkspaceEventWatcher? = WorkspaceEventWatcher(
+                rootURL: root,
+                debounceNanoseconds: 1_000_000
+            ) { calls.increment() }
+            watcher?.start()
+            for index in 0 ..< 8 {
+                try Data("x".utf8).write(to: root.appendingPathComponent("file\(index).md"))
+            }
+            watcher = nil
+        }
+        // A debounce already in flight may finish; after that nothing may arrive.
+        try await Task.sleep(nanoseconds: 300_000_000)
+        let settled = calls.value
+        try await Task.sleep(nanoseconds: 300_000_000)
+        XCTAssertEqual(calls.value, settled)
+    }
+
+    /// Past the cap each batch runs the handler itself: a zero-length debounce that the next
+    /// batch cancels could otherwise be starved by a writer that never pauses.
+    func testABatchPastTheMaximumDelayRunsTheHandlerInItsOwnTurn() {
+        let calls = LockedCounter()
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("WorkspaceEventWatcherTests-\(UUID().uuidString)")
+        let watcher = WorkspaceEventWatcher(
+            rootURL: root,
+            debounceNanoseconds: 5_000_000_000,
+            maximumDelayNanoseconds: 5_000_000_000
+        ) { calls.increment() }
+        watcher.start()
+        defer { watcher.stop() }
+
+        watcher.simulateDeliveredEventForTesting(pendingSinceNanosecondsAgo: 6_000_000_000)
+        XCTAssertFalse(watcher.isStopped)
+
+        XCTAssertEqual(calls.value, 1)
+    }
+}
+
+private final class LockedCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
+
+    func increment() {
+        lock.lock()
+        count += 1
+        lock.unlock()
+    }
+}

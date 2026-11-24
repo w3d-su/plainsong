@@ -29,6 +29,10 @@ extension PreviewController {
         guard !isInvalidated else {
             return .failed(reason: "invalidated", renderID: -1)
         }
+        // A dead renderer that is not coming back cannot post `renderComplete`.
+        guard !webContentProcessTerminated || recoversFromWebContentTermination else {
+            return .failed(reason: "web-content-process-terminated", renderID: -1)
+        }
         // Submitting fails any older pending export render as superseded.
         return await awaitExportRender(submitRender(change))
     }
@@ -49,6 +53,10 @@ extension PreviewController {
         }
         guard !isInvalidated else {
             return .failed(reason: "invalidated", renderID: -1)
+        }
+        // A dead renderer that is not coming back cannot post `renderComplete`.
+        guard !webContentProcessTerminated || recoversFromWebContentTermination else {
+            return .failed(reason: "web-content-process-terminated", renderID: -1)
         }
         let installation = assetSchemeHandler.updateAuthority(assetAccess)
         exportAssetAccess = assetAccess

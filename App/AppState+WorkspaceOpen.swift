@@ -68,7 +68,41 @@ extension AppState {
         rememberRecentItem(root)
     }
 
-    func activateFileSession(url: URL) throws {
+    /// Reads a file that will replace the workspace while the workspace is still open, so a file
+    /// this window cannot load fails first and activation reuses the read. `nil` when a session
+    /// that outlives the close (retired, or shown by another window) serves it from memory, or
+    /// when the close may save this window's copy first.
+    func prepareReplacementFileRead(url: URL) throws -> PreparedReplacementFileRead? {
+        // Activation runs with no workspace installed, where `canonicalSessionURL` keeps `url`.
+        let location = try WorkspaceFileSystemLocation(fileURL: url)
+        let key = location.fileURL
+        // Closing the workspace releases this window's own sessions; only one another window
+        // still shows serves the reopened file.
+        if let warmSession = registry.warmSession(at: key),
+           retainedManagedSessionLocation(for: warmSession) == location,
+           isPreservedForAnotherWindow(warmSession)
+        {
+            return nil
+        }
+        if retiredSessionMatch(for: key, matching: location) != nil {
+            return nil
+        }
+        let read = try prepareEditorImageAssetDocumentRead(fileStore: fileStore, at: location)
+        // Closing the workspace saves this window's dirty copy of the file, so activation reads
+        // the saved file instead.
+        let shownURL = sessionStateURL(for: shownSession)
+        if registry.warmSession(at: key) != nil
+            || shownURL.map({ exactFileURLSpellingMatches($0, key) }) == true
+        {
+            return nil
+        }
+        return PreparedReplacementFileRead(location: location, read: read)
+    }
+
+    func activateFileSession(
+        url: URL,
+        preparedRead replacementRead: PreparedReplacementFileRead? = nil
+    ) throws {
         let requestedURL = try canonicalSessionURL(for: url)
         // The candidate location is only a cache discriminator. A cached or retired session
         // must match it through its existing retained authority; its new authority/metadata is
@@ -123,10 +157,14 @@ extension AppState {
         } else {
             location
         }
-        let preparedRead = try prepareEditorImageAssetDocumentRead(
-            fileStore: fileStore,
-            at: loadLocation
-        )
+        let preparedRead = if let replacementRead, replacementRead.location == loadLocation {
+            replacementRead.read
+        } else {
+            try prepareEditorImageAssetDocumentRead(
+                fileStore: fileStore,
+                at: loadLocation
+            )
+        }
         let loaded = preparedRead.result
         let file = loaded.file
         let session = DocumentSession(
@@ -227,4 +265,9 @@ extension AppState {
             recentItemURLs = (try? recentItemStore.restore()) ?? recentItemURLs
         }
     }
+}
+
+struct PreparedReplacementFileRead {
+    let location: WorkspaceFileSystemLocation
+    let read: PreparedEditorImageAssetDocumentRead
 }

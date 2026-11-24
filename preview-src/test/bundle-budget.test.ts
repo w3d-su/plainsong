@@ -12,6 +12,13 @@ describe("committed preview bundle", () => {
     expect(mermaidJS).toMatch(/^"use strict";var PlainsongMermaid=/);
   });
 
+  it("keeps the whitespace esbuild emitted inside template literals", () => {
+    // build.mjs used to strip trailing whitespace from every line, which deleted the tab
+    // that ends a line inside hast-util-to-html's attribute escape tables.
+    expect(bundleJS).toContain('[[`\t\n\\f\\r &/=>`.split("")');
+    expect(bundleJS.match(/\t\n/g)).toHaveLength(8);
+  });
+
   it("references only the woff2 KaTeX fonts the export manifest lists", () => {
     const manifest = JSON.parse(fontManifest) as { format: string; files: string[] };
     // Vitest does not process CSS, so `bundle.css?raw` is empty here; bundle.js embeds

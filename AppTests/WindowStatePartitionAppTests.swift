@@ -28,8 +28,10 @@ final class WindowStatePartitionAppTests: XCTestCase {
 
         XCTAssertEqual(
             Self.storedPropertyNames(of: appState.windowState),
+            // `workspaceTreeRevealRequest` is the preview-link sidebar reveal, added after B1.
             WindowStatePartitionInventory.window.union(["onEditorReplaceAuthorityInputChange",
-                                                        "onExportHTMLContextChange"])
+                                                        "onExportHTMLContextChange",
+                                                        "workspaceTreeRevealRequest"])
         )
         XCTAssertEqual(
             Self.storedPropertyNames(of: appState.workspaceRootContext),

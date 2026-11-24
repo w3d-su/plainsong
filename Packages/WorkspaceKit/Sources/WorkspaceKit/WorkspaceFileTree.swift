@@ -31,12 +31,12 @@ public struct WorkspaceFileSnapshot: Sendable, Equatable {
 
         private static func normalized(_ path: String) -> String {
             let components = path
-                .split(separator: "/", omittingEmptySubsequences: true)
+                .splitOnPathSeparator(omittingEmptySubsequences: true)
                 .joined(separator: "/")
             // Preserve an absolute-path marker until the consumer performs containment
             // validation. Dropping it here would turn a hostile snapshot entry into a
             // seemingly safe workspace-relative path.
-            return path.hasPrefix("/") ? "/\(components)" : components
+            return path.hasLeadingPathSeparator ? "/\(components)" : components
         }
     }
 

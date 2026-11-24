@@ -9,18 +9,42 @@ extension MarkdownSyntaxHighlighter {
     /// the highlighter runs on a background task and NSFontManager is not
     /// documented as thread-safe.
     ///
-    /// Bold resolves through the weighted system API instead of descriptor traits:
-    /// trait-merged descriptors on the private system monospaced face do not
-    /// reliably cascade bold to CJK fallback fonts (PingFang), which left Chinese
-    /// `**strong**` text visually regular while ASCII appeared bold. All editor
-    /// fonts are currently the monospaced system family; revisit if custom editor
-    /// fonts ship (agent.md §11).
-    func boldFont(_ font: NSFont) -> NSFont {
-        var bold = NSFont.monospacedSystemFont(ofSize: font.pointSize, weight: .bold)
-        if font.fontDescriptor.symbolicTraits.contains(.italic) {
+    /// The system monospaced face resolves bold through the weighted system API instead
+    /// of descriptor traits: trait-merged descriptors on that private face do not reliably
+    /// cascade bold to CJK fallback fonts (PingFang), which left Chinese `**strong**` text
+    /// visually regular while ASCII appeared bold. A font chosen in Settings keeps its own
+    /// family when that family has a bold face; one without (Monaco) falls back to the
+    /// system bold so emphasis stays visible.
+    func boldFont(_ font: NSFont, size: CGFloat? = nil) -> NSFont {
+        let size = size ?? font.pointSize
+        let isItalic = font.fontDescriptor.symbolicTraits.contains(.italic)
+        if let familyBold = Self.familyBoldFont(for: font, size: size, italic: isItalic) {
+            return familyBold
+        }
+        var bold = NSFont.monospacedSystemFont(ofSize: size, weight: .bold)
+        if isItalic {
             bold = fontByAddingTraits(.italic, to: bold)
         }
         return bold
+    }
+
+    private static func familyBoldFont(for font: NSFont, size: CGFloat, italic: Bool) -> NSFont? {
+        // System faces have private, dot-prefixed names.
+        guard !font.fontName.hasPrefix("."), let family = font.familyName else {
+            return nil
+        }
+        var traits: NSFontDescriptor.SymbolicTraits = [.bold]
+        if italic {
+            traits.insert(.italic)
+        }
+        let descriptor = NSFontDescriptor(fontAttributes: [.family: family]).withSymbolicTraits(traits)
+        guard let candidate = NSFont(descriptor: descriptor, size: size),
+              candidate.familyName == family,
+              candidate.fontDescriptor.symbolicTraits.contains(.bold)
+        else {
+            return nil
+        }
+        return candidate
     }
 
     func italicFont(_ font: NSFont) -> NSFont {

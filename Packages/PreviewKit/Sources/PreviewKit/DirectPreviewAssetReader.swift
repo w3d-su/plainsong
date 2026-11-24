@@ -1,7 +1,7 @@
 import Foundation
 
 /// Mac direct-read adapter. It does not choose the allowlist: `AssetURLPolicy.loadAsset`
-/// still checks metadata size, then the byte count of what was read.
+/// still checks the opened file's size, then the byte count of what was read.
 struct DirectPreviewAssetReader: PreviewAssetReading {
     func read(_ request: PreviewAssetReadRequest) async throws -> PreviewAssetReadResult {
         try Task.checkCancellation()

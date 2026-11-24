@@ -69,7 +69,7 @@ extension CompletionEngine {
         cursor: Int
     ) -> CompletionContext? {
         let leadingWhitespace = MarkdownTextEditingSupport.leadingWhitespaceLength(in: linePrefix)
-        let contentStart = linePrefix.index(linePrefix.startIndex, offsetBy: leadingWhitespace)
+        let contentStart = Self.index(afterLeadingWhitespace: leadingWhitespace, in: linePrefix)
         let content = String(linePrefix[contentStart...])
         let marker: String
 
@@ -118,7 +118,7 @@ extension CompletionEngine {
         }
 
         let leadingWhitespace = MarkdownTextEditingSupport.leadingWhitespaceLength(in: linePrefix)
-        let contentStart = linePrefix.index(linePrefix.startIndex, offsetBy: leadingWhitespace)
+        let contentStart = Self.index(afterLeadingWhitespace: leadingWhitespace, in: linePrefix)
         let query = String(linePrefix[contentStart...])
         guard !query.contains(":"),
               query.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" })
@@ -198,6 +198,13 @@ extension CompletionEngine {
         )
     }
 
+    /// `leadingWhitespace` counts UTF-16 units. A space followed by a combining scalar is
+    /// one Character, so a Character offset would skip the scalar and leave it inside the
+    /// replacement range but outside the query.
+    static func index(afterLeadingWhitespace leadingWhitespace: Int, in linePrefix: String) -> String.Index {
+        linePrefix.utf16.index(linePrefix.utf16.startIndex, offsetBy: leadingWhitespace)
+    }
+
     func isInsideFencedCodeBlock(text: String, cursor: Int) -> Bool {
         MarkdownFenceScanner.openFence(in: text, before: cursor) != nil
     }
@@ -208,7 +215,7 @@ extension CompletionEngine {
         cursor: Int
     ) -> CompletionContext? {
         let leadingWhitespace = MarkdownTextEditingSupport.leadingWhitespaceLength(in: linePrefix)
-        let contentStart = linePrefix.index(linePrefix.startIndex, offsetBy: leadingWhitespace)
+        let contentStart = Self.index(afterLeadingWhitespace: leadingWhitespace, in: linePrefix)
         let query = String(linePrefix[contentStart...])
         guard query.isEmpty || query.allSatisfy({ "#>-".contains($0) }) else {
             return nil

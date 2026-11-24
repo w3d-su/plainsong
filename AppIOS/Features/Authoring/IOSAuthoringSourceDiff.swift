@@ -13,16 +13,14 @@ enum IOSAuthoringSourceDiff {
             return nil
         }
 
-        let oldBounds = boundaries(of: old)
-        let newBounds = boundaries(of: new)
         let rawPrefix = commonPrefixLength(oldText, newText)
-        let prefix = floor(rawPrefix, oldBounds)
+        let prefix = floor(rawPrefix, in: old)
         var suffix = commonSuffixLength(oldText, newText, prefix: prefix)
         while suffix > 0 {
             let oldStart = oldText.length - suffix
             let newStart = newText.length - suffix
             let suffixFits = oldStart >= prefix && newStart >= prefix
-            let aligned = isBoundary(oldStart, oldBounds) && isBoundary(newStart, newBounds)
+            let aligned = isBoundary(oldStart, in: old) && isBoundary(newStart, in: new)
             if suffixFits, aligned {
                 break
             }
@@ -110,46 +108,20 @@ enum IOSAuthoringSourceDiff {
         return suffix
     }
 
-    private static func boundaries(of text: String) -> [Int] {
-        var bounds = [0]
-        var units = 0
-        for character in text {
-            units += character.utf16.count
-            bounds.append(units)
-        }
-        return bounds
+    /// The start of the grapheme that contains UTF-16 `offset`. Only the grapheme at the
+    /// offset is inspected: an array of every boundary cost 8 bytes per character of a
+    /// document on the main actor for each frontmatter commit.
+    static func floor(_ offset: Int, in text: String) -> Int {
+        let units = text.utf16
+        guard offset > 0 else { return 0 }
+        guard let index = units.index(units.startIndex, offsetBy: offset, limitedBy: units.endIndex),
+              index < units.endIndex
+        else { return units.count }
+        let start = text.index(before: text.index(after: index))
+        return units.distance(from: units.startIndex, to: start)
     }
 
-    private static func floor(_ offset: Int, _ bounds: [Int]) -> Int {
-        var low = 0
-        var high = bounds.count - 1
-        var best = 0
-        while low <= high {
-            let mid = low + (high - low) / 2
-            if bounds[mid] <= offset {
-                best = bounds[mid]
-                low = mid + 1
-            } else {
-                high = mid - 1
-            }
-        }
-        return best
-    }
-
-    private static func isBoundary(_ offset: Int, _ bounds: [Int]) -> Bool {
-        var low = 0
-        var high = bounds.count - 1
-        while low <= high {
-            let mid = low + (high - low) / 2
-            if bounds[mid] == offset {
-                return true
-            }
-            if bounds[mid] < offset {
-                low = mid + 1
-            } else {
-                high = mid - 1
-            }
-        }
-        return false
+    private static func isBoundary(_ offset: Int, in text: String) -> Bool {
+        floor(offset, in: text) == offset
     }
 }

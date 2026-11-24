@@ -165,6 +165,10 @@ public struct MarkdownEditorView: View {
         .onChange(of: appearanceID) { _, _ in
             scheduleHighlight()
         }
+        .onChange(of: developmentPresentation) { _, _ in
+            // The fold plan belongs to the highlight; the last one was made for the old mode.
+            scheduleHighlight()
+        }
         .onChange(of: selection) { _, _ in
             guard developmentPresentation.enablesInlineFoldReveal else { return }
             scheduleHighlight()

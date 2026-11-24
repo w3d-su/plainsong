@@ -31,12 +31,14 @@ public extension MarkdownSyntaxParser {
     /// context is restored afterwards, so the range never starts inside fenced code.
     static func tableParseRange(in source: String, expanding range: NSRange) -> WYSIWYGTableParseRange {
         let text = source as NSString
-        guard range.length > 0, NSMaxRange(range) <= text.length else {
+        // An unvalidated caller range can be negative or have `location + length` past `Int.max`.
+        let (rangeEnd, overflow) = range.location.addingReportingOverflow(range.length)
+        guard range.location >= 0, range.length > 0, !overflow, rangeEnd <= text.length else {
             return WYSIWYGTableParseRange(range: range)
         }
         let lines = MarkdownTableLineScanner(text: text)
         var start = range.location
-        var end = NSMaxRange(range)
+        var end = rangeEnd
         var leadingCut: Int?
         var trailingCut: Int?
 
@@ -47,7 +49,7 @@ public extension MarkdownSyntaxParser {
             }
             leadingCut = block.startIsCut ? block.start : nil
         }
-        let lastLine = lines.lineStart(containing: NSMaxRange(range) - 1)
+        let lastLine = lines.lineStart(containing: rangeEnd - 1)
         if let block = lines.tableBlock(containing: lastLine) {
             let blockEnd = lines.nextLineStart(afterContentsEnd: block.contentsEnd)
             if blockEnd > end {
@@ -73,16 +75,25 @@ public extension MarkdownSyntaxParser {
 
 extension MarkdownSyntaxParser {
     /// Collects every `pipe_table` under `node` as a region in document coordinates.
+    /// `fragmentBase` is the document offset of the fragment's first unit, when that is
+    /// not the start of `parseRange`.
     func appendTableRegions(
         from node: Node,
         fragment: NSString,
         parseRange: WYSIWYGTableParseRange,
+        fragmentBase: Int? = nil,
         isNested: Bool = false,
         to regions: inout [WYSIWYGTableRegion]
     ) {
         switch node.nodeType {
         case "pipe_table":
-            regions.append(tableRegion(from: node, fragment: fragment, parseRange: parseRange, isNested: isNested))
+            regions.append(tableRegion(
+                from: node,
+                fragment: fragment,
+                parseRange: parseRange,
+                base: fragmentBase ?? parseRange.range.location,
+                isNested: isNested
+            ))
             return
         case "paragraph", "inline", "fenced_code_block", "indented_code_block", "minus_metadata", "plus_metadata",
              "html_block":
@@ -97,6 +108,7 @@ extension MarkdownSyntaxParser {
                 from: child,
                 fragment: fragment,
                 parseRange: parseRange,
+                fragmentBase: fragmentBase,
                 isNested: childIsNested,
                 to: &regions
             )
@@ -107,9 +119,9 @@ extension MarkdownSyntaxParser {
         from table: Node,
         fragment: NSString,
         parseRange: WYSIWYGTableParseRange,
+        base: Int,
         isNested: Bool
     ) -> WYSIWYGTableRegion {
-        let base = parseRange.range.location
         let lines = MarkdownTableLineScanner(text: fragment)
         var rows: [MarkdownTableRowStructure?] = []
         var pipeOffsets: [[Int]] = []
@@ -173,6 +185,10 @@ struct MarkdownTableLineScanner {
 
     func lineStart(containing offset: Int) -> Int {
         var index = min(max(offset, 0), text.length)
+        // The line feed of a CRLF pair belongs to the line its carriage return ends.
+        if index > 0, index < text.length, text.character(at: index) == 10, text.character(at: index - 1) == 13 {
+            index -= 1
+        }
         while index > 0 {
             let unit = text.character(at: index - 1)
             if unit == 10 || unit == 13 {

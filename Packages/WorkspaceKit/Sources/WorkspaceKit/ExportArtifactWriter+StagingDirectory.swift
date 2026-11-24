@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import WorkspaceCore
 
 extension ExportArtifactWriter {
     /// D5 step 1, with the containment rule amended by the owner decision of 2026-09-30 (E2
@@ -191,8 +192,8 @@ extension ExportArtifactWriter {
                 .folding(options: [.caseInsensitive], locale: Locale(identifier: "en_US_POSIX"))
                 .precomposedStringWithCanonicalMapping
         }
-        let pathComponents = path.split(separator: "/", omittingEmptySubsequences: true).map(key)
-        let directoryComponents = directory.split(separator: "/", omittingEmptySubsequences: true).map(key)
+        let pathComponents = path.splitOnPathSeparator(omittingEmptySubsequences: true).map(key)
+        let directoryComponents = directory.splitOnPathSeparator(omittingEmptySubsequences: true).map(key)
         guard pathComponents.count >= directoryComponents.count else { return false }
         return zip(pathComponents, directoryComponents).allSatisfy { $0.utf8.elementsEqual($1.utf8) }
     }
@@ -200,8 +201,8 @@ extension ExportArtifactWriter {
     /// Strict, byte-exact, component-wise containment of two canonical spellings. It is used
     /// only to accept staging, so it never folds case or normalization.
     static func pathLiesStrictly(_ path: String, inside ancestor: String) -> Bool {
-        let pathComponents = path.split(separator: "/", omittingEmptySubsequences: true)
-        let ancestorComponents = ancestor.split(separator: "/", omittingEmptySubsequences: true)
+        let pathComponents = path.splitOnPathSeparator(omittingEmptySubsequences: true)
+        let ancestorComponents = ancestor.splitOnPathSeparator(omittingEmptySubsequences: true)
         guard pathComponents.count > ancestorComponents.count else { return false }
         return zip(pathComponents, ancestorComponents).allSatisfy { $0.utf8.elementsEqual($1.utf8) }
     }
