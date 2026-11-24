@@ -436,6 +436,11 @@ extension AppState {
 
     func protectedSessionURLs() -> Set<URL> {
         var urls = Set(retiredEditorDocumentSessions.keys)
+        // A clean session can hold an unresolved external conflict (a change that arrived
+        // during IME composition). Evicting it would orphan the URL-keyed conflict, and
+        // `hasStatefulRetainedAuthorityCollision` would then refuse to reopen the file.
+        urls.formUnion(pendingExternalTexts.keys)
+        urls.formUnion(pendingExternalFileVersions.keys)
         for (sessionIdentity, context) in indeterminateSessionWriteContexts
             where indeterminateSessionWrites[sessionIdentity] != nil
         {

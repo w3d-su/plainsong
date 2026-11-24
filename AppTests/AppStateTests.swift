@@ -1939,7 +1939,7 @@ final class AppStateTests: XCTestCase {
         try Data([1, 2, 3]).write(to: leafURL)
         let capturedStatus = try fileStatus(at: leafURL)
         let capturedIdentity = WorkspaceFileSystemIdentity(
-            device: UInt64(capturedStatus.st_dev),
+            device: UInt64(UInt32(bitPattern: capturedStatus.st_dev)),
             inode: UInt64(capturedStatus.st_ino)
         )
         let directoryDescriptor = Darwin.open(

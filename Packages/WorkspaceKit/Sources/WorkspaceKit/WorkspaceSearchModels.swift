@@ -9,6 +9,9 @@ public struct WorkspaceSearchLimits: Sendable, Equatable {
     public static let defaultMaximumConcurrentReads = 4
     public static let defaultMaximumIgnoreFileSizeBytes = 64 * 1024
     public static let defaultMaximumIgnoreFiles = 128
+    /// Ignore-file paths one plan may look for, found or not. Each probe is an anchored
+    /// walk, so a deep tree cannot make planning unbounded.
+    public static let defaultMaximumIgnoreFileProbes = 1024
     public static let defaultMaximumReportedSkippedFiles = 100
     public static let defaultMaximumProgressEvents = 100
 
@@ -18,6 +21,7 @@ public struct WorkspaceSearchLimits: Sendable, Equatable {
     public let maximumConcurrentReads: Int
     public let maximumIgnoreFileSizeBytes: Int
     public let maximumIgnoreFiles: Int
+    public let maximumIgnoreFileProbes: Int
     public let maximumReportedSkippedFiles: Int
     public let maximumProgressEvents: Int
 
@@ -28,6 +32,7 @@ public struct WorkspaceSearchLimits: Sendable, Equatable {
         maximumConcurrentReads: Int = WorkspaceSearchLimits.defaultMaximumConcurrentReads,
         maximumIgnoreFileSizeBytes: Int = WorkspaceSearchLimits.defaultMaximumIgnoreFileSizeBytes,
         maximumIgnoreFiles: Int = WorkspaceSearchLimits.defaultMaximumIgnoreFiles,
+        maximumIgnoreFileProbes: Int = WorkspaceSearchLimits.defaultMaximumIgnoreFileProbes,
         maximumReportedSkippedFiles: Int = WorkspaceSearchLimits.defaultMaximumReportedSkippedFiles,
         maximumProgressEvents: Int = WorkspaceSearchLimits.defaultMaximumProgressEvents
     ) {
@@ -37,6 +42,7 @@ public struct WorkspaceSearchLimits: Sendable, Equatable {
         self.maximumConcurrentReads = max(1, maximumConcurrentReads)
         self.maximumIgnoreFileSizeBytes = maximumIgnoreFileSizeBytes
         self.maximumIgnoreFiles = maximumIgnoreFiles
+        self.maximumIgnoreFileProbes = maximumIgnoreFileProbes
         self.maximumReportedSkippedFiles = max(0, maximumReportedSkippedFiles)
         self.maximumProgressEvents = max(1, maximumProgressEvents)
     }

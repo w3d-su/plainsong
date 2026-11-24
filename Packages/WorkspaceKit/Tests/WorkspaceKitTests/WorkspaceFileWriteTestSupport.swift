@@ -182,7 +182,7 @@ extension WorkspaceAnchoredFileSystemTests {
     func writeFileIdentity(at url: URL) throws -> WorkspaceFileSystemIdentity {
         let status = try noFollowStatus(at: url)
         return WorkspaceFileSystemIdentity(
-            device: UInt64(status.st_dev),
+            device: UInt64(UInt32(bitPattern: status.st_dev)),
             inode: UInt64(status.st_ino)
         )
     }

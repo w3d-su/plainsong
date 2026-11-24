@@ -18,7 +18,12 @@ enum IOSWorkspaceTreeBuilder {
                 includesAllFiles: includesAllFiles
             )
         }
-        let entries = nest(childrenByParent(visible), parent: "", record: record)
+        let entries = nest(
+            childrenByParent(visible),
+            parent: "",
+            record: record,
+            previousIDs: previousIDs(record.latestSnapshot)
+        )
         return IOSWorkspaceSnapshot(
             workspaceID: record.workspaceID,
             accessGeneration: record.generation,
@@ -34,12 +39,24 @@ enum IOSWorkspaceTreeBuilder {
         let relative = item.relativePath.isEmpty ? record.displayName : item.relativePath
         guard let location = location(record: record, relativePath: relative, item: item) else { return nil }
         return IOSWorkspaceEntry(
-            id: UUID(),
+            id: previousIDs(record.latestSnapshot)[WorkspacePathByteKey(relative)] ?? UUID(),
             location: location,
             kind: kind(for: item),
             availability: item.availability,
             children: []
         )
+    }
+
+    /// Entry IDs of the last published tree by byte-exact path. A refresh keeps the ID of every
+    /// path that is still there, so selection, expansion and the search read cache survive it.
+    private static func previousIDs(_ snapshot: IOSWorkspaceSnapshot?) -> [WorkspacePathByteKey: UUID] {
+        var ids: [WorkspacePathByteKey: UUID] = [:]
+        var pending = snapshot?.entries ?? []
+        while let entry = pending.popLast() {
+            ids[WorkspacePathByteKey(entry.location.relativePath)] = entry.id
+            pending.append(contentsOf: entry.children)
+        }
+        return ids
     }
 
     private static func shouldInclude(
@@ -80,16 +97,22 @@ enum IOSWorkspaceTreeBuilder {
     private static func nest(
         _ childrenByParent: [WorkspacePathByteKey: [IOSWorkspaceFileItem]],
         parent: String,
-        record: IOSWorkspaceScopeRecord
+        record: IOSWorkspaceScopeRecord,
+        previousIDs: [WorkspacePathByteKey: UUID]
     ) -> [IOSWorkspaceEntry] {
-        let children = childrenByParent[WorkspacePathByteKey(parent)] ?? []
+        // Providers list in no fixed order; the tree must not reorder between refreshes.
+        let children = (childrenByParent[WorkspacePathByteKey(parent)] ?? []).sorted {
+            WorkspacePathOrder.isBefore($0.relativePath, $1.relativePath)
+        }
         return children.compactMap { item in
             guard let location = location(record: record, relativePath: item.relativePath, item: item) else {
                 return nil
             }
-            let nested = item.isDirectory ? nest(childrenByParent, parent: item.relativePath, record: record) : []
+            let nested = item.isDirectory
+                ? nest(childrenByParent, parent: item.relativePath, record: record, previousIDs: previousIDs)
+                : []
             return IOSWorkspaceEntry(
-                id: UUID(),
+                id: previousIDs[WorkspacePathByteKey(item.relativePath)] ?? UUID(),
                 location: location,
                 kind: kind(for: item),
                 availability: item.availability,

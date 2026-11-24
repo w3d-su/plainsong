@@ -1,5 +1,6 @@
 import Foundation
 import MarkdownCore
+import WorkspaceCore
 
 struct WorkspaceSearchCandidatePlan {
     let items: [WorkspaceSearchCandidatePlanItem]
@@ -192,13 +193,16 @@ enum WorkspaceSearchCandidatePlanner {
             .symlinkEscape
         case WorkspaceAnchoredFileSystemError.notRegularFile:
             .unsupportedPhysicalFileKind
+        case WorkspaceAnchoredFileSystemError.unreadable:
+            // A permission or I/O failure (a `chmod 000` ancestor) is not a containment error.
+            .unreadable
         default:
             .pathTraversal
         }
     }
 
     private static func isAlwaysIgnored(_ relativePath: String) -> Bool {
-        let components = relativePath.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
+        let components = relativePath.splitOnPathSeparator(omittingEmptySubsequences: true).map(String.init)
         return components.contains { component in
             let lowercased = component.lowercased()
             return component.hasPrefix(".")

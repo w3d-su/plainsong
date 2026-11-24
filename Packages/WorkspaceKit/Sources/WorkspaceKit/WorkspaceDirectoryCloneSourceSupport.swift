@@ -230,7 +230,7 @@ private extension WorkspaceDirectoryCloneSourceSupport {
         }
         return SourceSnapshot(
             identity: WorkspaceFileSystemIdentity(
-                device: UInt64(after.st_dev),
+                device: UInt64(UInt32(bitPattern: after.st_dev)),
                 inode: UInt64(after.st_ino)
             ),
             mode: after.st_mode,

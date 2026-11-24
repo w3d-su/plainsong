@@ -96,4 +96,32 @@ final class ExportHTMLProtocolTests: XCTestCase {
         )
         XCTAssertEqual(decoded, message)
     }
+
+    func testExportHTMLMessageBodyIsTheCodableMessage() throws {
+        let outcomes = [
+            ExportResourceOutcome(
+                resourceID: "r1",
+                kind: .image,
+                action: .embed,
+                dataURI: "data:image/png;base64,AAAA\"</script>"
+            ),
+            ExportResourceOutcome(resourceID: "r2", kind: .image, action: .embed, dataURIFrom: "r1"),
+            ExportResourceOutcome(resourceID: "r3", kind: .font, action: .omit, reason: "escapes-root"),
+        ]
+        let payloads = [
+            ExportHTMLPayload(exportID: 4, renderID: 9, phase: .discovery),
+            ExportHTMLPayload(
+                exportID: 4,
+                renderID: 9,
+                phase: .finalization,
+                documentTitle: "Title \u{2028} 🎉",
+                resourceOutcomes: outcomes
+            ),
+        ]
+        for payload in payloads {
+            let encoded = try JSONEncoder().encode(BridgeMessage.exportHTML(payload))
+            let expected = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? NSDictionary)
+            XCTAssertEqual(PreviewController.exportHTMLMessageBody(payload) as NSDictionary, expected)
+        }
+    }
 }

@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import WorkspaceCore
 
 /// Proves a coordinated URL still belongs to the grant root. Literal prefix checks are not authority.
 enum IOSWorkspaceRootAuthority {
@@ -15,7 +16,7 @@ enum IOSWorkspaceRootAuthority {
     /// The leaf does not exist yet. Prove its parent, then the leaf name joined to that real parent.
     static func proveNewLeaf(_ url: URL, root: URL) throws -> URL {
         let name = url.lastPathComponent
-        if name.isEmpty || name == "." || name == ".." || name.contains("/") || name.utf8.contains(0) {
+        if name.isEmpty || name == "." || name == ".." || name.containsPathSeparator || name.utf8.contains(0) {
             throw IOSWorkspaceFailure.invalidPath
         }
         let parent = url.deletingLastPathComponent()
@@ -24,7 +25,7 @@ enum IOSWorkspaceRootAuthority {
         guard isInside(root: rootReal, path: parentReal) else {
             throw IOSWorkspaceFailure.outsideGrant
         }
-        let leafReal = parentReal.hasSuffix("/") ? parentReal + name : parentReal + "/" + name
+        let leafReal = parentReal.hasTrailingPathSeparator ? parentReal + name : parentReal + "/" + name
         guard isInside(root: rootReal, path: leafReal) else {
             throw IOSWorkspaceFailure.outsideGrant
         }
@@ -48,7 +49,13 @@ enum IOSWorkspaceRootAuthority {
             throw IOSWorkspaceFailure.invalidPath
         }
         guard let resolved = realpath(cPath, nil) else {
-            throw IOSWorkspaceFailure.outsideGrant
+            // Only an unresolvable path is a containment failure. A missing or unreadable
+            // item is reported as such, so the caller does not ask for a new grant.
+            switch errno {
+            case ENOENT, ENOTDIR: throw IOSWorkspaceFailure.notFound
+            case EACCES, EPERM: throw IOSWorkspaceFailure.permissionDenied
+            default: throw IOSWorkspaceFailure.outsideGrant
+            }
         }
         defer { free(resolved) }
         return String(cString: resolved)

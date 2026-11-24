@@ -1,3 +1,4 @@
+import MarkdownCore
 import SyntaxKit
 import UIKit
 
@@ -105,6 +106,6 @@ enum IOSHighlightPresenter {
 
 enum ExactSourceFragment {
     static func matches(_ lhs: String, _ rhs: String) -> Bool {
-        (lhs as NSString).compare(rhs, options: .literal) == .orderedSame
+        ExactSourceText.matches(lhs, rhs)
     }
 }

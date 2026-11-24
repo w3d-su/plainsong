@@ -13,6 +13,8 @@ struct IOSLinkDraft: Identifiable {
 
 struct IOSFrontmatterModel {
     var acceptedText = ""
+    /// `IOSFrontmatterHead.length` of `acceptedText`.
+    var acceptedHeadLength: Int?
     var projectedSnapshot: IOSSourceEditorSnapshot?
     var capture: IOSSourceEditorSnapshot?
     var needsRecapture = false

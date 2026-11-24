@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import WorkspaceCore
 
 /// The no-follow namespace kind of an item. Unlike `WorkspaceFileKind`, this describes the
 /// directory entry itself, so a symbolic link is never classified from its target.
@@ -795,8 +796,8 @@ extension WorkspaceAnchoredFileSystem.DirectoryEntryIdentity {
 
 private extension String {
     func isByteExactDescendant(of ancestor: String) -> Bool {
-        let ancestorComponents = ancestor.split(separator: "/", omittingEmptySubsequences: true)
-        let components = split(separator: "/", omittingEmptySubsequences: true)
+        let ancestorComponents = ancestor.splitOnPathSeparator(omittingEmptySubsequences: true)
+        let components = splitOnPathSeparator(omittingEmptySubsequences: true)
         guard components.count > ancestorComponents.count else { return false }
         return zip(components, ancestorComponents).allSatisfy { component, ancestorComponent in
             component.utf8.elementsEqual(ancestorComponent.utf8)

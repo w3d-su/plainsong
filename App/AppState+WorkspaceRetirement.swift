@@ -225,6 +225,19 @@ private extension AppState {
             registry.workspaceRoots[authority] = nil
             context.registrationAuthority = nil
         }
+        // An image placement still running holds its fence on the closed root's context.
+        // Reusing that context would refuse the next workspace's file operations until the
+        // old placement returns.
+        if context.workspaceImageAssetInsertionCount > 0 {
+            let replacement = WorkspaceRootContext()
+            replacement.workspaceGeneration = context.workspaceGeneration
+            replacement.workspaceReloadPostProofHook = context.workspaceReloadPostProofHook
+            replacement.workspaceReloadPostLoadHook = context.workspaceReloadPostLoadHook
+            replacement.workspaceReloadPostPrepareHook = context.workspaceReloadPostPrepareHook
+            replacement.editorImageAssetDiscardEventHandler = context.editorImageAssetDiscardEventHandler
+            workspaceRootContext = replacement
+            connectWorkspaceRootContext()
+        }
     }
 
     func transferWorkspaceAuthority(

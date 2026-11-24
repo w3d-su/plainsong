@@ -60,15 +60,15 @@ public final class MarkdownSyntaxParser {
         fileKind: FileKind,
         expandedVisibleRange range: NSRange
     ) -> [MarkdownSyntaxToken] {
-        guard let fragment = source.fragment(in: range) else {
+        guard let fragment = MarkdownParseFragment(source: source, range: range) else {
             return []
         }
 
-        return tokens(in: fragment, fileKind: fileKind, parsesInlineMarkup: true)
+        return tokens(in: fragment.text, fileKind: fileKind, parsesInlineMarkup: true)
             .map { token in
                 MarkdownSyntaxToken(
                     kind: token.kind,
-                    range: NSRange(location: token.range.location + range.location, length: token.range.length)
+                    range: NSRange(location: token.range.location + fragment.base, length: token.range.length)
                 )
             }
     }
@@ -166,7 +166,7 @@ extension MarkdownSyntaxParser {
         if end - start < visibleHighlightMinimumLength {
             let targetEnd = min(nsSource.length, start + visibleHighlightMinimumLength)
             let seed = min(max(targetEnd, 0), nsSource.length - 1)
-            end = max(end, NSMaxRange(nsSource.lineRange(for: NSRange(location: seed, length: 0))))
+            end = max(end, NSMaxRange(nsSource.markdownLineRange(containing: seed)))
         }
 
         let context = MarkdownFenceScanner.contextRange(
@@ -180,8 +180,8 @@ extension MarkdownSyntaxParser {
         let fallbackLocation = min(range.location, max(0, source.length - 1))
         let startLocation = min(max(fallbackLocation, 0), source.length - 1)
         let lastLocation = min(max(NSMaxRange(range) - 1, startLocation), source.length - 1)
-        let startLine = source.lineRange(for: NSRange(location: startLocation, length: 0))
-        let endLine = source.lineRange(for: NSRange(location: lastLocation, length: 0))
+        let startLine = source.markdownLineRange(containing: startLocation)
+        let endLine = source.markdownLineRange(containing: lastLocation)
         return NSRange(location: startLine.location, length: NSMaxRange(endLine) - startLine.location)
     }
 }
@@ -448,14 +448,5 @@ extension MarkdownSyntaxParser {
         let location = Int(bytes.lowerBound / 2) + offset
         let length = Int((bytes.upperBound - bytes.lowerBound) / 2)
         return NSRange(location: location, length: length)
-    }
-}
-
-private extension String {
-    func fragment(in range: NSRange) -> String? {
-        guard let stringRange = Range(range, in: self) else {
-            return nil
-        }
-        return String(self[stringRange])
     }
 }

@@ -1,4 +1,5 @@
 import AppKit
+import MarkdownCore
 import SwiftUI
 
 /// AppKit-backed Search query field.
@@ -10,6 +11,10 @@ import SwiftUI
 /// Keyboard (WS3C PR C):
 /// - ↓ → move selection/focus into the results list (`onMoveDownToResults`)
 /// - Escape → return focus to the editor without clearing query/results (`onEscapeToEditor`)
+///
+/// While the field editor has IME marked text (Zhuyin/Pinyin), ↓ and Escape belong to the
+/// input context, the composing value is not published as a query, and the field is not
+/// overwritten from the binding.
 struct WorkspaceSearchQueryField: NSViewRepresentable {
     @Binding var text: String
     @ObservedObject var windowKeyState: WindowKeyStateTracker
@@ -51,9 +56,7 @@ struct WorkspaceSearchQueryField: NSViewRepresentable {
         context.coordinator.onEscapeToEditor = onEscapeToEditor
         context.coordinator.onFocusTraversal = onFocusTraversal
 
-        if field.stringValue != text {
-            field.stringValue = text
-        }
+        context.coordinator.applyExternalText(text, to: field)
         field.isEditable = isEnabled
         field.placeholderString = WorkspaceSearchFieldFocus.placeholder
         WorkspaceSearchFieldFocus.stampSearchFieldIdentity(on: field)
@@ -64,6 +67,7 @@ struct WorkspaceSearchQueryField: NSViewRepresentable {
         windowKeyState.bindSearchField(field)
     }
 
+    @MainActor
     final class Coordinator: NSObject, NSTextFieldDelegate {
         var text: Binding<String>
         var onMoveDownToResults: (() -> Void)?
@@ -83,18 +87,46 @@ struct WorkspaceSearchQueryField: NSViewRepresentable {
             self.onFocusTraversal = onFocusTraversal
         }
 
-        func controlTextDidChange(_ obj: Notification) {
-            guard let field = obj.object as? NSTextField else { return }
-            if text.wrappedValue != field.stringValue {
-                text.wrappedValue = field.stringValue
+        /// Never overwrites the field while its editor has marked text: that would drop the
+        /// composition.
+        func applyExternalText(_ newText: String, to field: NSTextField) {
+            guard !Self.hasMarkedText(field) else { return }
+            if !ExactSourceText.matches(field.stringValue, newText) {
+                field.stringValue = newText
             }
+        }
+
+        /// A composing value is not a query: it is published once committed.
+        func controlTextDidChange(_ obj: Notification) {
+            guard let field = obj.object as? NSTextField, !Self.hasMarkedText(field) else { return }
+            publish(field.stringValue)
+        }
+
+        func controlTextDidEndEditing(_ obj: Notification) {
+            guard let field = obj.object as? NSTextField else { return }
+            publish(field.stringValue)
+        }
+
+        private func publish(_ value: String) {
+            if !ExactSourceText.matches(text.wrappedValue, value) {
+                text.wrappedValue = value
+            }
+        }
+
+        private static func hasMarkedText(_ field: NSTextField) -> Bool {
+            (field.currentEditor() as? NSTextView)?.hasMarkedText() == true
         }
 
         func control(
             _: NSControl,
-            textView _: NSTextView,
+            textView: NSTextView,
             doCommandBy commandSelector: Selector
         ) -> Bool {
+            // ↓ picks a candidate and Escape cancels the composition; Tab stays with the
+            // input context too.
+            if textView.hasMarkedText() {
+                return false
+            }
             // Only swallow when a callback is installed; otherwise let AppKit handle the key.
             if commandSelector == #selector(NSResponder.moveDown(_:)),
                let onMoveDownToResults

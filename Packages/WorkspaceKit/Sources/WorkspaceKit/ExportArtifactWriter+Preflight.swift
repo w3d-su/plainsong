@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import WorkspaceCore
 
 /// The literal panel URL split without Foundation path normalization.
 struct ExportArtifactSelection {
@@ -30,7 +31,7 @@ struct ExportArtifactSelection {
         else {
             return .failure(.invalidDestinationURL)
         }
-        let components = path.split(separator: "/", omittingEmptySubsequences: true)
+        let components = path.splitOnPathSeparator(omittingEmptySubsequences: true)
         guard let leaf = components.last,
               !components.contains(where: { $0 == "." || $0 == ".." })
         else {

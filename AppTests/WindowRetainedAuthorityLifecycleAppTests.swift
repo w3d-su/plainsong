@@ -44,13 +44,16 @@ final class WindowRetainedAuthorityLifecycleAppTests: XCTestCase {
         fixture.appState.setCurrentDocument(fixture.third, requestingEditorFocus: false)
         fixture.hideSecond()
 
-        fixture.appState.handleSessionEvictions([
-            WorkspaceSessionEviction(url: fixture.secondURL, requiresSave: false),
-        ])
+        let eviction = [WorkspaceSessionEviction(url: fixture.secondURL, requiresSave: false)]
+        fixture.appState.handleSessionEvictions(eviction)
 
+        // The unresolved conflict keeps the session warm; evicting it would orphan the
+        // URL-keyed conflict state and refuse every later open of the file.
+        XCTAssertNotNil(fixture.appState.registry.warmSession(at: fixture.secondURL))
         XCTAssertFalse(owner.hasStopped)
         await reload.task.value
         XCTAssertNil(fixture.appState.externalReloadTasks[identity])
+        fixture.appState.handleSessionEvictions(eviction)
         XCTAssertTrue(owner.hasStopped)
         XCTAssertNil(fixture.appState.registry.retainedWorkspaceAuthorityOwners[identity])
     }

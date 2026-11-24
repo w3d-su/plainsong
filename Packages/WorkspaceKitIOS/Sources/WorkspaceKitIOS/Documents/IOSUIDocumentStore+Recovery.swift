@@ -72,10 +72,17 @@ extension IOSUIDocumentStore {
     }
 
     func persistRecovery(_ entry: IOSDocumentEntry, reason: IOSRecoveryReason) async throws -> IOSRecoveryReceipt {
+        let replaced = entry.checkpoint
         guard let record = recoveryRecord(entry, reason: reason) else {
             throw IOSDocumentFailure.recoveryFailed
         }
         let receipt = try await recovery.persist(record)
+        // The newer checkpoint is durable, so the one it replaced is no longer the recovery copy.
+        if let replaced, entry.checkpoint?.recordID == record.recordID,
+           replaced.revisionVersion < record.revisionVersion
+        {
+            await dropSuperseded(replaced, entry: entry, newerVersion: record.revisionVersion)
+        }
         entry.recoveryReceipt = receipt
         emit(.recoveryPersisted(receipt))
         return receipt
@@ -101,14 +108,26 @@ extension IOSUIDocumentStore {
 
     public func flushForBackground() async -> [IOSDocumentFlushOutcome] {
         let identities = byIdentity.keys.sorted { $0.rawValue.uuidString < $1.rawValue.uuidString }
-        var outcomes: [IOSDocumentFlushOutcome] = []
-        for identity in identities {
-            guard let entry = byIdentity[identity], !entry.closed, !entry.superseded else { continue }
-            if let outcome = await flush(entry) {
-                outcomes.append(outcome)
+        // Flush every document at once. Each one writes its local recovery record before it
+        // starts the provider save, so a slow save of one document cannot use up the
+        // background time before a later dirty document has its recovery record.
+        return await withTaskGroup(of: (Int, IOSDocumentFlushOutcome?).self) { group in
+            for (index, identity) in identities.enumerated() {
+                group.addTask { await (index, self.flushIfOpen(identity)) }
             }
+            var outcomes: [(Int, IOSDocumentFlushOutcome)] = []
+            for await (index, outcome) in group {
+                if let outcome {
+                    outcomes.append((index, outcome))
+                }
+            }
+            return outcomes.sorted { $0.0 < $1.0 }.map(\.1)
         }
-        return outcomes
+    }
+
+    private func flushIfOpen(_ identity: IOSDocumentIdentity) async -> IOSDocumentFlushOutcome? {
+        guard let entry = byIdentity[identity], !entry.closed, !entry.superseded else { return nil }
+        return await flush(entry)
     }
 
     func flush(_ entry: IOSDocumentEntry) async -> IOSDocumentFlushOutcome? {
