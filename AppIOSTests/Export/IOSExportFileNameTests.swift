@@ -157,8 +157,12 @@ final class IOSDocumentExportSmokeTests: XCTestCase {
     }
 
     func testDocumentChangeStopsTheExport() async throws {
+        @MainActor final class DocumentState {
+            var isCurrent = true
+        }
+
         let exporter = IOSDocumentExportController()
-        var current = true
+        let document = DocumentState()
         exporter.begin(
             .html,
             source: DocumentTextChange(
@@ -170,9 +174,9 @@ final class IOSDocumentExportSmokeTests: XCTestCase {
             assetAccess: nil,
             theme: "light",
             assetReader: nil,
-            isCurrent: { current }
+            isCurrent: { document.isCurrent }
         )
-        current = false
+        document.isCurrent = false
         let deadline = Date().addingTimeInterval(20)
         while exporter.isRunning, Date() < deadline {
             try await Task.sleep(for: .milliseconds(50))

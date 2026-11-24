@@ -97,7 +97,7 @@ final class IOSProductionCommandFocusTests: XCTestCase {
         let first = Self.binding(UUID())
         harness.runtime.editor.attach(first)
         let textView = harness.runtime.editor.textView
-        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        let window = try makeHostedTestWindow()
         let host = UIViewController()
         window.rootViewController = host
         textView.frame = CGRect(x: 0, y: 0, width: 390, height: 700)
@@ -131,7 +131,7 @@ final class IOSProductionCommandFocusTests: XCTestCase {
         let harness = try makeHarness()
         harness.runtime.editor.attach(Self.binding(UUID()))
         let textView = harness.runtime.editor.textView
-        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        let window = try makeHostedTestWindow()
         let host = UIViewController()
         window.rootViewController = host
         textView.frame = CGRect(x: 0, y: 0, width: 390, height: 700)

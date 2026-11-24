@@ -335,6 +335,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ios.tests
         GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "6"
 
   # A real app process without statically duplicating the packages in its test bundle.
   # It has no providers and never participates in production composition.

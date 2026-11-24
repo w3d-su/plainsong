@@ -297,9 +297,10 @@ private struct IOSConflictCopyRealFixture {
     let store: IOSUIDocumentStore
     let editor = IOSSourceEditorController()
     let controller: IOSDocumentSceneController
-    let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+    let window: UIWindow
 
     init(autosaveDelayNanoseconds: UInt64 = 100_000_000, simulatedCloudVersions: Bool = false) throws {
+        window = try makeHostedTestWindow()
         root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         original = root.appendingPathComponent("original.md")
         destinationFolder = root.appendingPathComponent("copies", isDirectory: true)

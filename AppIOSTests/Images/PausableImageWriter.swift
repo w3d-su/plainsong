@@ -73,11 +73,11 @@ final class PausableImageWriter: IOSWorkspaceAssetWriting, @unchecked Sendable {
 
     func stage(_ request: IOSImageAssetRequest, grant _: IOSWorkspaceGrant) async throws -> IOSStagedImageAsset {
         record("stage")
-        lock.lock()
-        stagedRequestsStorage.append(request)
-        stagedOperationID = request.operationID
-        let failure = stageFailure
-        lock.unlock()
+        let failure = lock.withLock {
+            stagedRequestsStorage.append(request)
+            stagedOperationID = request.operationID
+            return stageFailure
+        }
         if pauseStage {
             stageEntered.signal()
             await stageRelease.wait()
@@ -102,11 +102,11 @@ final class PausableImageWriter: IOSWorkspaceAssetWriting, @unchecked Sendable {
 
     func commit(_ asset: IOSStagedImageAsset) async -> IOSAssetCommitOutcome {
         record("commit")
-        lock.lock()
-        commitCounter += 1
-        commitCancellation = Task.isCancelled
-        let retain = forceRetainCommit
-        lock.unlock()
+        let retain = lock.withLock {
+            commitCounter += 1
+            commitCancellation = Task.isCancelled
+            return forceRetainCommit
+        }
         if retain {
             return .retained(receipt(asset, reason: retainReason))
         }
@@ -115,14 +115,15 @@ final class PausableImageWriter: IOSWorkspaceAssetWriting, @unchecked Sendable {
 
     func rollback(_ asset: IOSStagedImageAsset) async -> IOSAssetRollbackOutcome {
         record("rollback")
-        lock.lock()
-        rollbackCounter += 1
-        rollbackCancellation = Task.isCancelled
-        let retain = forceRetainRollback || asset.operationID != stagedOperationID
-        if !retain {
-            removed.append(asset.ownershipToken)
+        let retain = lock.withLock {
+            rollbackCounter += 1
+            rollbackCancellation = Task.isCancelled
+            let retain = forceRetainRollback || asset.operationID != stagedOperationID
+            if !retain {
+                removed.append(asset.ownershipToken)
+            }
+            return retain
         }
-        lock.unlock()
         if retain {
             return .retained(receipt(asset, reason: retainReason))
         }
