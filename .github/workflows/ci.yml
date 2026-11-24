@@ -50,9 +50,7 @@ permissions:
 # (codeql-swift.yml).
 jobs:
   # Docs-only fast path. A pull request counts as docs-only when every path it
-  # changes is under docs/ or is a top-level *.md, LICENSE or .gitignore file (no
-  # job reads the root .gitignore: checkouts hold only tracked files, and SwiftFormat,
-  # SwiftLint and XcodeGen do not consult it). Two docs paths
+  # changes is under docs/ or is a top-level *.md or LICENSE file. Two docs paths
   # are test inputs and still run everything: `make test-packages` reads
   # docs/perf-log.md and docs/evidence/** (Scripts/editor_find_f2_evidence_tests).
   # Deleting a top-level file also runs everything, because project.yml lists
@@ -95,7 +93,7 @@ jobs:
               docs/perf-log.md | docs/evidence/*) verdict="test input" ;;
               docs/*) verdict=docs ;;
               */*) verdict=code ;;
-              *.md | LICENSE | .gitignore) if [ "$status" = D ]; then verdict="deleted top-level file"; else verdict=docs; fi ;;
+              *.md | LICENSE) if [ "$status" = D ]; then verdict="deleted top-level file"; else verdict=docs; fi ;;
               *) verdict=code ;;
             esac
             printf '%s\t%s\t%s\n' "$status" "$verdict" "$path"

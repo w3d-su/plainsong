@@ -41,10 +41,18 @@ class CICoverageTests(unittest.TestCase):
         for path in ("Plainsong.xcodeproj", "build", "Packages/*/.build", "Packages/*/build"):
             self.assertIn(path, body.split())
 
-    def test_python_caches_are_ignored(self):
-        for path in ("Scripts/ios/__pycache__/x.cpython-312.pyc", "Scripts/ci/tests/__pycache__/"):
+    def assert_ignored(self, *paths):
+        for path in paths:
             ignored = subprocess.run(["git", "check-ignore", "-q", path], cwd=ROOT)
             self.assertEqual(ignored.returncode, 0, path)
+
+    def test_python_caches_are_ignored(self):
+        self.assert_ignored("Scripts/ios/__pycache__/x.cpython-312.pyc", "Scripts/ci/tests/__pycache__/")
+
+    # Claude Code loads CLAUDE.local.md from subdirectories too, so the rule must
+    # match at any depth, not only at the root.
+    def test_local_agent_instructions_are_ignored_at_any_depth(self):
+        self.assert_ignored("CLAUDE.local.md", "Packages/EditorKit/CLAUDE.local.md")
 
 
 if __name__ == "__main__":
