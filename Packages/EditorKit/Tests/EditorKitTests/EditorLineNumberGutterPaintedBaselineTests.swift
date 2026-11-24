@@ -11,10 +11,9 @@ final class EditorLineNumberGutterPaintedBaselineTests: XCTestCase {
     private typealias Support = EditorLineNumberGutterTestSupport
     private var windows: [NSWindow] = []
 
-    override func tearDown() {
+    override func tearDown() async throws {
         windows.forEach { $0.close() }
         windows.removeAll()
-        super.tearDown()
     }
 
     func testNumbersEndOnTheSamePixelRowAsTheSameDigitInTheText() throws {

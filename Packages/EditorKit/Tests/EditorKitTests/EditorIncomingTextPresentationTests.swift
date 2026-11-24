@@ -12,9 +12,8 @@ import XCTest
 /// otherwise keep believing markers that `textView.text =` wiped.
 @MainActor
 final class EditorIncomingTextPresentationTests: XCTestCase {
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        super.tearDown()
     }
 
     /// One incoming App text change: same UTF-16 length, same first and last 64 units, one
@@ -92,15 +91,7 @@ final class EditorIncomingTextPresentationTests: XCTestCase {
         driver.installInitialPresentation()
         let storage = try XCTUnwrap(MarkdownTextView.textStorage(of: fixture.textView))
         var characterEdits = 0
-        let observer = NotificationCenter.default.addObserver(
-            forName: NSTextStorage.didProcessEditingNotification,
-            object: storage,
-            queue: nil
-        ) { notification in
-            if (notification.object as? NSTextStorage)?.editedMask.contains(.editedCharacters) == true {
-                characterEdits += 1
-            }
-        }
+        let observer = observeCharacterEdits(in: storage) { characterEdits += 1 }
         defer { NotificationCenter.default.removeObserver(observer) }
 
         fixture.representable.updateRepresentedTextView(
@@ -147,15 +138,7 @@ final class EditorIncomingTextPresentationTests: XCTestCase {
         driver.installInitialPresentation()
         let storage = try XCTUnwrap(MarkdownTextView.textStorage(of: fixture.textView))
         var characterEdits = 0
-        let observer = NotificationCenter.default.addObserver(
-            forName: NSTextStorage.didProcessEditingNotification,
-            object: storage,
-            queue: nil
-        ) { notification in
-            if (notification.object as? NSTextStorage)?.editedMask.contains(.editedCharacters) == true {
-                characterEdits += 1
-            }
-        }
+        let observer = observeCharacterEdits(in: storage) { characterEdits += 1 }
         defer { NotificationCenter.default.removeObserver(observer) }
 
         fixture.model.revision = 1
@@ -284,5 +267,20 @@ final class EditorIncomingTextPresentationTests: XCTestCase {
         storage.attribute(
             EditorFindMatchHighlightMarker.attribute, at: location, effectiveRange: nil
         ) as? EditorFindMatchHighlightMarker
+    }
+
+    private func observeCharacterEdits(
+        in storage: NSTextStorage, onEdit: @escaping @MainActor () -> Void
+    ) -> NSObjectProtocol {
+        let onEditNotification: @MainActor () -> Void = {
+            if storage.editedMask.contains(.editedCharacters) {
+                onEdit()
+            }
+        }
+        return NotificationCenter.default.addObserver(
+            forName: NSTextStorage.didProcessEditingNotification, object: storage, queue: nil
+        ) { _ in
+            MainActor.assumeIsolated { onEditNotification() }
+        }
     }
 }

@@ -23,16 +23,17 @@ final class MarkdownSyntaxThemeConcurrencyTests: XCTestCase {
             MarkdownSyntaxTheme.noteAccessibilityIncreaseContrast(increaseContrast)
             let completed = DispatchSemaphore(value: 0)
             let worker = Task.detached {
+                defer { completed.signal() }
+                let appearance = try XCTUnwrap(NSAppearance(named: .aqua))
                 var red: CGFloat?
                 appearance.performAsCurrentDrawingAppearance {
                     red = color.usingColorSpace(.sRGB)?.redComponent
                 }
-                completed.signal()
                 return red
             }
             // A provider that uses main.sync cannot finish until this bounded wait ends.
             XCTAssertEqual(completed.wait(timeout: .now() + 2), .success)
-            let workerRed = await worker.value
+            let workerRed = try await worker.value
             let resolvedRed = try XCTUnwrap(workerRed)
             let expectedRed = increaseContrast ? try XCTUnwrap(builtInRed) : 0x11 / 255.0
             XCTAssertEqual(resolvedRed, expectedRed, accuracy: 0.02)

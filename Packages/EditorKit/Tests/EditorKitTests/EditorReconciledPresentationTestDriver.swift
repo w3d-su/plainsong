@@ -11,13 +11,11 @@ import XCTest
 final class EditorReconciledPresentationTestDriver {
     let fixture: EditorReplaceBatchSpikeSupport.Fixture
     let presentation: MarkdownEditorDevelopmentPresentation
-    private let debounce = ReconciledPresentationDebounce()
+    private let debounce: ReconciledPresentationDebounce
     private let service = MarkdownHighlightService()
     private let selectionProvider: () -> NSRange?
     private(set) var selectionAtRequest: NSRange?
-    private lazy var scheduler = EditorHighlightScheduler { [debounce] in
-        await debounce.wait()
-    }
+    private let scheduler: EditorHighlightScheduler
 
     private(set) var requestCount = 0
     private(set) var completedCount = 0
@@ -32,6 +30,9 @@ final class EditorReconciledPresentationTestDriver {
         self.fixture = fixture
         self.presentation = presentation
         self.selectionProvider = selectionProvider ?? { fixture.textView.selectedRange() }
+        let debounce = ReconciledPresentationDebounce()
+        self.debounce = debounce
+        scheduler = EditorHighlightScheduler { await debounce.wait() }
         fixture.coordinator.reconciledSourcePresentationInvalidationHandler = { [weak self] in
             guard let self else { return 0 }
             return restart()
