@@ -16,7 +16,8 @@ modules, and a Swift 6 and a Swift 5 module in one binary disagreed about it
 (SIGSEGV in PreviewKitTests with Xcode 16.4). `make check-preview-layering`
 (`Scripts/check-preview-webview-layering.py`) guards package sources, EditorKitTests,
 and every Xcode test target whose `project.yml` settings select Swift 6, so a test
-target is covered when it migrates. In these sources a direct `evaluateJavaScript`
+target is covered when it migrates. A `SWIFT_VERSION` that is a build-setting
+reference, such as `$(inherited)`, is not expanded and counts as Swift 6. In these sources a direct `evaluateJavaScript`
 call labels its `completionHandler:` argument (`nil` is allowed): the label tells
 the overloads apart without parsing trailing closures or statements in Swift, and
 it also catches an `async let` call that no `await` precedes.

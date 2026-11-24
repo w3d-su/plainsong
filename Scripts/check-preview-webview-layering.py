@@ -335,8 +335,14 @@ def builds_with_swift6(target, project_spec):
 
 
 def swift_major_version(version):
+    """The major language version, or 6 for a value that does not start with a digit.
+
+    Build-setting references such as `$(inherited)` or `$(MY_SWIFT)` are not expanded,
+    so they count as Swift 6: the guard fails closed, and the `completionHandler:` label
+    it then asks for is harmless in Swift 5.
+    """
     match = re.match(r"\s*([0-9]+)", version)
-    return int(match.group(1)) if match else 0
+    return int(match.group(1)) if match else 6
 
 
 def find_violations(root: Path, project_spec=None) -> list[str]:

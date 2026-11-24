@@ -471,6 +471,36 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
             "PartialNameOnly": structured(configs={"staging": six}),
         }), ["EarlierGroupLoses", "ExactNameSkipsOthers", "PartialNameOnly"])
 
+    def test_swift6_discovery_counts_unexpanded_references_as_swift6(self):
+        # The checker does not expand build-setting references, so it fails closed.
+        # xcodebuild builds the first three targets with Swift 6 and the fourth with
+        # Swift 5.10; a `completionHandler:` label is harmless there.
+        def structured(base=None, configs=None):
+            return {"base": base or {}, "configs": configs or {}, "groups": []}
+
+        def flagged(project_settings, targets):
+            for name in targets:
+                self.write_source(f"{name}/Probe.swift", "view.evaluateJavaScript(script) { _, _ in }")
+            project = {
+                "settings": project_settings,
+                "targets": {
+                    name: {"type": "bundle.unit-test", "sources": [name], "settings": settings}
+                    for name, settings in targets.items()
+                },
+            }
+            return [violation.split("/", 1)[0] for violation in self.violations(project)]
+
+        inherited = {"SWIFT_VERSION": "$(inherited)"}
+        self.assertEqual(flagged(structured(base={"SWIFT_VERSION": "6"}), {
+            "Inherited": inherited,
+            "InheritedRelease": structured(configs={"Release": inherited}),
+        }), ["Inherited", "InheritedRelease"])
+        self.assertEqual(flagged(structured(base={"SWIFT_VERSION": "5.10", "MY_SWIFT": "6"}), {
+            "Reference": {"SWIFT_VERSION": "$(MY_SWIFT)"},
+            "InheritedFive": inherited,
+            "LiteralFive": {"SWIFT_VERSION": "5.10"},
+        }), ["InheritedFive", "Reference"])
+
     def test_current_repository_has_no_violations(self):
         root = Path(__file__).resolve().parent.parent
         self.assertEqual(CHECKER["find_violations"](root), [])
