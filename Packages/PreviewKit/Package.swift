@@ -18,21 +18,18 @@ let package = Package(
                 .product(name: "MarkdownCore", package: "MarkdownCore"),
                 "PreviewKitContracts",
             ],
-            exclude: ["PreviewAssetReading.swift", "PreviewContracts.swift"],
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            exclude: ["PreviewAssetReading.swift", "PreviewContracts.swift"]
         ),
         .target(
             name: "PreviewKitContracts",
             dependencies: [.product(name: "MarkdownCore", package: "MarkdownCore")],
             path: "Sources/PreviewKit",
-            sources: ["PreviewAssetReading.swift", "PreviewContracts.swift"],
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            sources: ["PreviewAssetReading.swift", "PreviewContracts.swift"]
         ),
         .testTarget(
             name: "PreviewKitTests",
-            dependencies: ["PreviewKit"],
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            dependencies: ["PreviewKit"]
         ),
     ],
-    swiftLanguageModes: [.v5]
+    swiftLanguageModes: [.v6]
 )

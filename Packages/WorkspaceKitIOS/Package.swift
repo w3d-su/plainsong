@@ -19,14 +19,12 @@ let package = Package(
                 .product(name: "MarkdownCore", package: "MarkdownCore"),
                 .product(name: "WorkspaceCore", package: "WorkspaceCore"),
                 .product(name: "PreviewKitContracts", package: "PreviewKit"),
-            ],
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            ]
         ),
         .testTarget(
             name: "WorkspaceKitIOSTests",
-            dependencies: ["WorkspaceKitIOS"],
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            dependencies: ["WorkspaceKitIOS"]
         ),
     ],
-    swiftLanguageModes: [.v5]
+    swiftLanguageModes: [.v6]
 )
