@@ -46,7 +46,7 @@ let package = Package(
         ),
         .testTarget(
             name: "SyntaxKitTests",
-            dependencies: ["SyntaxKit"],
+            dependencies: ["SyntaxKit", "TreeSitterYAMLFixed"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ],
