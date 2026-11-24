@@ -215,7 +215,9 @@ final class ExportPrintSheetAppTests: XCTestCase {
     /// AppKit's blocking UI (modal alert or attached print sheet) while the task
     /// finishes so supersede/cancel unwinds on any host. The nested modal loop does
     /// not service the main dispatch queue, but it does service a main-run-loop
-    /// timer registered in the modal panel mode.
+    /// timer. Register it in the common modes, which in an AppKit app include the
+    /// default, modal panel and event tracking modes, so the timer still fires if
+    /// PrintingUI runs its nested loop in one of the others.
     private static func awaitPrintTask(_ task: Task<Void, Never>) async {
         let dismiss = Timer(timeInterval: 0.02, repeats: true) { _ in
             MainActor.assumeIsolated {
@@ -238,8 +240,7 @@ final class ExportPrintSheetAppTests: XCTestCase {
                 }
             }
         }
-        RunLoop.main.add(dismiss, forMode: .default)
-        RunLoop.main.add(dismiss, forMode: .modalPanel)
+        RunLoop.main.add(dismiss, forMode: .common)
         defer { dismiss.invalidate() }
         await task.value
     }
