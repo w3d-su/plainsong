@@ -17,10 +17,9 @@ let package = Package(
             dependencies: [
                 .product(name: "MarkdownCore", package: "MarkdownCore"),
                 .product(name: "SyntaxKit", package: "SyntaxKit"),
-            ],
-            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
+            ]
         ),
         .testTarget(name: "EditorKitIOSTests", dependencies: ["EditorKitIOS"]),
     ],
-    swiftLanguageModes: [.v5]
+    swiftLanguageModes: [.v6]
 )

@@ -315,6 +315,23 @@ class PreviewWebViewLayeringTests(unittest.TestCase):
             "App/Legacy.mm:2: import WebKit outside PreviewController",
         ])
 
+    def test_rejects_the_async_evaluate_javascript_import_in_package_sources(self):
+        source = "\n".join([
+            "let a = try await webView.evaluateJavaScript(script)",
+            "let b = try await controller.webView",
+            "    .evaluateJavaScript(script)",
+            "webView.evaluateJavaScript(script) { _, _ in }",
+            "// await webView.evaluateJavaScript(script)",
+            "let c = try await evaluateJavaScriptReply(script)",
+        ])
+        self.write_source("Packages/PreviewKit/Sources/PreviewKit/Probe.swift", source)
+        self.write_source("Packages/PreviewKit/Tests/PreviewKitTests/ProbeTests.swift", source)
+        detail = "await the completion-handler evaluateJavaScriptReply(_:), not the async evaluateJavaScript import"
+        self.assertEqual(self.violations({"targets": {}}), [
+            f"Packages/PreviewKit/Sources/PreviewKit/Probe.swift:1: {detail}",
+            f"Packages/PreviewKit/Sources/PreviewKit/Probe.swift:2: {detail}",
+        ])
+
     def test_current_repository_has_no_violations(self):
         root = Path(__file__).resolve().parent.parent
         self.assertEqual(CHECKER["find_violations"](root), [])

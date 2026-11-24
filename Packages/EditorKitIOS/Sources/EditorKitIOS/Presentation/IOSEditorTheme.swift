@@ -1,8 +1,8 @@
 import SyntaxKit
 import UIKit
 
-public struct IOSEditorTheme: Equatable {
-    public enum Palette: String, CaseIterable, Identifiable, Equatable {
+public struct IOSEditorTheme: Equatable, Sendable {
+    public enum Palette: String, CaseIterable, Identifiable, Equatable, Sendable {
         case plainsong
         case graphite
 

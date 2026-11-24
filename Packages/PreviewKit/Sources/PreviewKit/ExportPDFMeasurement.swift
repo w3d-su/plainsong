@@ -335,7 +335,7 @@ extension PreviewController {
         try checkExportAlive()
         try Task.checkCancellation()
         do {
-            return try await webView.evaluateJavaScript(script)
+            return try await evaluateJavaScriptReply(script)
         } catch {
             try checkExportAlive()
             throw ExportPDFCaptureError.captureFailed("\(label): \(error.localizedDescription)")

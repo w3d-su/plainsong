@@ -140,7 +140,9 @@ extension MarkdownTextViewCoordinator {
         let priorSelection = textView.selectedRange()
         // First so undo applies prior selection after STTextView restores text.
         undoManager?.registerUndo(withTarget: textView) { view in
-            view.textSelection = priorSelection
+            MainActor.assumeIsolated {
+                view.textSelection = priorSelection
+            }
         }
 
         var nativeEditCount = 0
@@ -170,8 +172,12 @@ extension MarkdownTextViewCoordinator {
             textView.textSelection = postSelection
             // Last so redo reapplies the planned caret after STTextView redo.
             undoManager?.registerUndo(withTarget: textView) { _ in
-                undoManager?.registerUndo(withTarget: textView) { redoView in
-                    redoView.textSelection = postSelection
+                MainActor.assumeIsolated {
+                    textView.undoManager?.registerUndo(withTarget: textView) { _ in
+                        MainActor.assumeIsolated {
+                            textView.textSelection = postSelection
+                        }
+                    }
                 }
             }
         }

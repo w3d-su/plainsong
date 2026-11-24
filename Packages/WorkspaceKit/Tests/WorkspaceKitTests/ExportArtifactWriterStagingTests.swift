@@ -10,8 +10,9 @@ extension ExportArtifactWriterTests {
         let probe = ExportBoundaryProbe()
         let observed = DescriptorCounts()
         let hooks = probe.hooks(afterPublication: { [probe] in
+            var status = stat()
             guard let staging = probe.stagingDirectoryPath,
-                  let status = try? self.status(at: staging)
+                  staging.withCString({ Darwin.lstat($0, &status) }) == 0
             else { return }
             observed.append(Int(status.st_dev))
         })
