@@ -364,7 +364,7 @@ revision.
   namespace mutation, an image insertion in that window, or quarantine refuse the close;
   a dirty document that can be saved is saved first, and a failed save keeps the window.
   A dirty document that cannot be saved closes only if the registry keeps its text,
-  authority, and prompt state (a warm conflicted or missing-file session, or a
+  authority, and prompt state (a warm conflicted session whose file is not missing, or a
   text-recovery copy); otherwise the close is refused. The last window on a root releases
   it (D1b) and may refuse; when the blocking document is in no window, the refusal's Show
   opens it there. Then the window releases its editor installations and writer,
