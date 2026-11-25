@@ -316,7 +316,9 @@ final class WindowFacadeRoutingAppTests: XCTestCase {
         XCTAssertGreaterThan(publishes, 0)
     }
 
-    func testOpeningAFileAnotherWindowHoldsDirtyReusesItsSessionWhenTheDiskCopyIsUnreadable() async throws {
+    /// WD1: the window that shows the file comes forward with its unsaved text, whatever
+    /// happened to the disk copy, and the requesting window keeps its workspace.
+    func testOpeningAFileAnotherWindowHoldsDirtyFocusesItWhenTheDiskCopyIsUnreadable() async throws {
         let primary = makePrimary()
         let second = primary.makeSiblingFacade(admitsFileOperations: true)
         let root = try makeRoot("root", file: "B.md", contents: "beta\n")
@@ -326,11 +328,22 @@ final class WindowFacadeRoutingAppTests: XCTestCase {
             primary.workspaceInstalledCaptureGeneration == primary.workspaceGeneration
                 && primary.workspaceSearchRootAuthority != nil
         }
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 120),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        KeyWindowRouter.shared.attach(window, to: second)
         defer {
+            window.orderOut(nil)
             primary.closeWorkspace()
             second.closeWorkspace()
         }
         primary.openWorkspaceFile(root.appendingPathComponent("B.md"))
+        let beta = primary.shownSession
+        let workspaceRoot = primary.workspaceRootURL
         try second.open(url: standalone, rememberAsLastOpened: false, preserveWorkspace: true)
         let alpha = second.shownSession
         XCTAssertEqual(alpha.fileURL?.lastPathComponent, "A.md")
@@ -339,10 +352,13 @@ final class WindowFacadeRoutingAppTests: XCTestCase {
 
         // An external tool leaves A's disk copy undecodable; window 1 opens A.
         try Data([0xFF, 0xFE]).write(to: standalone)
-        primary.openExternalFile(standalone)
-        XCTAssertNil(primary.presentedError)
+        primary.routeOpen(standalone)
 
-        XCTAssertTrue(primary.shownSession === alpha)
+        XCTAssertTrue(KeyWindowRouter.shared.focusedWindowState === second.windowState)
+        XCTAssertNil(primary.presentedError)
+        XCTAssertTrue(primary.shownSession === beta)
+        XCTAssertEqual(primary.workspaceRootURL, workspaceRoot)
+        XCTAssertTrue(second.shownSession === alpha)
         XCTAssertEqual(alpha.text, "alpha unsaved\n")
     }
 

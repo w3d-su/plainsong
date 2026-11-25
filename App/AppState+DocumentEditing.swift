@@ -93,9 +93,10 @@ extension AppState {
         if let workspaceURL = workspaceRootURL.flatMap({ Self.workspaceFileURL(for: url, under: $0) }) {
             openWorkspaceFile(workspaceURL)
         } else {
-            // Opening a file outside the workspace closes the workspace first. The sandbox
-            // grants no access to a file the user did not pick, so refuse before the close.
-            guard workspaceRootURL == nil || FileManager.default.isReadableFile(atPath: url.path) else {
+            // A file outside this window's root follows the Open rule from this window (§5.2).
+            // The sandbox grants no access to a file the user did not pick, so refuse one no
+            // window shows before a window appears or a workspace closes for it.
+            guard windowShowingFile(at: url) != nil || FileManager.default.isReadableFile(atPath: url.path) else {
                 // The sandbox answers EPERM for a file it does not grant, so only a plain
                 // "no such entry" is reported as a missing target.
                 let isMissing = access(url.path, F_OK) != 0 && (errno == ENOENT || errno == ENOTDIR)
@@ -108,7 +109,7 @@ extension AppState {
                 )
                 return
             }
-            openExternalFile(url)
+            routeOpen(url)
         }
     }
 

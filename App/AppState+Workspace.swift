@@ -271,13 +271,22 @@ extension AppState {
         guard FileKind(url: url) != nil else {
             throw AppStateError.unsupportedFile(url)
         }
+        // WD1: a file another window shows is focused there, and one this window already
+        // shows (perhaps through a hard link or an alias) is not opened again. Check before
+        // this window closes its workspace, so the refused open changes nothing here.
+        if let owner = windowShowingFile(at: url) {
+            guard owner !== windowState else { return }
+            throw DocumentShownInAnotherWindow(fileURL: url, target: RegisteredWindowState(window: owner))
+        }
 
         if preserveWorkspace {
             try activateFileSession(url: url)
         } else {
             // A file this window cannot load (outside the sandbox grant, not a regular file,
-            // or not UTF-8) must fail before the workspace it replaces is closed.
-            let replacementRead = try prepareReplacementFileRead(url: url)
+            // or not UTF-8) must fail before the workspace it replaces is closed. An empty
+            // window replaces nothing: it can still show a warm session from memory when the
+            // disk copy cannot be read.
+            let replacementRead = isEmptyWorkspaceWindow ? nil : try prepareReplacementFileRead(url: url)
             try closeWorkspaceForReplacement()
             try activateFileSession(url: url, preparedRead: replacementRead)
         }

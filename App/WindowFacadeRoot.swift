@@ -3,9 +3,8 @@ import SwiftUI
 
 /// One workspace scene. A scene gets the app-owned façade whenever no open scene shows it,
 /// including after its window closed (Dock reopen, Finder open). Every scene opened while the
-/// owner is shown gets its own window and root context on the same registry. Until PR D2
-/// such a scene refuses file and root opens and closes itself once `KeyWindowRouter.attach`
-/// sees its window, so it cannot mirror the first window.
+/// owner is shown (New Window, a WD7 open) gets its own admitted façade, window state, and
+/// root context on the same registry, so it never mirrors another window (PR D2).
 @MainActor
 final class WindowFacadeHolder: ObservableObject {
     let facade: AppState
@@ -18,9 +17,11 @@ final class WindowFacadeHolder: ObservableObject {
             facade = owner
             ownerClaimToken = token
         } else {
-            facade = owner.makeSiblingFacade(admitsFileOperations: WindowOpenAdmission.admitsLaterScenes)
+            facade = owner.makeSiblingFacade(admitsFileOperations: true)
             ownerClaimToken = nil
         }
+        // New Window and WD7 opens wait for the next scene (`WorkspaceWindowRequests`).
+        WorkspaceWindowRequests.shared.claimNextRequest(for: facade)
     }
 }
 
@@ -88,6 +89,11 @@ final class WorkspaceSceneReopener {
 
     var knownOwner: AppState? {
         retainedOwner
+    }
+
+    /// SwiftUI's `openWindow` for the workspace group, once a scene or command installed it.
+    var sceneOpener: (() -> Void)? {
+        openScene
     }
 
     func remember(_ owner: AppState) {

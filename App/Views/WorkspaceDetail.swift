@@ -92,6 +92,8 @@ struct EditorWorkspace: View {
         scrollCoordinator: EditorPreviewScrollCoordinator
     ) {
         scrollCoordinator.connect(previewController: controller)
+        // Closing the window invalidates this controller (§6.2 step 5).
+        WindowPreviewControllers.register(controller, for: appState.windowState)
 
         controller.onPreviewScrolled = { line in
             guard appState.preferences.typewriterSyncEnabled else { return }
@@ -114,6 +116,20 @@ private struct DocumentEditor: View {
     let scrollCoordinator: EditorPreviewScrollCoordinator
 
     var body: some View {
+        // A closing window's views can be evaluated once more after its façade switched to the
+        // empty document (SwiftUI may update a child before its parent drops it). The editor
+        // only shows a document with a file (`hasOpenDocument`), so that pass must bind nothing:
+        // a binding would keep the blank in the registry's `.editorBindings` inventory, where
+        // Save Copy and export refuse it and WD7 no longer sees an empty window (PR D2).
+        if session.fileURL == nil {
+            Color.clear
+        } else {
+            editor
+        }
+    }
+
+    @ViewBuilder
+    private var editor: some View {
         let editorBinding = appState.editorDocumentBinding(for: session)
         let presentation = EditorPresentationPolicy.resolve(
             usesWYSIWYGPresentation: usesWYSIWYGPresentation

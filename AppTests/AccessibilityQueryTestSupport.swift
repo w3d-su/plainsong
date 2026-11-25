@@ -52,6 +52,31 @@ enum AccessibilityQuery {
         AXUIElementPerformAction(element, kAXIncrementAction as CFString) == .success
     }
 
+    /// Like `find`, but searches only the accessibility window at `window`'s frame, so two
+    /// windows that share identifiers and titles cannot answer for each other.
+    static func find(identifier: String?, label: String?, onlyIn window: NSWindow) -> AXUIElement? {
+        guard let root = accessibilityWindow(at: window.frame) else { return nil }
+        var seen = Set<CFHashCode>()
+        return search(root, identifier: identifier, label: label, seen: &seen, depth: 0)
+    }
+
+    private static func accessibilityWindow(at frame: NSRect) -> AXUIElement? {
+        let app = AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
+        // Accessibility positions are top-left based, from the top of the primary screen.
+        let primaryTop = NSScreen.screens.first?.frame.maxY ?? 0
+        let expected = CGPoint(x: frame.minX, y: primaryTop - frame.maxY)
+        return children(of: app, attribute: kAXWindowsAttribute).first { candidate in
+            guard let raw = attribute(candidate, kAXPositionAttribute),
+                  CFGetTypeID(raw) == AXValueGetTypeID()
+            else {
+                return false
+            }
+            var point = CGPoint.zero
+            guard AXValueGetValue(unsafeBitCast(raw, to: AXValue.self), .cgPoint, &point) else { return false }
+            return abs(point.x - expected.x) < 2 && abs(point.y - expected.y) < 2
+        }
+    }
+
     private static func roots(for window: NSWindow) -> [AXUIElement] {
         let app = AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
         let windows = children(of: app, attribute: kAXWindowsAttribute)

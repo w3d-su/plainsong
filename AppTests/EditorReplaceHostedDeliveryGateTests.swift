@@ -247,6 +247,11 @@ extension EditorFindHostedGateTests {
         let editor = try hostedEditor(hosted)
         let session = appState.shownSession
         let controller = appState.editorFindHost.controller
+        // The test never writes to disk. A late FSEvent for the fixture's creation would start
+        // a disk inspection that refuses the final Replace as `externalObservationPending`
+        // (seen once on CI), so stop the watcher and let any inspection already started settle.
+        appState.workspaceWatcher?.stop()
+        try await waitForHostedReplaceObservationQuiescence(hosted)
         // An App-side source change neither the installed view nor Find has observed yet.
         session.replaceText("hit zero hit one hit two", refreshStatistics: false)
         XCTAssertEqual(controller.documentBinding.revision, 0)

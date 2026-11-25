@@ -179,22 +179,27 @@ final class PreviewLinkOpeningTests: XCTestCase {
         XCTAssertEqual(appState.shownSession.text, "# Note")
     }
 
-    func testReopeningTheDirtyShownFileInstallsTheCopyTheCloseSaved() async throws {
+    /// WD1: a window does not open the file it already shows again, so its workspace and its
+    /// unsaved text stay as they are.
+    func testReopeningTheDirtyShownFileKeepsItsSessionAndItsUnsavedText() async throws {
         let root = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let fileA = root.appendingPathComponent("a.md")
         try "# A".write(to: fileA, atomically: true, encoding: .utf8)
         let appState = try await openWorkspace(root, showing: fileA)
         let sessionA = appState.shownSession
+        let workspaceRoot = appState.workspaceRootURL
         appState.replaceDocumentText("# A unsaved", in: sessionA)
         appState.cancelAutosave(for: sessionA)
 
         try appState.open(url: fileA, rememberAsLastOpened: false, preserveWorkspace: false)
 
-        XCTAssertEqual(try String(contentsOf: fileA, encoding: .utf8), "# A unsaved")
-        XCTAssertEqual(appState.shownSession.text, "# A unsaved")
-        appState.replaceDocumentText("# A again", in: appState.shownSession)
-        try appState.save(session: appState.shownSession)
+        XCTAssertTrue(appState.shownSession === sessionA)
+        XCTAssertEqual(sessionA.text, "# A unsaved")
+        XCTAssertTrue(sessionA.isDirty)
+        XCTAssertEqual(appState.workspaceRootURL, workspaceRoot)
+        appState.replaceDocumentText("# A again", in: sessionA)
+        try appState.save(session: sessionA)
         XCTAssertEqual(try String(contentsOf: fileA, encoding: .utf8), "# A again")
     }
 
@@ -208,12 +213,56 @@ final class PreviewLinkOpeningTests: XCTestCase {
         let workspaceRoot = appState.workspaceRootURL
 
         try Data([0xFF, 0xFE]).write(to: fileA)
+        try appState.open(url: fileA, rememberAsLastOpened: false, preserveWorkspace: false)
+
+        XCTAssertEqual(appState.workspaceRootURL, workspaceRoot)
+        XCTAssertTrue(appState.shownSession === sessionA)
+        XCTAssertEqual(sessionA.text, "# A")
+    }
+
+    func testReopeningADirtyWarmFileInstallsTheCopyTheCloseSaved() async throws {
+        let root = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let fileA = root.appendingPathComponent("a.md")
+        let fileB = root.appendingPathComponent("b.md")
+        try "# A".write(to: fileA, atomically: true, encoding: .utf8)
+        try "# B".write(to: fileB, atomically: true, encoding: .utf8)
+        let appState = try await openWorkspace(root, showing: fileA)
+        let sessionA = appState.shownSession
+        appState.replaceDocumentText("# A unsaved", in: sessionA)
+        appState.openWorkspaceFile(fileB.standardizedFileURL)
+        XCTAssertEqual(appState.shownSession.text, "# B")
+        appState.cancelAutosave(for: sessionA)
+
+        try appState.open(url: fileA, rememberAsLastOpened: false, preserveWorkspace: false)
+
+        XCTAssertNil(appState.workspaceRootURL)
+        XCTAssertEqual(try String(contentsOf: fileA, encoding: .utf8), "# A unsaved")
+        XCTAssertEqual(appState.shownSession.text, "# A unsaved")
+        appState.replaceDocumentText("# A again", in: appState.shownSession)
+        try appState.save(session: appState.shownSession)
+        XCTAssertEqual(try String(contentsOf: fileA, encoding: .utf8), "# A again")
+    }
+
+    func testReopeningAWarmFileWhenItsDiskCopyIsUnreadableKeepsTheWorkspace() async throws {
+        let root = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let fileA = root.appendingPathComponent("a.md")
+        let fileB = root.appendingPathComponent("b.md")
+        try "# A".write(to: fileA, atomically: true, encoding: .utf8)
+        try "# B".write(to: fileB, atomically: true, encoding: .utf8)
+        let appState = try await openWorkspace(root, showing: fileA)
+        appState.openWorkspaceFile(fileB.standardizedFileURL)
+        let sessionB = appState.shownSession
+        let workspaceRoot = appState.workspaceRootURL
+
+        try Data([0xFF, 0xFE]).write(to: fileA)
         XCTAssertThrowsError(
             try appState.open(url: fileA, rememberAsLastOpened: false, preserveWorkspace: false)
         )
 
         XCTAssertEqual(appState.workspaceRootURL, workspaceRoot)
-        XCTAssertTrue(appState.shownSession === sessionA)
+        XCTAssertTrue(appState.shownSession === sessionB)
     }
 
     private func makeDirectory() throws -> URL {
