@@ -18,11 +18,16 @@ public extension ExactSourceText {
         let baseUnits = Array(base.utf16)
         let currentUnits = Array(current.utf16)
         let proposedUnits = Array(proposed.utf16)
-        guard let currentEdits = sourceEdits(from: baseUnits, to: currentUnits),
-              let proposedEdits = sourceEdits(from: baseUnits, to: proposedUnits)
+        guard let currentUnitEdits = sourceEdits(from: baseUnits, to: currentUnits),
+              let proposedUnitEdits = sourceEdits(from: baseUnits, to: proposedUnits)
         else {
             return nil
         }
+        // A unit diff can change one half of a surrogate pair. Two such edits to the same
+        // pair do not overlap as units and would merge into a scalar neither side wrote,
+        // so each edit is widened to the whole pair and then conflicts like any overlap.
+        let currentEdits = currentUnitEdits.map { coveringWholeSurrogatePairs($0, in: baseUnits) }
+        let proposedEdits = proposedUnitEdits.map { coveringWholeSurrogatePairs($0, in: baseUnits) }
 
         var mergedEdits = currentEdits
         for proposedEdit in proposedEdits {
@@ -47,6 +52,26 @@ private extension ExactSourceText {
     struct SourceEdit: Equatable {
         let range: Range<Int>
         let replacement: [UInt16]
+    }
+
+    static func coveringWholeSurrogatePairs(_ edit: SourceEdit, in base: [UInt16]) -> SourceEdit {
+        func splitsPair(at offset: Int) -> Bool {
+            offset > 0 && offset < base.count &&
+                UTF16.isLeadSurrogate(base[offset - 1]) && UTF16.isTrailSurrogate(base[offset])
+        }
+
+        var lowerBound = edit.range.lowerBound
+        var upperBound = edit.range.upperBound
+        var replacement = edit.replacement
+        if splitsPair(at: lowerBound) {
+            lowerBound -= 1
+            replacement.insert(base[lowerBound], at: 0)
+        }
+        if splitsPair(at: upperBound) {
+            replacement.append(base[upperBound])
+            upperBound += 1
+        }
+        return SourceEdit(range: lowerBound ..< upperBound, replacement: replacement)
     }
 
     static func sourceEdits(

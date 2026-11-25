@@ -48,7 +48,7 @@ final class IOSDocumentDeferredCloseTests: XCTestCase {
         await harness.coordinator.setBytes(Data("saved snapshot".utf8))
         await harness.coordinator.setBlockReads(true)
         let closing = Task { try await harness.store.close(handle.identity) }
-        await fulfillment(of: [entered], timeout: 2)
+        await assertFulfillment(of: [entered], timeout: 2)
         port.emit(.externalChange)
         XCTAssertTrue(entry.hasDeferredExternalChange)
         XCTAssertTrue(entry.externalReadTasks.isEmpty)

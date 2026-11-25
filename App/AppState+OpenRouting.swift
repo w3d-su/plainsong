@@ -56,7 +56,11 @@ extension AppState {
             }
             WorkspaceWindowRequests.shared.openNewWindow(
                 on: registry,
-                then: { [weak self] facade in facade.openInRequestedWindow(url, origin: self) },
+                then: { [weak self] facade in
+                    facade.performInRequestedWindow(origin: self, errorTitle: "Could Not Open File") {
+                        try facade.openInThisWindow(url)
+                    }
+                },
                 ifItNeverOpens: { [weak self] in
                     self?.present(AppStateError.newWindowDidNotOpen(url), title: "Could Not Open File")
                 }
@@ -90,12 +94,12 @@ extension AppState {
         rememberRecentItem(url)
     }
 
-    /// Runs in the new window a `routeOpen` requested. If the open fails there, the new window
-    /// closes and the error appears in the window the request came from, so no blank window is
-    /// left behind (WD7).
-    func openInRequestedWindow(_ url: URL, origin: AppState?) {
+    /// Runs `open` in the new window a `routeOpen` or New File requested. If it fails there, the
+    /// new window closes and the error appears in the window the request came from, so no blank
+    /// window is left behind (WD7).
+    func performInRequestedWindow(origin: AppState?, errorTitle: String, _ open: () throws -> Void) {
         do {
-            try openInThisWindow(url)
+            try open()
         } catch {
             let origin = origin.flatMap { origin in
                 origin !== self && KeyWindowRouter.shared.hasAttachedWindow(origin) ? origin : nil
@@ -103,13 +107,13 @@ extension AppState {
             // With the requesting window gone, keep this window and show the error in it,
             // unless WD1 found the file in another window: then nothing needs this one.
             guard origin != nil || error is DocumentShownInAnotherWindow else {
-                present(error, title: "Could Not Open File")
+                present(error, title: errorTitle)
                 return
             }
             KeyWindowRouter.shared.closeAttachedWindow(of: self, skippingCloseChecks: true)
             // WD1's focus, or its fallback refusal, also runs from the requesting window.
             let reporter = origin ?? KeyWindowRouter.shared.home(for: registry) ?? self
-            reporter.present(error, title: "Could Not Open File")
+            reporter.present(error, title: errorTitle)
         }
     }
 

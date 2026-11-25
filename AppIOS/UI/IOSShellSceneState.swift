@@ -329,6 +329,15 @@ final class IOSShellSceneState: ObservableObject {
         navigationPath.append(.document)
     }
 
+    /// Selects an available folder row so New File creates inside it (`newFileTarget`).
+    /// Rows were only tappable for documents, so a folder could never be the target.
+    @discardableResult
+    func selectDirectory(_ entry: IOSWorkspaceEntry) -> Bool {
+        guard case .directory = entry.kind, case .available = entry.availability else { return false }
+        selectedEntryID = entry.id
+        return true
+    }
+
     /// New File only uses the current directory grant. A file URL or an
     /// existing row cannot authorize its parent, including an empty workspace.
     var newFileTarget: IOSFileLocation? {

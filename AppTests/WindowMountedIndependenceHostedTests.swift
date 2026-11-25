@@ -299,8 +299,8 @@ extension EditorFindHostedGateTests {
         XCTAssertEqual(EditorSelectionProbe.visibleTextRange(in: other.window), otherVisibleBefore)
 
         // Preview scroll.
-        _ = try await firstPreview.webView.evaluateJavaScript("window.scrollTo(0, 600); window.scrollY")
-        let otherScroll = try await otherPreview.webView.evaluateJavaScript("window.scrollY") as? Double
+        _ = try await firstPreview.webView.evaluateJavaScriptReply("window.scrollTo(0, 600); window.scrollY")
+        let otherScroll = try await otherPreview.webView.evaluateJavaScriptReply("window.scrollY") as? Double
         XCTAssertEqual(otherScroll ?? 0, 0, accuracy: 0.5)
 
         // Find visibility and query.
@@ -334,6 +334,6 @@ extension EditorFindHostedGateTests {
     }
 
     private func previewText(_ controller: PreviewController) async throws -> String {
-        try await controller.webView.evaluateJavaScript("document.body.innerText") as? String ?? ""
+        try await controller.webView.evaluateJavaScriptReply("document.body.innerText") as? String ?? ""
     }
 }

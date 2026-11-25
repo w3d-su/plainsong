@@ -65,6 +65,26 @@ final class ExportPrintSheetAppTests: XCTestCase {
         XCTAssertTrue(completion.isResolved)
     }
 
+    func testPrintTaskWaitCanDismissAnAppModalWindow() async {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 160, height: 80),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        defer { window.orderOut(nil) }
+        let watchdog = Timer(timeInterval: 2, repeats: false) { _ in
+            MainActor.assumeIsolated { NSApp.abortModal() }
+        }
+        RunLoop.main.add(watchdog, forMode: .modalPanel)
+        defer { watchdog.invalidate() }
+
+        let task = Task { @MainActor in
+            XCTAssertEqual(NSApp.runModal(for: window), .stop)
+        }
+        await Self.awaitPrintTask(task)
+    }
+
     /// While the real print sheet is up the File-menu exports are ineligible and a
     /// supersede finishes the task and releases the controller and its WebView.
     func testSupersedeDuringRealPrintSheetFinishesAndReleasesObjects() async throws {
@@ -193,25 +213,15 @@ final class ExportPrintSheetAppTests: XCTestCase {
     /// inside `NSPrintOperation.runModal` before any sheet exists; the awaiting task
     /// then stays suspended inside that nested modal loop until it ends. Keep releasing
     /// AppKit's blocking UI (modal alert or attached print sheet) while the task
-    /// finishes so supersede/cancel unwinds on any host. The alert's nested loop does
-    /// not service the main dispatch queue, so the task await and a fallback dismissal
-    /// also run off the main actor: `postEvent` is documented thread-safe and Escape
-    /// cancels an alert or a print sheet, while `stopModal` breaks a buttonless
-    /// session that swallows the event.
+    /// finishes so supersede/cancel unwinds on any host. The nested modal loop does
+    /// not service the main dispatch queue, but it does service a main-run-loop
+    /// timer. Register it in the common modes, which in an AppKit app include the
+    /// default, modal panel and event tracking modes, so the timer still fires if
+    /// PrintingUI runs its nested loop in one of the others.
     private static func awaitPrintTask(_ task: Task<Void, Never>) async {
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask { await task.value }
-            group.addTask { @MainActor in
-                while !Task.isCancelled {
-                    if NSApp.modalWindow != nil { NSApp.stopModal() }
-                    for window in NSApp.windows where window.attachedSheet != nil {
-                        window.endSheet(window.attachedSheet!, returnCode: .cancel)
-                    }
-                    try? await Task.sleep(nanoseconds: 20_000_000)
-                }
-            }
-            group.addTask {
-                while !Task.isCancelled {
+        let dismiss = Timer(timeInterval: 0.02, repeats: true) { _ in
+            MainActor.assumeIsolated {
+                if NSApp.modalWindow != nil || RunLoop.current.currentMode == .modalPanel {
                     NSApp.stopModal()
                     if let escape = NSEvent.keyEvent(
                         with: .keyDown, location: .zero, modifierFlags: [],
@@ -222,12 +232,17 @@ final class ExportPrintSheetAppTests: XCTestCase {
                     ) {
                         NSApp.postEvent(escape, atStart: false)
                     }
-                    try? await Task.sleep(nanoseconds: 200_000_000)
+                }
+                for window in NSApp.windows {
+                    if let sheet = window.attachedSheet {
+                        window.endSheet(sheet, returnCode: .cancel)
+                    }
                 }
             }
-            await group.next()
-            group.cancelAll()
         }
+        RunLoop.main.add(dismiss, forMode: .common)
+        defer { dismiss.invalidate() }
+        await task.value
     }
 
     private static func waitUntil(

@@ -1,4 +1,5 @@
 import Foundation
+import os
 import WorkspaceCore
 @testable import WorkspaceKitIOS
 import XCTest
@@ -176,10 +177,10 @@ private final class RecordingFilePort: IOSWorkspaceFilePort, @unchecked Sendable
     }
 
     func list(url: URL, relativePath: String, root: URL) async throws -> [IOSWorkspaceFileItem] {
-        lock.lock()
-        listed.append(url.path(percentEncoded: false))
-        let count = listed.count
-        lock.unlock()
+        let count = lock.withLock {
+            listed.append(url.path(percentEncoded: false))
+            return listed.count
+        }
         if count > 8 {
             throw IOSWorkspaceFailure.coordinationFailed
         }
@@ -211,5 +212,59 @@ private final class RecordingFilePort: IOSWorkspaceFilePort, @unchecked Sendable
             root: root,
             providerIdentity: providerIdentity
         )
+    }
+}
+
+@MainActor
+final class IOSWorkspaceStableTreeTests: XCTestCase {
+    /// A refresh of an unchanged folder must publish the same entry IDs in the same order,
+    /// whatever order the provider lists in: selection, expansion and the search read cache
+    /// are keyed by them.
+    func testRefreshKeepsEntryIDsAndOrderWhenTheProviderReordersItsListing() async throws {
+        let harness = AccessHarness()
+        let grant = try await harness.openDirectory("/tmp/plainsong-lane06/Stable")
+        let notes = joined(grant.rootURL, "notes")
+        let reversed = OSAllocatedUnfairLock(initialState: false)
+        harness.files.nestedListing = { url, _ in
+            let listing: [IOSWorkspaceFileItem] = if url.path(percentEncoded: false)
+                == grant.rootURL.path(percentEncoded: false)
+            {
+                [
+                    listingEntry(url: joined(grant.rootURL, "a.md"), relativePath: "a.md", directory: false),
+                    listingEntry(url: joined(grant.rootURL, "b.md"), relativePath: "b.md", directory: false),
+                    listingEntry(url: notes, relativePath: "notes", directory: true),
+                ]
+            } else {
+                [
+                    listingEntry(
+                        url: joined(grant.rootURL, "notes/1.md"),
+                        relativePath: "notes/1.md",
+                        directory: false
+                    ),
+                    listingEntry(
+                        url: joined(grant.rootURL, "notes/2.md"),
+                        relativePath: "notes/2.md",
+                        directory: false
+                    ),
+                ]
+            }
+            return reversed.withLock { $0 } ? listing.reversed() : listing
+        }
+
+        let first = try await harness.service.refresh(grant)
+        reversed.withLock { $0 = true }
+        let second = try await harness.service.refresh(grant)
+
+        XCTAssertEqual(Self.flattened(first).map(\.path), ["a.md", "b.md", "notes", "notes/1.md", "notes/2.md"])
+        XCTAssertEqual(Self.flattened(second).map(\.path), Self.flattened(first).map(\.path))
+        XCTAssertEqual(Self.flattened(second).map(\.id), Self.flattened(first).map(\.id))
+        XCTAssertEqual(Set(Self.flattened(first).map(\.id)).count, 5)
+    }
+
+    private static func flattened(_ snapshot: IOSWorkspaceSnapshot) -> [(path: String, id: UUID)] {
+        func walk(_ entries: [IOSWorkspaceEntry]) -> [(path: String, id: UUID)] {
+            entries.flatMap { [(path: $0.location.relativePath, id: $0.id)] + walk($0.children) }
+        }
+        return walk(snapshot.entries)
     }
 }

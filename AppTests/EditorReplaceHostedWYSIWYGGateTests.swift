@@ -155,7 +155,7 @@ extension EditorFindHostedGateTests {
                 webView = try await waitForView(WKWebView.self, in: hosted.window)
                 if let webView {
                     try await waitUntil("baseline preview content is rendered", timeout: 8) {
-                        try await (webView.evaluateJavaScript("document.body.textContent") as? String)?
+                        try await (webView.evaluateJavaScriptReply("document.body.textContent") as? String)?
                             .contains("hit one hit two") == true
                     }
                 }
@@ -174,7 +174,7 @@ extension EditorFindHostedGateTests {
                            hosted.appState.shownSession.text)
             if let webView {
                 try await waitUntil("normal publication updates live preview", timeout: 8) {
-                    try await (webView.evaluateJavaScript("document.body.textContent") as? String)?
+                    try await (webView.evaluateJavaScriptReply("document.body.textContent") as? String)?
                         .contains("NEW one hit two") == true
                 }
             }

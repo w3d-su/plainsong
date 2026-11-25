@@ -40,6 +40,9 @@ final class WindowState: ObservableObject {
     }
 
     @Published var workspaceTree: WorkspaceFileTree?
+    /// Bumped when a file opened from outside the sidebar (a preview link) must be revealed,
+    /// so the sidebar re-expands a collapsed root disclosure.
+    @Published var workspaceTreeRevealRequest: UInt64 = 0
     @Published var workspaceSearchState = WorkspaceSearchState()
     /// Sidebar mode, query chrome, and focus request/applied tokens.
     /// Focus is AppKit first-responder routing on the owned Search `NSTextField`, not SwiftUI `FocusState`.

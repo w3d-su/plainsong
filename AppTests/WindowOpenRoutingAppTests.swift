@@ -12,13 +12,13 @@ final class WindowOpenRoutingAppTests: XCTestCase {
     private var defaults: UserDefaults!
     private var suiteName = ""
     private var directory: URL!
-    private var primary: AppState!
+    var primary: AppState!
     private var lastOpened: MemoryLastOpenedFileStore!
     private var scenes: [WindowFacadeHolder] = []
     private var windows: [NSWindow] = []
-    private var sceneRequests = 0
+    var sceneRequests = 0
     /// When false, the opener records the request but no scene appears until `attachNextScene`.
-    private var attachesScenesImmediately = true
+    var attachesScenesImmediately = true
     private var pendingScenes = 0
 
     override func setUp() async throws {
@@ -346,13 +346,13 @@ final class WindowOpenRoutingAppTests: XCTestCase {
         return scene.facade
     }
 
-    private func attachNextScene() -> AppState {
+    func attachNextScene() -> AppState {
         XCTAssertGreaterThan(pendingScenes, 0)
         pendingScenes -= 1
         return attachScene()
     }
 
-    private func openNewWindow() throws -> AppState {
+    func openNewWindow() throws -> AppState {
         let before = scenes.count
         XCTAssertTrue(WorkspaceWindowRequests.shared.openNewWindow(on: primary.registry))
         XCTAssertEqual(scenes.count, before + 1)
@@ -379,7 +379,7 @@ final class WindowOpenRoutingAppTests: XCTestCase {
         return window
     }
 
-    private func write(_ name: String, _ text: String) throws -> URL {
+    func write(_ name: String, _ text: String) throws -> URL {
         let url = directory.appendingPathComponent(name)
         try Data(text.utf8).write(to: url)
         return url

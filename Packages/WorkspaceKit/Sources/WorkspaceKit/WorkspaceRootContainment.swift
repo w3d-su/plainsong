@@ -1,4 +1,5 @@
 import Foundation
+import WorkspaceCore
 
 public enum WorkspaceRootContainmentError: Error, Equatable, Sendable {
     case emptyRelativePath
@@ -18,7 +19,7 @@ public enum WorkspaceRootContainment {
         guard !path.isEmpty else {
             throw WorkspaceRootContainmentError.emptyRelativePath
         }
-        guard !path.hasPrefix("/") else {
+        guard !path.hasLeadingPathSeparator else {
             throw WorkspaceRootContainmentError.absolutePath(path)
         }
         guard !path.utf8.contains(0) else {
@@ -26,7 +27,7 @@ public enum WorkspaceRootContainment {
         }
 
         var components: [Substring] = []
-        for component in path.split(separator: "/", omittingEmptySubsequences: true) {
+        for component in path.splitOnPathSeparator(omittingEmptySubsequences: true) {
             switch component {
             case ".":
                 continue
@@ -70,7 +71,7 @@ public enum WorkspaceRootContainment {
         guard !trimmedSource.isEmpty else {
             throw WorkspaceRootContainmentError.emptyRelativePath
         }
-        guard !trimmedSource.hasPrefix("/") else {
+        guard !trimmedSource.hasLeadingPathSeparator else {
             throw WorkspaceRootContainmentError.absolutePath(trimmedSource)
         }
 
@@ -81,7 +82,7 @@ public enum WorkspaceRootContainment {
         )
 
         var components = baseDirectory.standardizedFileURL.pathComponents
-        for component in trimmedSource.split(separator: "/", omittingEmptySubsequences: true) {
+        for component in trimmedSource.splitOnPathSeparator(omittingEmptySubsequences: true) {
             switch component {
             case ".":
                 continue
@@ -118,7 +119,7 @@ public enum WorkspaceRootContainment {
         if rootPath == "/" {
             return try normalizedRelativePath(String(filePath.dropFirst()))
         }
-        return try normalizedRelativePath(String(filePath.dropFirst(rootPath.count + 1)))
+        return try normalizedRelativePath(String(filePath.utf8.dropFirst(rootPath.utf8.count + 1)) ?? "")
     }
 
     public static func isContained(_ candidateURL: URL, in rootURL: URL) -> Bool {
@@ -129,9 +130,9 @@ public enum WorkspaceRootContainment {
             candidateURL.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
         )
         if rootPath == "/" {
-            return candidatePath.hasPrefix("/")
+            return candidatePath.hasLeadingPathSeparator
         }
-        return candidatePath == rootPath || candidatePath.hasPrefix("\(rootPath)/")
+        return candidatePath == rootPath || candidatePath.utf8.starts(with: "\(rootPath)/".utf8)
     }
 
     public static func resolvedRootURL(_ rootURL: URL) -> URL {
@@ -141,8 +142,8 @@ public enum WorkspaceRootContainment {
     public static func normalizedDirectoryPath(_ path: String) -> String {
         guard path != "/" else { return path }
         var result = path
-        while result.hasSuffix("/") {
-            result.removeLast()
+        while result.hasTrailingPathSeparator {
+            result.unicodeScalars.removeLast()
         }
         return result
     }

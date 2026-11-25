@@ -80,7 +80,9 @@ enum IOSNativeTextMutation {
     }
 }
 
-private extension IOSMarkdownTextView {
+extension IOSMarkdownTextView {
+    /// Clears the history once the undo or redo in progress has closed its group. Clearing
+    /// it from inside the replay would remove the group UIKit is still about to end.
     func discardHistoryAfterReplay() {
         guard let manager = undoManager else { return }
         let name: Notification.Name = manager.isUndoing ? .NSUndoManagerDidUndoChange : .NSUndoManagerDidRedoChange
@@ -89,7 +91,7 @@ private extension IOSMarkdownTextView {
         center.addObserver(self, selector: #selector(discardStaleHistory), name: name, object: manager)
     }
 
-    @objc func discardStaleHistory(_ notification: Notification) {
+    @objc private func discardStaleHistory(_ notification: Notification) {
         guard let manager = notification.object as? UndoManager else { return }
         NotificationCenter.default.removeObserver(self, name: notification.name, object: manager)
         // The refused entry was already consumed. Older ranges no longer describe the buffer.

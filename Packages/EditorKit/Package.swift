@@ -20,9 +20,13 @@ let package = Package(
                 .product(name: "SyntaxKit", package: "SyntaxKit"),
                 .product(name: "STTextView", package: "STTextView"),
             ],
-            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
-        .testTarget(name: "EditorKitTests", dependencies: ["EditorKit"]),
+        .testTarget(
+            name: "EditorKitTests",
+            dependencies: ["EditorKit"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
     ],
     swiftLanguageModes: [.v5]
 )

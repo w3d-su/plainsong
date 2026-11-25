@@ -72,7 +72,7 @@ public actor MarkdownSyntaxTokenizer: MarkdownSyntaxTokenizing {
         let parsedTokens = parser.tokens(
             in: request.source,
             fileKind: request.fileKind,
-            visibleRange: request.visibleRange
+            expandedVisibleRange: coveredRange
         )
         try throwIfCancelled()
         guard coveredRange.location >= 0, NSMaxRange(coveredRange) <= sourceLength else {

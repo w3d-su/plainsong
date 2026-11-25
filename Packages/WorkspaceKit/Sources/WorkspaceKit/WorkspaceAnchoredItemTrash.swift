@@ -435,7 +435,7 @@ private extension WorkspaceAnchoredItemTrasher {
         var status = stat()
         guard Darwin.lstat(url.path(percentEncoded: false), &status) == 0 else { return nil }
         return WorkspaceItemMutationExpectation(
-            identity: .init(device: UInt64(status.st_dev), inode: UInt64(status.st_ino)),
+            identity: .init(device: UInt64(UInt32(bitPattern: status.st_dev)), inode: UInt64(status.st_ino)),
             kind: WorkspaceFileSystemItemKind(mode: status.st_mode)
         )
     }

@@ -34,8 +34,8 @@ protocol IOSDocumentFilePort: AnyObject {
     func save(
         snapshot: Data,
         operationID: UUID,
-        completion: @escaping @MainActor (IOSDocumentFileWriteDisposition) -> Void
+        completion: @escaping @MainActor @Sendable (IOSDocumentFileWriteDisposition) -> Void
     )
     func close() async throws
-    func setHandler(_ handler: (@MainActor (IOSDocumentFileEvent) -> Void)?)
+    func setHandler(_ handler: (@MainActor @Sendable (IOSDocumentFileEvent) -> Void)?)
 }

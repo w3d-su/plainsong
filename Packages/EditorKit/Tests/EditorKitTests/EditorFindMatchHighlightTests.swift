@@ -13,9 +13,8 @@ final class EditorFindMatchHighlightTests: XCTestCase {
     /// rather than an artifact of the pass being a no-op.
     private static let controlAttribute = NSAttributedString.Key("app.plainsong.test.control")
 
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        super.tearDown()
     }
 
     func testFindHighlightSurvivesRecomputeWhileAnUnpreservedAttributeIsWiped() throws {

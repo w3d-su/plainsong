@@ -110,6 +110,8 @@ extension MarkdownSTTextView {
         performPresentationAttributeMutation(in: textStorage) {
             textStorage.removeAttribute(WYSIWYGImagePresentationMarker.attribute, range: range)
         }
+        (textDelegate as? MarkdownTextViewCoordinator)?
+            .imageThumbnailPresentationController.markersWereRemoved(in: range)
         invalidatePresentationParagraphs(containing: [range])
     }
 }

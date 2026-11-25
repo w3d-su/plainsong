@@ -227,6 +227,8 @@ extension IOSUIDocumentStore {
             byResource[entry.resourceKey] = nil
         }
         entry.lease.release()
+        entry.coalescedLeases.forEach { $0.release() }
+        entry.coalescedLeases = []
         emit(.closed(entry.identity))
     }
 }

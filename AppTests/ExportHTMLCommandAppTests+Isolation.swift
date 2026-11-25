@@ -28,8 +28,8 @@ extension ExportHTMLCommandAppTests {
             else {
                 return XCTFail("Visible preview must render before isolation is tested")
             }
-            _ = try await visible.webView.evaluateJavaScript("window.scrollTo(0, 200); true")
-            let previewBefore = try await visible.webView.evaluateJavaScript(
+            _ = try await visible.webView.evaluateJavaScriptReply("window.scrollTo(0, 200); true")
+            let previewBefore = try await visible.webView.evaluateJavaScriptReply(
                 "JSON.stringify([window.scrollX, window.scrollY, document.documentElement.dataset.theme, document.body.innerHTML])"
             ) as? String
             let documentBefore = DocumentState(fixture.session)
@@ -77,7 +77,7 @@ extension ExportHTMLCommandAppTests {
                 binding?.sha256Digest
             )
             XCTAssertEqual(visible.scrollDeliveryState.completedRenderID, renderID)
-            let previewAfter = try await visible.webView.evaluateJavaScript(
+            let previewAfter = try await visible.webView.evaluateJavaScriptReply(
                 "JSON.stringify([window.scrollX, window.scrollY, document.documentElement.dataset.theme, document.body.innerHTML])"
             ) as? String
             XCTAssertEqual(previewAfter, previewBefore)
@@ -111,7 +111,7 @@ extension ExportHTMLCommandAppTests {
             visible.setTheme("dark")
             guard case let .completed(renderID) = await visible.renderForExport(fixture.session.currentTextChange)
             else { return XCTFail("Visible preview must render") }
-            let previewBefore = try await visible.webView.evaluateJavaScript(
+            let previewBefore = try await visible.webView.evaluateJavaScriptReply(
                 "JSON.stringify([window.scrollY, document.documentElement.dataset.theme, document.body.innerHTML])"
             ) as? String
             let documentBefore = DocumentState(fixture.session)
@@ -138,7 +138,7 @@ extension ExportHTMLCommandAppTests {
             XCTAssertEqual(mounted.scrollView.contentView.bounds.origin, scrollBefore)
             XCTAssertEqual(fixture.appState.recentItemURLs, recents)
             XCTAssertEqual(visible.scrollDeliveryState.completedRenderID, renderID)
-            let previewAfter = try await visible.webView.evaluateJavaScript(
+            let previewAfter = try await visible.webView.evaluateJavaScriptReply(
                 "JSON.stringify([window.scrollY, document.documentElement.dataset.theme, document.body.innerHTML])"
             ) as? String
             XCTAssertEqual(previewAfter, previewBefore)

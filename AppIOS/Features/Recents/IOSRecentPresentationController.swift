@@ -96,6 +96,7 @@ final class IOSRecentPresentationController: ObservableObject {
         case .files: runtime.scene.navigationPath = []
         case nil: break
         }
+        runtime.restoreCommandFocusAfterReadOnlyPresentation()
     }
 
     /// OS-open and disposal supersede pending picker/navigation handoffs.
@@ -113,6 +114,7 @@ final class IOSRecentPresentationController: ObservableObject {
         isPresented = false
         presentationID = nil
         isActive = false
+        runtime?.restoreCommandFocusAfterReadOnlyPresentation()
     }
 
     private func chooseAgain(scope: IOSWorkspaceScope) {

@@ -38,7 +38,8 @@ final class EditorFindControllerLifetimeTests: XCTestCase {
 
         // Detached work still completes despite the worker owner's deinit cancelling its task.
         hold.release()
-        await fulfillment(of: [unexpectedNotification], timeout: 0.2)
+        let result = await XCTWaiter.fulfillment(of: [unexpectedNotification], timeout: 0.2)
+        XCTAssertEqual(result, .completed)
         XCTAssertNil(weakController)
         XCTAssertEqual(notificationCount, notificationCountBeforeRelease)
     }
@@ -64,7 +65,8 @@ final class EditorFindControllerLifetimeTests: XCTestCase {
         XCTAssertEqual(notificationCount, 1)
 
         hold.release()
-        await fulfillment(of: [completedNotification], timeout: 2)
+        let result = await XCTWaiter.fulfillment(of: [completedNotification], timeout: 2)
+        XCTAssertEqual(result, .completed)
         XCTAssertEqual(controller.completedMatchCount, 1)
         XCTAssertEqual(controller.session?.total, 1)
         XCTAssertTrue(controller.lastMatchRanOffMain)

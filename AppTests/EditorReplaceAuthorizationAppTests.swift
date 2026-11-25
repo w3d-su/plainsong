@@ -14,13 +14,12 @@ import XCTest
 final class EditorReplaceAuthorizationAppTests: XCTestCase {
     var windows: [NSWindow] = []
 
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorSelectionProbe.keyWindowOverrideForTesting = nil
         for window in windows {
             window.orderOut(nil)
         }
         windows.removeAll()
-        super.tearDown()
     }
 
     /// Each §5.6 state refuses with its own reason; setting **and** clearing it advances the

@@ -35,7 +35,7 @@ final class PreviewRenderingRegressionTests: XCTestCase {
             ))
             try await waitUntil { try await self.imageWidth(controller) == 1 }
             let oldSource = try await controller.webView
-                .evaluateJavaScript("document.querySelector('img').src") as? String
+                .evaluateJavaScriptReply("document.querySelector('img').src") as? String
             if workspaceMode { controller.setWorkspaceAssetRoot(second) }
             controller.render(DocumentTextChange(
                 text: "# B\n\n![](image.png)", version: 0, fileKind: .markdown,
@@ -43,10 +43,10 @@ final class PreviewRenderingRegressionTests: XCTestCase {
             ))
             try await waitUntil { try await self.imageWidth(controller) == 2 }
             let newSource = try await controller.webView
-                .evaluateJavaScript("document.querySelector('img').src") as? String
+                .evaluateJavaScriptReply("document.querySelector('img').src") as? String
             XCTAssertNotEqual(newSource, oldSource)
             let heading = try await controller.webView
-                .evaluateJavaScript("document.querySelector('h1').textContent") as? String
+                .evaluateJavaScriptReply("document.querySelector('h1').textContent") as? String
             XCTAssertEqual(heading, "B")
         }
     }
@@ -73,7 +73,7 @@ final class PreviewRenderingRegressionTests: XCTestCase {
           return [numerator.getBoundingClientRect().top, denominator.getBoundingClientRect().top];
         })()
         """
-        let mdValue = try await controller.webView.evaluateJavaScript(measure)
+        let mdValue = try await controller.webView.evaluateJavaScriptReply(measure)
         let md = try XCTUnwrap(mdValue as? [Double])
         XCTAssertGreaterThan(abs(md[0] - md[1]), 5)
         let secondID = controller.renderForTesting(DocumentTextChange(
@@ -82,11 +82,11 @@ final class PreviewRenderingRegressionTests: XCTestCase {
             version: 0, fileKind: .mdx, fileURL: nil
         ))
         try await waitUntil { completedID == secondID }
-        let mdxValue = try await controller.webView.evaluateJavaScript(measure)
+        let mdxValue = try await controller.webView.evaluateJavaScriptReply(measure)
         let mdx = try XCTUnwrap(mdxValue as? [Double])
         XCTAssertEqual(mdx[1] - mdx[0], md[1] - md[0], accuracy: 0.5)
         let unsafe = try await controller.webView
-            .evaluateJavaScript(
+            .evaluateJavaScriptReply(
                 "document.querySelectorAll('#preview-root > div[style], #preview-root > div span[style], #preview-root script, #preview-root > div svg').length"
             ) as? Int
         XCTAssertEqual(unsafe, 0)
@@ -109,10 +109,12 @@ final class PreviewRenderingRegressionTests: XCTestCase {
             fileURL: nil
         ))
         try await waitUntil { completedID == renderID }
-        try await controller.webView.evaluateJavaScript("document.querySelector('a[href=\"#target\"]').click(); true;")
+        try await controller.webView.evaluateJavaScriptReply(
+            "document.querySelector('a[href=\"#target\"]').click(); true;"
+        )
         try await waitUntil {
             try await controller.webView
-                .evaluateJavaScript(
+                .evaluateJavaScriptReply(
                     "window.scrollY > 0 && document.getElementById('plainsong-heading-target').getBoundingClientRect().top < window.innerHeight"
                 ) as? Bool ==
                 true
@@ -121,7 +123,7 @@ final class PreviewRenderingRegressionTests: XCTestCase {
     }
 
     private func imageWidth(_ controller: PreviewController) async throws -> Int? {
-        try await controller.webView.evaluateJavaScript("document.querySelector('img')?.naturalWidth ?? 0") as? Int
+        try await controller.webView.evaluateJavaScriptReply("document.querySelector('img')?.naturalWidth ?? 0") as? Int
     }
 
     private func waitUntil(_ condition: @escaping @MainActor () async throws -> Bool) async throws {

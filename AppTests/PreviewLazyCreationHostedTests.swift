@@ -28,7 +28,7 @@ extension EditorFindHostedGateTests {
         let controller = try XCTUnwrap(coordinator.previewControllerForTesting)
         XCTAssertTrue(controller.webView === webView)
         try await waitUntil("first show renders the document", timeout: 8) {
-            let text = try await webView.evaluateJavaScript("document.body.innerText") as? String
+            let text = try await webView.evaluateJavaScriptReply("document.body.innerText") as? String
             return text?.contains("Lazy preview document") == true
         }
 

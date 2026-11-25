@@ -111,7 +111,7 @@ private struct StringFieldRow: View {
 
     var body: some View {
         InspectorRow(key) {
-            TextField(key, text: Binding(get: { value }, set: update), axis: .vertical)
+            TextField(key, text: Binding(get: { value }, set: { update($0) }), axis: .vertical)
                 .labelsHidden()
                 .lineLimit(1 ... 4)
                 .textFieldStyle(.roundedBorder)
@@ -123,6 +123,9 @@ private struct TagsRow: View {
     let key: String
     let values: [String]
     let update: ([String]) -> Void
+    /// What the user is typing. Rebuilding the field from `values` on every key would
+    /// drop a trailing comma or space before the next tag can be typed.
+    @State private var draft: String?
 
     var body: some View {
         InspectorRow(key) {
@@ -130,10 +133,16 @@ private struct TagsRow: View {
                 TextField(key, text: tagsBinding, prompt: Text("Comma-separated"))
                     .labelsHidden()
                     .textFieldStyle(.roundedBorder)
+                    .onSubmit { draft = nil }
+                    .onChange(of: values) { _, newValues in
+                        if let draft, Self.splitTags(draft) != newValues {
+                            self.draft = nil
+                        }
+                    }
 
                 if !values.isEmpty {
                     TagFlowLayout {
-                        ForEach(values, id: \.self) { tag in
+                        ForEach(Array(values.enumerated()), id: \.offset) { _, tag in
                             Text(tag)
                                 .font(.caption)
                                 .lineLimit(1)
@@ -153,8 +162,14 @@ private struct TagsRow: View {
 
     private var tagsBinding: Binding<String> {
         Binding(
-            get: { values.joined(separator: ", ") },
-            set: { update(Self.splitTags($0)) }
+            get: { draft ?? values.joined(separator: ", ") },
+            set: {
+                draft = $0
+                let tags = Self.splitTags($0)
+                if tags != values {
+                    update(tags)
+                }
+            }
         )
     }
 
@@ -210,22 +225,26 @@ private struct RawYAMLText: View {
     }
 }
 
-private enum FrontmatterDateFormatting {
-    static func string(from date: Date) -> String {
-        formatter().string(from: date)
+enum FrontmatterDateFormatting {
+    static func string(from date: Date, timeZone: TimeZone = .current) -> String {
+        formatter(dateFormat: "yyyy-MM-dd", timeZone: timeZone).string(from: date)
     }
 
-    static func date(from string: String) -> Date? {
-        formatter().date(from: string)
+    /// Noon of the calendar day. Midnight does not exist on the day daylight time starts in
+    /// zones that switch at 00:00 (Havana, Santiago, Beirut), so parsing the bare day there
+    /// failed and the picker showed today instead.
+    static func date(from string: String, timeZone: TimeZone = .current) -> Date? {
+        formatter(dateFormat: "yyyy-MM-dd HH", timeZone: timeZone).date(from: string + " 12")
     }
 
-    private static func formatter() -> DateFormatter {
+    private static func formatter(dateFormat: String, timeZone: TimeZone) -> DateFormatter {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.isLenient = false
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
+        // The picker shows and the Add button stamps the user's calendar day.
+        formatter.timeZone = timeZone
+        formatter.dateFormat = dateFormat
         return formatter
     }
 }

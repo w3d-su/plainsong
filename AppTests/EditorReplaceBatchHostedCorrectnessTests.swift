@@ -17,12 +17,12 @@ extension EditorFindHostedGateTests {
         let hosted = try await makeHostedBatchWorkspace(layoutMode: .sourcePreview)
         let webView = try await waitForView(WKWebView.self, in: hosted.window)
         try await waitUntil("baseline batch preview renders", timeout: 10) {
-            try await (webView.evaluateJavaScript("document.body.textContent") as? String)?
+            try await (webView.evaluateJavaScriptReply("document.body.textContent") as? String)?
                 .contains("hit one hit two") == true
         }
         try await assertHostedBatchCommit(hosted, replacement: "NEW", expected: "NEW one NEW two", caret: 3)
         try await waitUntil("batch publication refreshes the live preview", timeout: 10) {
-            try await (webView.evaluateJavaScript("document.body.textContent") as? String)?
+            try await (webView.evaluateJavaScriptReply("document.body.textContent") as? String)?
                 .contains("NEW one NEW two") == true
         }
     }

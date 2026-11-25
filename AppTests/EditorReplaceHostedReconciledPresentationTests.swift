@@ -62,7 +62,7 @@ extension EditorFindHostedGateTests {
         let replacementSchedulesBefore = appState.editorFindHost.controller.replacementScheduleCount
         let match = try XCTUnwrap(findSessionBefore?.currentMatch?.range)
         assertReconciledFindDecoration(in: storage, match: match)
-        let intercepted = ReconciledPublicationInterception()
+        let intercepted = ReconciledPublicationInterception(storage: storage)
         let observer = NotificationCenter.default.addObserver(
             forName: NSTextStorage.didProcessEditingNotification,
             object: storage,
@@ -70,12 +70,12 @@ extension EditorFindHostedGateTests {
         ) { _ in
             MainActor.assumeIsolated {
                 guard intercepted.proposedSource == nil,
-                      !ExactSourceText.matches(storage.string, source)
+                      !ExactSourceText.matches(intercepted.storage.string, source)
                 else { return }
                 // Native insertion has passed App's writer preflight, but publication
                 // has not run. Removing that exact writer makes App's normal callback
                 // reject the proposed source and return its unchanged authoritative one.
-                intercepted.proposedSource = storage.string
+                intercepted.proposedSource = intercepted.storage.string
                 appState.editorWriterInstallations[ObjectIdentifier(session)] = nil
             }
         }
@@ -244,6 +244,12 @@ struct ReconciledHostedPresentation: Equatable {
     let imageVisualStates: [WYSIWYGImagePresentationMarker.VisualState]
 }
 
+@MainActor
 private final class ReconciledPublicationInterception {
+    let storage: NSTextStorage
     var proposedSource: String?
+
+    init(storage: NSTextStorage) {
+        self.storage = storage
+    }
 }

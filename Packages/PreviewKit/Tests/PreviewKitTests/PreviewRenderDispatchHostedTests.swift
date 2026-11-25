@@ -143,8 +143,10 @@ final class PreviewRenderDispatchHostedTests: XCTestCase {
         let json = try XCTUnwrap(rawJSON as? String)
         let types = try XCTUnwrap(rawTypes as? [String: String])
         let message = try JSONDecoder().decode(BridgeMessage.self, from: Data(json.utf8))
+        // A wrong message type is a failure, not a skip: a skip would pass the suite.
         guard case let .render(payload) = message else {
-            throw XCTSkip("Recorded message \(index) is not a render")
+            XCTFail("Recorded message \(index) is not a render")
+            throw CocoaError(.coderInvalidValue)
         }
         return RecordedMessage(message: message, types: types, assetRootID: payload.assetRootID)
     }

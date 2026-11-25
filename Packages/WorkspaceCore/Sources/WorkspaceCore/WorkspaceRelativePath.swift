@@ -35,14 +35,14 @@ public struct WorkspaceRelativePath: Hashable, Sendable {
         if path.isEmpty {
             return .emptyLeaf
         }
-        if path.hasPrefix("/") {
+        if path.hasLeadingPathSeparator {
             return .absolutePath
         }
         if path.utf8.contains(0) {
             return .nulByte
         }
 
-        let components = path.split(separator: "/", omittingEmptySubsequences: false)
+        let components = path.splitOnPathSeparator(omittingEmptySubsequences: false)
         if components.contains(where: { $0 == ".." }) {
             return .parentTraversal
         }

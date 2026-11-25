@@ -920,7 +920,7 @@ private final class Fixture {
         }
         return WorkspaceItemMutationExpectation(
             identity: WorkspaceFileSystemIdentity(
-                device: UInt64(status.st_dev),
+                device: UInt64(UInt32(bitPattern: status.st_dev)),
                 inode: UInt64(status.st_ino)
             ),
             kind: WorkspaceFileSystemItemKind(mode: status.st_mode)

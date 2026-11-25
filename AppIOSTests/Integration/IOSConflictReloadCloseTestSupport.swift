@@ -113,6 +113,10 @@ actor IOSConflictReloadCloseRecovery: IOSRecoveryPersisting {
         )
     }
 
+    func discardSuperseded(recordID: UUID, documentID: UUID, newerVersion: Int) async throws {
+        try await store.discardSuperseded(recordID: recordID, documentID: documentID, newerVersion: newerVersion)
+    }
+
     func cleanUp() {
         try? FileManager.default.removeItem(at: directory)
     }

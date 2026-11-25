@@ -58,23 +58,68 @@ private extension AppState {
 
 @MainActor
 extension AppState {
-    /// New File's save-panel choice. Replacing a file another window shows would overwrite
-    /// its document on disk, so that window comes forward instead and nothing is written
-    /// (WD1). The new file then follows the Open rule (§5.2).
+    /// New File's save-panel choice follows the Open rule (§5.2): an empty window takes the new
+    /// file, otherwise a new window does. The file is emptied by the window that opens it, so a
+    /// new window that never appears leaves its bytes alone.
     func createNewFile(at url: URL) {
+        let errorTitle = "Could Not Create File"
         do {
-            guard FileKind(url: url) != nil else {
-                throw AppStateError.unsupportedFile(url)
+            try validateNewFile(at: url)
+            guard !isEmptyWorkspaceWindow,
+                  WorkspaceWindowRequests.shared.canOpenNewWindow(for: registry)
+            else {
+                try createEmptyFileAndOpen(at: url)
+                return
             }
-            if let owner = windowShowingFile(at: url) {
-                throw DocumentShownInAnotherWindow(fileURL: url, target: RegisteredWindowState(window: owner))
-            }
-            try SecurityScopedAccess.withAccess(to: url) {
-                try Data().write(to: url, options: [.atomic])
-            }
-            routeOpen(url)
+            WorkspaceWindowRequests.shared.openNewWindow(
+                on: registry,
+                then: { [weak self] facade in
+                    facade.performInRequestedWindow(origin: self, errorTitle: errorTitle) {
+                        try facade.createEmptyFileAndOpen(at: url)
+                    }
+                },
+                ifItNeverOpens: { [weak self] in
+                    self?.present(AppStateError.newWindowDidNotOpen(url), title: errorTitle)
+                }
+            )
         } catch {
-            present(error, title: "Could Not Create File")
+            present(error, title: errorTitle)
+        }
+    }
+
+    /// Runs every refusal the open can raise before the chosen file is emptied. The save panel
+    /// may name an existing file, and a close blocked by a conflict or a failed save must
+    /// leave that file's bytes alone.
+    func createEmptyFileAndOpen(at url: URL) throws {
+        try validateNewFile(at: url)
+        try closeWorkspaceForReplacement()
+        try SecurityScopedAccess.withAccess(to: url) {
+            try Data().write(to: url, options: [.atomic])
+        }
+        try openInThisWindow(url)
+    }
+
+    private func validateNewFile(at url: URL) throws {
+        guard FileKind(url: url) != nil else {
+            throw AppStateError.unsupportedFile(url)
+        }
+        try refuseWindowFileOpenIfNeeded()
+        try validateWorkspaceMutationRecoveryStoresLoaded(at: url)
+        // WD1: replacing a file a window shows would overwrite its document on disk, so that
+        // window comes forward instead and nothing is written.
+        if let owner = windowShowingFile(at: url) {
+            throw DocumentShownInAnotherWindow(fileURL: url, target: RegisteredWindowState(window: owner))
+        }
+        // Unsaved text for the chosen file would be written over the new empty file, or lost.
+        let stateURL = url.standardizedFileURL
+        let dirtyOwner = registry.sessions(from: [
+            .warmCache, .retired, .editorBindings, .editorInstallations, .mutationRecovery, .windowDocuments,
+        ]).first { session in
+            guard session.isDirty, let ownedURL = sessionStateURL(for: session) else { return false }
+            return exactFileURLSpellingMatches(ownedURL, stateURL)
+        }
+        guard dirtyOwner == nil else {
+            throw AppStateError.duplicateSessionOwnership(url)
         }
     }
 }

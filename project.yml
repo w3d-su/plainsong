@@ -71,6 +71,7 @@ targets:
         product: Sparkle
     settings:
       base:
+        SWIFT_VERSION: "6"
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor
         PRODUCT_NAME: Plainsong
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -193,6 +194,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.tests
         GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "6"
 
   PerformanceTests:
     type: bundle.unit-test
@@ -215,6 +217,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.performance-tests
+        SWIFT_VERSION: "6"
         GENERATE_INFOPLIST_FILE: YES
 
   PlainsongUITests:
@@ -227,6 +230,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ui-tests
+        SWIFT_VERSION: "6"
         GENERATE_INFOPLIST_FILE: YES
 
   # Production composition uses the reviewed UIKit preview provider.
@@ -242,6 +246,11 @@ targets:
       - path: App/Resources/preview
         type: folder
         buildPhase: resources
+      # GPL-3.0-or-later: the iOS app carries the license text too
+      # (docs/decisions/2026-11-06-gpl-3.0-or-later-license.md);
+      # Scripts/ios/required-app-resources.txt refuses an archive without it.
+      - path: LICENSE
+        buildPhase: resources
     dependencies:
       - package: MarkdownCore
       - package: SyntaxKit
@@ -254,6 +263,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ios
         PRODUCT_NAME: PlainsongIOS
+        SWIFT_VERSION: "6"
         TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
@@ -296,6 +306,7 @@ targets:
               public.filename-extension:
                 - mdx
         CFBundleDisplayName: Plainsong
+        NSHumanReadableCopyright: "© 2026 w3d-su. Free software under the GNU GPL v3 or later, with ABSOLUTELY NO WARRANTY. License and source: https://github.com/w3d-su/plainsong"
         ITSAppUsesNonExemptEncryption: false
         UILaunchScreen:
           UIColorName: LaunchBackground
@@ -325,6 +336,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ios.tests
         GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "6"
 
   # A real app process without statically duplicating the packages in its test bundle.
   # It has no providers and never participates in production composition.
@@ -340,6 +352,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ios.preview-test-host
+        SWIFT_VERSION: "6"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
@@ -363,6 +376,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ios.preview-tests
+        SWIFT_VERSION: "6"
         GENERATE_INFOPLIST_FILE: YES
 
   # Lane 11 hosted smoke. Kept off the PlainsongIOS scheme so a 0-run or

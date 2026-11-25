@@ -1,8 +1,9 @@
 import AppKit
 import Foundation
 import MarkdownCore
+import SyntaxKit
 
-struct MarkdownHighlightResult: Equatable {
+struct MarkdownHighlightResult: Equatable, Sendable {
     let range: NSRange
     let text: AttributedString
     let foldPlan: WYSIWYGFoldPlan?
@@ -328,7 +329,7 @@ private extension MarkdownSyntaxHighlighter {
             let size = baseFont.pointSize + CGFloat(7 - min(max(level, 1), 6))
             attributed.addAttributes(
                 [
-                    .font: NSFont.monospacedSystemFont(ofSize: size, weight: .bold),
+                    .font: boldFont(baseFont, size: size),
                     .foregroundColor: theme.headingColor,
                 ],
                 range: token.range

@@ -154,7 +154,7 @@ struct WorkspaceTreeNodeRow: View, Equatable {
         }
     }
 
-    private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
+    func handleDrop(_ providers: [NSItemProvider]) -> Bool {
         guard node.isDirectory,
               let provider = providers
               .first(where: { $0.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) })
@@ -164,7 +164,7 @@ struct WorkspaceTreeNodeRow: View, Equatable {
 
         let move = actions.move
         let directoryID = node.id
-        provider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { item, _ in
+        provider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { @Sendable item, _ in
             let droppedID: String? = if let data = item as? Data {
                 String(data: data, encoding: .utf8)
             } else {

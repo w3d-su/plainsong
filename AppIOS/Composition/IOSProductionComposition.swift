@@ -114,9 +114,10 @@ struct IOSProductionComposition {
         )
         runtime.scene.surfaces.reviewCloudVersions = { [weak controller, weak runtime] id in
             guard let controller else { throw IOSDocumentFailure.unavailable }
-            runtime?.prepareForReadOnlyPresentation()
+            runtime?.beginCloudVersionReview()
             return try await controller.reviewVersions(id)
         }
+        runtime.scene.surfaces.cloudVersionReviewEnded = { [weak runtime] in runtime?.endCloudVersionReview() }
         runtime.scene.surfaces.applyCloudVersion = { [weak controller, weak scene = runtime.scene] id, review in
             guard let controller else { throw IOSDocumentFailure.unavailable }
             do {
@@ -138,6 +139,8 @@ struct IOSProductionComposition {
         )
         recoveryUI.onRestored = { [weak scene = runtime.scene] in scene?.navigateToDocument() }
         recoveryUI.onPresent = { [weak runtime] in runtime?.prepareForReadOnlyPresentation() }
+        recoveryUI.onDismissed = { [weak runtime] in runtime?.restoreCommandFocusAfterReadOnlyPresentation() }
+        runtime.conflictCopy?.onIdle = { [weak runtime] in runtime?.restoreCommandFocusAfterReadOnlyPresentation() }
         controller.onPreviewDocumentOpened = { [weak scene = runtime.scene] in scene?.navigateToDocument() }
         controller.onNavigationFailure = { [weak scene = runtime.scene] message in
             scene?.presentedError = IOSShellError(title: "Link Could Not Be Opened", message: message)

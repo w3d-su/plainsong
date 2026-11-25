@@ -32,7 +32,10 @@
             try await PreviewHostedTestWait.until("re-submitted render completes", timeoutNanoseconds: 30_000_000_000) {
                 completed.contains { $0 > shown }
             }
-            let text = try await controller.webView.evaluateJavaScript("document.body.innerText") as? String
+            let text = try await PreviewHostedTestWait.javascript(
+                "document.body.innerText",
+                in: controller.webView
+            ) as? String
             XCTAssertTrue(text?.contains("Survives a WebContent crash") == true, "reloaded page: \(text ?? "nil")")
             XCTAssertTrue(controller.isReady)
             XCTAssertFalse(controller.webContentProcessTerminated)

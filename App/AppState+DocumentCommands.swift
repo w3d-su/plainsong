@@ -92,16 +92,19 @@ extension AppState {
             focusWindowShowingDocument(shown)
             return
         }
+        let showWindow: (@MainActor () -> Void)? = if let conflict = error as? WorkspaceRootOpenConflict {
+            {
+                if let window = conflict.target.window {
+                    KeyWindowRouter.shared.focus(window)
+                }
+            }
+        } else {
+            nil
+        }
         presentedError = UserVisibleError(
             title: title,
             message: userVisibleDescription(for: error),
-            showWindow: (error as? WorkspaceRootOpenConflict).map { conflict in
-                {
-                    if let window = conflict.target.window {
-                        KeyWindowRouter.shared.focus(window)
-                    }
-                }
-            }
+            showWindow: showWindow
         )
     }
 

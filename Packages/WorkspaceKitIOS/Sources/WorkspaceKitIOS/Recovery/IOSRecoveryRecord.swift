@@ -80,4 +80,6 @@ protocol IOSRecoveryPersisting: Sendable {
         liveText: String,
         liveVersion: Int
     ) async throws
+    /// Removes a checkpoint of `documentID` once a revision newer than it is durable elsewhere.
+    func discardSuperseded(recordID: UUID, documentID: UUID, newerVersion: Int) async throws
 }

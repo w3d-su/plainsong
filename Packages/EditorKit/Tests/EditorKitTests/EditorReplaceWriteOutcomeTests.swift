@@ -8,9 +8,8 @@ import XCTest
 /// and a Replace stays its own undo step when typing follows it.
 @MainActor
 final class EditorReplaceWriteOutcomeTests: XCTestCase {
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        super.tearDown()
     }
 
     func testRefusedNativeInsertionIsNotReportedAsReplaced() async throws {

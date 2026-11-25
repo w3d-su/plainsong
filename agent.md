@@ -280,6 +280,8 @@ revision.
   (`node_modules`, `dist`, `build`, `.next`, `.astro`, `.build`, `deriveddata`, `.git`;
   the list Search ignores) without enumerating them; only the chain down to an open
   session's file in that root is scanned inside them. "Show all files" rescans everything.
+  The iOS scan has no "Show all files" toggle, so it lists those visible folders; it only
+  skips descending into hidden directories while hidden entries are off.
 - File tree operations: create/rename/delete/move file & folder (Finder-style, with
   trash not hard delete). Watch root recursively via `FSEventStream`; debounce 300 ms,
   never more than 2 s after the first unhandled batch, so a tool that keeps writing cannot
@@ -316,7 +318,9 @@ revision.
   LRU is one global cache: 8 warm sessions plus every installed document. An installed
   document is an editor-binding installation or any connected window's shown session;
   it does not count toward the 8 and cannot be evicted. Other protected sessions still
-  count toward the 8 and cannot be evicted. Recovery Show/Keep Editor Copy reconciles
+  count toward the 8 and cannot be evicted; a session with an unresolved external
+  conflict is one of them even when it is clean, because evicting it would orphan the
+  URL-keyed conflict. Recovery Show/Keep Editor Copy reconciles
   the LRU immediately when the previous shown session becomes countable. One preview is
   created per visible document pane. A scene gets the app-owned façade whenever no open
   scene shows it, so closing the only window and reopening it works; every other scene
@@ -351,8 +355,9 @@ revision.
   opens here instead. A root that some window has open is shared (WD2), and a single
   file inside it opens as that root's document in the chosen window. If the open fails in
   a new window, that window closes and the error appears where the request came from; a
-  new window that never appears is reported there too. File › New Window (⇧⌘N) opens an
-  empty window. Only the launch window restores the last file, and until PR E only the
+  new window that never appears is reported there too. The window that opens New File's
+  chosen file empties it, after every refusal; until then its bytes stay. File › New Window
+  (⇧⌘N) opens an empty window. Only the launch window restores the last file, and until PR E only the
   app-owned window is restorable.
 - Closing a window (⌘W, File › Close, the close button) is decided in
   `windowShouldClose`: pending editor source, a save or a read of the file in flight, a
@@ -607,7 +612,11 @@ republishes only when its value changes literally.
 - Link clicks: intercepted in Swift. `http(s)` → `NSWorkspace.open` (external browser).
   Relative `.md`/`.mdx` → open that file in the editor. The `href` arrives percent-encoded
   (remark encodes non-ASCII and spaces), so the App cuts the query and fragment, decodes the
-  path and opens it only when it is a scheme-less relative path. `#anchor` stays in JavaScript
+  path and opens it only when it is a scheme-less relative path. A workspace target is
+  selected in the sidebar with its folders expanded; an outside target follows the Open rule
+  (§5). One that no window shows and that cannot be read (the sandbox grants none the user
+  did not pick) or does not exist shows an error before a window opens or a workspace
+  closes. `#anchor` stays in JavaScript
   and scrolls the preview to a generated heading ID (Unicode and duplicate headings supported).
   On iOS, PreviewKit also owns external browser opening; production scene observation
   must not open its informational external-link event a second time.
@@ -666,8 +675,9 @@ a thematic break; the inspector still reports the missing closing delimiter (§1
 
 `window.webkit.messageHandlers.bridge.postMessage(...)` (JS→Swift, read field by field from
 the Foundation body, never through `JSONSerialization`) and
-`window.PlainsongBridge.receive(message)` (Swift→JS). `render` goes through
-`callAsyncJavaScript` with the message as a Foundation argument, so the document text is
+`window.PlainsongBridge.receive(message)` (Swift→JS). `render` and `exportHTML` go through
+`callAsyncJavaScript` with the message as a Foundation argument, so the document text and
+the export's embedded image data URIs are
 never JSON-encoded, interpolated into a script, or parsed as source; the other messages are
 JSON-encoded into an `evaluateJavaScript` script. Both carry the same message shape. Keep the protocol in
 `BridgeMessage.swift` + `ExportBridgeMessages.swift` (Codable) and `bridge.ts` —
@@ -1052,7 +1062,7 @@ scaffold does not install providers or authorize production composition before M
 
 ```sh
 make bootstrap        # brew install xcodegen swiftformat swiftlint node; npm ci (preview-src)
-make generate         # xcodegen generate  (run after editing project.yml)
+make generate         # Scripts/generate-project.sh: xcodegen generate, then installs the committed Package.resolved (run after editing project.yml)
 make preview-bundle   # build preview-src → App/Resources/preview/ (commit the output)
 make build            # xcodebuild -scheme Plainsong build
 make test             # test-packages (swift test) + test-hosted (xcodebuild test) + test-preview (npm test)
@@ -1149,6 +1159,11 @@ make format           # swiftformat . && swiftlint --fix
 3. **Layering is law:** App → {EditorKit, PreviewKit, WorkspaceKit} → MarkdownCore.
    Lower layers never import higher ones; MarkdownCore imports no UI frameworks.
 4. **Edit `project.yml`, never `.xcodeproj`.** Run `make generate` after.
+   After a dependency change also resolve
+   (`xcodebuild -resolvePackageDependencies -project Plainsong.xcodeproj -scheme Plainsong`)
+   and copy the generated project's `Package.resolved` back to the repository root in the
+   same commit; builds pass `-onlyUsePackageVersionsFromResolvedFile`
+   (`docs/decisions/2026-11-21-pinned-build-inputs.md`).
 5. **Bridge changes:** any change to `BridgeMessage.swift` requires the mirrored change in
    `bridge.ts`, a `PROTOCOL_VERSION` bump, and `make preview-bundle` in the same commit.
 6. **Tests accompany logic.** New MarkdownCore/pipeline logic without tests is incomplete.

@@ -187,6 +187,9 @@ final class MarkdownSTTextView: STTextView {
 
         if window != nil {
             windowAttachmentHandler?(self)
+            // Leaving the last window removed the selection observer; a custom color
+            // set before that would no longer repaint new selections.
+            refreshEditorSelectionColor()
         } else {
             removeEditorSelectionColorObserver()
         }
@@ -206,10 +209,12 @@ final class MarkdownSTTextView: STTextView {
                 isSuppressingIntermediateMarkedTextRemoval = false
                 markedTextReplacementRange = nil
                 isMarkedTextReplacementRangeConfirmed = false
+                let lengthBeforeInsertion = (textContentManager as? NSTextContentStorage)?.textStorage?.length
                 super.insertText(string, replacementRange: effectiveReplacementRange)
                 ensureInsertionPointAfterInsertedText(
                     string,
-                    at: effectiveReplacementRange.location
+                    replacing: effectiveReplacementRange,
+                    lengthBeforeInsertion: lengthBeforeInsertion
                 )
                 return
             }
@@ -239,14 +244,6 @@ final class MarkdownSTTextView: STTextView {
         }
 
         textSelection = NSRange(location: 0, length: 0)
-    }
-
-    private func ensureInsertionPointAfterInsertedText(_ string: Any, at insertionLocation: Int) {
-        guard let insertedLength = Self.utf16Length(ofInsertedText: string) else {
-            return
-        }
-
-        textSelection = NSRange(location: insertionLocation + insertedLength, length: 0)
     }
 
     private func markedTextSnapshot() -> MarkedTextSnapshot? {
@@ -288,18 +285,36 @@ final class MarkdownSTTextView: STTextView {
         snapshot: MarkedTextSnapshot,
         event: NSEvent
     ) -> Int? {
-        if let textAfterDeletingMarkedText = snapshot.fullText.replacing(range: snapshot.range, with: ""),
-           textAfterDeletingMarkedText == currentText
-        {
-            return 0
-        }
+        Self.discardedReplacementLength(
+            currentText: currentText,
+            fullText: snapshot.fullText,
+            markedRange: snapshot.range,
+            strayReplacements: Self.strayReplacementStrings(forReservedMarkedTextKey: event)
+        )
+    }
 
-        for replacement in Self.strayReplacementStrings(forReservedMarkedTextKey: event) {
-            if let textAfterStrayReplacement = snapshot.fullText.replacing(range: snapshot.range, with: replacement),
-               textAfterStrayReplacement == currentText
-            {
-                return replacement.utf16.count
+    /// The length of what replaced the marked text when the input context dropped it, or nil
+    /// when the text changed in any other way. A normal commit differs in length or in the
+    /// replaced units, so those are checked before any copy of the document is built.
+    static func discardedReplacementLength(
+        currentText: String,
+        fullText: String,
+        markedRange: NSRange,
+        strayReplacements: [String]
+    ) -> Int? {
+        let current = currentText as NSString
+        let lengthWithoutMarkedText = (fullText as NSString).length - markedRange.length
+        for replacement in [""] + strayReplacements {
+            let replacementRange = NSRange(location: markedRange.location, length: replacement.utf16.count)
+            guard current.length == lengthWithoutMarkedText + replacementRange.length,
+                  NSMaxRange(replacementRange) <= current.length,
+                  current.substring(with: replacementRange) == replacement,
+                  let expected = fullText.replacing(range: markedRange, with: replacement),
+                  expected == currentText
+            else {
+                continue
             }
+            return replacementRange.length
         }
 
         return nil
@@ -329,17 +344,6 @@ final class MarkdownSTTextView: STTextView {
 
     private func plainText() -> String? {
         (textContentManager as? NSTextContentStorage)?.textStorage?.string
-    }
-
-    private static func utf16Length(ofInsertedText string: Any) -> Int? {
-        switch string {
-        case let string as String:
-            string.utf16.count
-        case let attributedString as NSAttributedString:
-            attributedString.length
-        default:
-            nil
-        }
     }
 
     override func moveLeft(_ sender: Any?) {

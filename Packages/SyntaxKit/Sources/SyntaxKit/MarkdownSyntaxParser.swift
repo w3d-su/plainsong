@@ -60,15 +60,15 @@ public final class MarkdownSyntaxParser {
         fileKind: FileKind,
         expandedVisibleRange range: NSRange
     ) -> [MarkdownSyntaxToken] {
-        guard let fragment = source.fragment(in: range) else {
+        guard let fragment = MarkdownParseFragment(source: source, range: range) else {
             return []
         }
 
-        return tokens(in: fragment, fileKind: fileKind, parsesInlineMarkup: true)
+        return tokens(in: fragment.text, fileKind: fileKind, parsesInlineMarkup: true)
             .map { token in
                 MarkdownSyntaxToken(
                     kind: token.kind,
-                    range: NSRange(location: token.range.location + range.location, length: token.range.length)
+                    range: NSRange(location: token.range.location + fragment.base, length: token.range.length)
                 )
             }
     }
@@ -166,7 +166,7 @@ extension MarkdownSyntaxParser {
         if end - start < visibleHighlightMinimumLength {
             let targetEnd = min(nsSource.length, start + visibleHighlightMinimumLength)
             let seed = min(max(targetEnd, 0), nsSource.length - 1)
-            end = max(end, NSMaxRange(nsSource.lineRange(for: NSRange(location: seed, length: 0))))
+            end = max(end, NSMaxRange(nsSource.markdownLineRange(containing: seed)))
         }
 
         let context = MarkdownFenceScanner.contextRange(
@@ -180,8 +180,8 @@ extension MarkdownSyntaxParser {
         let fallbackLocation = min(range.location, max(0, source.length - 1))
         let startLocation = min(max(fallbackLocation, 0), source.length - 1)
         let lastLocation = min(max(NSMaxRange(range) - 1, startLocation), source.length - 1)
-        let startLine = source.lineRange(for: NSRange(location: startLocation, length: 0))
-        let endLine = source.lineRange(for: NSRange(location: lastLocation, length: 0))
+        let startLine = source.markdownLineRange(containing: startLocation)
+        let endLine = source.markdownLineRange(containing: lastLocation)
         return NSRange(location: startLine.location, length: NSMaxRange(endLine) - startLine.location)
     }
 }
@@ -337,7 +337,7 @@ extension MarkdownSyntaxParser {
             return
         }
 
-        let yamlSource = String(metadataText[yamlRange])
+        let yamlSource = (metadataText as NSString).substring(with: yamlRange)
         guard
             let yamlParser = yamlParserForHighlighting(),
             let tree = yamlParser.parse(yamlSource),
@@ -346,10 +346,7 @@ extension MarkdownSyntaxParser {
             return
         }
 
-        let baseLocation = metadataRange.location + metadataText.utf16.distance(
-            from: metadataText.utf16.startIndex,
-            to: yamlRange.lowerBound.samePosition(in: metadataText.utf16) ?? metadataText.utf16.startIndex
-        )
+        let baseLocation = metadataRange.location + yamlRange.location
         appendYAMLTokens(from: root, baseLocation: baseLocation, to: &tokens)
     }
 
@@ -424,17 +421,26 @@ extension MarkdownSyntaxParser {
         return 1
     }
 
-    func frontmatterBody(in metadataText: String) -> Range<String.Index>? {
-        guard
-            let firstNewline = metadataText.firstIndex(where: \.isNewline),
-            let closingLine = metadataText.range(of: "\n---", options: .backwards)
-            ?? metadataText.range(of: "\n+++", options: .backwards),
-            firstNewline < closingLine.lowerBound
-        else {
+    /// The UTF-16 range between the opening and closing fence lines. Works on UTF-16
+    /// units because `String` treats CRLF as one `Character`, which hides the line feed.
+    func frontmatterBody(in metadataText: String) -> NSRange? {
+        let text = metadataText as NSString
+        let firstNewline = text.range(of: "\n", options: .literal)
+        guard firstNewline.location != NSNotFound else { return nil }
+        var closingLine = text.range(of: "\n---", options: [.backwards, .literal])
+        if closingLine.location == NSNotFound {
+            closingLine = text.range(of: "\n+++", options: [.backwards, .literal])
+        }
+        guard closingLine.location != NSNotFound, firstNewline.location < closingLine.location else {
             return nil
         }
 
-        return metadataText.index(after: firstNewline) ..< closingLine.lowerBound
+        let start = NSMaxRange(firstNewline)
+        var end = closingLine.location
+        if end > start, text.character(at: end - 1) == 13 {
+            end -= 1
+        }
+        return NSRange(location: start, length: end - start)
     }
 
     func nsRange(for node: Node, offset: Int = 0) -> NSRange {
@@ -442,14 +448,5 @@ extension MarkdownSyntaxParser {
         let location = Int(bytes.lowerBound / 2) + offset
         let length = Int((bytes.upperBound - bytes.lowerBound) / 2)
         return NSRange(location: location, length: length)
-    }
-}
-
-private extension String {
-    func fragment(in range: NSRange) -> String? {
-        guard let stringRange = Range(range, in: self) else {
-            return nil
-        }
-        return String(self[stringRange])
     }
 }

@@ -195,6 +195,7 @@ final class MarkdownEditingTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testLineSelectionsIncludeLastLineWhenSelectionEndsAtLineStart() {
         struct TestCase {
             let name: String

@@ -73,7 +73,7 @@ final class PreviewScrollDeliveryTests: XCTestCase {
               return window.scrollY > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
             })()
             """
-            return try await controller.webView.evaluateJavaScript(script) as? Bool == true
+            return try await PreviewHostedTestWait.javascript(script, in: controller.webView) as? Bool == true
         }
         controller.shutdownForTesting()
     }
@@ -114,10 +114,16 @@ final class PreviewScrollDeliveryTests: XCTestCase {
 
         XCTAssertEqual(deliveryResult, false)
         try await waitUntil("second document renders without stale navigation") {
-            let text = try await controller.webView.evaluateJavaScript("document.body.innerText") as? String
+            let text = try await PreviewHostedTestWait.javascript(
+                "document.body.innerText",
+                in: controller.webView
+            ) as? String
             return text?.contains("Second document") == true
         }
-        let evaluatedScrollY = try await controller.webView.evaluateJavaScript("window.scrollY") as? Double
+        let evaluatedScrollY = try await PreviewHostedTestWait.javascript(
+            "window.scrollY",
+            in: controller.webView
+        ) as? Double
         let scrollY = try XCTUnwrap(evaluatedScrollY)
         XCTAssertEqual(scrollY, 0, accuracy: 0.5)
         controller.shutdownForTesting()

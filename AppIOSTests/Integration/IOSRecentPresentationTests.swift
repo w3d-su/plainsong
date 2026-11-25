@@ -26,6 +26,40 @@ final class IOSRecentPresentationTests: XCTestCase {
         XCTAssertTrue(access.restoreCalls.isEmpty)
     }
 
+    /// Recents releases the command route when it opens. Done without picking anything must
+    /// give it back, or every toolbar action and shortcut reports `.notFocused` until the
+    /// next document switch.
+    func testDismissingRecentsWithoutAChoiceReturnsCommandFocusToTheSameBinding() throws {
+        let access = IOSRecentTestAccess()
+        let runtime = try makeRuntime(access: access)
+        let facade = try XCTUnwrap(runtime.controller as? FakeSceneFacade)
+        let identity = IOSDocumentIdentity(rawValue: UUID())
+        let bindingID = UUID()
+        runtime.editor.attach(IOSSourceEditorDocumentBinding(
+            bindingID: bindingID, identity: identity,
+            session: DocumentSession(text: "# Kept", fileKind: .markdown),
+            accessGeneration: 1, canWrite: true
+        ))
+        runtime.editor.updateCommandFocus(for: identity, bindingID: bindingID, isFocused: true)
+        runtime.scene.startObserving()
+
+        let presentationID = try present(runtime)
+        XCTAssertEqual(facade.setCommandFocusCalls.last?.0, false)
+        runtime.restoreCommandFocusAfterReadOnlyPresentation()
+        XCTAssertEqual(facade.setCommandFocusCalls.last?.0, false, "focus returned under the open sheet")
+
+        runtime.recentPresentation.isPresented = false
+        runtime.recentPresentation.didDismiss(presentationID)
+
+        let restored = try XCTUnwrap(facade.setCommandFocusCalls.last)
+        XCTAssertTrue(restored.0)
+        XCTAssertEqual(restored.1, identity)
+        XCTAssertEqual(restored.2, bindingID)
+        let calls = facade.setCommandFocusCalls.count
+        runtime.restoreCommandFocusAfterReadOnlyPresentation()
+        XCTAssertEqual(facade.setCommandFocusCalls.count, calls)
+    }
+
     func testOSOpenRetiresPendingRecentPickerAndLateDismissalCannotOverrideIt() async throws {
         let access = IOSRecentTestAccess()
         let recordID = access.add(scope: .directory, status: .needsReselection)

@@ -19,6 +19,10 @@ build/
 .build/
 .swiftpm/
 
+# Python (Scripts tooling tests)
+__pycache__/
+*.pyc
+
 # Node (preview-src)
 node_modules/
 

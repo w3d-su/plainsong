@@ -43,7 +43,17 @@ Only the home window restores at launch: a window that New Window or a WD7 open 
 never restores (§6.1). Until E decides restoration (WD5), only the app-owned window sets
 `isRestorable`, so a relaunch cannot bring the other windows back empty. New File's save
 panel focuses a window that already shows the chosen file and writes nothing, because the
-empty write would replace that document on disk.
+empty write would replace that document on disk. Otherwise the window that opens the file
+empties it, after the refusals of #289 (unsaved text in a session that owns the file, a
+close that is blocked). A new window that never appears, or whose close is refused, leaves
+the chosen file's bytes alone.
+
+A preview link outside the root keeps #289's readability check, now before the Open rule:
+a target no window shows and that cannot be read is refused without a window appearing for
+it, in a single-file window too. #292's read before a workspace is replaced does not run in
+an empty window, which replaces nothing: a warm document whose disk copy cannot be read comes
+back there from memory with its unsaved text. In a window that shows the file, #292's reopen
+no longer closes the workspace, because WD1 does not open that file again.
 
 Hosted fixtures build their own registries, which no scene ever shows, so their opens stay
 in the window they target, as every window did before this PR. Routing tests simulate scenes

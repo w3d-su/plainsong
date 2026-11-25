@@ -197,13 +197,15 @@ final class ExportNetworkInterceptorTests: XCTestCase {
         XCTAssertTrue(navigation.didFinish)
         XCTAssertNil(navigation.failure)
         // Give any lazily started subresource a moment to reach the proxy.
-        let rendered = try await webView.evaluateJavaScript(
-            "document.querySelectorAll('img[src^=\"data:\"]').length"
+        let rendered = try await PreviewHostedTestWait.javascript(
+            "document.querySelectorAll('img[src^=\"data:\"]').length",
+            in: webView
         )
         XCTAssertEqual(rendered as? Int, 1)
         if fileKind == .markdown {
-            let features = try await webView.evaluateJavaScript(
-                "document.querySelectorAll('.katex, .hljs, .mermaid-rendered svg').length"
+            let features = try await PreviewHostedTestWait.javascript(
+                "document.querySelectorAll('.katex, .hljs, .mermaid-rendered svg').length",
+                in: webView
             )
             XCTAssertGreaterThan(features as? Int ?? 0, 0)
         }
