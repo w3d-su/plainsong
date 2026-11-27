@@ -56,7 +56,7 @@ final class IOSPerformanceProbeTests: XCTestCase {
     }
 
     func testRunTypesMeasuresAndRestoresTheDocument() async throws {
-        let host = ProbeHost(text: "# Title\n\nbody 👨‍👩‍👧 text\nlast line\n")
+        let host = try ProbeHost(text: "# Title\n\nbody 👨‍👩‍👧 text\nlast line\n")
         var highlight: (() -> Void)?
         var target = host.target()
         target.setHighlightObserver = { highlight = $0 }
@@ -84,8 +84,8 @@ final class IOSPerformanceProbeTests: XCTestCase {
         XCTAssertTrue(report.inadmissibleReasons.contains { $0.contains("Only 5 keystroke samples") })
     }
 
-    func testRefusedKeystrokeStopsTheRunAndLeavesTheTextAlone() async {
-        let host = ProbeHost(text: "alpha\nbeta\n")
+    func testRefusedKeystrokeStopsTheRunAndLeavesTheTextAlone() async throws {
+        let host = try ProbeHost(text: "alpha\nbeta\n")
         host.refusesAfter = 3
         let probe = IOSPerformanceProbe()
         probe.target = { host.target() }
@@ -99,8 +99,8 @@ final class IOSPerformanceProbeTests: XCTestCase {
         XCTAssertEqual(host.textView.text, host.original)
     }
 
-    func testReadOnlyAndMissingDocumentsAreRefusedBeforeTyping() async {
-        let host = ProbeHost(text: "alpha")
+    func testReadOnlyAndMissingDocumentsAreRefusedBeforeTyping() async throws {
+        let host = try ProbeHost(text: "alpha")
         let probe = IOSPerformanceProbe()
         probe.target = { host.target(canWrite: false) }
         await assertFailure(probe, .readOnly)
@@ -219,7 +219,7 @@ private final class ProbeHost: NSObject, UITextViewDelegate {
     }
 
     let textView = TextView(frame: CGRect(x: 0, y: 0, width: 320, height: 480))
-    let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 480))
+    let window: UIWindow
     let original: String
     var onChange: (() -> Void)?
 
@@ -232,7 +232,8 @@ private final class ProbeHost: NSObject, UITextViewDelegate {
         set { textView.refusesAfter = newValue }
     }
 
-    init(text: String) {
+    init(text: String) throws {
+        window = try makeHostedTestWindow(width: 320, height: 480)
         original = text
         super.init()
         textView.text = text

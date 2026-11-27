@@ -74,4 +74,32 @@ describe("code fence highlighting", () => {
     expect(highlightElement).toHaveBeenCalledWith(code);
     expect(code.querySelector(".hljs-keyword")).not.toBeNull();
   });
+
+  it("keeps an auto-detected bare fence across renders", async () => {
+    const body = "function greet(name) {\n  return `Hello, ${name}`;\n}";
+    await render(1, fence(body));
+    const [code] = codes();
+    const token = code.querySelector("[class^=hljs-]");
+    expect(code.className).toMatch(/\blanguage-\w+/);
+
+    await render(2, fence(body) + "\n\nEdit");
+    expect(codes()[0].querySelector("[class^=hljs-]")).toBe(token);
+    expect(highlightElement).toHaveBeenCalledTimes(1);
+
+    // An explicit language added to the same text still re-renders the block.
+    await render(3, fence(body, "swift"));
+    expect(codes()[0].classList.contains("language-swift")).toBe(true);
+    expect(highlightElement).toHaveBeenCalledTimes(2);
+  });
+
+  it("registers each grammar once and resolves the documented aliases", async () => {
+    const { default: hljs } = await import("highlight.js/lib/core");
+    expect(hljs.listLanguages().sort()).toEqual([
+      "bash", "css", "go", "javascript", "json", "markdown", "python", "rust", "swift",
+      "typescript", "xml", "yaml",
+    ]);
+    for (const alias of ["html", "js", "md", "py", "rs", "sh", "ts", "yml", "mermaid"]) {
+      expect(hljs.getLanguage(alias), alias).toBeDefined();
+    }
+  });
 });

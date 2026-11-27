@@ -49,7 +49,7 @@ final class ScriptedFilePort: IOSDocumentFilePort {
         self.openedData = openedData
     }
 
-    func setHandler(_ handler: (@MainActor (IOSDocumentFileEvent) -> Void)?) {
+    func setHandler(_ handler: (@MainActor @Sendable (IOSDocumentFileEvent) -> Void)?) {
         self.handler = handler
     }
 
@@ -89,7 +89,7 @@ final class ScriptedFilePort: IOSDocumentFilePort {
     func save(
         snapshot: Data,
         operationID: UUID,
-        completion: @escaping @MainActor (IOSDocumentFileWriteDisposition) -> Void
+        completion: @escaping @MainActor @Sendable (IOSDocumentFileWriteDisposition) -> Void
     ) {
         inFlight += 1
         peakInFlight = max(peakInFlight, inFlight)
@@ -175,67 +175,50 @@ final class ScriptedCoordinator: IOSCoordinatedFileAccess, @unchecked Sendable {
     private var readObserver: (@MainActor @Sendable () -> Void)?
 
     func setBytes(_ data: Data) async {
-        stateLock.lock()
-        bytes = data
-        stateLock.unlock()
+        stateLock.withLock { bytes = data }
     }
 
     func setBlockReads(_ blocked: Bool) async {
-        stateLock.lock()
-        blockReads = blocked
-        stateLock.unlock()
+        stateLock.withLock { blockReads = blocked }
     }
 
     func setReadObserver(_ observer: (@MainActor @Sendable () -> Void)?) async {
-        stateLock.lock()
-        readObserver = observer
-        stateLock.unlock()
+        stateLock.withLock { readObserver = observer }
     }
 
     func setReadFailure(_ failure: IOSWorkspaceFailure?) async {
-        stateLock.lock()
-        readFailure = failure
-        stateLock.unlock()
+        stateLock.withLock { readFailure = failure }
     }
 
     func blockedReads() async -> Int {
-        stateLock.lock()
-        defer { stateLock.unlock() }
-        return blockedReadCount
+        stateLock.withLock { blockedReadCount }
     }
 
     func completedReads() async -> Int {
-        stateLock.lock()
-        defer { stateLock.unlock() }
-        return readCount
+        stateLock.withLock { readCount }
     }
 
     func unblockReads() async {
-        stateLock.lock()
-        let gates = readGates
-        readGates.removeAll()
-        stateLock.unlock()
+        let gates = stateLock.withLock {
+            let gates = readGates
+            readGates.removeAll()
+            return gates
+        }
         for gate in gates {
             gate.resume()
         }
     }
 
     func seedExisting(_ key: Data) async {
-        stateLock.lock()
-        existingLeaves.insert(key)
-        stateLock.unlock()
+        stateLock.withLock { _ = existingLeaves.insert(key) }
     }
 
     func removeExisting(_ key: Data) async {
-        stateLock.lock()
-        existingLeaves.remove(key)
-        stateLock.unlock()
+        stateLock.withLock { _ = existingLeaves.remove(key) }
     }
 
     func createdLeaves() async -> [(Data, Data)] {
-        stateLock.lock()
-        defer { stateLock.unlock() }
-        return created
+        stateLock.withLock { created }
     }
 
     func read(
@@ -244,10 +227,7 @@ final class ScriptedCoordinator: IOSCoordinatedFileAccess, @unchecked Sendable {
         operationID: UUID,
         maximumByteCount _: Int
     ) async throws -> IOSCoordinatedRead {
-        stateLock.lock()
-        let shouldBlock = blockReads
-        let observer = readObserver
-        stateLock.unlock()
+        let (shouldBlock, observer) = stateLock.withLock { (blockReads, readObserver) }
         await observer?()
         if shouldBlock {
             await withCheckedContinuation { continuation in
@@ -257,13 +237,12 @@ final class ScriptedCoordinator: IOSCoordinatedFileAccess, @unchecked Sendable {
                 self.stateLock.unlock()
             }
         }
-        stateLock.lock()
-        let failure = readFailure
-        let payload = bytes
-        if failure == nil {
-            readCount += 1
+        let (failure, payload) = stateLock.withLock {
+            if readFailure == nil {
+                readCount += 1
+            }
+            return (readFailure, bytes)
         }
-        stateLock.unlock()
         if let failure {
             throw failure
         }
@@ -277,13 +256,14 @@ final class ScriptedCoordinator: IOSCoordinatedFileAccess, @unchecked Sendable {
         operationID: UUID
     ) async throws -> IOSCreatedLeaf {
         let key = Data(location.relativePath.utf8)
-        stateLock.lock()
-        let exists = existingLeaves.contains(key)
-        if !exists {
-            existingLeaves.insert(key)
-            created.append((key, data))
+        let exists = stateLock.withLock {
+            let exists = existingLeaves.contains(key)
+            if !exists {
+                existingLeaves.insert(key)
+                created.append((key, data))
+            }
+            return exists
         }
-        stateLock.unlock()
         if exists {
             throw IOSWorkspaceFailure.alreadyExists
         }
@@ -318,20 +298,19 @@ final class ScriptedRecovery: IOSRecoveryPersisting, @unchecked Sendable {
     private var records: [UUID: IOSRecoveryRecord] = [:]
 
     func setFailNext(_ fail: Bool) async {
-        stateLock.lock()
-        failNext = fail
-        stateLock.unlock()
+        stateLock.withLock { failNext = fail }
     }
 
     func persist(_ record: IOSRecoveryRecord) async throws -> IOSRecoveryReceipt {
-        stateLock.lock()
-        let shouldFail = failNext
-        if shouldFail {
-            failNext = false
-        } else {
-            records[record.recordID] = record
+        let shouldFail = stateLock.withLock {
+            let shouldFail = failNext
+            if shouldFail {
+                failNext = false
+            } else {
+                records[record.recordID] = record
+            }
+            return shouldFail
         }
-        stateLock.unlock()
         if shouldFail {
             throw IOSDocumentFailure.recoveryFailed
         }
@@ -346,24 +325,18 @@ final class ScriptedRecovery: IOSRecoveryPersisting, @unchecked Sendable {
     }
 
     func list() async -> IOSRecoveryList {
-        stateLock.lock()
-        let values = Array(records.values)
-        stateLock.unlock()
+        let values = stateLock.withLock { Array(records.values) }
         return IOSRecoveryList(records: values, corruptNames: [])
     }
 
     func load(_ recordID: UUID) async throws -> IOSRecoveryRecord {
-        stateLock.lock()
-        let record = records[recordID]
-        stateLock.unlock()
+        let record = stateLock.withLock { records[recordID] }
         guard let record else { throw IOSRecoveryDiscardError.missing }
         return record
     }
 
     func discard(recordID: UUID, persistedText: String, liveText: String, liveVersion: Int) async throws {
-        stateLock.lock()
-        let record = records[recordID]
-        stateLock.unlock()
+        let record = stateLock.withLock { records[recordID] }
         guard let record else { throw IOSRecoveryDiscardError.missing }
         guard ExactSourceText.matches(persistedText, record.source) else {
             throw IOSRecoveryDiscardError.contentNotConfirmed
@@ -371,9 +344,17 @@ final class ScriptedRecovery: IOSRecoveryPersisting, @unchecked Sendable {
         if liveVersion > record.revisionVersion, !ExactSourceText.matches(liveText, record.source) {
             throw IOSRecoveryDiscardError.newerLocalRevision
         }
-        stateLock.lock()
-        records[recordID] = nil
-        stateLock.unlock()
+        stateLock.withLock { records[recordID] = nil }
+    }
+
+    func discardSuperseded(recordID: UUID, documentID: UUID, newerVersion: Int) async throws {
+        try stateLock.withLock {
+            guard let record = records[recordID] else { throw IOSRecoveryDiscardError.missing }
+            guard record.documentID == documentID, record.revisionVersion < newerVersion else {
+                throw IOSRecoveryDiscardError.newerLocalRevision
+            }
+            records[recordID] = nil
+        }
     }
 }
 

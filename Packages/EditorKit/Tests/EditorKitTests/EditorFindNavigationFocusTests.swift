@@ -6,9 +6,8 @@ import XCTest
 /// match landing mid-query cannot interrupt typing in the find field.
 @MainActor
 final class EditorFindNavigationFocusTests: XCTestCase {
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        super.tearDown()
     }
 
     private let documentA = EditorDocumentIdentity(rawValue: "document-a")

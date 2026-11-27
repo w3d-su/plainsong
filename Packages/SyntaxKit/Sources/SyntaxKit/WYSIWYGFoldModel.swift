@@ -3,7 +3,7 @@ import MarkdownCore
 
 /// Pure fold and image-region model. Mac presentation maps these ranges onto
 /// AppKit attributes; this type has no color, font, or view.
-public struct WYSIWYGFoldPlan: Equatable {
+public struct WYSIWYGFoldPlan: Equatable, Sendable {
     public let visibleRange: NSRange
     public let regions: [WYSIWYGFoldRegion]
     /// Syntax-only image metadata. Presentation deliberately ignores these regions until
@@ -72,8 +72,8 @@ public struct WYSIWYGFoldPlan: Equatable {
     }
 }
 
-public struct WYSIWYGFoldRegion: Equatable {
-    public enum Kind: Equatable, Hashable {
+public struct WYSIWYGFoldRegion: Equatable, Sendable {
+    public enum Kind: Equatable, Hashable, Sendable {
         case heading(level: Int)
         case strong
         case emphasis

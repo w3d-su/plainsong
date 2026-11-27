@@ -1,4 +1,5 @@
 import AppKit
+import MarkdownCore
 import SwiftUI
 
 /// Owned AppKit single-line replacement field (`docs/editor-replace-gates.md` §5.1, §5.5).
@@ -63,12 +64,7 @@ struct EditorReplaceField: NSViewRepresentable {
         if field.accessibilityHelp() != errorText {
             field.setAccessibilityHelp(errorText)
         }
-        // Never overwrite the field while IME marked text is active (Zhuyin/Pinyin).
-        let isComposing = (field.currentEditor() as? NSTextView)?.hasMarkedText() == true
-            || coordinator.isComposing
-        if !isComposing, field.stringValue != text {
-            field.stringValue = text
-        }
+        coordinator.applyExternalText(text, to: field)
     }
 
     static func dismantleNSView(_ field: NSTextField, coordinator: Coordinator) {
@@ -82,7 +78,6 @@ struct EditorReplaceField: NSViewRepresentable {
         var onEscape: () -> Void
         var onOwnerUnmount: (NSTextField) -> Void = { _ in }
         weak var field: NSTextField?
-        var isComposing = false
 
         init(text: Binding<String>, onSubmit: @escaping (NSWindow?) -> Void, onEscape: @escaping () -> Void) {
             self.text = text
@@ -93,15 +88,30 @@ struct EditorReplaceField: NSViewRepresentable {
         /// A composing value is not a replacement value: it is published only once committed,
         /// so marked text alone never changes the replacement generation.
         func controlTextDidChange(_ obj: Notification) {
-            guard let field = obj.object as? NSTextField else { return }
-            if let editor = field.currentEditor() as? NSTextView, editor.hasMarkedText() {
-                isComposing = true
-                return
+            guard let field = obj.object as? NSTextField, !Self.hasMarkedText(field) else { return }
+            publish(field.stringValue)
+        }
+
+        /// Never overwrites the field while IME marked text is active (Zhuyin/Pinyin).
+        /// Composition is read live from the field editor, never from a stored flag that a
+        /// composition ending without a text-change notification would leave set.
+        func applyExternalText(_ newText: String, to field: NSTextField) {
+            guard !Self.hasMarkedText(field) else { return }
+            if !ExactSourceText.matches(field.stringValue, newText) {
+                field.stringValue = newText
             }
-            isComposing = false
-            if text.wrappedValue != field.stringValue {
-                text.wrappedValue = field.stringValue
+        }
+
+        /// The replacement is literal source text, so a canonically equivalent value is a
+        /// new value.
+        private func publish(_ value: String) {
+            if !ExactSourceText.matches(text.wrappedValue, value) {
+                text.wrappedValue = value
             }
+        }
+
+        private static func hasMarkedText(_ field: NSTextField) -> Bool {
+            (field.currentEditor() as? NSTextView)?.hasMarkedText() == true
         }
 
         func controlTextDidBeginEditing(_ obj: Notification) {
@@ -111,10 +121,7 @@ struct EditorReplaceField: NSViewRepresentable {
         func controlTextDidEndEditing(_ obj: Notification) {
             guard let field = obj.object as? NSTextField else { return }
             (field as? EditorFindOwnedTextField)?.fieldEditorIsActive = false
-            isComposing = false
-            if text.wrappedValue != field.stringValue {
-                text.wrappedValue = field.stringValue
-            }
+            publish(field.stringValue)
         }
 
         /// Return and Escape belong to the input context while marked text exists; afterwards

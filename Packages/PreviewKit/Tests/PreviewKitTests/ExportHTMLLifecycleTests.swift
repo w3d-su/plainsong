@@ -48,8 +48,10 @@ final class ExportHTMLLifecycleTests: XCTestCase {
         let controller = try support.makeController()
         defer { controller.invalidate() }
         let renderID = try await support.render(controller, text: "# Send", fileKind: .markdown, version: 1)
-        _ = try await controller.webView
-            .evaluateJavaScript("window.PlainsongBridge.receive = () => { throw new Error('send'); }; null")
+        _ = try await PreviewHostedTestWait.javascript(
+            "window.PlainsongBridge.receive = () => { throw new Error('send'); }; null",
+            in: controller.webView
+        )
         let result = await controller.exportHTML(matchingRenderID: renderID)
         assertFailure(result, reason: "bridge-send-failed")
         XCTAssertNil(controller.pendingHTMLExport)
@@ -113,7 +115,10 @@ final class ExportHTMLLifecycleTests: XCTestCase {
         let controller = try support.makeController()
         defer { controller.invalidate() }
         let firstID = try await support.render(controller, text: "# First", fileKind: .markdown, version: 1)
-        _ = try await controller.webView.evaluateJavaScript("window.PlainsongBridge.receive = () => {}; null")
+        _ = try await PreviewHostedTestWait.javascript(
+            "window.PlainsongBridge.receive = () => {}; null",
+            in: controller.webView
+        )
         let secondID = controller.renderForTesting(.init(
             text: "# Second",
             version: 0,
@@ -169,9 +174,9 @@ final class ExportHTMLLifecycleTests: XCTestCase {
         trigger: (PreviewController, Task<PreviewHTMLExportResult, Never>) -> Void
     ) async throws {
         var controller: PreviewController? = try support.makeController()
-        weak var releasedController = controller
-        defer { releasedController?.invalidate() }
-        weak var releasedWebView = controller?.webView
+        let releasedController = { [weak controller] in controller }
+        defer { releasedController()?.invalidate() }
+        let releasedWebView = { [weak webView = controller?.webView] in webView }
         let renderID = try await support.render(controller!, text: "# Lifecycle", fileKind: .markdown, version: 1)
         controller!.exportTimeoutNanoseconds = timeout
         try await suspendExports(controller!)
@@ -188,18 +193,18 @@ final class ExportHTMLLifecycleTests: XCTestCase {
         task = nil
         controller = nil
         try await support.waitUntil("controller and WebView release") {
-            releasedController == nil && releasedWebView == nil
+            releasedController() == nil && releasedWebView() == nil
         }
     }
 
     private func suspendExports(_ controller: PreviewController) async throws {
-        _ = try await controller.webView.evaluateJavaScript("""
+        _ = try await PreviewHostedTestWait.javascript("""
         const originalReceive = window.PlainsongBridge.receive;
         window.PlainsongBridge.receive = message => {
             if (message.name !== 'exportHTML') originalReceive(message);
         };
         null;
-        """)
+        """, in: controller.webView)
     }
 
     private func assertFailure(_ result: PreviewHTMLExportResult, reason: String) {

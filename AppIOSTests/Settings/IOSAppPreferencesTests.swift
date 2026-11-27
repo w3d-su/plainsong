@@ -6,22 +6,15 @@ import XCTest
 
 @MainActor
 final class IOSAppPreferencesTests: XCTestCase {
-    private var suite = ""
-    private var defaults: UserDefaults!
-
-    override func setUp() {
-        super.setUp()
-        suite = "app.plainsong.ios.settings.tests.\(UUID().uuidString)"
-        defaults = UserDefaults(suiteName: suite)
+    private func makeDefaults() throws -> UserDefaults {
+        let suite = "app.plainsong.ios.settings.tests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        addTeardownBlock { @MainActor in defaults.removePersistentDomain(forName: suite) }
+        return defaults
     }
 
-    override func tearDown() {
-        defaults?.removePersistentDomain(forName: suite)
-        defaults = nil
-        super.tearDown()
-    }
-
-    func testInvalidValuesClampAndTraversalCannotLeaveTheAssetFolder() {
+    func testInvalidValuesClampAndTraversalCannotLeaveTheAssetFolder() throws {
+        let defaults = try makeDefaults()
         defaults.set("sideways", forKey: "Plainsong.ios.settings.editorAppearance")
         defaults.set(80.0, forKey: "Plainsong.ios.settings.editorFontSize")
         defaults.set(0.1, forKey: "Plainsong.ios.settings.autosaveIntervalSeconds")
@@ -48,7 +41,8 @@ final class IOSAppPreferencesTests: XCTestCase {
         XCTAssertEqual(preferences.generation, 4)
     }
 
-    func testEditorChromePreferencesRoundTrip() {
+    func testEditorChromePreferencesRoundTrip() throws {
+        let defaults = try makeDefaults()
         defaults.set("Comic Sans", forKey: "Plainsong.ios.settings.editorFontName")
         defaults.set("graphite", forKey: "Plainsong.ios.settings.editorPalette")
         defaults.set(false, forKey: "Plainsong.ios.settings.showsLineNumbers")
@@ -72,7 +66,8 @@ final class IOSAppPreferencesTests: XCTestCase {
         XCTAssertEqual(preferences.generation, 4)
     }
 
-    func testImageFolderDraftKeepsSpacesAndReportsAFallback() {
+    func testImageFolderDraftKeepsSpacesAndReportsAFallback() throws {
+        let defaults = try makeDefaults()
         let preferences = IOSAppPreferences(defaults: defaults)
         let generation = preferences.generation
         let kept = IOSAssetFolderDraft.commit("my images", to: preferences)
@@ -90,6 +85,7 @@ final class IOSAppPreferencesTests: XCTestCase {
     }
 
     func testApplyingPreferencesChangesTheLiveProviders() throws {
+        let defaults = try makeDefaults()
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("ApplyPrefs-\(UUID())")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let runtime = try IOSProductionComposition

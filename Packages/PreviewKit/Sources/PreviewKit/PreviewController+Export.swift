@@ -57,10 +57,10 @@ extension PreviewController {
         phase: ExportHTMLPhase,
         outcomes: [ExportResourceOutcome] = []
     ) {
-        send(.exportHTML(ExportHTMLPayload(
+        sendExportHTML(ExportHTMLPayload(
             exportID: pending.exportID, renderID: pending.renderID, phase: phase,
             documentTitle: pending.documentTitle, resourceOutcomes: outcomes
-        ))) { [weak self] succeeded in
+        )) { [weak self] succeeded in
             if !succeeded {
                 self?.failPendingHTMLExport(reason: "bridge-send-failed", matchingExportID: pending.exportID)
             }

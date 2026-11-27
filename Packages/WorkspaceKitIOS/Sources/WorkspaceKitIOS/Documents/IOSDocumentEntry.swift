@@ -46,6 +46,8 @@ final class IOSDocumentEntry {
     var autosaveTask: Task<Void, Never>?
     var autosaveGeneration: UInt64 = 0
     var externalToken: UUID?
+    /// Leases of opens that joined this entry, released with `lease` when it closes.
+    var coalescedLeases: [any IOSWorkspaceAccessLease] = []
     var hasDeferredExternalChange = false
     var openingReadbackFailed = false
 

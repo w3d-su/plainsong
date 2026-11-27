@@ -110,7 +110,22 @@ struct IOSDocumentStateBanner: View {
     let scene: IOSShellSceneState
     @State private var reviewingVersions: IOSCloudVersionRequest?
 
+    /// The sheet hangs off the banner as a whole. Attached to the button inside the
+    /// conflict branch, it was torn down when resolving a version moved the status off
+    /// `.conflict` while the picker was still applying.
     var body: some View {
+        stateBanner
+            .sheet(item: $reviewingVersions, onDismiss: scene.surfaces.cloudVersionReviewEnded) { request in
+                if let load = scene.surfaces.reviewCloudVersions, let apply = scene.surfaces.applyCloudVersion {
+                    IOSCloudVersionPicker(documentID: request.documentID, load: load, apply: apply)
+                        // Applying a version can clear the conflict and take the
+                        // sheet down without its onDismiss.
+                        .onDisappear { scene.surfaces.cloudVersionReviewEnded?() }
+                }
+            }
+    }
+
+    @ViewBuilder private var stateBanner: some View {
         switch chrome.status {
         case .opening:
             banner(tint: .blue, showsActions: false) {
@@ -177,12 +192,9 @@ struct IOSDocumentStateBanner: View {
                 }
             } actions: {
                 if chrome.hasCloudVersionConflict, let id = chrome.documentIdentity,
-                   let load = scene.surfaces.reviewCloudVersions, let apply = scene.surfaces.applyCloudVersion
+                   scene.surfaces.reviewCloudVersions != nil, scene.surfaces.applyCloudVersion != nil
                 {
                     bannerButton("Review iCloud Versions") { reviewingVersions = IOSCloudVersionRequest(documentID: id)
-                    }
-                    .sheet(item: $reviewingVersions) { request in
-                        IOSCloudVersionPicker(documentID: request.documentID, load: load, apply: apply)
                     }
                 }
                 ViewThatFits(in: .horizontal) {

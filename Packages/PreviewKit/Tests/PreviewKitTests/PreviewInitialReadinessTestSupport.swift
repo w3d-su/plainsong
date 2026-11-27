@@ -20,10 +20,12 @@ final class InitialReadinessTestClock {
 
     var deadlines: [Deadline] = []
 
-    func schedule(after delay: UInt64, fire: @escaping @MainActor () -> Void) -> PreviewInitialReadiness.Cancellation {
-        let deadline = Deadline(delay: delay, action: fire)
-        deadlines.append(deadline)
-        return { deadline.isCancelled = true }
+    var scheduler: PreviewInitialReadiness.Scheduler {
+        { delay, fire in
+            let deadline = Deadline(delay: delay) { fire() }
+            self.deadlines.append(deadline)
+            return { deadline.isCancelled = true }
+        }
     }
 
     func fire(_ index: Int = 0) {
@@ -46,9 +48,11 @@ final class InitialReadinessTestPage {
         return nil
     }
 
-    func send(_ message: BridgeMessage, completion: (@MainActor (Bool) -> Void)?) {
-        messages.append(message)
-        completion?(true)
+    func installBridgeTransport(on controller: PreviewController) {
+        controller.bridgeTransportOverrideForTesting = { message, completion in
+            self.messages.append(message)
+            completion?(true)
+        }
     }
 
     var renderedPayloads: [RenderPayload] {
@@ -76,11 +80,13 @@ struct InitialReadinessTestFixture {
             previewIndexURL: index,
             recoversFromWebContentTermination: recoversFromTermination,
             retriesSilentInitialLoad: true,
-            initialReadinessScheduler: clock.schedule,
+            initialReadinessScheduler: clock.scheduler,
             pageLoadOverrideForTesting: page.load
         )
-        controller.bridgeTransportOverrideForTesting = page.send
-        controller.readinessProbeOverrideForTesting = page.probeReadiness
+        page.installBridgeTransport(on: controller)
+        controller.readinessProbeOverrideForTesting = { reply in
+            page.probeReadiness { reply($0) }
+        }
     }
 
     static func change(_ text: String, version: Int = 1, file: URL? = nil) -> DocumentTextChange {

@@ -22,7 +22,7 @@ final class ExportPDFPaintedTailAppTests: XCTestCase {
             // (21.494px) out at 21px while macOS 27 keeps it fractional, which put
             // both blocks past 14,400 there. At 21px every WebKit paints the end at
             // 21n + 43 (14,386 / 14,407), straddling the side cap.
-            try await controller.webView.evaluateJavaScript("""
+            try await controller.webView.evaluateJavaScriptReply("""
             document.querySelectorAll("#preview-root pre, #preview-root pre code")
               .forEach(element => element.style.setProperty("line-height", "21px", "important"));
             const pre = document.querySelector("#preview-root pre");

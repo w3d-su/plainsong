@@ -17,6 +17,9 @@ final class AssetURLSchemeHandlerState: @unchecked Sendable {
     private var reportedMissingDirectoryGrant = false
     private var macGeneration: UInt64 = 0
     private var invalidated = false
+    /// Scheme tasks whose read has begun and not yet returned. The read holds its scheme
+    /// task until it returns, so an identifier here cannot be reused by a later task.
+    private var activeTaskIDs: Set<ObjectIdentifier> = []
     private var stoppedTaskIDs: Set<ObjectIdentifier> = []
     private var reads: [ObjectIdentifier: Task<Void, Never>] = [:]
 
@@ -91,6 +94,7 @@ final class AssetURLSchemeHandlerState: @unchecked Sendable {
         guard let requested = Self.plainsongToken(in: url), requested == plainsongRootToken else {
             return .staleToken
         }
+        activeTaskIDs.insert(taskID)
         return .ready(AssetReadCapture(
             plainsongRootToken: plainsongRootToken,
             access: access,
@@ -107,13 +111,35 @@ final class AssetURLSchemeHandlerState: @unchecked Sendable {
             task.cancel()
             return
         }
-        reads[id] = task
+        // A read that already returned has nothing left to cancel.
+        if activeTaskIDs.contains(id) {
+            reads[id] = task
+        }
         lock.unlock()
+    }
+
+    /// The read for `taskID` returned. Its bookkeeping goes with it; otherwise every
+    /// asset request would leave a task handle and every stopped one an identifier.
+    func finish(_ taskID: ObjectIdentifier) {
+        lock.lock()
+        defer { lock.unlock() }
+        activeTaskIDs.remove(taskID)
+        stoppedTaskIDs.remove(taskID)
+        reads.removeValue(forKey: taskID)
+    }
+
+    var trackedTaskCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return activeTaskIDs.count + stoppedTaskIDs.count + reads.count
     }
 
     func stop(_ taskID: ObjectIdentifier) {
         lock.lock()
-        stoppedTaskIDs.insert(taskID)
+        // Only a read still running can deliver, so only that needs the stop recorded.
+        if activeTaskIDs.contains(taskID) {
+            stoppedTaskIDs.insert(taskID)
+        }
         let task = reads.removeValue(forKey: taskID)
         lock.unlock()
         task?.cancel()

@@ -62,6 +62,10 @@ struct WorkspaceFilesSidebar: View {
         // The pick tracker is per-view @State: it outlives Files → Search → Files,
         // so a deferred open still retrying when the navigator unmounts is cancelled.
         .onDisappear { selectionDeferral.cancelPendingOpen() }
+        // A file opened from elsewhere (a preview link) is revealed under a collapsed root.
+        .onChange(of: appState.workspaceTreeRevealRequest) {
+            isRootExpanded = true
+        }
     }
 
     private func list(_ tree: WorkspaceFileTree) -> some View {

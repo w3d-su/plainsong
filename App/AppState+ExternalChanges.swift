@@ -343,7 +343,8 @@ extension AppState {
             cleanDetachedSessionRecords[sessionIdentity] = nil
         }
 
-        guard session === shownSession else { return }
+        // Every window showing the session gets the banner, not only the façade whose
+        // watcher observed the deletion.
         restoreRecoveryPrompt(for: session)
     }
 
@@ -713,10 +714,12 @@ private extension AppState {
         indeterminateSessionWriteContexts[sessionIdentity] = nil
         pendingExternalReloadApplications[sessionIdentity] = nil
         externalReloadTasks[sessionIdentity] = nil
-        if let prompt = missingFilePrompt,
-           exactFileURLSpellingMatches(prompt.fileURL, application.canonicalURL)
-        {
-            missingFilePrompt = nil
+        for window in registry.connectedWindows where window.shownSession === session {
+            if let prompt = window.missingFilePrompt,
+               exactFileURLSpellingMatches(prompt.fileURL, application.canonicalURL)
+            {
+                window.missingFilePrompt = nil
+            }
         }
         if let prompt = indeterminateFileWriteReconciliationPrompt,
            exactFileURLSpellingMatches(prompt.fileURL, application.canonicalURL)
@@ -727,19 +730,6 @@ private extension AppState {
             by: session,
             canonicalURL: application.canonicalURL
         )
-    }
-
-    func clearExternalChangePromptIfOwned(
-        by session: DocumentSession,
-        canonicalURL: URL
-    ) {
-        guard shownSession === session,
-              let prompt = externalChangePrompt,
-              exactFileURLSpellingMatches(prompt.fileURL, canonicalURL)
-        else {
-            return
-        }
-        externalChangePrompt = nil
     }
 
     func handleExternalDiskInspection(
@@ -911,9 +901,11 @@ private extension AppState {
             canonicalURL: canonicalURL
         )
         sessionPolicy.updateDirtyState(for: canonicalURL, isDirty: false)
+        for window in registry.connectedWindows where window.shownSession === session {
+            window.missingFilePrompt = nil
+            window.externalChangePrompt = nil
+        }
         if session === shownSession {
-            missingFilePrompt = nil
-            externalChangePrompt = nil
             scheduleCompletionWorkspaceRefresh()
             restartActiveWorkspaceSearchWithFreshOverlays()
         }
@@ -954,6 +946,22 @@ private extension AppState {
 
 @MainActor
 extension AppState {
+    func clearExternalChangePromptIfOwned(
+        by session: DocumentSession,
+        canonicalURL: URL
+    ) {
+        // A prompt left in another window showing the session would block every save of
+        // the file through `isSaveBlockedByWindowPrompt` with nothing left to resolve.
+        for window in registry.connectedWindows where window.shownSession === session {
+            guard let prompt = window.externalChangePrompt,
+                  exactFileURLSpellingMatches(prompt.fileURL, canonicalURL)
+            else {
+                continue
+            }
+            window.externalChangePrompt = nil
+        }
+    }
+
     /// Hands a finished inspection read to the file-private arbitration below.
     func completeExternalDiskInspection(
         _ prepared: PreparedExternalFileRead,

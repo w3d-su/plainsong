@@ -97,7 +97,7 @@ extension AppState {
                 onChunk: { chunk in hook?(chunk) },
                 progress: { progress in
                     Task { @MainActor [weak self] in
-                        guard let self, isCurrentEditorReplaceBatch(capture), state.isPreparing,
+                        guard let appState = self, appState.isCurrentEditorReplaceBatch(capture), state.isPreparing,
                               progress.completedMatchCount > (state.progress.last?.completedMatchCount ?? 0)
                         else { return }
                         state.progress.append(progress)

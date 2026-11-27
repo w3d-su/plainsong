@@ -232,6 +232,8 @@ extension IOSUIDocumentStore {
         entry.filePort.setHandler(nil)
         forgetClosedEntry(entry)
         entry.lease.release()
+        entry.coalescedLeases.forEach { $0.release() }
+        entry.coalescedLeases = []
         emit(.closed(entry.identity))
     }
 }

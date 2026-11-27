@@ -81,12 +81,12 @@ final class EditorFindHostedGateTests: XCTestCase {
 
         let webView = try await waitForView(WKWebView.self, in: host.window)
         try await waitUntil("live preview renders the target source line", timeout: 8) {
-            let value = try await webView.evaluateJavaScript(
+            let value = try await webView.evaluateJavaScriptReply(
                 "document.querySelector('[data-line=\"\(document.targetLine)\"]') !== null"
             )
             return value as? Bool == true
         }
-        let targetStartsOffscreen = try await webView.evaluateJavaScript(
+        let targetStartsOffscreen = try await webView.evaluateJavaScriptReply(
             """
             (() => {
               const target = document.querySelector('[data-line="\(document.targetLine)"]');
@@ -107,7 +107,7 @@ final class EditorFindHostedGateTests: XCTestCase {
             // Explicit navigation forwards the selected source line as a forced intent.
             // `scrollRangeToVisible` only promises that the match becomes visible; it does
             // not promise that the match itself is placed near the top of either viewport.
-            let value = try await webView.evaluateJavaScript(
+            let value = try await webView.evaluateJavaScriptReply(
                 """
                 (() => {
                   const target = document.querySelector('[data-line="\(document.targetLine)"]');
@@ -139,7 +139,7 @@ final class EditorFindHostedGateTests: XCTestCase {
         registerTeardown(host: host, fixture: fixture)
         let webView = try await waitForView(WKWebView.self, in: host.window)
         try await waitUntil("live preview renders the second match", timeout: 8) {
-            let value = try await webView.evaluateJavaScript(
+            let value = try await webView.evaluateJavaScriptReply(
                 "document.querySelector('[data-line=\"\(document.secondLine)\"]') !== null"
             )
             return value as? Bool == true
@@ -151,7 +151,7 @@ final class EditorFindHostedGateTests: XCTestCase {
             EditorSelectionProbe.appliedEditorSelection(in: host.window)?.range == document.firstRange
                 && appState.editorFindHost.controller.session?.currentOrdinal == 1
         }
-        let secondStartsOffscreen = try await webView.evaluateJavaScript(
+        let secondStartsOffscreen = try await webView.evaluateJavaScriptReply(
             """
             document.querySelector('[data-line="\(document.secondLine)"]')
               .getBoundingClientRect().top >= window.innerHeight
@@ -212,7 +212,7 @@ final class EditorFindHostedGateTests: XCTestCase {
         }
         scrollCoordinator.installClockForTesting { DispatchTime.now().uptimeNanoseconds }
         try await waitUntil("second match becomes visible after preview-owned handoff") {
-            let value = try await webView.evaluateJavaScript(
+            let value = try await webView.evaluateJavaScriptReply(
                 """
                 (() => {
                   const target = document.querySelector('[data-line="\(document.secondLine)"]');

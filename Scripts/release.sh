@@ -63,7 +63,7 @@ echo "==> Release $MARKETING_VERSION ($BUILD_NUMBER)"
 mkdir -p "$OUT_DIR"
 
 echo "==> Generate project"
-xcodegen generate
+Scripts/generate-project.sh
 
 if [[ "$UNSIGNED" == "1" ]]; then
     echo "==> Build Release (UNSIGNED alpha: ad-hoc signature, no notarization)"
@@ -93,6 +93,7 @@ STRIP_SETTINGS=(
 )
 xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Release \
     -derivedDataPath "$DERIVED_DATA" \
+    -onlyUsePackageVersionsFromResolvedFile \
     MARKETING_VERSION="$MARKETING_VERSION" \
     CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
     PLAINSONG_UPDATES_ENABLED=YES \
@@ -192,6 +193,9 @@ fi
 
 echo "==> Package DMG"
 Scripts/make-dmg.sh "$APP_PATH" "$DMG_PATH"
+if [[ "$UNSIGNED" != "1" ]]; then
+    Scripts/sign-dmg.sh "$DMG_PATH"
+fi
 
 echo "==> Checksum"
 # Compute inside the output dir so the .sha256 records only the filename;

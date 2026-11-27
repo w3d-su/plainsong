@@ -158,6 +158,7 @@ final class IOSDocumentExportController: ObservableObject {
     @Published private(set) var isRunning = false
     @Published private(set) var status: String?
 
+    weak var windowScene: UIWindowScene?
     private var task: Task<Void, Never>?
     private(set) var completionNote: String?
     var onNote: ((String) -> Void)?
@@ -254,7 +255,7 @@ final class IOSDocumentExportController: ObservableObject {
             }
             return
         }
-        let host = IOSExportPreviewHost(webView: preview.webView)
+        let host = IOSExportPreviewHost(webView: preview.webView, windowScene: windowScene)
         defer {
             preview.invalidate()
             host.remove()
@@ -410,17 +411,15 @@ private final class IOSExportPreviewHost {
     private let webView: WKWebView
     private var window: UIWindow?
 
-    init(webView: WKWebView) {
+    init(webView: WKWebView, windowScene: UIWindowScene?) {
         self.webView = webView
         let frame = CGRect(x: 0, y: 0, width: 800, height: 1100)
         webView.frame = frame
-        let window = UIWindow(frame: frame)
-        if let scene = UIApplication.shared.connectedScenes
+        guard let scene = windowScene ?? UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
-            .first(where: { $0.activationState != .unattached })
-        {
-            window.windowScene = scene
-        }
+            .first(where: { $0.activationState != .unattached }) else { return }
+        let window = UIWindow(windowScene: scene)
+        window.frame = frame
         let root = UIViewController()
         window.rootViewController = root
         window.windowLevel = .normal - 1

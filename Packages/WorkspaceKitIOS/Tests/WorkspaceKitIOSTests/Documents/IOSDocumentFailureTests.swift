@@ -39,7 +39,7 @@ final class IOSDocumentFailureTests: XCTestCase {
         let failedEntered = expectation(description: "fail")
         port.onSaveEntered = { failedEntered.fulfill() }
         let failed = Task { try await harness.store.save(handle.identity) }
-        await fulfillment(of: [failedEntered], timeout: 2)
+        await assertFulfillment(of: [failedEntered], timeout: 2)
         port.releaseOne()
         do {
             _ = try await failed.value
@@ -55,7 +55,7 @@ final class IOSDocumentFailureTests: XCTestCase {
         let indeterminateEntered = expectation(description: "indeterminate")
         port.onSaveEntered = { indeterminateEntered.fulfill() }
         let indeterminate = Task { try await harness.store.save(handle.identity) }
-        await fulfillment(of: [indeterminateEntered], timeout: 2)
+        await assertFulfillment(of: [indeterminateEntered], timeout: 2)
         port.releaseOne()
         do {
             _ = try await indeterminate.value
@@ -138,7 +138,7 @@ final class IOSDocumentFailureTests: XCTestCase {
         let entered = expectation(description: "close save")
         port.onSaveEntered = { entered.fulfill() }
         let closing = Task { try await harness.store.close(handle.identity) }
-        await fulfillment(of: [entered], timeout: 2)
+        await assertFulfillment(of: [entered], timeout: 2)
         XCTAssertEqual(port.inFlight, 1)
         port.releaseOne()
         let outcome = try await closing.value

@@ -71,9 +71,8 @@ final class EditorScrollLineIndexTests: XCTestCase {
 
 @MainActor
 final class EditorScrollLineIndexTypingTests: XCTestCase {
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        super.tearDown()
     }
 
     func testTypingUpdatesTheScrollLineIndexWithoutRescanningTheDocument() throws {

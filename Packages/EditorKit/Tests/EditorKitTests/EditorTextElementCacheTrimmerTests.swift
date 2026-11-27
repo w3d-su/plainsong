@@ -7,10 +7,9 @@ import XCTest
 final class EditorTextElementCacheTrimmerTests: XCTestCase {
     private var windows: [NSWindow] = []
 
-    override func tearDown() {
+    override func tearDown() async throws {
         windows.forEach { $0.close() }
         windows.removeAll()
-        super.tearDown()
     }
 
     func testChunksWalkBackFromTheEndToAMarginBelowTheViewport() throws {

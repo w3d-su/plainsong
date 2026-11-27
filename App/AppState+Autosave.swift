@@ -77,25 +77,28 @@ extension AppState {
         let sessionIdentity = ObjectIdentifier(session)
         let token = UUID()
         let delayNanoseconds = UInt64(preferences.autosaveIntervalSeconds * 1_000_000_000)
-        let task = Task { @MainActor [weak self, weak session] in
+        let task = Task { @MainActor [weak self, registry, weak session] in
             do {
                 try await Task.sleep(nanoseconds: delayNanoseconds)
             } catch {
                 return
             }
-            guard let self, let session,
+            // The scheduling window may have closed. The session outlives it in the registry,
+            // so a surviving façade saves it.
+            guard let facade = self ?? KeyWindowRouter.shared.home(for: registry),
+                  let session,
                   !Task.isCancelled,
-                  sessionAutosaveTasks[sessionIdentity]?.token == token
+                  registry.sessionAutosaveTasks[sessionIdentity]?.token == token
             else {
                 return
             }
 
-            sessionAutosaveTasks[sessionIdentity] = nil
-            guard session.isDirty, canAutosave(session: session) else { return }
+            registry.sessionAutosaveTasks[sessionIdentity] = nil
+            guard session.isDirty, facade.canAutosave(session: session) else { return }
             do {
-                try save(session: session)
+                try facade.save(session: session)
             } catch {
-                present(error, title: "Autosave Failed", for: session)
+                facade.present(error, title: "Autosave Failed", for: session)
             }
         }
         sessionAutosaveTasks[sessionIdentity] = SessionBackgroundTask(token: token, task: task)

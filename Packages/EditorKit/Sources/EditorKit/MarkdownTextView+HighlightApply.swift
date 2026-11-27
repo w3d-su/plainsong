@@ -65,7 +65,9 @@ extension MarkdownTextView {
 
         let preservedImageMarkers = collectImagePresentationMarkers(
             in: textStorage,
-            range: targetRange
+            range: targetRange,
+            generation: (textView as? MarkdownSTTextView)?
+                .wysiwygZeroWidthContentStorageDelegate?.imagePresentationGeneration
         )
         let preservedFindHighlights = EditorFindMatchHighlight.collect(
             in: textStorage,
@@ -122,9 +124,13 @@ extension MarkdownTextView {
         return effectiveRange == range && (existing as NSDictionary).isEqual(to: attributes)
     }
 
+    /// Only markers of the generation being presented are kept. A marker of an earlier
+    /// source is never drawn and its controller no longer tracks it, so restoring it would
+    /// keep it, and its thumbnail, on those characters for good.
     private static func collectImagePresentationMarkers(
         in textStorage: NSTextStorage,
-        range: NSRange
+        range: NSRange,
+        generation: UInt64?
     ) -> [(range: NSRange, marker: WYSIWYGImagePresentationMarker)] {
         var preserved: [(range: NSRange, marker: WYSIWYGImagePresentationMarker)] = []
         guard range.length > 0 else {
@@ -134,7 +140,9 @@ extension MarkdownTextView {
             WYSIWYGImagePresentationMarker.attribute,
             in: range
         ) { value, attributeRange, _ in
-            guard let marker = value as? WYSIWYGImagePresentationMarker else {
+            guard let marker = value as? WYSIWYGImagePresentationMarker,
+                  marker.generation == generation
+            else {
                 return
             }
             preserved.append((attributeRange, marker))

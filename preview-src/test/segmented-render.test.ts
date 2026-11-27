@@ -275,4 +275,18 @@ describe("segmented preview render", () => {
       });
     }
   }
+
+  it("runs overlapping calls one after the other", async () => {
+    const plain = Array.from({ length: 12 }, (_, index) => `Paragraph ${index}.\n`).join("\n");
+    const linked = `${plain}\n[site]\n\n[site]: https://example.com\n`;
+    const renderer = new SegmentedRenderer("md", finest);
+
+    // The whole render of `linked` awaits the pipeline. A call that started meanwhile
+    // used to see its unfinished state and render whole as well.
+    const [first, second] = await Promise.all([renderer.render(linked), renderer.render(plain)]);
+
+    expect(first).toBe(await renderMarkdown(linked));
+    expect(second).toBe(await renderMarkdown(plain));
+    expect(renderer.assembledSegmentCount).toBeGreaterThan(1);
+  });
 });

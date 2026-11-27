@@ -34,6 +34,22 @@ final class ExportRenderLifecycleTests: XCTestCase {
         XCTAssertTrue(html.contains("Exact Export Render"))
     }
 
+    func testRenderedPageCapturesThroughWebKitPDF() async throws {
+        let controller = try support.makeController()
+        defer { controller.invalidate() }
+        controller.webView.frame = CGRect(x: 0, y: 0, width: 640, height: 480)
+        let result = await controller.renderForExport(change("# PDF piece\n\nBody text.\n"))
+        guard case .completed = result else {
+            return XCTFail("Expected an exact render completion, got \(result)")
+        }
+
+        let document = try await controller.captureExportPDF()
+
+        XCTAssertGreaterThanOrEqual(document.pageCount, 1)
+        XCTAssertFalse(document.data.isEmpty)
+        XCTAssertNil(controller.pdfPieceCapture.pending)
+    }
+
     func testNewerRenderSupersedesAPendingExportRender() async throws {
         try await assertPendingRenderFails(reason: "render-superseded") { controller, _ in
             _ = controller.renderForTesting(self.change("# Newer\n"))
@@ -83,7 +99,10 @@ final class ExportRenderLifecycleTests: XCTestCase {
         controller.exportTimeoutNanoseconds = timeout
         try await support.waitUntil("preview bridge ready") { controller.isReady }
         // Swallow bridge messages so the submitted render can never complete on its own.
-        _ = try await controller.webView.evaluateJavaScript("window.PlainsongBridge.receive = () => {}; null")
+        _ = try await PreviewHostedTestWait.javascript(
+            "window.PlainsongBridge.receive = () => {}; null",
+            in: controller.webView
+        )
 
         let task = Task { await controller.renderForExport(change("# Pending\n")) }
         if reason != "timeout" {

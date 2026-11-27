@@ -104,6 +104,23 @@ extension AppState {
             preserving: preservedRootSessions
         )
     }
+
+    /// The closing window's own document still releases with its root. Another window's
+    /// shown session, or a live installation that window holds, stays out of the set.
+    func isPreservedForAnotherWindow(_ session: DocumentSession) -> Bool {
+        if registry.connectedWindows.contains(where: { window in
+            window !== windowState && window.shownSession === session
+        }) {
+            return true
+        }
+        return editorBindingInstallations.contains { installation, owner in
+            guard owner === session,
+                  let window = registry.editorInstallationWindows[installation]?.window,
+                  window !== windowState
+            else { return false }
+            return registry.connectedWindows.contains { $0 === window }
+        }
+    }
 }
 
 @MainActor
@@ -123,23 +140,6 @@ private extension AppState {
             sessionClosureIdentity(first).utf8.lexicographicallyPrecedes(
                 sessionClosureIdentity(second).utf8
             )
-        }
-    }
-
-    /// The closing window's own document still releases with its root. Another window's
-    /// shown session, or a live installation that window holds, stays out of the set.
-    func isPreservedForAnotherWindow(_ session: DocumentSession) -> Bool {
-        if registry.connectedWindows.contains(where: { window in
-            window !== windowState && window.shownSession === session
-        }) {
-            return true
-        }
-        return editorBindingInstallations.contains { installation, owner in
-            guard owner === session,
-                  let window = registry.editorInstallationWindows[installation]?.window,
-                  window !== windowState
-            else { return false }
-            return registry.connectedWindows.contains { $0 === window }
         }
     }
 
@@ -224,6 +224,19 @@ private extension AppState {
         if let authority = context.registrationAuthority {
             registry.workspaceRoots[authority] = nil
             context.registrationAuthority = nil
+        }
+        // An image placement still running holds its fence on the closed root's context.
+        // Reusing that context would refuse the next workspace's file operations until the
+        // old placement returns.
+        if context.workspaceImageAssetInsertionCount > 0 {
+            let replacement = WorkspaceRootContext()
+            replacement.workspaceGeneration = context.workspaceGeneration
+            replacement.workspaceReloadPostProofHook = context.workspaceReloadPostProofHook
+            replacement.workspaceReloadPostLoadHook = context.workspaceReloadPostLoadHook
+            replacement.workspaceReloadPostPrepareHook = context.workspaceReloadPostPrepareHook
+            replacement.editorImageAssetDiscardEventHandler = context.editorImageAssetDiscardEventHandler
+            workspaceRootContext = replacement
+            connectWorkspaceRootContext()
         }
     }
 

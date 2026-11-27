@@ -83,12 +83,12 @@ extension MarkdownSyntaxParser {
         canParseTSX: Bool,
         to tokens: inout [MarkdownSyntaxToken]
     ) {
-        let excludedRanges = tokens.compactMap { token -> NSRange? in
+        let excludedRanges = MDXRangeSet(tokens.compactMap { token -> NSRange? in
             if token.kind == .codeBlock || token.kind == .frontmatter {
                 return token.range
             }
             return nil
-        }
+        })
 
         guard canParseTSX else {
             appendMDXSourceFallbackTokens(in: source, excluding: excludedRanges, to: &tokens)
@@ -96,17 +96,21 @@ extension MarkdownSyntaxParser {
         }
 
         let lineTSXRanges = appendMDXLineTSXTokens(in: source, excluding: excludedRanges, to: &tokens)
-        appendMDXHTMLTokens(from: root, excludingInlineRanges: lineTSXRanges, to: &tokens)
+        appendMDXHTMLTokens(from: root, excludingInlineRanges: MDXRangeSet(lineTSXRanges), to: &tokens)
     }
 
     func appendMDXHTMLTokens(
         from node: Node,
-        excludingInlineRanges excludedInlineRanges: [NSRange],
+        excludingInlineRanges excludedInlineRanges: MDXRangeSet,
         to tokens: inout [MarkdownSyntaxToken]
     ) {
         switch node.nodeType {
         case "html_block":
-            appendTSXTokens(from: node, to: &tokens)
+            // The JSX lines of this block were already tokenized by the line pass, so its
+            // tokens are emitted twice. `docs/ios/evidence/lane-02/pre-move-baseline.json`
+            // pins that output byte for byte.
+            let range = nsRange(for: node)
+            appendTSXTokens(in: node.text ?? "", baseLocation: range.location, fallbackRange: range, to: &tokens)
             return
 
         case "inline":
@@ -130,7 +134,7 @@ extension MarkdownSyntaxParser {
 
     func appendMDXInlineHTMLTokens(
         from inlineNode: Node,
-        excluding excludedRanges: [NSRange],
+        excluding excludedRanges: MDXRangeSet,
         to tokens: inout [MarkdownSyntaxToken]
     ) {
         guard
@@ -153,12 +157,12 @@ extension MarkdownSyntaxParser {
     func appendMDXInlineHTMLTokens(
         from node: Node,
         baseLocation: Int,
-        excluding excludedRanges: [NSRange],
+        excluding excludedRanges: MDXRangeSet,
         to tokens: inout [MarkdownSyntaxToken]
     ) {
         if node.nodeType == "html_inline" || node.nodeType == "html_tag" {
             let fallbackRange = nsRange(for: node, offset: baseLocation)
-            guard !fallbackRange.intersects(any: excludedRanges) else {
+            guard !excludedRanges.intersects(fallbackRange) else {
                 return
             }
 
@@ -187,7 +191,7 @@ extension MarkdownSyntaxParser {
     @discardableResult
     func appendMDXLineTSXTokens(
         in source: String,
-        excluding excludedRanges: [NSRange],
+        excluding excludedRanges: MDXRangeSet,
         to tokens: inout [MarkdownSyntaxToken]
     ) -> [NSRange] {
         let nsSource = source as NSString
@@ -200,7 +204,7 @@ extension MarkdownSyntaxParser {
             let trimmed = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
             let isMDXLine = isMDXESMLine(trimmed) || isMDXJSXLine(trimmed)
 
-            if isMDXLine, !lineRange.intersects(any: excludedRanges) {
+            if isMDXLine, !excludedRanges.intersects(lineRange) {
                 appendTSXTokens(
                     in: rawLine,
                     baseLocation: lineRange.location,
@@ -214,15 +218,6 @@ extension MarkdownSyntaxParser {
         }
 
         return parsedRanges
-    }
-
-    func appendTSXTokens(from node: Node, to tokens: inout [MarkdownSyntaxToken]) {
-        appendTSXTokens(
-            in: node.text ?? "",
-            baseLocation: nsRange(for: node).location,
-            fallbackRange: nsRange(for: node),
-            to: &tokens
-        )
     }
 
     func appendTSXTokens(
@@ -259,7 +254,7 @@ extension MarkdownSyntaxParser {
 
     func appendMDXSourceFallbackTokens(
         in source: String,
-        excluding excludedRanges: [NSRange],
+        excluding excludedRanges: MDXRangeSet,
         to tokens: inout [MarkdownSyntaxToken]
     ) {
         let nsSource = source as NSString
@@ -269,7 +264,7 @@ extension MarkdownSyntaxParser {
             let lineRange = nsSource.lineRange(for: NSRange(location: location, length: 0))
             let rawLine = nsSource.substring(with: lineRange)
             let trimmed = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
-            if isMDXESMLine(trimmed) || isMDXJSXLine(trimmed), !lineRange.intersects(any: excludedRanges) {
+            if isMDXESMLine(trimmed) || isMDXJSXLine(trimmed), !excludedRanges.intersects(lineRange) {
                 tokens.append(MarkdownSyntaxToken(kind: .mdxSource, range: lineRange))
             }
 
@@ -279,6 +274,29 @@ extension MarkdownSyntaxParser {
 
     func isMDXESMLine(_ line: String) -> Bool {
         line.hasPrefix("import ") || line.hasPrefix("export ")
+    }
+
+    /// MDX reads a top-level block whose first line starts with `import ` or `export ` at
+    /// column 0 as JavaScript up to the next blank line. Markdown parses it as a paragraph,
+    /// so its `*`, `_` and backticks would fold as inline markup.
+    func isMDXESMBlock(_ paragraph: Node, fragment: String) -> Bool {
+        guard let parentType = paragraph.parent?.nodeType, parentType == "document" || parentType == "section"
+        else {
+            return false
+        }
+        let storage = fragment as NSString
+        let location = nsRange(for: paragraph).location
+        let keywordLength = 7
+        guard location + keywordLength <= storage.length else {
+            return false
+        }
+        if location > 0 {
+            let previous = storage.character(at: location - 1)
+            guard previous == 10 || previous == 13 else {
+                return false
+            }
+        }
+        return isMDXESMLine(storage.substring(with: NSRange(location: location, length: keywordLength)))
     }
 
     func isMDXJSXLine(_ line: String) -> Bool {
@@ -310,8 +328,39 @@ private extension MarkdownSyntaxToken.Kind {
     }
 }
 
-private extension NSRange {
-    func intersects(any ranges: [NSRange]) -> Bool {
-        ranges.contains { NSIntersectionRange(self, $0).length > 0 }
+/// Disjoint sorted ranges, so an intersection test is a binary search instead of a scan
+/// of every range for every line.
+struct MDXRangeSet {
+    private let ranges: [NSRange]
+
+    init(_ ranges: [NSRange]) {
+        var merged: [NSRange] = []
+        for range in ranges.sorted(by: { $0.location < $1.location }) where range.length > 0 {
+            if let last = merged.last, range.location <= NSMaxRange(last) {
+                let end = max(NSMaxRange(last), NSMaxRange(range))
+                merged[merged.count - 1] = NSRange(location: last.location, length: end - last.location)
+            } else {
+                merged.append(range)
+            }
+        }
+        self.ranges = merged
+    }
+
+    func intersects(_ range: NSRange) -> Bool {
+        guard range.length > 0 else {
+            return false
+        }
+        // The first range that ends after `range` starts is the only candidate.
+        var low = 0
+        var high = ranges.count
+        while low < high {
+            let middle = (low + high) / 2
+            if NSMaxRange(ranges[middle]) <= range.location {
+                low = middle + 1
+            } else {
+                high = middle
+            }
+        }
+        return low < ranges.count && ranges[low].location < NSMaxRange(range)
     }
 }

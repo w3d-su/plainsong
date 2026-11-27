@@ -14,7 +14,6 @@ final class WindowStateRegistryAppTests: XCTestCase {
     private var recorder: UnwiredContainerHookRecorder?
 
     override func setUp() async throws {
-        try await super.setUp()
         recorder = UnwiredContainerHookRecorder()
     }
 
@@ -22,7 +21,6 @@ final class WindowStateRegistryAppTests: XCTestCase {
         XCTAssertEqual(recorder?.reports, [], "Every window was connected before it received input")
         recorder?.stop()
         recorder = nil
-        try await super.tearDown()
     }
 
     // MARK: - W1 bullet 3: inventories, ownership, and untitled sessions

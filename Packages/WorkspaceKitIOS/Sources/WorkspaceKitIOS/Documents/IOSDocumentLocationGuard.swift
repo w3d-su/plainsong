@@ -18,7 +18,7 @@ enum IOSDocumentLocationGuard {
             return root == file
         case .directory:
             var expected = grant.rootURL.path(percentEncoded: false)
-            if !expected.hasSuffix("/") {
+            if !expected.hasTrailingPathSeparator {
                 expected.append("/")
             }
             expected.append(location.relativePath)
@@ -49,7 +49,7 @@ enum IOSDocumentLocationGuard {
     }
 
     static func recognizedDocumentExtension(_ relativePath: String) -> String? {
-        let parts = relativePath.split(separator: "/", omittingEmptySubsequences: false)
+        let parts = relativePath.splitOnPathSeparator(omittingEmptySubsequences: false)
         guard let name = parts.last, !name.isEmpty else { return nil }
         let nameString = String(name)
         guard let dot = nameString.lastIndex(of: ".") else { return nil }

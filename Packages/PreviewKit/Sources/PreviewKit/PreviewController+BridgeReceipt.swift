@@ -4,8 +4,20 @@ import Foundation
 
 extension PreviewController: WKScriptMessageHandler {
     public func userContentController(_: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.name == "bridge" else { return }
+        guard message.name == "bridge",
+              Self.acceptsBridgeSender(
+                  isMainFrame: message.frameInfo.isMainFrame,
+                  sender: message.webView,
+                  owner: webView
+              )
+        else { return }
         receiveBridgeBody(message.body)
+    }
+
+    /// Defense in depth: the bridge belongs to this controller's page. The CSP already
+    /// keeps frames out, so a message from a subframe or another web view is not ours.
+    nonisolated static func acceptsBridgeSender(isMainFrame: Bool, sender: AnyObject?, owner: AnyObject) -> Bool {
+        isMainFrame && sender === owner
     }
 
     /// Reads typed fields straight from WebKit's Foundation body. Export HTML can be many

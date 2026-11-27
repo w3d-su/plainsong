@@ -19,7 +19,7 @@ let package = Package(
                 .product(name: "MarkdownCore", package: "MarkdownCore"),
                 .product(name: "WorkspaceCore", package: "WorkspaceCore"),
             ],
-            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
             name: "IOSAcceptanceHarnessTests",
@@ -29,7 +29,7 @@ let package = Package(
                 .product(name: "WorkspaceCore", package: "WorkspaceCore"),
                 .product(name: "PreviewKit", package: "PreviewKit"),
             ],
-            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ],
     swiftLanguageModes: [.v5]

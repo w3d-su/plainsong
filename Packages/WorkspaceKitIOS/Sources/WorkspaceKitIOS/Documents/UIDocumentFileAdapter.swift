@@ -19,7 +19,7 @@ final class UIDocumentFileAdapter: IOSDocumentFilePort {
         return canEdit(document)
     }
 
-    func setHandler(_ handler: (@MainActor (IOSDocumentFileEvent) -> Void)?) {
+    func setHandler(_ handler: (@MainActor @Sendable (IOSDocumentFileEvent) -> Void)?) {
         self.handler = handler
         installHandler()
     }
@@ -56,7 +56,7 @@ final class UIDocumentFileAdapter: IOSDocumentFilePort {
     func save(
         snapshot: Data,
         operationID: UUID,
-        completion: @escaping @MainActor (IOSDocumentFileWriteDisposition) -> Void
+        completion: @escaping @MainActor @Sendable (IOSDocumentFileWriteDisposition) -> Void
     ) {
         let document = prepareDocument()
         guard !document.documentState.contains(.inConflict), canEdit(document) else {

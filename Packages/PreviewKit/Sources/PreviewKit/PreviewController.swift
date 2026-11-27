@@ -67,6 +67,7 @@ public final class PreviewController: NSObject, ObservableObject {
     var exportPDFPageJoiner: (
         @Sendable ([Data], [CGFloat]) throws -> (data: Data, pageScales: [CGFloat])
     )?
+    var pdfPieceCapture = ExportPDFPieceCapture()
     var pendingHTMLExport: PendingHTMLExport?
     var pendingExportRender: PendingExportRender?
     private(set) var theme = "system"
@@ -326,8 +327,10 @@ public final class PreviewController: NSObject, ObservableObject {
         onCheckboxToggled = nil
         renderCompletionObserver = nil
         iosDocumentIdentity = nil
+        eventHub.invalidate()
         assetSchemeHandler.invalidateReads()
         failPendingExportWork(reason: "invalidated")
+        failPendingExportPDFPiece()
     }
 
     func shutdownForTesting() {
@@ -355,11 +358,11 @@ public final class PreviewController: NSObject, ObservableObject {
 
         let script = "window.PlainsongBridge.receive(\(json));"
         if let completion {
-            webView.evaluateJavaScript(script) { _, error in
+            webView.evaluateJavaScript(script, completionHandler: { _, error in
                 completion(error == nil)
-            }
+            })
         } else {
-            webView.evaluateJavaScript(script)
+            webView.evaluateJavaScript(script, completionHandler: nil)
         }
     }
 
@@ -462,7 +465,8 @@ extension PreviewController {
                 PreviewPlatform.openExternalURL(url)
             }
         default:
-            reportRelativeLink(href)
+            // `file:`, `mailto:`, `javascript:`, `data:` and the rest are not relative links.
+            break
         }
     }
 
@@ -517,6 +521,7 @@ extension PreviewController: WKNavigationDelegate {
         resetRenderDispatch(keepingPending: !recoversFromWebContentTermination)
         viewportScrollQueue.reset()
         failPendingExportWork(reason: "web-content-process-terminated")
+        failPendingExportPDFPiece()
         scrollDeliveryState.failPendingDelivery()
         scrollDeliveryState = PreviewScrollDeliveryState()
         recoverFromWebContentTermination(resubmitting: newestRender)
@@ -549,7 +554,7 @@ extension PreviewController: WKNavigationDelegate {
             readinessProbeOverrideForTesting(accept)
         } else {
             let script = "window.PlainsongPreview && window.PlainsongPreview.PROTOCOL_VERSION"
-            webView.evaluateJavaScript(script) { @MainActor result, _ in accept(result) }
+            webView.evaluateJavaScript(script, completionHandler: { @MainActor result, _ in accept(result) })
         }
     }
 

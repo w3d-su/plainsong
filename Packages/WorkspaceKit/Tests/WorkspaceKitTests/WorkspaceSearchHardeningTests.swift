@@ -18,7 +18,7 @@ final class WorkspaceSearchHardeningTests: XCTestCase {
             failurePoint: .beforeMatching("600-valid.md")
         )
 
-        let events = await collectEvents(service, request: request)
+        let events = await Self.collectEvents(service, request: request)
         let summary = try XCTUnwrap(completedSummaries(in: events).only)
         assertGlobalOverflowEvents(events, fixture: fixture)
         assertGlobalOverflowSummary(summary, skipped: skippedFileEvents(in: events), fixture: fixture)
@@ -29,7 +29,7 @@ final class WorkspaceSearchHardeningTests: XCTestCase {
         let root = try makeTemporaryDirectory()
         let request = try makeRequest(root: root, paths: ["post.md"])
 
-        let events = await collectEvents(
+        let events = await Self.collectEvents(
             WorkspaceSearchService(reader: UnexpectedCancellationErrorReader()),
             request: request
         )
@@ -55,7 +55,7 @@ final class WorkspaceSearchHardeningTests: XCTestCase {
             limits: WorkspaceSearchLimits(maximumConcurrentReads: 4)
         )
         let consumer = Task {
-            await collectEvents(WorkspaceSearchService(reader: reader), request: request)
+            await WorkspaceSearchHardeningTests.collectEvents(WorkspaceSearchService(reader: reader), request: request)
         }
 
         await reader.waitUntilCandidateStartCount(4)
@@ -160,7 +160,7 @@ extension WorkspaceSearchHardeningTests {
         )
     }
 
-    private func collectEvents(
+    private static func collectEvents(
         _ service: WorkspaceSearchService,
         request: WorkspaceSearchRequest
     ) async -> [WorkspaceSearchEvent] {

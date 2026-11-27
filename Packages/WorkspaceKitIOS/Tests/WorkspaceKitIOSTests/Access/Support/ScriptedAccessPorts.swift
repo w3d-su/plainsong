@@ -45,10 +45,7 @@ final class ScriptedWorkspaceFiles: IOSWorkspaceFilePort, @unchecked Sendable {
 
     func metadata(url: URL, relativePath: String, root: URL) async throws -> IOSWorkspaceFileItem {
         let item = nextMetadataItem(url: url, relativePath: relativePath, root: root)
-        lock.lock()
-        let shouldPark = parkMetadata
-        let failure = metadataFailure
-        lock.unlock()
+        let (shouldPark, failure) = lock.withLock { (parkMetadata, metadataFailure) }
         if let failure {
             throw failure
         }
@@ -63,14 +60,11 @@ final class ScriptedWorkspaceFiles: IOSWorkspaceFilePort, @unchecked Sendable {
     }
 
     func list(url: URL, relativePath: String, root: URL) async throws -> [IOSWorkspaceFileItem] {
-        lock.lock()
-        listCalls += 1
-        listedURLs.append(url)
-        let shouldPark = parkLists
-        let nested = nestedListing
-        let result = listResult
-        let calls = listCalls
-        lock.unlock()
+        let (shouldPark, nested, result, calls) = lock.withLock {
+            listCalls += 1
+            listedURLs.append(url)
+            return (parkLists, nestedListing, listResult, listCalls)
+        }
         _ = root
         if calls > 8 {
             throw IOSWorkspaceFailure.coordinationFailed
@@ -94,12 +88,10 @@ final class ScriptedWorkspaceFiles: IOSWorkspaceFilePort, @unchecked Sendable {
         maximumByteCount: Int,
         root: URL
     ) async throws -> IOSWorkspaceFilePayload {
-        lock.lock()
-        readCalls += 1
-        let shouldPark = parkReads
-        let stored = fileBytes[relativePath]
-        let result = readResult
-        lock.unlock()
+        let (shouldPark, stored, result) = lock.withLock {
+            readCalls += 1
+            return (parkReads, fileBytes[relativePath], readResult)
+        }
         _ = (maximumByteCount, root)
         if shouldPark {
             return try await withCheckedThrowingContinuation { continuation in
@@ -138,9 +130,7 @@ final class ScriptedWorkspaceFiles: IOSWorkspaceFilePort, @unchecked Sendable {
     }
 
     func removeIfOwned(url: URL, relativePath: String, root: URL, providerIdentity: Data) async throws {
-        lock.lock()
-        let shouldPark = parkRemoves
-        lock.unlock()
+        let shouldPark = lock.withLock { parkRemoves }
         _ = root
         if shouldPark {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in

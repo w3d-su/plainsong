@@ -1,4 +1,4 @@
 --swiftversion 5.10
 --indent 4
 --maxwidth 120
---exclude **/.build,BlogEditor.xcodeproj,preview-src
+--exclude **/.build,Plainsong.xcodeproj,preview-src

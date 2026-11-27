@@ -9,9 +9,8 @@ import XCTest
 final class EditorReconciledSourcePresentationTests: XCTestCase {
     private let source = "# Heading\nIntro **bold** [link](https://host/a) ![alt](fixture.png)\nTail"
 
-    override func tearDown() {
+    override func tearDown() async throws {
         EditorFindControllerTestSupport.tearDownWindows()
-        super.tearDown()
     }
 
     func testWriterActivationSynchronizationAutomaticallyRederivesPresentationAndClampsSelection() async throws {

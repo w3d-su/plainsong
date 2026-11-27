@@ -5,6 +5,11 @@ import UniformTypeIdentifiers
 import XCTest
 
 @MainActor
+private final class ExportWindowAvailability {
+    var isAvailable = false
+}
+
+@MainActor
 extension ExportHTMLCommandAppTests {
     func testAvailabilityRequiresMarkdownOrMDXAndADocumentWindow() throws {
         let fixture = try makeFixture()
@@ -33,11 +38,11 @@ extension ExportHTMLCommandAppTests {
         let fixture = try makeFixture()
         let app = fixture.appState
         let window = try XCTUnwrap(app.exportHTMLDocumentWindow)
-        var available = false
-        app.exportHTMLOperations.panelWindowProvider = { available ? window : nil }
+        let availability = ExportWindowAvailability()
+        app.exportHTMLOperations.panelWindowProvider = { availability.isAvailable ? window : nil }
         let menu = MenuBarState(appState: app)
         XCTAssertFalse(menu.snapshot.canExportHTML)
-        available = true
+        availability.isAvailable = true
         NotificationCenter.default.post(name: AppState.exportHTMLWindowRegistered, object: window)
         for _ in 0 ..< 100 {
             if menu.snapshot.canExportHTML {
@@ -46,7 +51,7 @@ extension ExportHTMLCommandAppTests {
             try await Task.sleep(nanoseconds: 1_000_000)
         }
         XCTAssertTrue(menu.snapshot.canExportHTML)
-        available = false
+        availability.isAvailable = false
         NotificationCenter.default.post(name: NSWindow.willCloseNotification, object: window)
         for _ in 0 ..< 100 {
             if !menu.snapshot.canExportHTML {

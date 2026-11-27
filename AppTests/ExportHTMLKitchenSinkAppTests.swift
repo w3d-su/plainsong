@@ -102,7 +102,7 @@ final class ExportHTMLKitchenSinkAppTests: XCTestCase {
         }
         XCTAssertTrue(navigation.didFinish)
         XCTAssertNil(navigation.error)
-        let json = try await reopened.evaluateJavaScript(featureScript) as? String
+        let json = try await reopened.evaluateJavaScriptReply(featureScript) as? String
         let data = try XCTUnwrap(json?.data(using: .utf8))
         return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
     }

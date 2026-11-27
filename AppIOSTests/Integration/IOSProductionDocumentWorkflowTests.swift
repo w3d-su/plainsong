@@ -4,7 +4,7 @@ import MarkdownCore
 @testable import PlainsongIOS
 @testable import PreviewKit
 import UIKit
-@preconcurrency import WebKit
+import WebKit
 import WorkspaceCore
 @testable import WorkspaceKitIOS
 import XCTest
@@ -300,13 +300,13 @@ final class IOSProductionDocumentWorkflowTests: XCTestCase {
                 reply.finish(.failure(IOSDocumentFailure.unavailable))
             }
             reply.timeout = timeout
-            preview.webView.evaluateJavaScript("document.body.innerText") { result, error in
+            preview.webView.evaluateJavaScript("document.body.innerText", completionHandler: { result, error in
                 if let error {
                     reply.finish(.failure(error))
                 } else {
                     reply.finish(.success(result as? String ?? ""))
                 }
-            }
+            })
         }
     }
 }

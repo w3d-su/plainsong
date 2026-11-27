@@ -69,7 +69,7 @@ final class ExportPDFWideRunsEdgeAppTests: XCTestCase {
             pdf.contentSize.width, pdf.contentSize.height
         ))
         defer { controller.invalidate() }
-        let lastBottom = try await controller.webView.evaluateJavaScript("""
+        let lastBottom = try await controller.webView.evaluateJavaScriptReply("""
         (() => {
           const root = document.getElementById("preview-root");
           const style = getComputedStyle(root);

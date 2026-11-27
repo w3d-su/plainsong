@@ -1,4 +1,5 @@
 import Foundation
+import WorkspaceCore
 
 /// The documented, bounded subset of root and nested `.gitignore` / `.ignore` handling.
 struct WorkspaceSearchIgnorePolicy {
@@ -17,19 +18,22 @@ struct WorkspaceSearchIgnorePolicy {
         let directories = ancestorDirectories(for: candidatePaths)
         let readLimit = inclusiveLimit(for: limits.maximumIgnoreFileSizeBytes)
         var reads = 0
+        var probes = 0
         var rules: [WorkspaceSearchIgnoreRule] = []
 
         outer: for directory in directories {
             for filename in [".gitignore", ".ignore"] {
-                guard reads < limits.maximumIgnoreFiles else { break outer }
+                guard reads < limits.maximumIgnoreFiles,
+                      probes < limits.maximumIgnoreFileProbes
+                else { break outer }
                 try Task.checkCancellation()
+                probes += 1
 
                 let relativePath = directory.isEmpty ? filename : "\(directory)/\(filename)"
                 guard let location = try? rootAuthority.location(relativePath: relativePath) else {
                     continue
                 }
 
-                reads += 1
                 let data: Data
                 do {
                     data = try await reader.readFile(
@@ -38,9 +42,15 @@ struct WorkspaceSearchIgnorePolicy {
                     )
                 } catch let error as CancellationError {
                     throw error
+                } catch WorkspaceSearchFileReadError.disappeared {
+                    // Most directories have no ignore file. A probe that finds none reads
+                    // nothing, so it counts toward `maximumIgnoreFileProbes` only.
+                    continue
                 } catch {
+                    reads += 1
                     continue
                 }
+                reads += 1
                 guard data.count <= limits.maximumIgnoreFileSizeBytes,
                       let contents = String(data: data, encoding: .utf8)
                 else {
@@ -65,7 +75,7 @@ struct WorkspaceSearchIgnorePolicy {
     private static func ancestorDirectories(for paths: [String]) -> [String] {
         var directories = [WorkspacePathByteKey(""): ""]
         for path in paths {
-            let components = path.split(separator: "/", omittingEmptySubsequences: true)
+            let components = path.splitOnPathSeparator(omittingEmptySubsequences: true)
             guard components.count > 1 else { continue }
 
             var directory = ""
@@ -76,8 +86,8 @@ struct WorkspaceSearchIgnorePolicy {
         }
 
         return directories.values.sorted { first, second in
-            let firstDepth = first.split(separator: "/", omittingEmptySubsequences: true).count
-            let secondDepth = second.split(separator: "/", omittingEmptySubsequences: true).count
+            let firstDepth = first.splitOnPathSeparator(omittingEmptySubsequences: true).count
+            let secondDepth = second.splitOnPathSeparator(omittingEmptySubsequences: true).count
             return firstDepth == secondDepth
                 ? WorkspacePathByteKey(first) < WorkspacePathByteKey(second)
                 : firstDepth < secondDepth
@@ -114,7 +124,7 @@ private struct WorkspaceSearchIgnoreRule {
                 isNegated: isNegated,
                 isRooted: isRooted,
                 isDirectoryOnly: isDirectoryOnly,
-                hasPathSeparator: line.contains("/")
+                hasPathSeparator: line.containsPathSeparator
             )
         }
     }
@@ -122,7 +132,9 @@ private struct WorkspaceSearchIgnoreRule {
     func matches(relativePath: String) -> Bool {
         guard let localPath = pathRelativeToBase(relativePath) else { return false }
 
-        if !isDirectoryOnly, matchesTarget(localPath) { return true }
+        if !isDirectoryOnly, matchesTarget(localPath) {
+            return true
+        }
         // A matching directory excludes its descendants even without a trailing slash.
         return directoryPrefixes(of: localPath).contains { matchesTarget($0) }
     }
@@ -131,11 +143,12 @@ private struct WorkspaceSearchIgnoreRule {
         guard !baseDirectory.isEmpty else { return relativePath }
         let prefix = "\(baseDirectory)/"
         guard relativePath.utf8.starts(with: prefix.utf8) else { return nil }
-        return String(relativePath.dropFirst(prefix.count))
+        // Drop bytes, not `Character`s: the separator can merge with a following combining mark.
+        return String(decoding: relativePath.utf8.dropFirst(prefix.utf8.count), as: UTF8.self)
     }
 
     private func directoryPrefixes(of path: String) -> [String] {
-        let components = path.split(separator: "/", omittingEmptySubsequences: true)
+        let components = path.splitOnPathSeparator(omittingEmptySubsequences: true)
         guard components.count > 1 else { return [] }
 
         var result: [String] = []
@@ -152,7 +165,7 @@ private struct WorkspaceSearchIgnoreRule {
             return WorkspaceSearchGlob.matches(pathPattern: pattern, path: path)
         }
 
-        return path.split(separator: "/", omittingEmptySubsequences: true).contains { component in
+        return path.splitOnPathSeparator(omittingEmptySubsequences: true).contains { component in
             WorkspaceSearchGlob.matchesComponent(pattern: pattern, value: String(component))
         }
     }
@@ -160,13 +173,15 @@ private struct WorkspaceSearchIgnoreRule {
 
 private enum WorkspaceSearchGlob {
     static func matches(pathPattern: String, path: String) -> Bool {
-        let patternComponents = pathPattern.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
-        let pathComponents = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        let patternComponents = pathPattern.splitOnPathSeparator(omittingEmptySubsequences: false).map(String.init)
+        let pathComponents = path.splitOnPathSeparator(omittingEmptySubsequences: false).map(String.init)
         var cache: [String: Bool] = [:]
 
         func match(_ patternIndex: Int, _ pathIndex: Int) -> Bool {
             let key = "\(patternIndex):\(pathIndex)"
-            if let cached = cache[key] { return cached }
+            if let cached = cache[key] {
+                return cached
+            }
 
             let value: Bool = if patternIndex == patternComponents.count {
                 pathIndex == pathComponents.count

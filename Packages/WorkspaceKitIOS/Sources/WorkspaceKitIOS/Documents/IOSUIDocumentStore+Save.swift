@@ -24,6 +24,7 @@ extension IOSUIDocumentStore {
         )
         entry.nextSequence = operation.sequence
         let acknowledgement = try await enqueue(entry, operation)
+        await discardSupersededCheckpoint(entry, savedVersion: operation.capturedVersion)
         if let record = entry.checkpoint, record.revisionVersion == operation.capturedVersion,
            !entry.fenced, !session.isDirty, session.version == operation.capturedVersion
         {
@@ -43,10 +44,36 @@ extension IOSUIDocumentStore {
         return acknowledgement
     }
 
+    /// A checkpoint written by a background flush that timed out holds an older revision. Once
+    /// a later revision of the same session is confirmed on disk, nothing else removes it.
+    func discardSupersededCheckpoint(_ entry: IOSDocumentEntry, savedVersion: Int) async {
+        guard let record = entry.checkpoint, record.revisionVersion < savedVersion, !entry.fenced,
+              let session = entry.session, !session.isDirty, session.version == savedVersion
+        else { return }
+        await dropSuperseded(record, entry: entry, newerVersion: savedVersion)
+    }
+
+    func dropSuperseded(_ record: IOSRecoveryRecord, entry: IOSDocumentEntry, newerVersion: Int) async {
+        do {
+            try await recovery.discardSuperseded(
+                recordID: record.recordID, documentID: entry.identity.rawValue, newerVersion: newerVersion
+            )
+        } catch { return }
+        if entry.checkpoint?.recordID == record.recordID {
+            entry.checkpoint = nil
+        }
+        if entry.recoveryReceipt?.recordID == record.recordID {
+            entry.recoveryReceipt = nil
+        }
+    }
+
     func watchEdits(_ entry: IOSDocumentEntry) {
         guard let session = entry.session else { return }
+        // Subscribe now, not when the task first runs: an edit made before then would
+        // otherwise never reach autosave or recovery. The stream buffers that edit.
+        let changes = session.textChanges(includeCurrent: false)
         entry.textTask = Task { @MainActor in
-            for await _ in session.textChanges(includeCurrent: false) {
+            for await _ in changes {
                 self.scheduleAutosave(entry)
             }
         }
