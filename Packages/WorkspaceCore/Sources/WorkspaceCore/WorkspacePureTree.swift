@@ -91,6 +91,9 @@ public struct WorkspacePureTree: Equatable, Sendable {
         options: Options
     ) -> WorkspacePureTree {
         let root = WorkspacePureTreeBuilder(entries: entries, options: options).build()
+        if previousExpandedNodeIDs.isEmpty, previousSelectedNodeID == nil {
+            return WorkspacePureTree(root: root)
+        }
         let currentIDs = root.nodeIDs()
         let expanded = previousExpandedNodeIDs.intersection(currentIDs)
         let selected = previousSelectedNodeID.flatMap { currentIDs.contains($0) ? $0 : nil }
@@ -123,19 +126,52 @@ public struct WorkspacePureTree: Equatable, Sendable {
 }
 
 private struct WorkspacePureTreeBuilder {
+    private struct Child {
+        let entry: WorkspacePureEntry
+        let parentPath: WorkspacePathByteKey
+        let name: String
+        let sortKey: WorkspacePathOrder.Key
+        let sortPriority: Int
+    }
+
+    private struct PathParts {
+        let parent: String
+        let name: String
+
+        init(_ path: String) {
+            guard let separator = path.lastPathSeparatorIndex else {
+                parent = ""
+                name = path
+                return
+            }
+            let prefix = path[..<separator]
+            if path.hasTrailingPathSeparator {
+                let components = path.splitOnPathSeparator()
+                parent = components.dropLast().joined(separator: "/")
+                name = components.last.map(String.init) ?? path
+            } else {
+                parent = prefix.containsPathSeparator
+                    ? prefix.splitOnPathSeparator().joined(separator: "/")
+                    : String(prefix)
+                name = String(path[path.utf8.index(after: separator)...])
+            }
+        }
+    }
+
     let entries: [WorkspacePureEntry]
     let options: WorkspacePureTree.Options
 
     func build() -> WorkspacePureNode {
         let visible = visibleEntries()
-        let duplicateNodeIDs = Set(
-            Dictionary(grouping: visible, by: \.preferredNodeID)
-                .compactMap { nodeID, matches in matches.count > 1 ? nodeID : nil }
-        )
-        let entriesByParent = Dictionary(
-            grouping: visible,
-            by: { WorkspacePathByteKey(parentPath(of: $0)) }
-        )
+        var seenNodeIDs = Set<String>(minimumCapacity: visible.count)
+        var duplicateNodeIDs: Set<String> = []
+        for child in visible {
+            let preferredID = child.entry.preferredNodeID
+            if !seenNodeIDs.insert(preferredID).inserted {
+                duplicateNodeIDs.insert(preferredID)
+            }
+        }
+        let entriesByParent = Dictionary(grouping: visible, by: \.parentPath)
         let children = buildChildren(
             parentPath: WorkspacePathByteKey(""),
             entriesByParent: entriesByParent,
@@ -152,42 +188,50 @@ private struct WorkspacePureTreeBuilder {
         )
     }
 
-    private func visibleEntries() -> [WorkspacePureEntry] {
-        guard !options.showAllFiles else {
-            return entries
-        }
-
+    private func visibleEntries() -> [Child] {
         var directoryPaths: Set<WorkspacePathByteKey> = []
-        let directlyVisible = entries.filter { entry in
-            guard entry.kind != .directory, entry.kind.isVisibleByDefault else { return false }
-            insertAncestorPaths(of: entry.relativePath, into: &directoryPaths)
-            return true
-        }
-        let directlyVisiblePaths = Set(directlyVisible.map { WorkspacePathByteKey($0.relativePath) })
-
-        return entries.filter { entry in
-            let pathKey = WorkspacePathByteKey(entry.relativePath)
-            return switch entry.kind {
-            case .directory:
-                directoryPaths.contains(pathKey)
-            case .markdown, .mdx, .image:
-                directlyVisiblePaths.contains(pathKey)
-            case .other:
-                false
+        let candidates = entries.compactMap { entry -> Child? in
+            guard options.showAllFiles || entry.kind.isVisibleByDefault else { return nil }
+            let parts = PathParts(entry.relativePath)
+            let parentPath = WorkspacePathByteKey(parts.parent)
+            if !options.showAllFiles, entry.kind != .directory, !parts.parent.isEmpty,
+               directoryPaths.insert(parentPath).inserted
+            {
+                var ancestor = parts.parent[...]
+                while let separator = ancestor.lastPathSeparatorIndex {
+                    ancestor = ancestor[..<separator]
+                    let ancestorPath = WorkspacePathByteKey(String(ancestor))
+                    guard directoryPaths.insert(ancestorPath).inserted else { break }
+                }
             }
+            return Child(
+                entry: entry,
+                parentPath: parentPath,
+                name: parts.name,
+                sortKey: WorkspacePathOrder.Key(entry.relativePath),
+                sortPriority: options.showAllFiles ? 0 : defaultFilterSortPriority(entry.kind)
+            )
+        }
+        guard !options.showAllFiles else { return candidates }
+        return candidates.filter { child in
+            child.entry.kind != .directory || directoryPaths.contains(WorkspacePathByteKey(child.entry.relativePath))
         }
     }
 
     private func buildChildren(
         parentPath: WorkspacePathByteKey,
-        entriesByParent: [WorkspacePathByteKey: [WorkspacePureEntry]],
+        entriesByParent: [WorkspacePathByteKey: [Child]],
         duplicateNodeIDs: Set<String>
     ) -> [WorkspacePureNode] {
         (entriesByParent[parentPath] ?? [])
             .sorted { first, second in
-                compare(first, second)
+                if first.sortPriority != second.sortPriority {
+                    return first.sortPriority < second.sortPriority
+                }
+                return first.sortKey.isBefore(second.sortKey)
             }
-            .map { entry in
+            .map { child in
+                let entry = child.entry
                 let preferredID = entry.preferredNodeID
                 let nodeID = duplicateNodeIDs.contains(preferredID)
                     ? WorkspaceDisplayNodeID.disambiguated(
@@ -197,7 +241,7 @@ private struct WorkspacePureTreeBuilder {
                     : preferredID
                 return WorkspacePureNode(
                     id: nodeID,
-                    name: lastPathComponent(of: entry.relativePath),
+                    name: child.name,
                     relativePath: entry.relativePath,
                     kind: entry.kind,
                     contentModificationDate: entry.contentModificationDate,
@@ -213,17 +257,6 @@ private struct WorkspacePureTreeBuilder {
             }
     }
 
-    private func compare(_ first: WorkspacePureEntry, _ second: WorkspacePureEntry) -> Bool {
-        if !options.showAllFiles {
-            let firstPriority = defaultFilterSortPriority(first.kind)
-            let secondPriority = defaultFilterSortPriority(second.kind)
-            if firstPriority != secondPriority {
-                return firstPriority < secondPriority
-            }
-        }
-        return WorkspacePathOrder.isBefore(first.relativePath, second.relativePath)
-    }
-
     private func defaultFilterSortPriority(_ kind: WorkspaceFileKind) -> Int {
         switch kind {
         case .markdown, .mdx:
@@ -235,35 +268,6 @@ private struct WorkspacePureTreeBuilder {
         case .other:
             3
         }
-    }
-
-    private func parentPath(of entry: WorkspacePureEntry) -> String {
-        let components = entry.relativePath.splitOnPathSeparator(omittingEmptySubsequences: true)
-        guard components.count > 1 else { return "" }
-        return components.dropLast().joined(separator: "/")
-    }
-
-    private func insertAncestorPaths(
-        of relativePath: String,
-        into paths: inout Set<WorkspacePathByteKey>
-    ) {
-        let components = relativePath.splitOnPathSeparator(omittingEmptySubsequences: true)
-        guard components.count > 1 else { return }
-
-        var current = ""
-        for component in components.dropLast() {
-            if current.isEmpty {
-                current = String(component)
-            } else {
-                current += "/\(component)"
-            }
-            paths.insert(WorkspacePathByteKey(current))
-        }
-    }
-
-    private func lastPathComponent(of relativePath: String) -> String {
-        relativePath.splitOnPathSeparator(omittingEmptySubsequences: true).last.map(String.init)
-            ?? relativePath
     }
 }
 

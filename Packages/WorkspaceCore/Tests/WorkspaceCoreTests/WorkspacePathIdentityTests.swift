@@ -1,8 +1,32 @@
 import Foundation
-import WorkspaceCore
+@testable import WorkspaceCore
 import XCTest
 
 final class WorkspacePathIdentityTests: XCTestCase {
+    func testPreparedPathOrderMatchesFoundationAndByteTies() {
+        let ascii = (0 ..< 128).map { "folder/P\(UnicodeScalar($0)!)ost.md" }
+        let names = [
+            "", "0", "00", "01", "1", "2", "10", "002", "01z", "1A", "1[", "2:3", "10:2",
+            "999999999", "1000000000", "0000000000", "18446744073709551616",
+            "A2B02.md", "a02b2.md", "a2b10.md", "A2b2.MD",
+            "١", "１２", "٠", "é", "e\u{0301}", "Å", "A\u{030a}", "SS", "ß", "文2", "文10", "👩‍💻",
+        ]
+        let paths = (ascii + names).map { (path: $0, key: WorkspacePathOrder.Key($0)) }
+        for first in paths {
+            for second in paths {
+                let comparison = first.path.compare(second.path, options: [.caseInsensitive, .numeric])
+                let expected = comparison == .orderedSame
+                    ? first.path.utf8.lexicographicallyPrecedes(second.path.utf8)
+                    : comparison == .orderedAscending
+                XCTAssertEqual(
+                    first.key.isBefore(second.key),
+                    expected,
+                    "\(first.path.debugDescription), \(second.path.debugDescription)"
+                )
+            }
+        }
+    }
+
     func testByteKeyDoesNotTreatCanonicalEquivalentsAsEqual() {
         let nfc = "caf\u{00E9}"
         let nfd = "cafe\u{0301}"
