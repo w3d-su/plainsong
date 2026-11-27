@@ -1,4 +1,6 @@
 import morphdom from "morphdom";
+import { MathDOMPatch } from "./math-dom";
+import type { PreviewMathSlots } from "./math-fragments";
 import {
   applyMermaidBlockOutcome,
   type MermaidBlockDescriptor,
@@ -16,21 +18,27 @@ export function patchPreviewRoot(
   liveRoot: HTMLElement,
   nextRoot: HTMLElement,
   coordinator: MermaidRenderCoordinator,
+  slots?: PreviewMathSlots,
 ): Promise<void> {
+  const math = new MathDOMPatch(nextRoot, slots);
   const descriptors = prepareMermaidBlocks(nextRoot, coordinator);
   const pendingWrappers = new Set<HTMLElement>();
 
   morphdom(liveRoot, nextRoot, {
     childrenOnly: true,
     onBeforeElUpdated: shouldUpdatePreviewElement,
-    onBeforeElChildrenUpdated: shouldUpdatePreviewChildren,
+    onBeforeElChildrenUpdated(live, next) {
+      return math.updateChildren(live, next) && shouldUpdatePreviewChildren(live, next);
+    },
     onElUpdated(element) {
       collectPendingMermaidWrapper(element, pendingWrappers);
     },
     onNodeAdded(node) {
+      math.added(node);
       collectPendingMermaidWrapper(node, pendingWrappers);
     },
   });
+  math.finish();
 
   return renderPendingMermaidBlocks(
     liveRoot,

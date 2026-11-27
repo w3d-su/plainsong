@@ -601,6 +601,11 @@ open construct retries past where it closes. Definitions, footnotes and document
 not parse render whole, with no segment pass while that holds; ESM after an import merges
 segments (`docs/decisions/2026-10-24-preview-segmented-render.md`).
 
+Each segment or whole render typesets equal plain-text formulas once per display mode.
+The bridge carries the serialized KaTeX fragments separately and keeps a live formula's
+children when its complete markup matches. Source positions belong to each occurrence.
+See `docs/decisions/2026-11-28-preview-math-fragments.md`.
+
 Post-render in browser: `highlight.js` handles non-Mermaid code fences. A fence with no
 info string auto-detects its language only up to 4,000 UTF-16 units
 (`AUTO_DETECT_MAX_LENGTH`); a longer bare fence renders as plain text, because

@@ -1,6 +1,7 @@
 import type { PreviewFileKind } from "./bridge";
 import { closedFrontmatterEnd } from "./frontmatter";
 import { HeadingSlugAllocator, headingIDPrefix } from "./heading-anchors";
+import { expandMath, type PreviewMathSlots } from "./math-fragments";
 import {
   type RenderedSegment,
   renderSegment,
@@ -85,16 +86,16 @@ export class SegmentedRenderer {
     private readonly limits: SegmentLimits = defaultLimits,
   ) {}
 
-  /** Equal to `renderMarkdown(text)` (or `renderMdx`), including what it throws. */
-  render(text: string): Promise<string> {
+  /** Equal to the whole render. With `slots`, the bridge receives math markup separately. */
+  render(text: string, slots?: PreviewMathSlots): Promise<string> {
     // One at a time: a whole render awaits the pipeline, and a second call started
     // meanwhile would read and overwrite `wholeNext` and the candidates mid-render.
-    const result = this.tail.then(() => this.renderNext(text));
+    const result = this.tail.then(() => this.renderNext(text, slots));
     this.tail = result.then(noop, noop);
     return result;
   }
 
-  private async renderNext(text: string): Promise<string> {
+  private async renderNext(text: string, slots?: PreviewMathSlots): Promise<string> {
     this.renderedSegmentCount = 0;
     this.assembledSegmentCount = 0;
     // A definition makes the document render whole. New definition-like lines go to a whole
@@ -109,7 +110,7 @@ export class SegmentedRenderer {
       (candidates !== "" && candidates !== this.checkedCandidates);
     if (startWhole) {
       this.checkedCandidates = candidates;
-      return this.renderWhole(text, candidates);
+      return this.renderWhole(text, candidates, slots);
     }
 
     let segments: PlacedSegment[] | undefined;
@@ -119,19 +120,19 @@ export class SegmentedRenderer {
       this.previous = this.current;
       this.current = new SegmentCache();
     }
-    if (segments === undefined) return this.renderWhole(text, candidates);
+    if (segments === undefined) return this.renderWhole(text, candidates, slots);
     this.wholeNext = undefined;
     this.assembledSegmentCount = segments.length;
-    return assemble(segments);
+    return assemble(segments, slots);
   }
 
   /** The whole render, which also decides whether the next render may segment. It leaves the
    * segment cache alone, so segmenting resumes with the segments of the last segmented render. */
-  private async renderWhole(text: string, candidates: string): Promise<string> {
+  private async renderWhole(text: string, candidates: string, slots?: PreviewMathSlots): Promise<string> {
     // Stays set when the render throws: a document that does not parse renders whole until
     // it does, instead of parsing as segments and then again as a whole for its error.
     this.wholeNext = "failed";
-    const { html, requiresWhole } = await renderWholeDocument(this.fileKind, text);
+    const { html, requiresWhole } = await renderWholeDocument(this.fileKind, text, slots);
     this.wholeNext = requiresWhole ? "required" : undefined;
     this.requiredCandidates = candidates;
     return html;
@@ -271,7 +272,7 @@ interface PlacedSegment {
   offset: number;
 }
 
-function assemble(segments: PlacedSegment[]): string {
+function assemble(segments: PlacedSegment[], slots?: PreviewMathSlots): string {
   const output: string[] = [];
   const slugs = new HeadingSlugAllocator();
   let mathOffset = 0;
@@ -284,7 +285,7 @@ function assemble(segments: PlacedSegment[]): string {
     if (segment.hasBlocks) {
       if (joined) output.push("\n");
       joined = true;
-      output.push(pieces[0]);
+      output.push(expandMath(pieces[0], segment.mathHTML, slots));
       for (let index = 1; index < pieces.length; index += 3) {
         const value = Number(pieces[index + 1]);
         switch (pieces[index]) {
@@ -297,7 +298,7 @@ function assemble(segments: PlacedSegment[]): string {
           default:
             output.push(ids[value]);
         }
-        output.push(pieces[index + 2]);
+        output.push(expandMath(pieces[index + 2], segment.mathHTML, slots));
       }
     }
     mathOffset += segment.mathCount;

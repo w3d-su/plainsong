@@ -15,10 +15,10 @@ import {
   rehypeHeadingAnchors,
 } from "./heading-anchors";
 import {
-  katexRenderOptions,
   rehypeMathBlocks,
   rehypeMathDiagnostics,
 } from "./math";
+import { expandMath, katexRenderOptions, type PreviewMathSlots } from "./math-fragments";
 import {
   mdxSanitizeSchema,
   remarkMdxPlaceholders,
@@ -98,9 +98,13 @@ export async function renderMdx(markdown: string): Promise<string> {
 export async function renderWholeDocument(
   fileKind: PreviewFileKind,
   text: string,
+  slots?: PreviewMathSlots,
 ): Promise<{ html: string; requiresWhole: boolean }> {
   const file = await (fileKind === "md" ? markdownProcessor : mdxProcessor).process(text);
-  return { html: String(file), requiresWhole: (file.data as WholeDocumentFileData).requiresWhole ?? false };
+  return {
+    html: expandMath(String(file), file.data.mathHTML ?? [], slots),
+    requiresWhole: (file.data as WholeDocumentFileData).requiresWhole ?? false,
+  };
 }
 
 /** One segment's HTML with assembly holes (segmented-render.ts). */
@@ -114,6 +118,7 @@ export interface RenderedSegment {
   headingSlugs: string[];
   /** Math wrappers (`data-math-index` values) in the segment. */
   mathCount: number;
+  mathHTML: string[];
   /** MDX: the segment has ESM. Each ESM block is parsed after `var <earlier imports>`,
    * so whether it parses depends on the imports of earlier segments. */
   hasEsm: boolean;
@@ -153,6 +158,7 @@ export function renderSegment(
     hasBlocks: fileData.hasBlocks ?? false,
     headingSlugs: fileData.headingSlugs ?? [],
     mathCount: fileData.mathProvenance?.length ?? 0,
+    mathHTML: file.data.mathHTML ?? [],
     hasEsm: fileData.hasEsm ?? false,
     importsBindings: fileData.importsBindings ?? false,
   };

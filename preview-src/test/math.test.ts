@@ -1,4 +1,5 @@
 import { VFile } from "vfile";
+import katex from "katex";
 import { describe, expect, it, vi } from "vitest";
 import mathFixture from "../../Fixtures/math.md?raw";
 import mathEdgeCases from "../../Fixtures/math-edge-cases.md?raw";
@@ -7,6 +8,21 @@ import type { TreeNode } from "../src/mdx-placeholders";
 import { renderMarkdown, renderMdx } from "../src/pipeline";
 
 describe("math preview", () => {
+  it("typesets equal source once per display mode and keeps each occurrence's location", async () => {
+    const typeset = vi.spyOn(katex, "renderToString");
+    try {
+      for (const render of [renderMarkdown, renderMdx]) {
+        typeset.mockClear();
+        const html = await render("$x$ and $x$ and $y$\n\n$$\nx\n$$\n\n$$\nx\n$$");
+        expect(typeset.mock.calls.map(([, settings]) => settings?.displayMode)).toEqual([false, false, true]);
+        expect(html.match(/encoding="application\/x-tex"/gu)).toHaveLength(5);
+        expect(html).toContain('data-math-index="4" data-line="7" data-line-end="9"');
+      }
+    } finally {
+      typeset.mockRestore();
+    }
+  });
+
   it("renders the math fixture through both pipelines", async () => {
     for (const render of [renderMarkdown, renderMdx]) {
       const html = await render(mathFixture);

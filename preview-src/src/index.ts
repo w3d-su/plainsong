@@ -22,6 +22,7 @@ import {
 import { LazyMermaid, loadMermaidScript } from "./mermaid-loader";
 import { MermaidRenderCoordinator } from "./mermaid-renderer";
 import { mdxErrorDetails } from "./mdx-error";
+import { PreviewMathSlots } from "./math-fragments";
 import { PreviewScrollIndex } from "./scroll-index";
 import { SegmentedRenderer } from "./segmented-render";
 
@@ -213,9 +214,10 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
   applyPreviewSettings(payload.theme, payload.allowRemoteImages);
 
   let html: string;
+  const slots = new PreviewMathSlots();
   try {
     if (renderer?.fileKind !== payload.fileKind) renderer = new SegmentedRenderer(payload.fileKind);
-    html = await renderer.render(payload.text);
+    html = await renderer.render(payload.text, slots);
   } catch (error) {
     if (payload.fileKind !== "mdx") throw error;
     if (payload.renderID < latestRenderID) return;
@@ -242,7 +244,7 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
   rewriteImageSources(nextRoot, payload.baseDir, currentAllowRemoteImages, payload.assetRootID);
 
   clearMdxErrorBanner();
-  const mermaidPatch = patchPreviewRoot(previewRoot, nextRoot, mermaidRenderer);
+  const mermaidPatch = patchPreviewRoot(previewRoot, nextRoot, mermaidRenderer, slots);
   // The checkbox provenance changes with the DOM, before asynchronous diagrams settle.
   currentRenderedID = payload.renderID;
   currentRenderedVersion = payload.version;
