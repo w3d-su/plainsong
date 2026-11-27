@@ -173,6 +173,7 @@ final class ScriptedCoordinator: IOSCoordinatedFileAccess, @unchecked Sendable {
     private var blockedReadCount = 0
     private var readCount = 0
     private var readObserver: (@MainActor @Sendable () -> Void)?
+    private var captureObserver: (@MainActor @Sendable () -> Void)?
 
     func setBytes(_ data: Data) async {
         stateLock.withLock { bytes = data }
@@ -184,6 +185,10 @@ final class ScriptedCoordinator: IOSCoordinatedFileAccess, @unchecked Sendable {
 
     func setReadObserver(_ observer: (@MainActor @Sendable () -> Void)?) async {
         stateLock.withLock { readObserver = observer }
+    }
+
+    func setCaptureObserver(_ observer: (@MainActor @Sendable () -> Void)?) async {
+        stateLock.withLock { captureObserver = observer }
     }
 
     func setReadFailure(_ failure: IOSWorkspaceFailure?) async {
@@ -237,12 +242,13 @@ final class ScriptedCoordinator: IOSCoordinatedFileAccess, @unchecked Sendable {
                 self.stateLock.unlock()
             }
         }
-        let (failure, payload) = stateLock.withLock {
+        let (failure, payload, capturedObserver) = stateLock.withLock {
             if readFailure == nil {
                 readCount += 1
             }
-            return (readFailure, bytes)
+            return (readFailure, bytes, captureObserver)
         }
+        await capturedObserver?()
         if let failure {
             throw failure
         }

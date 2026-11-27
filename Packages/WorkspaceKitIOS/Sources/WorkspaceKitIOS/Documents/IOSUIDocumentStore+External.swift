@@ -24,6 +24,9 @@ extension IOSUIDocumentStore {
         case let .writePermissionChanged(writable):
             let changed = entry.allowsProviderWrite != writable
             entry.allowsProviderWrite = writable
+            if entry.session == nil {
+                entry.deferredOpeningWritableNotice = writable
+            }
             if writable, entry.isUntouchedOpeningSnapshot {
                 if entry.externalToken == nil { startExternalRead(entry) }
                 return
@@ -86,9 +89,13 @@ extension IOSUIDocumentStore {
             throw IOSDocumentFailure.documentChanged
         }
         installSession(entry, text: text, canWrite: entry.allowsProviderWrite && !entry.lease.isReleased)
-        if entry.isUntouchedOpeningSnapshot, entry.hasDeferredExternalChange, entry.externalToken == nil {
+        if entry.isUntouchedOpeningSnapshot,
+           entry.hasDeferredExternalChange || entry.deferredOpeningWritableNotice,
+           entry.externalToken == nil
+        {
             startExternalRead(entry)
         }
+        entry.deferredOpeningWritableNotice = false
         guard let handle = entry.handle() else { throw IOSDocumentFailure.unavailable }
         finishOpen(entry, result: .success(handle))
         return handle

@@ -9,7 +9,10 @@ If the readback fails, the last verified bytes remain an untouched read-only sna
 unedited snapshot may close without a recovery copy because closing it cannot discard user
 work. A later external read that matches those bytes, or a Reload accepted by the editor,
 restores write access from the provider's current permission. Permission notices that arrive
-during opening readback replace the initial open result at installation.
+during opening readback replace the initial open result at installation. If that readback
+fails, a writable notice received before installation is deferred like a queued change notice
+and starts one verification read after the session is published. If the readback succeeds,
+the notice supplies only the initial permission and does not reread bytes by itself.
 
 A write whose outcome is indeterminate invalidates the saved baseline. Undoing back to the
 previous text is not proof that the provider stored those bytes, so the document stays dirty
