@@ -6,17 +6,32 @@ import Yams
 extension Frontmatter {
     enum ParseError: Error, CustomStringConvertible {
         case notMapping
+        case unreadableTokens
 
         var description: String {
-            "Frontmatter must be a YAML mapping."
+            switch self {
+            case .notMapping: "Frontmatter must be a YAML mapping."
+            case .unreadableTokens: "Could not read YAML tokens while preserving comments."
+            }
         }
     }
 
-    static func loadMapping(from rawYAML: String) throws -> [String: Any] {
-        let trimmedYAML = rawYAML.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedYAML.isEmpty else { return [:] }
+    struct ParsedMapping {
+        let root: Node?
+        let values: [String: Any]
 
-        let loaded = try Yams.load(yaml: rawYAML)
+        init(yaml: String) throws {
+            if yaml.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                root = nil
+                values = [:]
+            } else {
+                root = try Yams.compose(yaml: yaml)
+                values = try Frontmatter.mappingValues(from: root?.any)
+            }
+        }
+    }
+
+    private static func mappingValues(from loaded: Any?) throws -> [String: Any] {
         if let mapping = loaded as? [String: Any] {
             return mapping
         }
@@ -37,37 +52,37 @@ extension Frontmatter {
 
     static func replacing(
         rawYAML: String,
+        original: ParsedMapping,
         key: String,
         value: FrontmatterValue,
         lineEnding: String
-    ) throws -> String {
-        var lines = linesWithoutTerminators(rawYAML)
-        if hasLineTerminatorSuffix(rawYAML), lines.last == "" {
-            lines.removeLast()
-        }
-
-        if let startIndex = lines.firstIndex(where: { topLevelKeySpan(in: $0)?.key == key }),
-           let span = topLevelKeySpan(in: lines[startIndex])
-        {
+    ) throws -> String? {
+        let sourceLines = yamlSourceLines(in: rawYAML)
+        let lines = sourceLines.map(String.init)
+        if original.values[key] != nil {
+            // A line resembling a key can itself be part of a multiline scalar.
+            guard let mark = original.root?.mapping?.first(where: { $0.key.scalar?.string == key })?.key.mark,
+                  mark.column == 1, lines.indices.contains(mark.line - 1),
+                  let span = topLevelKeySpan(in: lines[mark.line - 1]), span.key == key else { return nil }
+            let startIndex = mark.line - 1
             // Keep the source's spelling of the key (`"title"`, `'title'`), so the edit
             // replaces that entry instead of appending a second, duplicate `title`.
             let endIndex = valueSpanEndIndex(startingAt: startIndex, in: lines)
-            let replacementLines = try formattedLines(
+            var replacementLines = try formattedLines(
                 keyToken: span.keyToken,
                 value: value,
                 quotesDate: span.hasQuotedInlineValue
             )
-            lines.replaceSubrange(startIndex ..< endIndex, with: replacementLines)
-        } else {
-            try lines.append(contentsOf: formattedLines(
-                keyToken: formattedKey(key),
-                value: value,
-                quotesDate: false
-            ))
+            try preserveComments(
+                in: lines[startIndex ..< endIndex], rawYAML: rawYAML, replacement: &replacementLines
+            )
+            let range = sourceLines[startIndex].startIndex ..< sourceLines[endIndex - 1].endIndex
+            return rawYAML.replacingCharacters(in: range, with: replacementLines.joined(separator: lineEnding))
         }
 
-        guard !lines.isEmpty else { return "" }
-        return lines.joined(separator: lineEnding) + lineEnding
+        let added = try formattedLines(keyToken: formattedKey(key), value: value, quotesDate: false)
+        let separator = rawYAML.isEmpty || sourceLines.last?.isEmpty == true ? "" : lineEnding
+        return rawYAML + separator + added.joined(separator: lineEnding) + lineEnding
     }
 
     /// Whether `updatedYAML` still parses, has exactly the original keys (plus `key` when it
@@ -75,14 +90,13 @@ extension Frontmatter {
     /// rewrite cannot express, such as a key spelling it does not recognize.
     static func writebackReadsBack(
         _ updatedYAML: String,
-        originalYAML: String,
+        original: ParsedMapping,
         key: String,
         value: FrontmatterValue
     ) -> Bool {
-        guard let original = try? loadMapping(from: originalYAML),
-              let updated = try? loadMapping(from: updatedYAML),
-              Set(updated.keys) == Set(original.keys).union([key]),
-              let written = updated[key]
+        guard let updated = try? ParsedMapping(yaml: updatedYAML),
+              Set(updated.values.keys) == Set(original.values.keys).union([key]),
+              let written = updated.values[key]
         else {
             return false
         }
@@ -95,10 +109,8 @@ extension Frontmatter {
         case let .stringList(expected):
             guard let items = written as? [Any] else { return false }
             return items.compactMap { $0 as? String } == expected && items.count == expected.count
-        case .date:
-            // A date may load as a timestamp, a string or another scalar, never as a
-            // collection: `{draft: true}` typed into the field must not become a mapping.
-            return !(written is [Any]) && !(written is [AnyHashable: Any]) && !(written is NSNull)
+        case let .date(expected):
+            return updated.root?[key]?.scalar?.string == expected && !(written is NSNull)
         case .raw:
             return true
         }

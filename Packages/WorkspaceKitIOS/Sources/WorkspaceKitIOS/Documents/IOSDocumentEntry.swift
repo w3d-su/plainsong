@@ -49,6 +49,18 @@ final class IOSDocumentEntry {
     /// Leases of opens that joined this entry, released with `lease` when it closes.
     var coalescedLeases: [any IOSWorkspaceAccessLease] = []
     var hasDeferredExternalChange = false
+    /// The latest write permission notice received before the first session exists.
+    var deferredOpeningWritableNotice = false
+    var openingReadbackFailed = false
+
+    var isUntouchedOpeningSnapshot: Bool {
+        openingReadbackFailed && session?.version == 0 && session?.isDirty == false
+    }
+
+    var needsCloseRecovery: Bool {
+        session?.isDirty == true || (fenced && !isUntouchedOpeningSnapshot)
+    }
+
     var pendingProposal: IOSDocumentReloadProposal?
     var explicitReloadOperationID: UUID?
     var providerAvailabilityGeneration: UInt64 = 0

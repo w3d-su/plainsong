@@ -77,13 +77,14 @@ final class IOSDocumentStoreRaceTests: XCTestCase {
         let first = Task { try await harness.store.save(handle.identity) }
         await assertFulfillment(of: [entered], timeout: 2)
         handle.session.replaceText("three")
+        // The queue can start the next write before the first caller resumes.
+        let next = expectation(description: "second")
+        port.onSaveEntered = { next.fulfill() }
         let second = Task { try await harness.store.save(handle.identity) }
         await Task.yield()
         XCTAssertEqual(port.peakInFlight, 1, "removing the writer queue makes this overlap")
         port.releaseOne()
         _ = try await first.value
-        let next = expectation(description: "second")
-        port.onSaveEntered = { next.fulfill() }
         await assertFulfillment(of: [next], timeout: 2)
         XCTAssertEqual(port.peakInFlight, 1)
         port.releaseOne()

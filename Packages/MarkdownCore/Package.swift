@@ -8,7 +8,7 @@ let package = Package(
         .library(name: "MarkdownCore", targets: ["MarkdownCore"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/jpsim/Yams.git", from: "6.2.2"),
+        .package(url: "https://github.com/jpsim/Yams.git", exact: "6.2.2"),
     ],
     targets: [
         .target(
