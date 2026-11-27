@@ -1,29 +1,12 @@
 import type { VFile } from "vfile";
 import type { VFileMessage } from "vfile-message";
 import type { TreeNode } from "./mdx-placeholders";
+import { MathFragments } from "./math-fragments";
 import {
   holeMarker,
   requireWholeDocument,
   type SegmentHoleOptions,
 } from "./segment-holes";
-
-// Shared KaTeX settings for both pipelines (docs/math plan §3.4):
-// - trust:false keeps \url, \href, \includegraphics and \html* disabled.
-// - htmlAndMathml keeps the MathML tree for assistive technology.
-// - strict:"ignore" renders LaTeX-incompatible but renderable input (e.g. CJK
-//   text in math mode) silently. "warn" only logged to the WKWebView console on
-//   every debounced render and never reached the preview, because rehype-katex
-//   records only thrown errors as VFile messages.
-// - maxExpand caps macro expansion; maxSize caps user-specified sizes in em.
-// displayMode/throwOnError stay with rehype-katex 7: it derives display mode per
-// node and catches errors itself, recording them as VFile diagnostics.
-export const katexRenderOptions = {
-  trust: false,
-  output: "htmlAndMathml",
-  strict: "ignore",
-  maxExpand: 1000,
-  maxSize: 20,
-} as const;
 
 const mathBlockClass = "plainsong-math-block";
 const mathInlineClass = "plainsong-math-inline";
@@ -55,7 +38,9 @@ interface MathFileData extends Record<string, unknown> {
 export function rehypeMathBlocks(options?: SegmentHoleOptions) {
   return (tree: TreeNode, file: VFile) => {
     const provenance: MathProvenance[] = [];
-    wrapMathNodes(tree, provenance, options?.holes ?? false);
+    const fragments = file.data.hasAuthoredHTML ? undefined : new MathFragments();
+    wrapMathNodes(tree, provenance, options?.holes ?? false, file, fragments);
+    file.data.mathHTML = fragments?.html ?? [];
     (file.data as MathFileData).mathProvenance = provenance;
   };
 }
@@ -98,23 +83,26 @@ interface MathWrapper {
   node: TreeNode;
 }
 
-function wrapMathNodes(parent: TreeNode, provenance: MathProvenance[], holes: boolean): void {
+function wrapMathNodes(
+  parent: TreeNode, provenance: MathProvenance[], holes: boolean, file: VFile, fragments?: MathFragments,
+): void {
   const children = parent.children;
   if (!children) return;
 
   for (let index = 0; index < children.length; index += 1) {
     const child = children[index];
-    if (isDisplayMathPre(child)) {
+    const code = displayMathCode(child);
+    if (code) {
       // `$$` flow math leaves the inner `code` unpositioned; copy the `pre`
       // position so rehype-katex's `place: element.position` still resolves.
-      const code = displayMathCode(child);
-      if (code && !code.position && child.position) {
+      if (!code.position && child.position) {
         code.position = child.position;
       }
       children[index] = wrapNode(child, "div", mathBlockClass, provenance, {
         withEndLine: true,
         holes,
       });
+      fragments?.render(children[index], code, true, file);
       continue;
     }
     if (isInlineMathCode(child)) {
@@ -122,9 +110,10 @@ function wrapMathNodes(parent: TreeNode, provenance: MathProvenance[], holes: bo
         withEndLine: false,
         holes,
       });
+      fragments?.render(children[index], child, false, file);
       continue;
     }
-    wrapMathNodes(child, provenance, holes);
+    wrapMathNodes(child, provenance, holes, file, fragments);
   }
 }
 
@@ -155,10 +144,6 @@ function wrapNode(
     position: node.position,
     children: [node],
   };
-}
-
-function isDisplayMathPre(node: TreeNode): boolean {
-  return displayMathCode(node) !== undefined;
 }
 
 function displayMathCode(node: TreeNode): TreeNode | undefined {

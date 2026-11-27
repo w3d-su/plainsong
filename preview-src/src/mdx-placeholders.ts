@@ -10,6 +10,7 @@ import type {
   MdxTextExpression,
 } from "mdast-util-mdx";
 import type { Position } from "unist";
+import type { VFile } from "vfile";
 
 type SourcePosition = Position;
 
@@ -136,18 +137,20 @@ function safeSanitizeAttributes(
 }
 
 export function remarkMdxPlaceholders() {
-  return (tree: TreeNode) => {
-    rewriteMdxChildren(tree);
+  return (tree: TreeNode, file: VFile) => {
+    rewriteMdxChildren(tree, file);
   };
 }
 
-function rewriteMdxChildren(parent: TreeNode): void {
+function rewriteMdxChildren(parent: TreeNode, file: VFile): void {
   if (!parent.children) return;
 
   for (let index = 0; index < parent.children.length; index += 1) {
     const child = parent.children[index];
-    rewriteMdxChildren(child);
-    parent.children[index] = rewriteMdxNode(child) ?? child;
+    rewriteMdxChildren(child, file);
+    const replacement = rewriteMdxNode(child);
+    if (replacement?.type === "mdxLowercaseElement") file.data.hasAuthoredHTML = true;
+    parent.children[index] = replacement ?? child;
   }
 }
 

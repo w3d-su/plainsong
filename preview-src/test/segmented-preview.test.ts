@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import perf100 from "../../Fixtures/perf-100kb.md?raw";
 import type { BridgeMessage, RenderPayload } from "../src/bridge";
+import { renderMarkdown, renderMdx } from "../src/pipeline";
 
 // The bridge renders through the segmented renderer (segmented-render.ts). After edits that
 // reuse segments and shift lines, the preview must show what one render of the final text
@@ -33,6 +34,38 @@ function previewHTML(): string {
 beforeEach(loadPreview);
 
 describe("segmented preview rendering through the bridge", () => {
+  it("keeps unchanged math in place and matches the full HTML after each edit", async () => {
+    for (const [kind, whole] of [["md", renderMarkdown], ["mdx", renderMdx]] as const) {
+      await loadPreview();
+      const source = "$a$ and $a$\n\n$$\na\n$$";
+      const edits = [
+        source, source.replace("and $a$", "and $b$"), source.replace("and $a$", "and $\\badcmd$"),
+        "$\\badcmd$ and $\\badcmd$", source, "prefix\n\n" + source,
+        source + "\n\n[ref]: /target", source + '\n\n`<span data-plainsong-math-slot="0"></span>`',
+      ];
+      let firstMath: Element | null = null;
+      for (const [index, text] of edits.entries()) {
+        await render(index + 1, text, kind);
+        const expected = document.createElement("main");
+        expected.innerHTML = await whole(text);
+        expect(previewHTML()).toBe(expected.innerHTML);
+        const first = document.querySelector(".katex");
+        if (index === 0) firstMath = first;
+        if (index === 1 || index === 2) expect(first).toBe(firstMath);
+      }
+    }
+  });
+
+  it("renders authored MDX math with its enclosing element and cannot claim a math slot", async () => {
+    const text = '<div className="math-inline">$x$ tail</div>\n\n<span data-plainsong-math-slot="0">authored</span>\n\n$x$';
+    await render(1, text, "mdx");
+    const expected = document.createElement("main");
+    expected.innerHTML = await renderMdx(text);
+    expect(previewHTML()).toBe(expected.innerHTML);
+    expect(previewHTML()).toContain("authored");
+    expect(previewHTML()).not.toContain("data-plainsong-math-slot");
+  });
+
   it("shows the same preview as one render of the final text", { timeout: 60_000 }, async () => {
     const middle = perf100.indexOf("\n## Section 00008");
     // Shift every later line, and repeat a heading so later IDs gain suffixes.
