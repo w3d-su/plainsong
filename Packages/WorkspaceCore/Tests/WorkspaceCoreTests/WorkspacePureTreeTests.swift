@@ -45,6 +45,31 @@ final class WorkspacePureTreeTests: XCTestCase {
         XCTAssertEqual(tree.node(id: "nfc-directory")?.children.map(\.id), ["visible"])
     }
 
+    func testFilteredSiblingsShareAncestorsAndKeepTheirExactNames() {
+        let accented = "\u{0301}notes"
+        let tree = WorkspacePureTree.reconcile(
+            previousExpandedNodeIDs: [],
+            previousSelectedNodeID: nil,
+            entries: [
+                row("posts/\(accented)/10.md", kind: .markdown, identity: "ten"),
+                row("posts/empty/hidden.txt", kind: .other, identity: "hidden"),
+                row("posts/other/image.png", kind: .image, identity: "image"),
+                row("posts/\(accented)/2.md", kind: .markdown, identity: "two"),
+                row("posts/empty", kind: .directory, identity: "empty"),
+                row("posts/\(accented)", kind: .directory, identity: "accented"),
+                row("posts/other", kind: .directory, identity: "other"),
+                row("posts", kind: .directory, identity: "posts"),
+            ],
+            options: .init(showAllFiles: false)
+        )
+
+        XCTAssertEqual(tree.root.children.map(\.id), ["posts"])
+        XCTAssertEqual(Set(tree.node(id: "posts")?.children.map(\.id) ?? []), ["accented", "other"])
+        XCTAssertEqual(tree.node(id: "accented")?.name, accented)
+        XCTAssertEqual(tree.node(id: "accented")?.children.map(\.name), ["2.md", "10.md"])
+        XCTAssertEqual(tree.node(id: "other")?.children.map(\.id), ["image"])
+    }
+
     func testNumericSortPlacesTenAfterTwo() {
         let tree = showAll([
             row("posts/post-10.md", kind: .markdown, identity: "ten"),
@@ -56,6 +81,18 @@ final class WorkspacePureTreeTests: XCTestCase {
             "posts/post-2.md",
             "posts/post-10.md",
         ])
+    }
+
+    func testGroupingAndLeafNamesOmitEmptyPathComponents() {
+        let tree = showAll([
+            row("posts", kind: .directory, identity: "posts"),
+            row("posts/notes", kind: .directory, identity: "notes"),
+            row("posts//notes/\u{0301}a.md", kind: .markdown, identity: "accented"),
+            row("posts//notes/b.md///", kind: .markdown, identity: "trailing"),
+        ])
+        XCTAssertEqual(Set(tree.node(id: "notes")?.children.map(\.id) ?? []), ["accented", "trailing"])
+        XCTAssertEqual(tree.node(id: "accented")?.name, "\u{0301}a.md")
+        XCTAssertEqual(tree.node(id: "trailing")?.name, "b.md")
     }
 
     func testCaseInsensitiveTieBreaksByUTF8Bytes() {

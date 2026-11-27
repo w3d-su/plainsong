@@ -183,16 +183,7 @@ final class WorkspaceFileTreeTests: XCTestCase {
     }
 
     func testReconcileTwoThousandFilesStaysUnderBudget() {
-        let entries = (0 ..< 2000).map { index in
-            entry(
-                "content/post-\(String(format: "%04d", index)).md",
-                kind: .markdown,
-                identity: "post-\(index)"
-            )
-        } + [
-            entry("content", kind: .directory, identity: "content"),
-        ]
-
+        let entries = postEntries(indices: Array(0 ..< 2000))
         let start = DispatchTime.now().uptimeNanoseconds
         _ = WorkspaceFileTree.reconcile(
             previous: nil,
@@ -206,6 +197,26 @@ final class WorkspaceFileTreeTests: XCTestCase {
             lessThanOrEqualTo: 50,
             metric: "WorkspaceFileTree.reconcile 2000 files"
         )
+    }
+
+    func testReconcileOrdersEveryPermutedPost() {
+        let entries = postEntries(indices: (0 ..< 2000).map { $0 * 877 % 2000 })
+        let tree = WorkspaceFileTree.reconcile(
+            previous: nil,
+            snapshot: WorkspaceFileSnapshot(entries: entries),
+            options: .init(showAllFiles: false)
+        )
+        XCTAssertEqual(tree.root.children.first?.children.map(\.id), (0 ..< 2000).map { "post-\($0)" })
+    }
+
+    private func postEntries(indices: [Int]) -> [WorkspaceFileSnapshot.Entry] {
+        indices.map { index in
+            entry(
+                "content/post-\(String(format: "%04d", index)).md",
+                kind: .markdown,
+                identity: "post-\(index)"
+            )
+        } + [entry("content", kind: .directory, identity: "content")]
     }
 
     private func entry(
