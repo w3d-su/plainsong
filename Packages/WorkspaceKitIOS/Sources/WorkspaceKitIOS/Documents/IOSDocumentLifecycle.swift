@@ -29,7 +29,15 @@ extension IOSUIDocumentStore {
         // A provider's own save notification can already be reading the durable
         // baseline. Let those issued observations finish before deciding whether
         // close must retain the writer; cancellation is not proof of clean bytes.
-        await drainExternalReadsForClose(entry)
+        // Verification of an untouched failed open is only a write-permission
+        // probe: closing discards no user work, so it must not wait for that probe.
+        if entry.isUntouchedOpeningSnapshot {
+            entry.externalToken = nil
+            entry.hasDeferredExternalChange = false
+            entry.externalReadTasks.values.forEach { $0.cancel() }
+        } else {
+            await drainExternalReadsForClose(entry)
+        }
         if entry.needsCloseRecovery || entry.hasDeferredExternalChange
             || entry.externalToken != nil
             || !guardCurrentAuthority(entry, generation: generation)

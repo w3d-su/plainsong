@@ -103,6 +103,35 @@ final class IOSDocumentIntegrityTests: XCTestCase {
         XCTAssertEqual(completedReads, 1)
     }
 
+    func testClosingUneditedFailedOpenSnapshotDoesNotWaitForWritableVerification() async throws {
+        let harness = DocumentIOHarness()
+        harness.ports.blockOpen = true
+        await harness.coordinator.setBlockReads(true)
+        await harness.coordinator.setReadFailure(.offline)
+        let opening = Task { try await harness.openNote(text: "old") }
+        await waitUntil { harness.ports.created.first?.parked == 1 }
+        let port = try XCTUnwrap(harness.ports.created.first)
+        port.emit(.externalChange)
+        port.releaseOne()
+        await waitUntil { await harness.coordinator.blockedReads() == 1 }
+        port.emit(.writePermissionChanged(true))
+        await harness.coordinator.unblockReads()
+        let handle = try await opening.value
+        await waitUntil { await harness.coordinator.blockedReads() == 2 }
+
+        let closing = Task { try await harness.store.close(handle.identity) }
+        await waitUntil(timeout: 0.5) { port.closeCalls == 1 }
+        await harness.coordinator.setReadFailure(nil)
+        await harness.coordinator.setBytes(Data("old".utf8))
+        await harness.coordinator.setBlockReads(false)
+        await harness.coordinator.unblockReads()
+        guard case .closed = try await closing.value else {
+            return XCTFail("closing an untouched opening snapshot must release its writer")
+        }
+        let drafts = await harness.store.recoveryList()
+        XCTAssertTrue(drafts.records.isEmpty)
+    }
+
     func testFailedReadbackDuringOpenKeepsOriginalReadOnly() async throws {
         let harness = DocumentIOHarness()
         harness.ports.blockOpen = true

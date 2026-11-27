@@ -138,30 +138,40 @@ extension IOSUIDocumentStore {
         let location = entry.location
         let lease = entry.lease
         let operationID = UUID()
+        weak var weakEntry = entry
         let task = Task { @MainActor in
-            defer { entry.externalReadTasks[token] = nil }
+            defer { weakEntry?.externalReadTasks[token] = nil }
             do {
                 // An already-issued provider write must finish before its own notice is read.
-                await entry.queue.drain()
-                guard entry.externalToken == token,
-                      self.guardCurrentAuthority(entry, generation: generation)
-                else { return }
+                if let entry = weakEntry {
+                    await entry.queue.drain()
+                }
+                let shouldRead = {
+                    guard let entry = weakEntry else { return false }
+                    return entry.externalToken == token
+                        && self.guardCurrentAuthority(entry, generation: generation)
+                }()
+                guard shouldRead else { return }
                 let read = try await self.coordinatedAccess.read(
                     location,
                     lease: lease,
                     operationID: operationID,
                     maximumByteCount: self.maximumExternalBytes
                 )
-                await self.completeExternalRead(
-                    entry: entry,
-                    token: token,
-                    capturedVersion: capturedVersion,
-                    generation: generation,
-                    identity: identity,
-                    read: read
-                )
+                if let entry = weakEntry {
+                    await self.completeExternalRead(
+                        entry: entry,
+                        token: token,
+                        capturedVersion: capturedVersion,
+                        generation: generation,
+                        identity: identity,
+                        read: read
+                    )
+                }
             } catch {
-                await self.failExternalRead(entry: entry, token: token, error: error)
+                if let entry = weakEntry {
+                    await self.failExternalRead(entry: entry, token: token, error: error)
+                }
             }
         }
         entry.externalReadTasks[token] = task
