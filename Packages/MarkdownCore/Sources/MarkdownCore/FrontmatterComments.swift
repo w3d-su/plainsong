@@ -44,8 +44,10 @@ extension Frontmatter {
                 let before = scalars[..<index]
                 let comment = String(scalars[index...])
                 if lineIndex == replacedLines.startIndex {
-                    let padding = before.reversed().prefix { $0 == " " || $0 == "\t" }.reversed()
-                    replacement[0] += String(String.UnicodeScalarView(padding)) + comment
+                    let padding = String(String.UnicodeScalarView(
+                        before.reversed().prefix { $0 == " " || $0 == "\t" }.reversed()
+                    ))
+                    replacement[0] += (padding.isEmpty ? " " : padding) + comment
                 } else {
                     let indentation = before.prefix { $0 == " " || $0 == "\t" }
                     replacement.append(String(indentation) + comment)

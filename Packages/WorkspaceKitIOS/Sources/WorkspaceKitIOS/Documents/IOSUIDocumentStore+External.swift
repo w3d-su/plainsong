@@ -22,13 +22,13 @@ extension IOSUIDocumentStore {
         case .deleted:
             fenceUnavailable(entry, .access(.notFound))
         case let .writePermissionChanged(writable):
+            let changed = entry.allowsProviderWrite != writable
+            entry.allowsProviderWrite = writable
             if writable, entry.isUntouchedOpeningSnapshot {
                 if entry.externalToken == nil { startExternalRead(entry) }
                 return
             }
-            guard entry.allowsProviderWrite != writable else { return }
-            entry.allowsProviderWrite = writable
-            guard entry.session != nil, !entry.fenced else { return }
+            guard changed, entry.session != nil, !entry.fenced else { return }
             if writable {
                 // Check external bytes before admitting another write.
                 handleFileEvent(.externalChange, entry: entry)
@@ -57,7 +57,7 @@ extension IOSUIDocumentStore {
     /// A failed readback keeps the last verified bytes as an untouched snapshot. Created
     /// bytes count: create returns only after writing them, and a restored draft keeps its record.
     func finishOpeningSession(
-        _ entry: IOSDocumentEntry, initialText: String, canWrite: Bool
+        _ entry: IOSDocumentEntry, initialText: String
     ) async throws -> IOSDocumentHandle {
         var text = initialText
         while entry.hasDeferredExternalChange, !entry.fenced,
@@ -85,7 +85,10 @@ extension IOSUIDocumentStore {
         guard guardCurrentAuthority(entry, generation: entry.accessGeneration) else {
             throw IOSDocumentFailure.documentChanged
         }
-        installSession(entry, text: text, canWrite: canWrite && !entry.lease.isReleased)
+        installSession(entry, text: text, canWrite: entry.allowsProviderWrite && !entry.lease.isReleased)
+        if entry.isUntouchedOpeningSnapshot, entry.hasDeferredExternalChange, entry.externalToken == nil {
+            startExternalRead(entry)
+        }
         guard let handle = entry.handle() else { throw IOSDocumentFailure.unavailable }
         finishOpen(entry, result: .success(handle))
         return handle

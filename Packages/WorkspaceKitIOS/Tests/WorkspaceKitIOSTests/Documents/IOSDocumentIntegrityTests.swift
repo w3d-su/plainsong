@@ -31,6 +31,26 @@ final class IOSDocumentIntegrityTests: XCTestCase {
         XCTAssertTrue(port.written.isEmpty)
     }
 
+    func testWritableNoticeDuringOpenReadbackMakesTheFirstSessionWritable() async throws {
+        let harness = DocumentIOHarness()
+        harness.ports.canWrite = false
+        harness.ports.blockOpen = true
+        await harness.coordinator.setBlockReads(true)
+        let opening = Task { try await harness.openNote(text: "old") }
+        await waitUntil { harness.ports.created.first?.parked == 1 }
+        let port = try XCTUnwrap(harness.ports.created.first)
+        port.emit(.externalChange)
+        port.releaseOne()
+        await waitUntil { await harness.coordinator.blockedReads() == 1 }
+        port.emit(.writePermissionChanged(true))
+        await harness.coordinator.setBytes(Data("current".utf8))
+        await harness.coordinator.setBlockReads(false)
+        await harness.coordinator.unblockReads()
+        let handle = try await opening.value
+        XCTAssertEqual(handle.session.text, "current")
+        XCTAssertEqual(harness.store.state(for: handle.identity)?.canWrite, true)
+    }
+
     func testFailedReadbackDuringOpenKeepsOriginalReadOnly() async throws {
         let harness = DocumentIOHarness()
         harness.ports.blockOpen = true
@@ -57,6 +77,35 @@ final class IOSDocumentIntegrityTests: XCTestCase {
         harness.store.acknowledgeExternalReload(operationID: proposal.operationID, outcome: .installed(revision))
         XCTAssertEqual(harness.store.state(for: handle.identity)?.canWrite, true)
         XCTAssertFalse(handle.session.isDirty)
+    }
+
+    func testNoticeQueuedDuringFailedOpenReadbackRetriesAfterPublishing() async throws {
+        let harness = DocumentIOHarness()
+        harness.ports.blockOpen = true
+        await harness.coordinator.setBlockReads(true)
+        await harness.coordinator.setReadFailure(.offline)
+        let opening = Task { try await harness.openNote(text: "old") }
+        await waitUntil { harness.ports.created.first?.parked == 1 }
+        let port = try XCTUnwrap(harness.ports.created.first)
+        port.emit(.externalChange)
+        port.releaseOne()
+        await waitUntil { await harness.coordinator.blockedReads() == 1 }
+        port.emit(.externalChange)
+        await harness.coordinator.unblockReads()
+        let handle = try await opening.value
+        XCTAssertEqual(handle.session.text, "old")
+        XCTAssertEqual(harness.store.state(for: handle.identity)?.canWrite, false)
+
+        await waitUntil { await harness.coordinator.blockedReads() == 2 }
+        await harness.coordinator.setReadFailure(nil)
+        await harness.coordinator.setBytes(Data("current".utf8))
+        await harness.coordinator.setBlockReads(false)
+        await harness.coordinator.unblockReads()
+        await waitUntil { harness.store.byIdentity[handle.identity]?.pendingProposal != nil }
+        let proposal = try XCTUnwrap(harness.store.byIdentity[handle.identity]?.pendingProposal)
+        XCTAssertEqual(proposal.text, "current")
+        let completedReads = await harness.coordinator.completedReads()
+        XCTAssertEqual(completedReads, 1)
     }
 
     func testClosingAnUneditedFailedOpenSnapshotDoesNotCreateRecovery() async throws {

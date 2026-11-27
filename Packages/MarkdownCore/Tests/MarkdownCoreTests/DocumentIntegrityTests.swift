@@ -72,6 +72,18 @@ final class DocumentIntegrityTests: XCTestCase {
         XCTAssertEqual(Frontmatter.updating(source, key: "tags", value: .stringList([])), expected)
     }
 
+    func testAdjacentCommentsGainSeparationWhenReplacementChangesShape() throws {
+        let list = "---\ntags: [one]# topics\n---\n"
+        let updatedList = try XCTUnwrap(Frontmatter.updating(list, key: "tags", value: .stringList(["one", "two"])))
+        XCTAssertEqual(updatedList, "---\ntags: # topics\n  - \"one\"\n  - \"two\"\n---\n")
+        XCTAssertEqual(Frontmatter.parse(updatedList).block?.fieldValues["tags"], .stringList(["one", "two"]))
+
+        let boolean = "---\ndraft: \"true\"# status\n---\n"
+        let updatedBoolean = try XCTUnwrap(Frontmatter.updating(boolean, key: "draft", value: .bool(false)))
+        XCTAssertEqual(updatedBoolean, "---\ndraft: false # status\n---\n")
+        XCTAssertEqual(Frontmatter.parse(updatedBoolean).block?.fieldValues["draft"], .bool(false))
+    }
+
     func testEditedDateAndTagsKeepCommentsOutsideTheirValues() throws {
         let source = "---\ndate: 2026-01-01 # updated\ntags: a, b # c\n---\n正文"
         let fields = try XCTUnwrap(Frontmatter.parse(source).block).fieldValues

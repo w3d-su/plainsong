@@ -165,7 +165,7 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
             if let initialText {
                 try await entry.filePort.create(snapshot: IOSDocumentTextCodec.encode(initialText))
                 text = initialText
-                canWrite = true
+                canWrite = entry.filePort.canWrite
             } else {
                 let opened = try await entry.filePort.open()
                 guard let decoded = IOSDocumentTextCodec.decode(opened.data) else {
@@ -174,7 +174,10 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
                 text = decoded
                 canWrite = opened.canWrite
             }
-            return try await finishOpeningSession(entry, initialText: text, canWrite: canWrite)
+            // Permission notices can arrive while opening readback is suspended. Keep the
+            // provider's latest notice instead of letting the older open result win.
+            entry.allowsProviderWrite = canWrite
+            return try await finishOpeningSession(entry, initialText: text)
         } catch {
             await relinquishFailedOpen(entry)
             if error is CancellationError {
