@@ -44,6 +44,9 @@ extension IOSUIDocumentStore {
         do {
             try await entry.filePort.close()
             entry.portClosed = true
+            if entry.isUntouchedOpeningSnapshot {
+                entry.externalReadTasks.values.forEach { $0.cancel() }
+            }
         } catch {
             emit(.failed(entry.identity, operationID: UUID(), reason: .closeFailed))
             throw IOSDocumentFailure.closeFailed
