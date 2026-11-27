@@ -31,15 +31,10 @@ extension IOSUIDocumentStore {
         // close must retain the writer; cancellation is not proof of clean bytes.
         // Verification of an untouched failed open is only a write-permission
         // probe: closing discards no user work, so it must not wait for that probe.
-        if entry.isUntouchedOpeningSnapshot {
-            entry.externalToken = nil
-            entry.hasDeferredExternalChange = false
-            entry.externalReadTasks.values.forEach { $0.cancel() }
-        } else {
+        if !entry.isUntouchedOpeningSnapshot {
             await drainExternalReadsForClose(entry)
         }
-        if entry.needsCloseRecovery || entry.hasDeferredExternalChange
-            || entry.externalToken != nil
+        if entry.needsCloseRecovery || externalBarrierBlocksClose(entry)
             || !guardCurrentAuthority(entry, generation: generation)
         {
             return await retainDraft(entry)
@@ -54,8 +49,7 @@ extension IOSUIDocumentStore {
             throw IOSDocumentFailure.closeFailed
         }
         // Closing a provider is asynchronous. A newer source cannot be retired by its result.
-        if session.version != version || entry.needsCloseRecovery || entry.hasDeferredExternalChange
-            || entry.externalToken != nil
+        if session.version != version || entry.needsCloseRecovery || externalBarrierBlocksClose(entry)
             || !guardCurrentAuthority(entry, generation: generation)
         {
             let retained = await retainDraft(entry)
@@ -68,6 +62,10 @@ extension IOSUIDocumentStore {
         entry.hasDeferredExternalChange = false
         publishClosed(entry, superseded: false)
         return .closed
+    }
+
+    func externalBarrierBlocksClose(_ entry: IOSDocumentEntry) -> Bool {
+        !entry.isUntouchedOpeningSnapshot && (entry.hasDeferredExternalChange || entry.externalToken != nil)
     }
 
     func drainExternalReadsForClose(_ entry: IOSDocumentEntry) async {

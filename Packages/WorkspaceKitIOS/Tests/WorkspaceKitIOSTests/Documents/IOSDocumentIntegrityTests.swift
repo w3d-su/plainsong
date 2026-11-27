@@ -120,7 +120,13 @@ final class IOSDocumentIntegrityTests: XCTestCase {
         await waitUntil { await harness.coordinator.blockedReads() == 2 }
 
         let closing = Task { try await harness.store.close(handle.identity) }
-        await waitUntil(timeout: 0.5) { port.closeCalls == 1 }
+        await waitUntil(timeout: 0.5) {
+            if case .closed = harness.store.state(for: handle.identity) { return true }
+            return false
+        }
+        XCTAssertEqual(port.closeCalls, 1)
+        let blockedDuringClose = await harness.coordinator.blockedReads()
+        XCTAssertEqual(blockedDuringClose, 2)
         await harness.coordinator.setReadFailure(nil)
         await harness.coordinator.setBytes(Data("old".utf8))
         await harness.coordinator.setBlockReads(false)
@@ -130,6 +136,39 @@ final class IOSDocumentIntegrityTests: XCTestCase {
         }
         let drafts = await harness.store.recoveryList()
         XCTAssertTrue(drafts.records.isEmpty)
+    }
+
+    func testFailedCloseKeepsWritableVerificationAlive() async throws {
+        let harness = DocumentIOHarness()
+        harness.ports.blockOpen = true
+        await harness.coordinator.setBlockReads(true)
+        await harness.coordinator.setReadFailure(.offline)
+        let opening = Task { try await harness.openNote(text: "old") }
+        await waitUntil { harness.ports.created.first?.parked == 1 }
+        let port = try XCTUnwrap(harness.ports.created.first)
+        port.emit(.externalChange)
+        port.releaseOne()
+        await waitUntil { await harness.coordinator.blockedReads() == 1 }
+        port.emit(.writePermissionChanged(true))
+        await harness.coordinator.unblockReads()
+        let handle = try await opening.value
+        await waitUntil { await harness.coordinator.blockedReads() == 2 }
+
+        port.closeFailure = .closeFailed
+        do {
+            _ = try await harness.store.close(handle.identity)
+            XCTFail("provider close must fail")
+        } catch let error as IOSDocumentFailure {
+            XCTAssertEqual(error, .closeFailed)
+        }
+        let blockedAfterClose = await harness.coordinator.blockedReads()
+        XCTAssertEqual(blockedAfterClose, 2)
+        await harness.coordinator.setReadFailure(nil)
+        await harness.coordinator.setBytes(Data("old".utf8))
+        await harness.coordinator.setBlockReads(false)
+        await harness.coordinator.unblockReads()
+        await waitUntil { harness.store.state(for: handle.identity)?.canWrite == true }
+        XCTAssertNil(harness.store.byIdentity[handle.identity]?.pendingProposal)
     }
 
     func testFailedReadbackDuringOpenKeepsOriginalReadOnly() async throws {
