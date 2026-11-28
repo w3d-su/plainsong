@@ -38,7 +38,8 @@
 > page (scaled to fit at print) instead of erroring. Real panel/Powerbox,
 > keyboard/VoiceOver, and idle PDF timing stay open. On 2026-11-17 hosted tests on
 > the written output check E3's kitchen-sink bullet and E5's shared-snapshot bullet,
-> and `main`'s full CI run checks E9's regression bullet.**
+> and `main`'s full CI run checks E9's regression bullet. On 2026-11-28 the owner
+> accepted E9's typing bullet on the probe's no-export control.**
 > Precedent:
 > PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
 > or an owner-recorded result in the same commit.
@@ -1613,8 +1614,15 @@ for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
 - [x] Measure the production offscreen path with a large document, code-heavy/KaTeX/
   Mermaid fixture, and many bounded raster assets in Debug and Release before freezing
   any export-specific wall-clock or memory budget.
-- [ ] Export work never enters the editor keystroke path; the existing < 16 ms typing
+- [x] Export work never enters the editor keystroke path; the existing < 16 ms typing
   budget remains green while export is active.
+  Checked 2026-11-28 on
+  `AppBackedEditorPerformanceTests/testTypingStaysIsolatedFromActiveHTMLAndPDFExport`
+  (testable Release, `main` at `15ec386f`) and two owner decisions: G0 and G1 pass for
+  HTML and PDF and HTML passes G2; PDF's G2 first-keystroke failure is the idle pause,
+  which the no-export control fails the same way; and the export's main-thread chunks
+  (up to 73 ms CPU in one Release slice) are accepted. See "E9 typing isolation owner
+  acceptance — 2026-11-28".
 - [x] Existing preview protocol, asset containment, MDX sanitizer, theme, render,
   scroll-sync, Save/Save Copy, and workspace mutation/recovery suites remain green.
 - [x] Dependency manifests are unchanged.
@@ -2110,4 +2118,18 @@ run, superseded runs, and results: `docs/perf/2026-11-18-export-e9-typing-isolat
 
 Open for the owner: whether the no-export control answers the PDF first-keystroke
 criterion or the after-idle cost must be fixed first, and whether those main-thread
-chunks are acceptable.
+chunks are acceptable. Both were decided on 2026-11-28 (next section).
+
+### E9 typing isolation owner acceptance — 2026-11-28
+
+A testable Release re-run of the probe on `main` at `15ec386f`, which includes #279,
+gives the 2026-11-18 verdicts: HTML passes G0, G1 and G2; PDF passes G0 and G1 and fails
+G2's first-keystroke clause (max 30.9 ms). With no export, the first keystroke after
+1.1–1.6 s of idle now takes 13–14 ms (#279); after 2–27 s it still takes 17–28 ms. Record:
+`docs/perf/2026-11-28-export-e9-typing-rerun.md`.
+
+The owner accepted both open decisions
+(`docs/decisions/2026-11-28-export-e9-typing-owner-acceptance.md`): the no-export control
+answers PDF's first-keystroke clause, and the export's main-thread chunks (up to 73 ms of
+CPU in one Release slice) stay as they are. E9's typing bullet is checked. The first
+keystroke after an idle pause of about 2 s or more remains a §12 typing item of its own.
