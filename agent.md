@@ -851,6 +851,11 @@ changes reschedule trimming without republishing an unchanged viewport.
 The synchronous typing gates do not see SwiftUI, layout or display work a keystroke
 schedules; typing with the preview visible is measured by the opt-in hosted
 busy-slice probe (`MainThreadStallHostedTests`, `TEST_RUNNER_PLAINSONG_RUN_SCROLL_PROBE=1`).
+Hosted typing times also depend on the core type that runs the main thread (the same
+1 MiB keystroke takes about 5 ms on a performance core and 16 ms on an efficiency core)
+and, after an idle of several seconds, on memory pressure: the kernel compresses idle heap
+pages and the next keystroke decompresses them (`docs/perf/2026-11-28-idle-first-keystroke.md`).
+Compare instructions and cycles per core type before handler times.
 
 M5 planning note: the highlight budget is accepted only from visible-range-first
 highlighting instrumentation, not from the historical 250 KB full-document inline
