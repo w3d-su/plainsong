@@ -29,8 +29,11 @@ Debug/Release, destination, typed writer outcome, and any remaining paths in
   Passed 2026-11-28 in the real-panel smoke (`docs/export-gates.md` E6). No alias refusal.
 - [ ] External APFS: subfolder and volume root; verify staging/cleanup or report
   exact refusal and residue paths. Check unsupported filesystem refusal separately.
-- [ ] Q3 modes: new `0644` with default umask, overwrite preserving `0640` and
+  Recorded 2026-11-28 with APFS and exFAT disk images (`docs/export-gates.md` E6). It
+  stays open: an export to a volume's root never succeeds, and that is an owner decision.
+- [x] Q3 modes: new `0644` with default umask, overwrite preserving `0640` and
   `0755`, unreadable `0200` refusal; no privilege-bit inheritance.
+  Passed 2026-11-28 in the real-panel smoke (`docs/export-gates.md` E6).
 - [ ] Export a long post (a `perf-500kb.md`-scale document): many pages, each
   ending at a clean break — no clipped lines or split rows — and a document with
   an atomic element taller than the page budget (a very tall diagram, image, or

@@ -1,7 +1,8 @@
 # Export PR F Phase B — owner smoke and test entry points
 
-The first three owner boxes below were checked on 2026-11-28 from a real-panel smoke
-(`docs/export-gates.md` E6); the rest remain unchecked. Automated destination seams run in
+Four owner boxes below (Desktop and Documents, home-folder root, `café`, modes) were
+checked on 2026-11-28 from a real-panel smoke (`docs/export-gates.md` E6); the rest remain
+unchecked. Automated destination seams run in
 the app container; they do not prove a real Powerbox leaf grant. Record date, macOS version,
 Debug/Release build, exact `ExportArtifactWriteOutcome`, and any remaining paths under E6/E7
 in `docs/export-gates.md` when the owner actually runs a case.
@@ -22,8 +23,11 @@ in `docs/export-gates.md` when the owner actually runs a case.
 - [ ] External APFS: a subfolder and the volume root; record staging location, same-device
   refusal, and any `.TemporaryItems` reported as indeterminate. exFAT/FAT32/HFS+ should
   refuse early as `unsupportedVolumeSemantics`.
-- [ ] Modes: new file is `0644` with default umask; overwrite `0640` and `0755` while
+  Recorded 2026-11-28 with APFS and exFAT disk images (`docs/export-gates.md` E6). It
+  stays open: an export to a volume's root never succeeds, and that is an owner decision.
+- [x] Modes: new file is `0644` with default umask; overwrite `0640` and `0755` while
   retaining their mode; a `0200` file refuses as `destinationUnreadable`.
+  Passed 2026-11-28 in the real-panel smoke (`docs/export-gates.md` E6).
 - [ ] Single-file mode and a folder inside the open workspace: create and overwrite;
   test panel Cancel and progress Cancel; source, selection, scroll, dirty baseline,
   document URL, recents, tree, and recovery state remain unchanged.

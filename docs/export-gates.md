@@ -1195,8 +1195,8 @@ PR F supporting automation (not Powerbox evidence):
 `testPanelCancelAndProgressCancelAreSilentAndReleaseTheController`,
 `testDestinationIdentityCapturedAtPanelReturnCannotReplaceARacedLeaf`, and the E1
 stale-operation tests. The leaf-grant box below stays open. Of the eight real-panel
-cases in `docs/export-html-phase-b-checklist.md`, the first three were checked on
-2026-11-28.
+cases in `docs/export-html-phase-b-checklist.md`, four were checked on 2026-11-28
+(Desktop and Documents, home-folder root, `café`, modes).
 PDF seam (not Powerbox evidence): `testPDFExtensionRefusalAndFreshURLWriteNothingElse`
 and `testPDFPanelDefaultsUseTheSanitizedTitleAndAFreshPanel`. Writer extension refusal
 for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
@@ -1235,8 +1235,32 @@ carries new content.
   Creative Cloud Files folder, and the export was written there, at exactly that panel
   URL. It was moved to the Trash at once.
 - Exported files carry `com.apple.quarantine`, like any file a sandboxed app writes.
-- Not run: iCloud Drive, an external volume, the `0640`/`0755`/`0200` mode cases (a
-  system alert in front blocked the panel), progress Cancel, keyboard-only and VoiceOver.
+- A second run the same day used the same commit, rebuilt and re-signed the same way, and
+  exported `a-overview.md`:
+  - Modes, HTML and PDF, in a folder in `~/Documents`. Overwriting a `0640` and a `0755`
+    file committed and kept `0640` and `0755`, with a new inode and the new content. A
+    `0200` file was refused with "Nothing was written. The existing file can't be read
+    (Permission denied, error 13)", the writer's `destinationUnreadable`. The old file
+    and the container's staging folder were untouched.
+  - An external volume, simulated by a 64 MB APFS disk image that macOS reports as
+    external:
+    - A subfolder: a new HTML file, its overwrite, and a new PDF all committed. Staging
+      was in Foundation's `.TemporaryItems/folders.501/TemporaryItems/` at the volume
+      root, on the same device, and was empty after each export. The subfolder gained
+      only the leaves.
+    - The root of a fresh volume: HTML ended `indeterminate` ("couldn't confirm the
+      export … That file was not changed"). Nothing was published. Foundation had
+      created `.TemporaryItems/` and `.TemporaryItems/folders.501/` in the chosen
+      folder, and the notice listed both as not proven removed.
+    - The volume root once `.TemporaryItems` exists: HTML and PDF were refused with
+      "Nothing was written. Plainsong can't export safely to this location or volume",
+      and the root gained no entry. The staging folder's modification time changed, so
+      this fits the staging-inside-the-chosen-folder refusal.
+  - A 64 MB exFAT disk image: HTML and PDF were refused with the same notice, and the
+    volume gained no entry. The notice does not name the reason; the missing staging
+    entry fits the early `unsupportedVolumeSemantics` check.
+- Not run: iCloud Drive, a physical external drive, progress Cancel, keyboard-only and
+  VoiceOver.
 
 > **2026-09-29 D5 amendment:** Every bullet below that PR E's evidence checked was proven
 > against the now-retired parent-anchored writer, so all five were reopened until PR E2
@@ -1276,8 +1300,15 @@ carries new content.
   overwrite committed. The staging directory lies below the chosen folder only inside the
   app-private root, as D5 step 1 allows, and the home folder gained only the leaf. `café`:
   a new file and an overwrite committed, with no `destinationAlias` refusal, so no NFC/NFD
-  decision is needed for it. The external volume's root has not been run, so this box
-  stays open.
+  decision is needed for it. External volume, an APFS disk image: under the sandbox too,
+  the first export to a fresh volume's root made Foundation create
+  `.TemporaryItems/folders.<uid>/` in the chosen folder. The writer reported both
+  folders as not proven removed (`indeterminate`, nothing published). Once they exist,
+  every export to that root is refused with nothing written. So an export to a volume's
+  root never succeeds, and the first attempt leaves those two folders there. That
+  conflicts with the first clause above ("never gives it a new entry other than the
+  leaf"). The owner must decide whether to accept it or to stage elsewhere for a volume
+  root, so this box stays open.
 - [x] New-file publication uses `RENAME_EXCL | RENAME_NOFOLLOW_ANY`, and owner-confirmed
   exact-regular-file replacement uses `RENAME_SWAP | RENAME_NOFOLLOW_ANY`, both by exact
   leaf path. Ordinary rename-overwrite and truncating direct writes are absent. These fail
@@ -1539,6 +1570,9 @@ carries new content.
 - [x] HTML: progress/Cancel, render/MDX/resource errors, placeholder counts, every writer
   failure group, and indeterminate paths have accessible word/symbol feedback.
 - [ ] PDF failure/Print cancellation feedback (PR G); keyboard/VoiceOver owner smoke.
+  Recorded 2026-11-28 in the E6 real-panel smoke: PDF failure notices for
+  `destinationUnreadable` and for an unsupported location, and Print… Cancel with no
+  notice. Keyboard and VoiceOver remain, so the box stays open.
 - [x] HTML success/cancel/failure/indeterminate leaves text, selection, editor/visible-preview
   scroll/DOM/theme, dirty/saved baseline, identity, recents, tree and recovery state unchanged.
 - [x] PDF/Print side-effect isolation (PR G).
