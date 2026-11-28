@@ -1182,18 +1182,85 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
 
 ### E6 — One-shot sandbox write and refusal matrix
 
-- [ ] HTML/PDF writes use only the exact URL freshly returned by that operation's
+- [x] HTML/PDF writes use only the exact URL freshly returned by that operation's
   `NSSavePanel`; cancel, denied scope, and stale URL write nothing.
+  Checked 2026-11-28 on the owner's decision after the real-panel smoke below. All 17
+  exports, one of them sent to the wrong folder by a misclick, wrote exactly at the URL
+  that their own fresh panel returned, and panel Cancel wrote nothing. A real panel
+  cannot produce a denied scope or a stale URL; those rest on the PR F automation listed
+  next.
 
 PR F supporting automation (not Powerbox evidence):
 `testEveryInvocationRequiresAFreshPanelResultAndNeverReusesACancelledDestination`,
 `testPanelCancelAndProgressCancelAreSilentAndReleaseTheController`,
 `testDestinationIdentityCapturedAtPanelReturnCannotReplaceARacedLeaf`, and the E1
-stale-operation tests. Both owner-dependent boxes below stay open. The eight real-panel
-cases are all unchecked in `docs/export-html-phase-b-checklist.md`.
+stale-operation tests. The leaf-grant box below stays open. Of the eight real-panel
+cases in `docs/export-html-phase-b-checklist.md`, four were checked on 2026-11-28
+(Desktop and Documents, home-folder root, `café`, modes).
 PDF seam (not Powerbox evidence): `testPDFExtensionRefusalAndFreshURLWriteNothingElse`
 and `testPDFPanelDefaultsUseTheSanitizedTitleAndAFreshPanel`. Writer extension refusal
 for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
+
+Real-panel smoke (2026-11-28). Claude Code ran it through computer use at the owner's
+request, and the owner chose which boxes it closes. Build: `main` at `15ec386f`, Debug,
+sandboxed, re-signed ad hoc as `app.plainsong.exportsmoke` so the owner's own app stayed
+untouched; macOS 27.0 (26A428). Source: `smoke.md` in a workspace, with frontmatter
+`title: "Smoke: export/test"`, changed on disk between exports so that every overwrite
+carries new content.
+
+| Destination | HTML new / overwrite | PDF new / overwrite |
+|---|---|---|
+| `~/Desktop` | committed / committed | committed / committed |
+| `~/Documents` | committed / committed | committed / committed |
+| Home-folder root | committed / committed | committed / committed |
+| `~/Documents/café` (NFC name) | committed / committed | committed / committed |
+
+- Every export ended in the "Exported as HTML" or "Exported as PDF" notice that names the
+  panel's folder, which is the writer's `.committed` outcome. Each new file is `0644`. Each
+  overwrite went through the panel's Replace confirmation. It left a new inode holding
+  the new content (checked in the HTML, and in the PDF's text through PDFKit), still
+  `0644`.
+- Before and after every export, a listing of each destination's top level (inodes,
+  modes, sizes, hidden entries) and of the container's `tmp/TemporaryItems` shows one new
+  or replaced leaf and nothing else. There was no "(A Document Being Saved By …)" folder
+  and no staging residue. `tmp/TemporaryItems` changed at each export and was empty after
+  it.
+- `café` was made with NFC bytes (`63 61 66 c3 a9`). Its new file and its overwrite both
+  committed with no `destinationAlias` refusal, and the folder name stayed NFC.
+- Every panel was fresh: it opened in the document's folder with the default name, never
+  at the previous destination. HTML and PDF panel Cancel and Print… Cancel showed no
+  notice and wrote nothing (listings unchanged). Print… opened the standard panel with a
+  one-page preview and no save panel first.
+- One PDF went to a folder that was not meant: a misclick in the panel sidebar chose a
+  Creative Cloud Files folder, and the export was written there, at exactly that panel
+  URL. It was moved to the Trash at once.
+- Exported files carry `com.apple.quarantine`, like any file a sandboxed app writes.
+- A second run the same day used the same commit, rebuilt and re-signed the same way, and
+  exported `a-overview.md`:
+  - Modes, HTML and PDF, in a folder in `~/Documents`. Overwriting a `0640` and a `0755`
+    file committed and kept `0640` and `0755`, with a new inode and the new content. A
+    `0200` file was refused with "Nothing was written. The existing file can't be read
+    (Permission denied, error 13)", the writer's `destinationUnreadable`. The old file
+    and the container's staging folder were untouched.
+  - An external volume, simulated by a 64 MB APFS disk image that macOS reports as
+    external:
+    - A subfolder: a new HTML file, its overwrite, and a new PDF all committed. Staging
+      was in Foundation's `.TemporaryItems/folders.501/TemporaryItems/` at the volume
+      root, on the same device, and was empty after each export. The subfolder gained
+      only the leaves.
+    - The root of a fresh volume: HTML ended `indeterminate` ("couldn't confirm the
+      export … That file was not changed"). Nothing was published. Foundation had
+      created `.TemporaryItems/` and `.TemporaryItems/folders.501/` in the chosen
+      folder, and the notice listed both as not proven removed.
+    - The volume root once `.TemporaryItems` exists: HTML and PDF were refused with
+      "Nothing was written. Plainsong can't export safely to this location or volume",
+      and the root gained no entry. The staging folder's modification time changed, so
+      this fits the staging-inside-the-chosen-folder refusal.
+  - A 64 MB exFAT disk image: HTML and PDF were refused with the same notice, and the
+    volume gained no entry. The notice does not name the reason; the missing staging
+    entry fits the early `unsupportedVolumeSemantics` check.
+- Not run: iCloud Drive, a physical external drive, progress Cancel, keyboard-only and
+  VoiceOver.
 
 > **2026-09-29 D5 amendment:** Every bullet below that PR E's evidence checked was proven
 > against the now-retired parent-anchored writer, so all five were reopened until PR E2
@@ -1228,6 +1295,20 @@ for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
   - **An external volume's root**: unsandboxed, Foundation may create
     `.TemporaryItems/folders.<uid>/` at the volume root before the writer refuses. Record
     whether that happens under the sandbox.
+
+  Recorded 2026-11-28 (the real-panel smoke above). Home-folder root: a new file and an
+  overwrite committed. The staging directory lies below the chosen folder only inside the
+  app-private root, as D5 step 1 allows, and the home folder gained only the leaf. `café`:
+  a new file and an overwrite committed, with no `destinationAlias` refusal, so no NFC/NFD
+  decision is needed for it. External volume, an APFS disk image: under the sandbox too,
+  the first export to a fresh volume's root made Foundation create
+  `.TemporaryItems/folders.<uid>/` in the chosen folder. The writer reported both
+  folders as not proven removed (`indeterminate`, nothing published). Once they exist,
+  every export to that root is refused with nothing written. So an export to a volume's
+  root never succeeds, and the first attempt leaves those two folders there. That
+  conflicts with the first clause above ("never gives it a new entry other than the
+  leaf"). The owner must decide whether to accept it or to stage elsewhere for a volume
+  root, so this box stays open.
 - [x] New-file publication uses `RENAME_EXCL | RENAME_NOFOLLOW_ANY`, and owner-confirmed
   exact-regular-file replacement uses `RENAME_SWAP | RENAME_NOFOLLOW_ANY`, both by exact
   leaf path. Ordinary rename-overwrite and truncating direct writes are absent. These fail
@@ -1481,10 +1562,17 @@ for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
 - [x] HTML: fresh save panels are configured for `.html`, sanitized title/basename defaults,
   directory creation, and accessibility. Destination/presentation seams prove cancellation
   and document isolation; real sheet/Powerbox/bookmark lifetime acceptance stays under E6.
-- [ ] PDF panel defaults (PR G), and owner verification of the real HTML panel (E6).
+- [x] PDF panel defaults (PR G), and owner verification of the real HTML panel (E6).
+  Checked 2026-11-28 on the real-panel smoke under E6. Both panels opened in the
+  document's folder. Each offered the sanitized title as the name, with the base name
+  selected: `Smoke- export-test.html` or `.pdf` from `Smoke: export/test`. Each showed
+  the extension, an Export button, and New Folder.
 - [x] HTML: progress/Cancel, render/MDX/resource errors, placeholder counts, every writer
   failure group, and indeterminate paths have accessible word/symbol feedback.
 - [ ] PDF failure/Print cancellation feedback (PR G); keyboard/VoiceOver owner smoke.
+  Recorded 2026-11-28 in the E6 real-panel smoke: PDF failure notices for
+  `destinationUnreadable` and for an unsupported location, and Print… Cancel with no
+  notice. Keyboard and VoiceOver remain, so the box stays open.
 - [x] HTML success/cancel/failure/indeterminate leaves text, selection, editor/visible-preview
   scroll/DOM/theme, dirty/saved baseline, identity, recents, tree and recovery state unchanged.
 - [x] PDF/Print side-effect isolation (PR G).

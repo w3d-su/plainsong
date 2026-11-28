@@ -16,17 +16,24 @@ Debug/Release, destination, typed writer outcome, and any remaining paths in
 
 ## PDF: real NSSavePanel / Powerbox, sandboxed build
 
-- [ ] Desktop and Documents: create and overwrite a PDF in each; inspect first,
+- [x] Desktop and Documents: create and overwrite a PDF in each; inspect first,
   last and boundary content and confirm no unrelated filesystem entries appear.
-- [ ] Home root: create and overwrite `~/x.pdf` using a fresh selected leaf URL.
+  Passed 2026-11-28 in the real-panel smoke (`docs/export-gates.md` E6). The
+  source was one page; its text matched each time.
+- [x] Home root: create and overwrite `~/x.pdf` using a fresh selected leaf URL.
+  Passed 2026-11-28 in the real-panel smoke (`docs/export-gates.md` E6).
 - [ ] iCloud Drive: create, overwrite, overwrite an evicted leaf, and record
   materialization/coordination responsiveness and any residue.
-- [ ] Accented folder created with `mkdir café`: create and overwrite. If D5
+- [x] Accented folder created with `mkdir café`: create and overwrite. If D5
   refuses an alias, record the exact panel URL; do not relax its identity rules.
+  Passed 2026-11-28 in the real-panel smoke (`docs/export-gates.md` E6). No alias refusal.
 - [ ] External APFS: subfolder and volume root; verify staging/cleanup or report
   exact refusal and residue paths. Check unsupported filesystem refusal separately.
-- [ ] Q3 modes: new `0644` with default umask, overwrite preserving `0640` and
+  Recorded 2026-11-28 with APFS and exFAT disk images (`docs/export-gates.md` E6). It
+  stays open: an export to a volume's root never succeeds, and that is an owner decision.
+- [x] Q3 modes: new `0644` with default umask, overwrite preserving `0640` and
   `0755`, unreadable `0200` refusal; no privilege-bit inheritance.
+  Passed 2026-11-28 in the real-panel smoke (`docs/export-gates.md` E6).
 - [ ] Export a long post (a `perf-500kb.md`-scale document): many pages, each
   ending at a clean break — no clipped lines or split rows — and a document with
   an atomic element taller than the page budget (a very tall diagram, image, or
